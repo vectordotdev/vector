@@ -17,12 +17,7 @@ components: sources: vector: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Vector"
-					thing:    "a \(name) sink"
-					url:      urls.vector_sink
-					versions: null
-				}
+				service: services.vector
 
 				interface: socket: {
 					direction: "incoming"

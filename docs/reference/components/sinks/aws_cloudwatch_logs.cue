@@ -49,7 +49,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			}
 			tls: enabled: false
 			to: {
-				service: services.aws_cloudwatch
+				service: services.aws_cloudwatch_logs
 
 				interface: {
 					socket: {

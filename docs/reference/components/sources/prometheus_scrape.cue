@@ -17,12 +17,7 @@ components: sources: prometheus_scrape: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Prometheus"
-					thing:    "one or more \(name) endpoints"
-					url:      urls.prometheus_client
-					versions: null
-				}
+				service: services.prometheus_client
 
 				interface: socket: {
 					api: {

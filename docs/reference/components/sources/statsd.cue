@@ -18,12 +18,7 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "StatsD"
-					thing:    "a \(name) client"
-					url:      urls.statsd
-					versions: null
-				}
+				service: services.statsd
 
 				interface: socket: {
 					api: {

@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: prometheus_remote_write: {
-	title:       "Prometheus remote_write"
+	title:       "Prometheus Remote Write"
 	description: "The [Prometheus](\(urls.prometheus)) remote_write protocol is a protobuf based encoding for sending metrics efficiently between agents."
 
 	classes: {
@@ -16,16 +16,11 @@ components: sources: prometheus_remote_write: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Prometheus remote_write client"
-					thing:    "a \(name)"
-					url:      urls.prometheus_remote_integrations
-					versions: null
-				}
+				service: services.prometheus
 
 				interface: socket: {
 					api: {
-						title: "Prometheus"
+						title: "Prometheus Remote Write"
 						url:   urls.prometheus_remote_write
 					}
 					direction: "incoming"

@@ -16,12 +16,7 @@ components: sources: journald: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				service: {
-					name:     "JournalD"
-					thing:    name
-					url:      urls.journald
-					versions: null
-				}
+				service: services.journald
 
 				interface: binary: {
 					name: "journalctl"

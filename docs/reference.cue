@@ -230,8 +230,40 @@ _values: {
 	url:      string
 	versions: string | null
 
-	setup?: [string, ...string]
+	setup?: #SetupSteps
+
+	connect_to?: [_=string]: {
+		logs?: {
+			description?: string
+			setup:        #SetupSteps
+		}
+
+		metrics?: {
+			description?: string
+			setup:        #SetupSteps
+		}
+	}
 }
+
+#SetupStep: {
+	title:        string
+	description?: string
+	notes?: [...string]
+
+	detour?: {
+		url: string
+	}
+
+	vector?: {
+		configure: #Object
+	}
+
+	if detour == _|_ && vector == _|_ {
+		description: string
+	}
+}
+
+#SetupSteps: [#SetupStep, ...#SetupStep]
 
 #Schema: [Name=string]: {
 	// `category` allows you to group options into categories.

@@ -16,12 +16,7 @@ components: sources: nginx_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Nginx Server"
-					thing:    "an \(name)"
-					url:      urls.nginx
-					versions: null
-				}
+				service: services.nginx
 
 				interface: {
 					socket: {

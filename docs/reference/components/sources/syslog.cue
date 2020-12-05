@@ -13,12 +13,7 @@ components: sources: syslog: {
 
 		receive: {
 			from: {
-				service: {
-					name:     "Syslog"
-					thing:    "a \(name) client"
-					url:      urls.syslog
-					versions: null
-				}
+				service: services.syslog
 
 				interface: socket: {
 					api: {

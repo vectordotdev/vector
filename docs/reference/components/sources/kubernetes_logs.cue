@@ -17,12 +17,7 @@ components: sources: kubernetes_logs: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				service: {
-					name:     "Kubernetes"
-					thing:    "a \(name) cluster"
-					url:      urls.kubernetes
-					versions: ">= 1.14"
-				}
+				service: services.kubernetes
 
 				interface: {
 					file_system: {

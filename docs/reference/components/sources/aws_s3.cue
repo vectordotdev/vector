@@ -9,28 +9,7 @@ components: sources: aws_s3: components._aws & {
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
-			from: service: {
-				name:     "AWS S3"
-				thing:    "an \(name) bucket"
-				url:      urls.aws_s3
-				versions: null
-
-				setup: [
-					"""
-						Create an [AWS SQS queue][urls.aws_sqs] for Vector to consume bucket
-						notifications from. Then, configure the [bucket
-						notifications](https://docs.aws.amazon.com/AmazonS3/latest/dev/ways-to-add-notification-config-to-bucket.html)
-						to publish to this queue for the following events:
-
-						- PUT
-						- POST
-						- COPY
-						- Multipart upload completed
-
-						These represent object creation events.
-						""",
-				]
-			}
+			from: service:       services.aws_s3
 		}
 	}
 

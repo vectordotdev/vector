@@ -15,12 +15,7 @@ components: sources: host_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: service: {
-				name:     "host"
-				thing:    "a \(name)"
-				url:      urls.host
-				versions: null
-			}
+			from: service:       services.host
 		}
 		multiline: enabled: false
 	}

@@ -18,20 +18,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "AWS Kinesis Firehose"
-					thing:    "a \(name) stream"
-					url:      urls.aws_kinesis_firehose
-					versions: null
-
-					setup: [
-						"""
-						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
-						in your preferred AWS region. Point the endpoint to your
-						Vector instance's address.
-						""",
-					]
-				}
+				service: services.aws_kinesis_firehose
 
 				interface: socket: {
 					api: {
@@ -161,7 +148,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
 				   [`aws_cloudwatch_logs_subscription_parser`][vector_transform_aws_cloudwatch_logs_subscription_parser]
-				   transform to extract the log events.. Make sure to set
+				   transform to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 
