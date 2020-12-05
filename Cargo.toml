@@ -131,7 +131,7 @@ openssl = "0.10.30"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
 async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
-structopt = "0.3.19"
+structopt = "0.3.21"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
