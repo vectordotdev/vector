@@ -15,9 +15,7 @@ services: apache_http: {
 			description: """
 				Install Apache HTTP by following their installation instructions.
 				"""
-			detour: {
-				url: urls.apache_install
-			}
+			detour: url: urls.apache_install
 		},
 	]
 
