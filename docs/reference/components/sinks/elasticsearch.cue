@@ -157,6 +157,7 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: string: {
+				default: "index"
 				examples: ["index", "create"]
 			}
 		}
