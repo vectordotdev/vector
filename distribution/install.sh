@@ -128,10 +128,7 @@ install_from_archive() {
         x86_64-apple-darwin)
             _archive_arch=$_arch
             ;;
-        x86_64-*linux*-gnu)
-            _archive_arch="x86_64-unknown-linux-gnu"
-            ;;
-        x86_64-*linux*-musl)
+        x86_64-*linux*)
             _archive_arch="x86_64-unknown-linux-musl"
             ;;
         aarch64-*linux*)
