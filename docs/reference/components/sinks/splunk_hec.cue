@@ -54,29 +54,7 @@ components: sinks: splunk_hec: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Splunk"
-					thing:    "a \(name) index"
-					url:      urls.splunk
-					versions: null
-
-					setup: [
-						{
-							title: "Create a Splunk HEC endpoint"
-							description: """
-								Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
-								and create a Splunk HEC endpoint.
-								"""
-						},
-						{
-							title: "Configure Vector"
-							description: """
-								Splunk will provide you with a host and token. Copy those
-								values to the `host` and `token` options.
-								"""
-						},
-					]
-				}
+				service: services.splunk
 
 				interface: {
 					socket: {
