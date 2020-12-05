@@ -418,12 +418,13 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "avro-rs"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3df4679042d549ad2dec299b84d64d4c3d2cd727e1a772dd6372bd9f7d71d723"
+checksum = "59bf434d81d873245368207b8423fceea71a3375db67dd5e6022213d828761f7"
 dependencies = [
  "byteorder",
  "digest 0.9.0",
+ "lazy_static",
  "libflate",
  "num-bigint 0.2.6",
  "rand 0.4.6",
