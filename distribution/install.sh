@@ -215,11 +215,12 @@ get_gnu_musl_glibc() {
   local _glibc_version
   _ldd_version=$(ldd --version)
   if [[ $_ldd_version =~ "GNU" ]]; then
-    _glibc_version=$(echo "$ldd_version" | awk '/ldd/{print $NF}')
+    _glibc_version=$(echo "$_ldd_version" | awk '/ldd/{print $NF}')
     if [ 1 -eq "$(echo "${_glibc_version} < 2.18" | bc)" ]; then
       echo "musl"
     else
       echo "gnu"
+    fi
 elif [[ $_ldd_version =~ "musl" ]]; then
   echo "musl"
 else
