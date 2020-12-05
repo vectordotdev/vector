@@ -22,7 +22,7 @@ services: heroku: {
 				title: "Configure Vector to accept Heroku logs"
 				vector: configure: sources: logplex: {
 					type:    "logplex"
-					address: "fdsfdsf"
+					address: "0.0.0.0:80"
 				}
 			},
 			{
