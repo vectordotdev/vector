@@ -570,6 +570,29 @@ mod tests {
     }
 
     #[test]
+    fn sets_insert_action_when_configured() {
+        let config = ElasticSearchConfig {
+            bulk_action: BulkAction::Create,
+            index: Some(String::from("vector")),
+            encoding: EncodingConfigWithDefault {
+                codec: Encoding::Default,
+                except_fields: Some(vec!["timestamp".to_string()]),
+                ..Default::default()
+            },
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let event = Event::from("hello there");
+        let encoded = es.encode_event(event).unwrap();
+        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"message":"hello there"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+    }
+
+    #[test]
     fn handles_error_response() {
         let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
         let response = Response::builder()
