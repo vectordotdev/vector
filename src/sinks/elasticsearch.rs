@@ -96,17 +96,13 @@ impl ElasticSearchAuth {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum BulkAction {
+    #[derivative(Default)]
     Index,
     Create,
-}
-
-impl Default for BulkAction {
-    fn default() -> Self {
-        BulkAction::Index
-    }
 }
 
 impl BulkAction {
