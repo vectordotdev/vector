@@ -237,8 +237,10 @@ pub trait InternalEvent {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
 
+    /// Called instead of emit_metrics for wrapped emits.
+    ///
     /// Only necessary to implement for certain metrics, like topological ones,
-    /// for componenets that are used inside other componenets.
+    /// and for components that are used inside other components.
     /// Known such metrics:
     /// - `processed_events_total`
     /// - `processed_bytes_total'
