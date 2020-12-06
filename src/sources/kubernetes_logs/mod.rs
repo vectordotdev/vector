@@ -7,7 +7,7 @@
 
 use crate::event::Event;
 use crate::internal_events::{
-    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+    wrap::WrapEmit, FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
 };
 use crate::kubernetes as k8s;
@@ -330,7 +330,7 @@ impl Source {
 
         let event_processing_loop = partial_events_merger.transform(
             Box::new(events.map(Ok).compat())
-        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
+        ).wrap_emit().map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

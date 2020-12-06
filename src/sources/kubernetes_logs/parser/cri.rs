@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    internal_events::wrap::WrapEmit,
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
         FunctionTransform,
@@ -43,7 +44,7 @@ impl Cri {
 
             let parser = RegexParser::build(&rp_config)
                 .expect("regexp patterns are static, should never fail");
-            parser.into_function()
+            parser.wrap_emit().into_function()
         };
 
         Self { regex_parser }
