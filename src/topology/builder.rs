@@ -1,7 +1,7 @@
 use super::{
     fanout::{self, Fanout},
     task::{Task, TaskOutput},
-    BuildedBuffer, ConfigDiff,
+    BuiltBuffer, ConfigDiff,
 };
 use crate::{
     buffers,
@@ -38,7 +38,7 @@ pub struct Pieces {
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
-    mut buffers: HashMap<String, BuildedBuffer>,
+    mut buffers: HashMap<String, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -188,7 +188,7 @@ pub async fn build_pieces(
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;
             }
-            Ok(builded) => builded,
+            Ok(built) => built,
         };
 
         let (trigger, tripwire) = Tripwire::new();

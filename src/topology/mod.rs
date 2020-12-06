@@ -35,7 +35,7 @@ use tracing_futures::Instrument;
 // TODO: Result is only for compat, remove when not needed
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
-type BuildedBuffer = (
+type BuiltBuffer = (
     buffers::BufferInputCloner,
     Arc<Mutex<Option<Box<dyn Stream01<Item = Event, Error = ()> + Send>>>>,
     buffers::Acker,
@@ -87,7 +87,7 @@ pub async fn start_validated(
 pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
-    buffers: HashMap<String, BuildedBuffer>,
+    buffers: HashMap<String, BuiltBuffer>,
 ) -> Option<Pieces> {
     match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
@@ -314,7 +314,7 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         new_config: &Config,
-    ) -> HashMap<String, BuildedBuffer> {
+    ) -> HashMap<String, BuiltBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
