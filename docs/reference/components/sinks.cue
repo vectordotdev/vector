@@ -308,6 +308,28 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.keepalive != _|_ {
+				keepalive: {
+					common:      false
+					description: "Configures the TCP keepalive behavior for the connection to the sink."
+					required:    false
+					type: object: {
+						examples: []
+						options: {
+							time_secs: {
+								common:      false
+								description: "The time a connection needs to be idle before sending TCP keepalive probes."
+								required:    false
+								type: uint: {
+									default: null
+									unit:    "seconds"
+								}
+							}
+						}
+					}
+				}
+			}
+
 			if sinks[Name].features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
 					can_enable:             sinks[Name].features.send.tls.can_enable
