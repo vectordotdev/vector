@@ -1,8 +1,13 @@
 package metadata
 
 components: sources: internal_metrics: {
-	title:       "Internal Metrics"
-	description: "The internal metrics source exposes metrics emitted by the running Vector instance (as opposed to components in its topology)."
+	title: "Internal Metrics"
+
+	description: """
+		The internal metrics source exposes Vector's own internal metrics,
+		allowing you to collect, process, and route Vector's internal metrics
+		just like other metrics.
+		"""
 
 	classes: {
 		commonly_used: true

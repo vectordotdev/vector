@@ -1,9 +1,7 @@
 package metadata
 
 components: sources: docker_logs: {
-	title:       "Docker"
-	description: "Test."
-
+	title: "Docker"
 	alias: "docker"
 
 	classes: {

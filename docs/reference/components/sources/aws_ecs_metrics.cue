@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: aws_ecs_metrics: {
-	title:       "AWS ECS Metrics"
-	description: "The ECS metrics source collects the docker container stats for tasks running in Amazon ECS or Fargate."
+	title: "AWS ECS Metrics"
+
+	description: """
+		The ECS metrics source collects the docker container stats for tasks
+		running in AWS ECS or AWS Fargate.
+		"""
 
 	classes: {
 		commonly_used: false

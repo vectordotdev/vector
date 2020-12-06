@@ -3,8 +3,7 @@ package metadata
 components: sources: aws_kinesis_firehose: components._aws & {
 	_port: 443
 
-	title:       "AWS Kinesis Firehose"
-	description: "[AWS Kinesis Firehose](\(urls.aws_kinesis_firehose)) is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
+	title: "AWS Kinesis Firehose"
 
 	classes: {
 		commonly_used: false
@@ -50,7 +49,14 @@ components: sources: aws_kinesis_firehose: components._aws & {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				AWS Kinesis Firehose can only deliver data over HTTP. You will need
+				to solve TLS termination by fronting Vector with a load balaner or
+				configuring the `tls.*` options.
+				""",
+		]
+
 		warnings: []
 		notices: []
 	}

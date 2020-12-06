@@ -160,6 +160,7 @@ urls: {
 	gzip:                                                     "https://www.gzip.org/"
 	haproxy:                                                  "https://www.haproxy.org/"
 	helm:                                                     "https://helm.sh/"
+	heroku:                                                   "https://www.heroku.com"
 	heroku_http_log_drain:                                    "https://devcenter.heroku.com/articles/log-drains#https-drains"
 	heroku_start:                                             "https://devcenter.heroku.com/start"
 	homebrew:                                                 "https://brew.sh/"

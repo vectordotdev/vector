@@ -6,6 +6,8 @@ services: aws_cloudwatch_logs: {
 	url:      urls.aws_cloudwatch_logs
 	versions: null
 
+	description: services._aws_cloudwatch.description
+
 	connect_to: {
 		aws_kinesis_firehose: logs: {
 			setup: [

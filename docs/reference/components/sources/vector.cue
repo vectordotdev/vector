@@ -5,6 +5,11 @@ components: sources: vector: {
 
 	title: "Vector"
 
+	description: """
+		The Vector source receives data from another upstream Vector instance
+		using the Vector sink.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"

@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: apache_metrics: {
-	title: "Apache HTTP Server (HTTPD) Metrics"
+	title:       "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
@@ -43,7 +43,11 @@ components: sources: apache_metrics: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			"""
+			The [Apache Status module](\(urls.apache_mod_status)) must be enabled.
+			""",
+		]
 		warnings: []
 		notices: []
 	}

@@ -1,8 +1,8 @@
 package metadata
 
 services: host: {
-	name:     "host"
-	thing:    "a \(name)"
+	name:     "a Host (Node)"
+	thing:    name
 	url:      urls.host
 	versions: null
 }

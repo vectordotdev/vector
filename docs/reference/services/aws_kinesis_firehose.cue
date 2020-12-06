@@ -6,6 +6,13 @@ services: aws_kinesis_firehose: {
 	url:      urls.aws_kinesis_firehose
 	versions: null
 
+	description:	"""
+		[Amazon Kinesis Data Firehose](\(urls.aws_kinesis_firehose)) is a fully
+		managed service for delivering real-time streaming data to destinations
+		such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift,
+		Amazon Elasticsearch Service (Amazon ES), and Splunk.
+		"""
+
 	connect_to: {
 		vector: logs: {
 			_address: "0.0.0.0:443"

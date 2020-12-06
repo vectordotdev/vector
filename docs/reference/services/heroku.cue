@@ -6,6 +6,13 @@ services: heroku: {
 	url:      urls.logplex
 	versions: null
 
+	description: """
+		[Heroku](\(urls.heroku)) is a container-based platform for deploying and
+		managing applications. It's a platform as a service (PaaS) that is fully
+		managed, allowing developers on Heroku to focus on their applications
+		instead of their infrastructure.
+		"""
+
 	setup: [
 		{
 			title: "Setup a Heroku app"
