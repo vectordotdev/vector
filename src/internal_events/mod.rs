@@ -113,6 +113,7 @@ mod vector;
 mod wasm;
 
 pub mod kubernetes;
+pub mod wrap;
 
 pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
@@ -235,11 +236,24 @@ pub use mongodb_metrics::*;
 pub trait InternalEvent {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
+
+    /// Only necessary to implement for certain metrics, like topological ones,
+    /// for componenets that are used inside other componenets.
+    /// Known such metrics:
+    /// - `processed_events_total`
+    /// - `processed_bytes_total'
+    fn emit_metrics_wrapped(&self) {
+        self.emit_metrics()
+    }
 }
 
 pub fn emit(event: impl InternalEvent) {
     event.emit_logs();
-    event.emit_metrics();
+    if wrap::is_wrapped() {
+        event.emit_metrics_wrapped();
+    } else {
+        event.emit_metrics();
+    }
 }
 
 #[macro_export]
