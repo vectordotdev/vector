@@ -6,10 +6,7 @@ pub struct RemapEventProcessed;
 
 impl InternalEvent for RemapEventProcessed {
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1,
-                 "component_kind" => "transform",
-                 "component_type" => "remap",
-        );
+        counter!("processed_events_total", 1);
     }
 }
 
@@ -38,10 +35,7 @@ impl InternalEvent for RemapMappingError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-                 "error_type" => "failed_mapping",
-                 "component_kind" => "transform",
-                 "component_type" => "remap",
-        );
+                 "error_type" => "failed_mapping");
     }
 }
 
@@ -57,9 +51,6 @@ impl InternalEvent for RemapConditionExecutionError {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "component_kind" => "condition",
-                 "component_type" => "mapping",
-        );
+        counter!("processing_errors_total", 1);
     }
 }
