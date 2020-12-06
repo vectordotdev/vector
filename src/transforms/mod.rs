@@ -41,6 +41,8 @@ pub mod lua;
 pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
+#[cfg(feature = "transforms-monotonic_counter_rate")]
+pub mod monotonic_counter_rate;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
 #[cfg(feature = "transforms-regex_parser")]

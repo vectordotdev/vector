@@ -68,6 +68,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "transforms-monotonic_counter_rate")]
+mod monotonic_counter_rate;
 #[cfg(feature = "sinks-nats")]
 mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
@@ -185,6 +187,8 @@ pub use self::logplex::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "transforms-monotonic_counter_rate")]
+pub(crate) use self::monotonic_counter_rate::*;
 #[cfg(feature = "sinks-nats")]
 pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
