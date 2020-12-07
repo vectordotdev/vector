@@ -375,9 +375,9 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_hits hits\n# TYPE vector_hits counter\n".to_owned()
+            "# HELP vector_hits hits\n# TYPE vector_hits counter\n"
         );
-        assert_eq!(frame, "vector_hits{code=\"200\"} 10\n".to_owned());
+        assert_eq!(frame, "vector_hits{code=\"200\"} 10\n");
     }
 
     #[test]
@@ -396,9 +396,9 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_temperature temperature\n# TYPE vector_temperature gauge\n".to_owned()
+            "# HELP vector_temperature temperature\n# TYPE vector_temperature gauge\n"
         );
-        assert_eq!(frame, "vector_temperature{code=\"200\"} -1.1\n".to_owned());
+        assert_eq!(frame, "vector_temperature{code=\"200\"} -1.1\n");
     }
 
     #[test]
@@ -419,9 +419,9 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_users users\n# TYPE vector_users gauge\n".to_owned()
+            "# HELP vector_users users\n# TYPE vector_users gauge\n"
         );
-        assert_eq!(frame, "vector_users 1\n".to_owned());
+        assert_eq!(frame, "vector_users 1\n");
     }
 
     #[test]
@@ -442,9 +442,9 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_users users\n# TYPE vector_users gauge\n".to_owned()
+            "# HELP vector_users users\n# TYPE vector_users gauge\n"
         );
-        assert_eq!(frame, "vector_users 0\n".to_owned());
+        assert_eq!(frame, "vector_users 0\n");
     }
 
     #[test]
@@ -467,9 +467,9 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
+            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n"
         );
-        assert_eq!(frame, "vector_requests_bucket{le=\"0\"} 0\nvector_requests_bucket{le=\"2.5\"} 6\nvector_requests_bucket{le=\"5\"} 8\nvector_requests_bucket{le=\"+Inf\"} 8\nvector_requests_sum 15\nvector_requests_count 8\n".to_owned());
+        assert_eq!(frame, "vector_requests_bucket{le=\"0\"} 0\nvector_requests_bucket{le=\"2.5\"} 6\nvector_requests_bucket{le=\"5\"} 8\nvector_requests_bucket{le=\"+Inf\"} 8\nvector_requests_sum 15\nvector_requests_count 8\n");
     }
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
 
         assert_eq!(
             header,
-            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
+            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n"
         );
         assert_eq!(
             frame,
@@ -528,9 +528,9 @@ vector_requests_count 6
 
         assert_eq!(
             header,
-            "# HELP ns_requests requests\n# TYPE ns_requests summary\n".to_owned()
+            "# HELP ns_requests requests\n# TYPE ns_requests summary\n"
         );
-        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.01\"} 1.5\nns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 12\nns_requests_count{code=\"200\"} 6\n".to_owned());
+        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.01\"} 1.5\nns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 12\nns_requests_count{code=\"200\"} 6\n");
     }
 
     #[test]
@@ -559,8 +559,8 @@ vector_requests_count 6
 
         assert_eq!(
             header,
-            "# HELP ns_requests requests\n# TYPE ns_requests summary\n".to_owned()
+            "# HELP ns_requests requests\n# TYPE ns_requests summary\n"
         );
-        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.75\"} 2\nns_requests{code=\"200\",quantile=\"0.9\"} 3\nns_requests{code=\"200\",quantile=\"0.95\"} 3\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 15\nns_requests_count{code=\"200\"} 8\nns_requests_min{code=\"200\"} 1\nns_requests_max{code=\"200\"} 3\nns_requests_avg{code=\"200\"} 1.875\n".to_owned());
+        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.75\"} 2\nns_requests{code=\"200\",quantile=\"0.9\"} 3\nns_requests{code=\"200\",quantile=\"0.95\"} 3\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 15\nns_requests_count{code=\"200\"} 8\nns_requests_min{code=\"200\"} 1\nns_requests_max{code=\"200\"} 3\nns_requests_avg{code=\"200\"} 1.875\n");
     }
 }
