@@ -518,19 +518,19 @@ mod integration_tests {
 
         let indexed_fields = vec!["asdf".to_string()];
         let mut config = config(Encoding::Json, indexed_fields).await;
-        config.index = Template::try_from("{{ some_field }}".to_string()).ok();
+        config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("some_field", "rendered value");
+        event.as_mut_log().insert("index_name", "custom_index");
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
         let index = entry["index"].as_str().unwrap();
-        assert_eq!("rendered value", index);
+        assert_eq!("custom_index", index);
     }
 
     #[tokio::test]
