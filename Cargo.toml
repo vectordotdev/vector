@@ -570,4 +570,4 @@ required-features = ["remap-benches"]
 tower-layer = "0.3"
 
 [patch.crates-io]
-k8s-openapi = { git = "https://github.com/Arnavion/k8s-openapi", branch = "fix-81" }
+k8s-openapi = { git = "https://github.com/timberio/k8s-openapi", branch = "resource-request-removal" }
