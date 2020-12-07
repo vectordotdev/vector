@@ -779,17 +779,21 @@ components: {
 				description: """
 					Key/value pairs representing mapped log field names and types. This is used to
 					coerce log fields from strings into their proper types. The available types are
-					listed in the [Types](#types-table) table below.
+					listed in the **Types** table below.
 
-					Note that for timestamp coercions can come in two forms:
+					Timestamp coercions need to be prefaced with `timestamp|`, for example
+					`\"timestamp|%F\"`. Timestamp specifiers can use either of the following:
 
-					1. One of the [built-in formats](#timestamp_formats) listed in the table below.
-					2. Custom timestamps using the [time format specifiers](\(urls.chrono_time_formats))
-						from Rust's `chrono` library. Custom timestamps need to be prefixed with
-						`timestamp|`, for example `timestamp|%Y-%m-%d %H:%M:%S`.
+					1. One of the built-in-formats listed in the **Timestamp Formats** table below.
+					2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+					`chrono` library.
 					"""
 				required:    false
 				warnings: []
+
+				// Used to generate an HTML table of allowed type coercions. List is derived from
+				// the Value enum: https://github.com/timberio/vector/blob/master/src/event/value.rs#L13-L20
+				allowed_types: ["array", "bool", "bytes", "float", "int", "map", "null", "timestamp"]
 
 				// This map is used to generate an HTML table
 				timestamp_formats: [_group=string]: [_format=string]: string
