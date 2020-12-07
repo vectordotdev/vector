@@ -14,6 +14,7 @@ use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
+    uri::{Authority, PathAndQuery, Scheme},
     Method, Request, StatusCode, Uri,
 };
 use hyper::Body;
@@ -301,10 +302,13 @@ fn validate_headers(
 fn build_uri(base: &Uri) -> Uri {
     let mut parts = base.clone().into_parts();
     if parts.scheme.is_none() {
-        parts.scheme = Some("http".parse().unwrap());
+        parts.scheme = Some(Scheme::HTTP);
     }
     if parts.authority.is_none() {
-        parts.authority = Some("127.0.0.1".parse().unwrap());
+        parts.authority = Some(Authority::from_static("127.0.0.1"));
+    }
+    if parts.path_and_query.is_none() {
+        parts.path_and_query = Some(PathAndQuery::from_static(""));
     }
     Uri::from_parts(parts).unwrap()
 }
