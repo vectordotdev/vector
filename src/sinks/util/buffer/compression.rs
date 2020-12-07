@@ -1,4 +1,5 @@
 use serde::{de, ser};
+use serde_json::Value;
 use std::fmt;
 
 pub const GZIP_NONE: usize = 0;
@@ -99,7 +100,35 @@ impl<'de> de::Deserialize<'de> for Compression {
                             if level.is_some() {
                                 return Err(de::Error::duplicate_field("level"));
                             }
-                            level = Some(map.next_value::<&str>()?);
+                            level = Some(match map.next_value::<Value>()? {
+                                Value::Number(level) => match level.as_u64() {
+                                    Some(value) if value <= 9 => value as usize,
+                                    Some(_) | None => {
+                                        return Err(de::Error::invalid_value(
+                                            de::Unexpected::Other("0, 1, 2, 3, 4, 5, 6, 7, 8 or 9"),
+                                            &self,
+                                        ))
+                                    }
+                                },
+                                Value::String(level) => match level.as_str() {
+                                    "none" => GZIP_NONE,
+                                    "fast" => GZIP_FAST,
+                                    "default" => GZIP_DEFAULT,
+                                    "best" => GZIP_BEST,
+                                    _ => {
+                                        return Err(de::Error::invalid_value(
+                                            de::Unexpected::Other("none, fast, default or best"),
+                                            &self,
+                                        ))
+                                    }
+                                },
+                                _ => {
+                                    return Err(de::Error::invalid_type(
+                                        de::Unexpected::Other("Number or String"),
+                                        &self,
+                                    ))
+                                }
+                            });
                         }
                         _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
                     };
@@ -110,30 +139,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         Some(_) => Err(de::Error::unknown_field("level", &["algorithm"])),
                         None => Ok(Compression::None),
                     },
-                    "gzip" => Ok(Compression::Gzip(match level {
-                        Some(level) => Some(match level {
-                            "none" => GZIP_NONE,
-                            "fast" => GZIP_FAST,
-                            "default" => GZIP_DEFAULT,
-                            "best" => GZIP_BEST,
-                            value => match value.parse::<usize>() {
-                                Ok(level) if level <= 9 => level,
-                                Ok(level) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Unsigned(level as u64),
-                                        &self,
-                                    ))
-                                }
-                                Err(_) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Str(value),
-                                        &self,
-                                    ))
-                                }
-                            },
-                        }),
-                        None => None,
-                    })),
+                    "gzip" => Ok(Compression::Gzip(level)),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
@@ -165,5 +171,32 @@ impl ser::Serialize for Compression {
             }
         };
         map.end()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Compression;
+
+    #[test]
+    fn deserialization() {
+        let fixtures = [
+            (r#""none""#, Compression::None),
+            (r#"{"algorithm": "none"}"#, Compression::None),
+            (r#"{"algorithm": "gzip"}"#, Compression::Gzip(None)),
+            (
+                r#"{"algorithm": "gzip", "level": "best"}"#,
+                Compression::Gzip(Some(9)),
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": 8}"#,
+                Compression::Gzip(Some(8)),
+            ),
+        ];
+
+        for (sources, result) in fixtures.iter() {
+            let deserialized: Compression = serde_json::from_str(sources).expect("valid source");
+            assert_eq!(deserialized, *result);
+        }
     }
 }
