@@ -346,7 +346,7 @@ impl ElasticSearchCommon {
             .into());
         }
 
-        let authorization = match &config.auth {
+        let mut authorization = match &config.auth {
             Some(ElasticSearchAuth::Basic { user, password }) => Some(Auth::Basic {
                 user: user.clone(),
                 password: password.clone(),
