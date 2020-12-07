@@ -65,6 +65,7 @@ impl OutputFormat {
     }
 
     fn round_robin_generate(sequence: &bool, items: &[String], n: usize) -> Vec<Event> {
+        // unwrap can be called here because items cannot be empty
         let line: String = items.choose(&mut rand::thread_rng()).unwrap().into();
 
         let event = if *sequence {
@@ -211,12 +212,12 @@ mod tests {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "round_robin"
-               items = ["one", "two"]
-               count = 1"#,
+               items = ["one", "two", "three", "four"]
+               count = 5"#,
         )
         .await;
 
-        let lines = &["one", "two"];
+        let lines = &["one", "two", "three", "four"];
 
         for _ in 0..5 {
             let event = rx.poll().unwrap();
@@ -256,17 +257,17 @@ mod tests {
             r#"format = "round_robin"
                items = ["one", "two"]
                sequence = true
-               count = 2"#,
+               count = 5"#,
         )
         .await;
 
-        for n in 0..2 {
+        for n in 0..5 {
             let event = rx.poll().unwrap();
             match event {
                 Ready(Some(event)) => {
                     let log = event.as_log();
                     let message = log[&message_key].to_string_lossy();
-                    assert!(message.starts_with((n as usize).to_string()));
+                    assert!(message.starts_with(&n.to_string()));
                 }
                 Ready(None) => panic!("Premature end of input"),
                 NotReady => panic!("Generator was not ready"),
@@ -299,11 +300,11 @@ mod tests {
     async fn apache_common_generates_output() {
         let mut rx = runit(
             r#"format = "apache_common"
-            count = 10"#,
+            count = 5"#,
         )
         .await;
 
-        for _ in 0..10 {
+        for _ in 0..5 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
         assert_eq!(rx.poll().unwrap(), Ready(None));
@@ -313,11 +314,11 @@ mod tests {
     async fn apache_error_generates_output() {
         let mut rx = runit(
             r#"format = "apache_error"
-            count = 10"#,
+            count = 5"#,
         )
         .await;
 
-        for _ in 0..10 {
+        for _ in 0..5 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
         assert_eq!(rx.poll().unwrap(), Ready(None));
@@ -327,11 +328,11 @@ mod tests {
     async fn syslog_generates_output() {
         let mut rx = runit(
             r#"format = "syslog"
-            count = 10"#,
+            count = 5"#,
         )
         .await;
 
-        for _ in 0..10 {
+        for _ in 0..5 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
         assert_eq!(rx.poll().unwrap(), Ready(None));
