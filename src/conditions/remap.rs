@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::RemapConditionExecutionFailed,
+    internal_events::RemapConditionExecutionError,
     Event,
 };
 use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
@@ -69,7 +69,7 @@ impl Condition for Remap {
                 _ => unreachable!("boolean type constraint set"),
             })
             .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
+                emit!(RemapConditionExecutionError);
                 false
             })
     }

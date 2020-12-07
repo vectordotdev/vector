@@ -11,14 +11,14 @@ impl InternalEvent for RemapEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct RemapFailedMapping {
+pub struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
     /// mapping. This internal event will reflect that in its messaging.
     pub event_dropped: bool,
     pub error: String,
 }
 
-impl InternalEvent for RemapFailedMapping {
+impl InternalEvent for RemapMappingError {
     fn emit_logs(&self) {
         let message = if self.event_dropped {
             "Mapping failed with event; discarding event."
@@ -34,18 +34,23 @@ impl InternalEvent for RemapFailedMapping {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "failed_mapping");
+        counter!("processing_errors_total", 1,
+                 "error_type" => "failed_mapping");
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct RemapConditionExecutionFailed;
+pub struct RemapConditionExecutionError;
 
-impl InternalEvent for RemapConditionExecutionFailed {
+impl InternalEvent for RemapConditionExecutionError {
     fn emit_logs(&self) {
         warn!(
             message = "Remap condition execution failed.",
             rate_limit_secs = 120
         )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1);
     }
 }
