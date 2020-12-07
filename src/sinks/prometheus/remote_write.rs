@@ -88,9 +88,7 @@ impl SinkConfig for RemoteWriteConfig {
                 service,
                 EncodeBatch {
                     inner: MetricBuffer::new(batch.size),
-                    transform: Arc::new(Box::new(move |metrics: Vec<Metric>| {
-                        s2.encode_events(metrics)
-                    })),
+                    transform: Box::new(move |metrics: Vec<Metric>| s2.encode_events(metrics)),
                 },
                 batch.timeout,
                 cx.acker(),
@@ -111,19 +109,20 @@ impl SinkConfig for RemoteWriteConfig {
 
 ///
 use crate::sinks::util::batch::{Batch, BatchError, PushResult};
-use std::sync::Arc;
 
-struct EncodeBatch<B, I, O>
+struct EncodeBatch<B, I, O, F>
 where
     B: Batch<Output = I>,
+    F: Fn(I) -> O + Send + Sync + Clone,
 {
     inner: B,
-    transform: Arc<Box<dyn Fn(I) -> O + Send + Sync>>,
+    transform: F,
 }
 
-impl<B, I, O> Batch for EncodeBatch<B, I, O>
+impl<B, I, O, F> Batch for EncodeBatch<B, I, O, F>
 where
     B: Batch<Output = I>,
+    F: Fn(I) -> O + Send + Sync + Clone,
 {
     type Input = B::Input;
     type Output = O;
@@ -146,7 +145,7 @@ where
     fn fresh(&self) -> Self {
         Self {
             inner: self.inner.fresh(),
-            transform: Arc::clone(&self.transform),
+            transform: self.transform.clone(),
         }
     }
 
