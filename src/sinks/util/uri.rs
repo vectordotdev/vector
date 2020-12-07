@@ -104,6 +104,7 @@ impl From<Uri> for UriSerde {
 }
 
 fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
+    // We get a valid `Authority` as input, therefore cannot fail here.
     let mut url = url::Url::parse(&format!("http://{}", authority)).unwrap();
 
     let user = url.username();
@@ -115,9 +116,12 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
             .decode_utf8_lossy()
             .into_owned();
 
+        // These methods have the same failure condition as `username`,
+        // because we have a non-empty username, they cannot fail here.
         url.set_username("").unwrap();
         url.set_password(None).unwrap();
 
+        // We get a valid `Authority` as input, therefore cannot fail here.
         let authority = Uri::from_maybe_shared(url.into_string())
             .unwrap()
             .authority()
