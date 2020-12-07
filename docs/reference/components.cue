@@ -807,8 +807,8 @@ components: {
 					`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
 					`%FT%T` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
 					`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
-					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue Dec  1 02:37:54 2020`
-					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec 01 02:37:54 2020`
+					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
 					`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
 					`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
 					`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
