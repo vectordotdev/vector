@@ -81,11 +81,17 @@ impl SinkConfig for RemoteWriteConfig {
             buckets,
             quantiles,
         };
+        let s2 = service.clone();
         let sink = request
             .batch_sink(
                 HttpRetryLogic,
                 service,
-                MetricBuffer::new(batch.size),
+                EncodeBatch {
+                    inner: MetricBuffer::new(batch.size),
+                    transform: Arc::new(Box::new(move |metrics: Vec<Metric>| {
+                        s2.encode_events(metrics)
+                    })),
+                },
                 batch.timeout,
                 cx.acker(),
             )
@@ -102,6 +108,57 @@ impl SinkConfig for RemoteWriteConfig {
         "prometheus_remote_write"
     }
 }
+
+///
+use crate::sinks::util::batch::{Batch, BatchError, PushResult};
+use std::sync::Arc;
+
+struct EncodeBatch<B, I, O>
+where
+    B: Batch<Output = I>,
+{
+    inner: B,
+    transform: Arc<Box<dyn Fn(I) -> O + Send + Sync>>,
+}
+
+impl<B, I, O> Batch for EncodeBatch<B, I, O>
+where
+    B: Batch<Output = I>,
+{
+    type Input = B::Input;
+    type Output = O;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(B::get_settings_defaults(config, defaults.into())?.into())
+    }
+
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        self.inner.push(item)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            transform: Arc::clone(&self.transform),
+        }
+    }
+
+    fn finish(self) -> Self::Output {
+        (self.transform)(self.inner.finish())
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
+}
+///
 
 async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
     let request = http::Request::get(endpoint)
@@ -146,7 +203,8 @@ impl RemoteWriteService {
     }
 }
 
-impl tower::Service<Vec<Metric>> for RemoteWriteService {
+impl tower::Service<Bytes> for RemoteWriteService {
+    // impl tower::Service<Vec<Metric>> for RemoteWriteService {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -155,8 +213,9 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
         task::Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<Metric>) -> Self::Future {
-        let body = self.encode_events(events);
+    fn call(&mut self, body: Bytes) -> Self::Future {
+        // fn call(&mut self, events: Vec<Metric>) -> Self::Future {
+        // let body = self.encode_events(events);
         let body = snap_block(body);
 
         let request = http::Request::post(self.endpoint.clone())
