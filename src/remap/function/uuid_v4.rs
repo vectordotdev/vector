@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = state::Program::default();
-        let mut object = map![];
+        let mut object: Value = map![].into();
         let value = UuidV4Fn.execute(&mut state, &mut object).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

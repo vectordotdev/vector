@@ -24,8 +24,8 @@ impl Function for ToString {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ToStringFn { value, default }))
     }
@@ -55,6 +55,7 @@ impl Expression for ToStringFn {
             Float(v) => Ok(v.to_string().into()),
             Boolean(v) => Ok(v.to_string().into()),
             Timestamp(v) => Ok(v.to_string().into()),
+            Regex(v) => Ok(v.to_string().into()),
             Null => Ok("".into()),
             Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
@@ -115,7 +116,7 @@ mod tests {
         }
 
         array_infallible {
-            expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
+            expr: |_| ToStringFn { value: Array::from(vec![0]).boxed(), default: None},
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
@@ -125,7 +126,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToStringFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
+            expr: |_| ToStringFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None},
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
@@ -134,8 +135,8 @@ mod tests {
 
         fallible_value_with_fallible_default {
             expr: |_| ToStringFn {
-                value: Variable::new("foo".to_owned()).boxed(),
-                default: Some(Variable::new("foo".to_owned()).boxed()),
+                value: Variable::new("foo".to_owned(), None).boxed(),
+                default: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef {
                 fallible: true,
@@ -145,7 +146,7 @@ mod tests {
 
        fallible_value_with_infallible_default {
             expr: |_| ToStringFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 default: Some(Literal::from(true).boxed()),
             },
             def: TypeDef {
@@ -157,7 +158,7 @@ mod tests {
         infallible_value_with_fallible_default {
             expr: |_| ToStringFn {
                 value: Literal::from(true).boxed(),
-                default: Some(Variable::new("foo".to_owned()).boxed()),
+                default: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef {
                 fallible: false,
@@ -183,7 +184,7 @@ mod tests {
             (
                 map![],
                 Ok(Value::from("default")),
-                ToStringFn::new(Literal::from(vec![0]).boxed(), Some("default".into())),
+                ToStringFn::new(Array::from(vec![0]).boxed(), Some("default".into())),
             ),
             (
                 map!["foo": 20],
@@ -199,7 +200,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

@@ -4,6 +4,8 @@ use k8s_openapi::{
 };
 use k8s_test_framework::{Framework, Interface, Reader};
 
+pub mod metrics;
+
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
 pub fn make_framework() -> Framework {

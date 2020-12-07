@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -196,7 +196,7 @@ impl HttpSink for ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventReceived {
+        emit!(ElasticSearchEventEncoded {
             byte_size: body.len(),
             index
         });
@@ -211,6 +211,10 @@ impl HttpSink for ElasticSearchCommon {
             let mut request = self.signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression.content_encoding() {
+                request.add_header("Content-Encoding", ce);
+            }
 
             if let Some(headers) = &self.config.headers {
                 for (header, value) in headers {
@@ -705,6 +709,22 @@ mod integration_tests {
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
                 endpoint: "http://localhost:4571".into(),
+                ..config()
+            },
+            false,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn insert_events_on_aws_with_compression() {
+        trace_init();
+
+        run_insert_tests(
+            ElasticSearchConfig {
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                endpoint: "http://localhost:4571".into(),
+                compression: Compression::gzip_default(),
                 ..config()
             },
             false,

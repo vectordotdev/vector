@@ -51,6 +51,7 @@ lazy_static! {
         Box::new(Log),
         Box::new(Flatten),
         Box::new(Merge),
+        Box::new(Redact),
     ];
 
     // List of both mutable, and immutable functions that can be loaded into a
