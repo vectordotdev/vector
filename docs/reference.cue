@@ -445,7 +445,7 @@ _values: {
 		_values.current_timestamp,
 		"Sun Dec  6 21:50:24 PST 2020",
 		"16 Aug 2020 15:09:01 -0000",
-		"1607320423"
+		"1607320423",
 	]
 
 	formats: [_group=string]: [_format=string]: string
