@@ -436,14 +436,17 @@ _values: {
 		2. Custom timestamps using the [time format specifiers](\(urls.chrono_time_formats))
 			from Rust's `chrono` library. Custom timestamps need to be prefixed with
 			`timestamp|`, for example `timestamp|%Y-%m-%d %H:%M:%S`.
-
-
 		"""
 
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [_values.current_timestamp]
+	examples: [
+		_values.current_timestamp,
+		"Sun Dec  6 21:50:24 PST 2020",
+		"16 Aug 2020 15:09:01 -0000",
+		"1607320423"
+	]
 
 	formats: [_group=string]: [_format=string]: string
 
