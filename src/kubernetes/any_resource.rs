@@ -111,14 +111,6 @@ impl Identity for AnyResource {
     }
 }
 
-// See https://github.com/Arnavion/k8s-openapi/issues/81.
-impl k8s_openapi::Resource for AnyResource {
-    const API_VERSION: &'static str = "dummy";
-    const GROUP: &'static str = "dummy";
-    const KIND: &'static str = "dummy";
-    const VERSION: &'static str = "dummy";
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
