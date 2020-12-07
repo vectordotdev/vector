@@ -291,19 +291,19 @@ mod tests {
                         "sandbox0-uid",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.\"nested0.label0\"").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label0").unwrap(),
                         "val0",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.\"nested0.label1\"").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label1").unwrap(),
                         "val1",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.\"nested1.label0\"").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.nested1\\.label0").unwrap(),
                         "val2",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.\"nested2.label0.deep0\"")
+                        LookupBuf::from_str("kubernetes.pod_labels.nested2\\.label0\\.deep0")
                             .unwrap(),
                         "val3",
                     );

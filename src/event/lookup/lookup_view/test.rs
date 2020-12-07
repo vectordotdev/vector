@@ -88,7 +88,7 @@ fn fields_with_quotes() {
     let input = "florp.\"flop fleep\"";
     let lookup = Lookup::from_str(input).unwrap();
     assert_eq!(lookup[0], Segment::field("florp"));
-    assert_eq!(lookup[1], Segment::field("flop fleep"));
+    assert_eq!(lookup[1], Segment::field(r#""flop fleep""#));
     assert_eq!(lookup.to_string(), input);
 }
 

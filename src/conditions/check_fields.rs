@@ -1202,7 +1202,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err(r#"predicates failed: ["foo.length_eq: 10", "bar.length_eq: 4"]"#.to_owned())
+            Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
         );
 
         event
@@ -1211,7 +1211,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err(r#"predicates failed: ["bar.length_eq: 4"]"#.to_owned())
+            Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
         );
 
         event
@@ -1240,7 +1240,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err(r#"predicates failed: ["foo.not_exists: true"]"#.into())
+            Err(r#"predicates failed: [ foo.not_exists: true ]"#.into())
         );
     }
 }

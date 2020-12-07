@@ -844,9 +844,9 @@ mod tests {
             ),
             (
                 "del(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from(
+                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from_str(
                     "foo bar",
-                )]))]),
+                ).unwrap()]))]),
             ),
             (
                 "del(.foo)\ndel(.bar.baz)",

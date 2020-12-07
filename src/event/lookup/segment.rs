@@ -116,6 +116,7 @@ impl<'a> Segment<'a> {
             match inner_segment.as_rule() {
                 ParserRule::lookup_field_quoted_content => {
                     debug_assert!(retval.is_none());
+                    tracing::trace!(segment = %full_segment, ?rule, action = %"push");
                     retval = Some(Segment::field(full_segment));
                 },
                 ParserRule::LOOKUP_QUOTE => continue,
@@ -143,9 +144,11 @@ impl<'a> Segment<'a> {
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
                 ParserRule::lookup_array_index => {
+                    debug_assert!(retval.is_none());
+                    tracing::trace!(segment = %inner_segment, ?rule, action = %"push");
                     retval = Some(Segment::from_lookup_array_index(inner_segment)?);
-                    break;
                 },
+                ParserRule::LOOKUP_OPEN_BRACKET | ParserRule::LOOKUP_CLOSE_BRACKET => continue,
                 _ => {
                     return Err(format!(
                         "Got invalid lookup rule. Got: {:?}. Want: {:?}",

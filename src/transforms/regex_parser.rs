@@ -491,9 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_valid_optional_capture() {
-        let log = do_transform("1234", r#"['(?P<status>\d+
-        }
-        })?']"#, "")
+        let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
         assert_eq!(log[Lookup::from("status")], "1234".into());
