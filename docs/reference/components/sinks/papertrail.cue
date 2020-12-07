@@ -25,7 +25,8 @@ components: sinks: papertrail: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			keepalive: enabled: true
+			request: enabled:   false
 			tls: {
 				enabled:                true
 				can_enable:             true

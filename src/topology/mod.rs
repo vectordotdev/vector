@@ -706,7 +706,7 @@ mod tests {
     #[tokio::test]
     async fn topology_doesnt_reload_new_data_dir() {
         let mut old_config = Config::builder();
-        old_config.add_source("in", SocketConfig::make_tcp_config(next_addr()));
+        old_config.add_source("in", SocketConfig::make_basic_tcp_config(next_addr()));
         old_config.add_sink(
             "out",
             &[&"in"],

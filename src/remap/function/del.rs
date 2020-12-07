@@ -41,15 +41,14 @@ impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.paths
             .iter()
-            .map(Path::as_string)
-            .for_each(|string| object.remove(&string, false));
+            .try_for_each(|path| object.remove(path.as_ref(), false))?;
 
         Ok(Value::Null)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            fallible: false,
+            fallible: true,
             kind: value::Kind::Null,
         }
     }
@@ -64,7 +63,7 @@ mod tests {
             paths: vec![Path::from("foo")]
         },
         def: TypeDef {
-            fallible: false,
+            fallible: true,
             kind: value::Kind::Null,
         },
     }];

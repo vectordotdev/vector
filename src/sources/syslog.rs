@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
-use crate::sources::util::build_unix_source;
+use crate::sources::util::build_unix_stream_source;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
@@ -9,6 +9,7 @@ use crate::{
     event::{Event, LookupBuf, SegmentBuf, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -46,6 +47,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     Tcp {
         address: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
     },
     Udp {
@@ -91,6 +93,7 @@ impl GenerateConfig for SyslogConfig {
         toml::Value::try_from(Self {
             mode: Mode::Tcp {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
+                keepalive: None,
                 tls: None,
             },
             host_key: None,
@@ -116,18 +119,22 @@ impl SourceConfig for SyslogConfig {
             .unwrap_or_else(|| log_schema().host_key().clone());
 
         match self.mode.clone() {
-            Mode::Tcp { address, tls } => {
+            Mode::Tcp {
+                address,
+                keepalive,
+                tls,
+            } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
                 };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
-                source.run(address, shutdown_secs, tls, shutdown, out)
+                source.run(address, keepalive, shutdown_secs, tls, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_source(
+            Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
                 SyslogDecoder::new(self.max_length),
                 host_key,
@@ -340,7 +347,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 }
 
 /**
-* Function to pass to build_unix_source, specific to the Unix mode of the syslog source.
+* Function to pass to build_unix_stream_source, specific to the Unix mode of the syslog source.
 * Handles the logic of parsing and decoding the syslog message format.
 **/
 // TODO: many more cases to handle:
@@ -454,6 +461,45 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_tcp());
+    }
+
+    #[test]
+    fn config_tcp_keepalive_empty() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+          "#,
+        )
+        .unwrap();
+
+        let keepalive = match config.mode {
+            Mode::Tcp { keepalive, .. } => keepalive,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        assert_eq!(keepalive, None);
+    }
+
+    #[test]
+    fn config_tcp_keepalive_full() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            keepalive.time_secs = 7200
+          "#,
+        )
+        .unwrap();
+
+        let keepalive = match config.mode {
+            Mode::Tcp { keepalive, .. } => keepalive,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        let keepalive = keepalive.expect("keepalive config not set");
+
+        assert_eq!(keepalive.time_secs, Some(7200));
     }
 
     #[test]

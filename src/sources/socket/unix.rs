@@ -2,7 +2,10 @@ use crate::{
     event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
-    sources::{util::build_unix_source, Source},
+    sources::{
+        util::{build_unix_datagram_source, build_unix_stream_source},
+        Source,
+    },
     Pipeline,
 };
 use bytes::Bytes;
@@ -34,7 +37,7 @@ impl UnixConfig {
 }
 
 /**
-* Function to pass to build_unix_source, specific to the basic unix source.
+* Function to pass to build_unix_*_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
 fn build_event(host_key: LookupBuf, received_from: Option<Bytes>, line: &str) -> Option<Event> {
@@ -54,14 +57,32 @@ fn build_event(host_key: LookupBuf, received_from: Option<Bytes>, line: &str) ->
     Some(event)
 }
 
-pub fn unix(
+pub(super) fn unix_datagram(
     path: PathBuf,
     max_length: usize,
     host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    build_unix_source(
+    build_unix_datagram_source(
+        path,
+        max_length,
+        host_key,
+        LinesCodec::new_with_max_length(max_length),
+        shutdown,
+        out,
+        build_event,
+    )
+}
+
+pub(super) fn unix_stream(
+    path: PathBuf,
+    max_length: usize,
+    host_key: LookupBuf,
+    shutdown: ShutdownSignal,
+    out: Pipeline,
+) -> Source {
+    build_unix_stream_source(
         path,
         LinesCodec::new_with_max_length(max_length),
         host_key,

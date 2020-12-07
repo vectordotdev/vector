@@ -25,7 +25,7 @@ async fn pipe() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_sink(
         "out",
@@ -63,7 +63,7 @@ async fn sample() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_transform(
         "sampler",
@@ -120,7 +120,7 @@ async fn fork() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_sink(
         "out1",
@@ -174,11 +174,11 @@ async fn merge_and_fork() {
     let mut config = config::Config::builder();
     config.add_source(
         "in1",
-        sources::socket::SocketConfig::make_tcp_config(in_addr1),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
     );
     config.add_source(
         "in2",
-        sources::socket::SocketConfig::make_tcp_config(in_addr2),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
     );
     config.add_sink(
         "out1",
@@ -247,7 +247,7 @@ async fn reconnect() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_sink(
         "out",

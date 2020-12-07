@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::RemapConditionExecutionFailed,
+    internal_events::RemapConditionExecutionError,
     Event,
 };
 use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
@@ -69,7 +69,7 @@ impl Condition for Remap {
                 _ => unreachable!("boolean type constraint set"),
             })
             .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
+                emit!(RemapConditionExecutionError);
                 false
             })
     }
@@ -134,9 +134,7 @@ mod test {
             (
                 log_event![],
                 ".",
-                Err(
-                    "remap error: parser error:  --> 1:2\n  |\n1 | .\n  |  ^---\n  |\n  = expected path_segment",
-                ),
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
         ];

@@ -42,7 +42,7 @@ pub struct HecSinkConfig {
     pub host_key: LookupBuf,
     #[serde(default)]
     pub indexed_fields: Vec<LookupBuf>,
-    pub index: Option<LookupBuf>,
+    pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     #[serde(
@@ -155,6 +155,17 @@ impl HttpSink for HecSinkConfig {
                 .ok()
         });
 
+        let index = self.index.as_ref().and_then(|index| {
+            index
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceMissingKeys {
+                        keys: &missing_keys
+                    });
+                })
+                .ok()
+        });
+
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
@@ -194,7 +205,7 @@ impl HttpSink for HecSinkConfig {
             body["host"] = json!(host);
         }
 
-        if let Some(index) = &self.index {
+        if let Some(index) = index {
             body["index"] = json!(index);
         }
 
@@ -493,7 +504,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let mut config = config(Encoding::Text, vec![]).await;
-        config.index = Some(LookupBuf::from("custom_index"));
+        config.index = Template::try_from(LookupBuf::from("custom_index")).ok();
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
@@ -503,6 +514,27 @@ mod integration_tests {
         let entry = find_entry(message.as_str()).await;
 
         assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
+    }
+
+    #[tokio::test]
+    async fn splunk_index_is_interpolated() {
+        let cx = SinkContext::new_test();
+
+        let indexed_fields = vec!["asdf".to_string()];
+        let mut config = config(Encoding::Json, indexed_fields).await;
+        config.index = Template::try_from("{{ some_field }}".to_string()).ok();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("some_field", "rendered value");
+        sink.run(stream::once(ready(event))).await.unwrap();
+
+        let entry = find_entry(message.as_str()).await;
+
+        let index = entry["index"].as_str().unwrap();
+        assert_eq!("rendered value", index);
     }
 
     #[tokio::test]

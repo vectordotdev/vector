@@ -1,6 +1,7 @@
 use crate::{
-    event::LookupBuf, shutdown::ShutdownSignal, sources::util::build_unix_source, sources::Source,
-    Event, Pipeline,
+    event::LookupBuf, shutdown::ShutdownSignal, sources::util::build_unix_stream_source, sources::Source,
+    Event,
+    Pipeline,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ fn build_event(_: LookupBuf, _: Option<Bytes>, line: &str) -> Option<Event> {
 }
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {
-    build_unix_source(
+    build_unix_stream_source(
         config.path,
         LinesCodec::new(),
         crate::config::log_schema().host_key().clone(),

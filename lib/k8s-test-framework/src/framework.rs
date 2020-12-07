@@ -1,8 +1,8 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, test_pod, up_down, vector,
-    wait_for_resource, wait_for_rollout, Interface, Reader, Result,
+    exec_tail, kubernetes_version, log_lookup, namespace, port_forward, test_pod, up_down, vector,
+    wait_for_resource, wait_for_rollout, Interface, PortForwarder, Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -66,6 +66,24 @@ impl Framework {
     /// `namespace`.
     pub fn exec_tail(&self, namespace: &str, resource: &str, file: &str) -> Result<Reader> {
         exec_tail(&self.interface.kubectl_command, namespace, resource, file)
+    }
+
+    /// Initialize port forward for a particular `resource` in a particular
+    /// `namespace` with a partucular pair of local/resource ports.
+    pub fn port_forward(
+        &self,
+        namespace: &str,
+        resource: &str,
+        local_port: u16,
+        resource_port: u16,
+    ) -> Result<PortForwarder> {
+        port_forward(
+            &self.interface.kubectl_command,
+            namespace,
+            resource,
+            local_port,
+            resource_port,
+        )
     }
 
     /// Exect a `kubectl --version`command returning a K8sVersion Struct

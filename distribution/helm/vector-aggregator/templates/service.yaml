@@ -1,0 +1,13 @@
+{{- if eq (include "vector-aggregator.servicePortsPresent" .) "true" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "libvector.fullname" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+spec:
+  ports:
+    {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
+  selector:
+    {{- include "libvector.selectorLabels" . | nindent 4 }}
+{{- end }}
