@@ -291,6 +291,9 @@ _values: {
 	// `types` sets the option's value type. External tagging is used since
 	// each type has its own set of fields.
 	type: #Type & {_args: "required": required}
+
+	// Allow for extra fields
+	...
 }
 
 #TargetTriples: {
