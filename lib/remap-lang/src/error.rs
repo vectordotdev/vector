@@ -111,6 +111,16 @@ impl fmt::Display for Rule {
             variable,
             WHITESPACE,
             lookup,
+            lookup_segment,
+            lookup_field_quoted,
+            lookup_field_quoted_content,
+            lookup_field,
+            lookup_array,
+            lookup_array_index,
+            LOOKUP_QUOTE,
+            LOOKUP_OPEN_BRACKET,
+            LOOKUP_CLOSE_BRACKET,
+            LOOKUP_PERIOD,
         ]
     }
 }

@@ -367,7 +367,6 @@ mod integration_tests {
                     .get(log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
-                    .unwrap()
                     .format("%Y-%m-%d %H:%M:%S")
             ),
         );
@@ -429,7 +428,6 @@ timestamp_format = "unix""#,
                     .get(log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
-                    .unwrap()
                     .format("%Y-%m-%d %H:%M:%S")
             ),
         );

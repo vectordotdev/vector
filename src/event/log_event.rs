@@ -1,3 +1,4 @@
+#![allow(clippy::needless_collect)]
 use crate::event::{
     lookup::{Segment, SegmentBuf},
     Lookup, LookupBuf, Value,

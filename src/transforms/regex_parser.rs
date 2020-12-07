@@ -423,8 +423,10 @@ mod tests {
             log,
             serde_json::json!({
                 "message": "status=1234 time=5678",
-                "prefix.status": "1234",
-                "prefix.time": "5678",
+                "prefix": {
+                    "status": "1234",
+                    "time": "5678",
+                },
             })
         );
     }
@@ -467,8 +469,10 @@ mod tests {
         assert_eq!(
             log,
             serde_json::json!({
-                "message.status": "1234",
-                "message.time": "5678",
+                "message": {
+                    "status": "1234",
+                    "time": "5678",
+                },
             })
         );
     }
@@ -487,7 +491,9 @@ mod tests {
 
     #[tokio::test]
     async fn handles_valid_optional_capture() {
-        let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "")
+        let log = do_transform("1234", r#"['(?P<status>\d+
+        }
+        })?']"#, "")
             .await
             .unwrap();
         assert_eq!(log[Lookup::from("status")], "1234".into());

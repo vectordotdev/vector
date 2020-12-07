@@ -584,11 +584,12 @@ impl Condition for CheckFields {
             Ok(())
         } else {
             Err(format!(
-                "predicates failed: {:?}",
+                "predicates failed: [ {} ]",
                 failed_preds
                     .iter()
                     .map(|v| format!("{}", v))
                     .collect::<Vec<_>>()
+                    .join(", ")
             ))
         }
     }

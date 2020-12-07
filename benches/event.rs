@@ -29,7 +29,7 @@ fn benchmark_event(c: &mut Criterion) {
                     "key3": "value3"
                 }))
             },
-            |e| e.all_fields().count(),
+            |e| e.pairs(true).count(),
             BatchSize::SmallInput,
         )
     });
@@ -62,7 +62,7 @@ fn benchmark_event(c: &mut Criterion) {
                     "key3": "value3"
                 }))
             },
-            |e| e.all_fields().count(),
+            |e| e.pairs(true).count(),
             BatchSize::SmallInput,
         )
     });
@@ -95,7 +95,7 @@ fn benchmark_event(c: &mut Criterion) {
                     },
                 }))
             },
-            |e| e.all_fields().count(),
+            |e| e.pairs(true).count(),
             BatchSize::SmallInput,
         )
     });

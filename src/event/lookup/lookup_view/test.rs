@@ -73,6 +73,26 @@ fn array() {
 }
 
 #[test]
+fn fields() {
+    crate::test_util::trace_init();
+    let input = "florp.flop";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::field("florp"));
+    assert_eq!(lookup[1], Segment::field("flop"));
+    assert_eq!(lookup.to_string(), input);
+}
+
+#[test]
+fn fields_with_quotes() {
+    crate::test_util::trace_init();
+    let input = "florp.\"flop fleep\"";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::field("florp"));
+    assert_eq!(lookup[1], Segment::field("flop fleep"));
+    assert_eq!(lookup.to_string(), input);
+}
+
+#[test]
 fn to_string() {
     crate::test_util::trace_init();
     let input = SUFFICIENTLY_COMPLEX;
@@ -148,7 +168,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 
     let mut buf = Vec::new();
     test_file.read_to_end(&mut buf)?;
-    let string = String::from_utf8(buf).unwrap().to_string();
+    let string = String::from_utf8(buf).unwrap();
     // remove trailing newline introduced by editors
     Ok(string.trim_end().to_owned())
 }
