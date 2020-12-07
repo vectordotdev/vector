@@ -776,9 +776,49 @@ components: {
 
 			_types: {
 				common:      true
-				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
+				description: """
+					Key/value pairs representing mapped log field names and types. This is used to
+					coerce log fields from strings into their proper types. The available types are
+					listed in the [Types](#types-table) table below.
+
+					Note that for timestamp coercions can come in two forms:
+
+					1. One of the [built-in formats](#timestamp_formats) listed in the table below.
+					2. Custom timestamps using the [time format specifiers](\(urls.chrono_time_formats))
+						from Rust's `chrono` library. Custom timestamps need to be prefixed with
+						`timestamp|`, for example `timestamp|%Y-%m-%d %H:%M:%S`.
+					"""
 				required:    false
 				warnings: []
+
+				// This map is used to generate an HTML table
+				timestamp_formats: [_group=string]: [_format=string]: string
+
+				timestamp_formats: {
+					"Standard": {
+						"%F %T":           "`YYYY-MM-DD HH:MM:SS`"
+						"%v %T":           "`DD-Mmm-YYYY HH:MM:SS`"
+						"%FT%T":           "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone"
+						"%a, %d %b %Y %T": "[RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone"
+						"%a %d %b %T %Y":  "[`date`](\(urls.date)) command output without time zone"
+						"%a %b %e %T %Y":  "[ctime](\(urls.ctime)) format"
+					}
+
+					"UTC": {
+						"%s":     "[UNIX](\(urls.unix_timestamp)) timestamp"
+						"%FT%TZ": "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC"
+					}
+
+					"Time zone": {
+						"%+":                 "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone"
+						"%a %d %b %T %Z %Y":  "[`date`](\(urls.date)) command output with time zone"
+						"%a %d %b %T %z %Y":  "[`date`](\(urls.date)) command output with numeric time zone"
+						"%a %d %b %T %#z %Y": """
+							[`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present)
+							"""
+					}
+				}
+
 				type: object: {
 					examples: [
 						{
@@ -787,6 +827,7 @@ components: {
 							success:           "bool"
 							timestamp_iso8601: "timestamp|%F"
 							timestamp_custom:  "timestamp|%a %b %e %T %Y"
+							timestamp_unix:    "timestamp|%F %T"
 							parent: {"child": "int"}
 						},
 					]
