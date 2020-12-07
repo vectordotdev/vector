@@ -79,6 +79,7 @@ impl fmt::Display for Rule {
             call,
             char,
             comparison,
+            conditional_expr,
             EOI,
             equality,
             expression,

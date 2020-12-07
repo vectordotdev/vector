@@ -12,7 +12,8 @@ rule_string_inner = _{ SOI ~ string_inner ~ EOI }
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
-if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block)* ~ ("else" ~ block)? }
+if_statement = { "if" ~ (boolean_expr | conditional_expr) ~ block ~ ("else if" ~ (boolean_expr | conditional_expr ) ~ block)* ~ ("else" ~ block)? }
+
 
 // Primary ---------------------------------------------------------------------
 
@@ -80,6 +81,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 // Other ----------------------------------------------------------------------
 
+conditional_expr = { "(" ~ NEWLINE* ~ (expression ~ (NEWLINE+ | ";"))* ~ boolean_expr ~ NEWLINE* ~ ")" }
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 target = _{ variable | path }
 block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*) ~ NEWLINE* ~ "}" }

@@ -137,9 +137,11 @@ impl<'a> Parser<'a> {
 
         for pair in pairs {
             match pair.as_rule() {
-                R::assignment | R::boolean_expr | R::block | R::if_statement => {
-                    expressions.push(self.expression_from_pair(pair)?)
-                }
+                R::assignment
+                | R::boolean_expr
+                | R::conditional_expr
+                | R::block
+                | R::if_statement => expressions.push(self.expression_from_pair(pair)?),
                 R::EOI => (),
                 _ => return Err(e(R::expression)),
             }
@@ -166,6 +168,7 @@ impl<'a> Parser<'a> {
         match pair.as_rule() {
             R::assignment => self.assignment_from_pairs(pair.into_inner()),
             R::boolean_expr => self.boolean_expr_from_pairs(pair.into_inner()),
+            R::conditional_expr => self.conditional_expr_from_pairs(pair.into_inner()),
             R::block => self.block_from_pairs(pair.into_inner()),
             R::if_statement => self.if_statement_from_pairs(pair.into_inner()),
             _ => Err(e(R::expression)),
@@ -236,6 +239,17 @@ impl<'a> Parser<'a> {
 
     /// Parse block expressions.
     fn block_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
+        let mut expressions = vec![];
+
+        for pair in pairs {
+            expressions.push(self.expression_from_pair(pair)?);
+        }
+
+        Ok(Block::new(expressions).into())
+    }
+
+    /// Parse conditional expressions - a sequence of expressions followed by a boolean.
+    fn conditional_expr_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
         let mut expressions = vec![];
 
         for pair in pairs {
@@ -787,6 +801,11 @@ mod tests {
                 r#"/ab/ = .foo"#,
                 vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
             ),
+            (
+                // If conditional expression list must end with a boolean.
+                r#"if (.x = 2; .y = 3) { 1 }"#,
+                vec!["expected operator_boolean_expr, operator_equality, operator_comparison"]
+            )
         ];
 
         for (source, exp_expressions) in cases {
