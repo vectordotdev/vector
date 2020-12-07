@@ -407,6 +407,11 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-json_parser",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_configfile() {
         let tempdir = tempdir().expect("Unable to create tempdir for config");
