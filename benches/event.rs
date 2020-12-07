@@ -12,12 +12,17 @@ use vector::{
 
 fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert single-level", |b| {
-        b.iter(|| {
+        b.iter_batched(|| {
+            let key1 = LookupBuf::from("key1");
+            let key2 = LookupBuf::from("key2");
+            let key3 = LookupBuf::from("key3");
+            (key1, key2, key3)
+        }, |(key1, key2, key3)| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert(LookupBuf::from("key1"), Bytes::from("value1"));
-            log.insert(LookupBuf::from("key2"), Bytes::from("value2"));
-            log.insert(LookupBuf::from("key3"), Bytes::from("value3"));
-        })
+            log.insert(key1, Bytes::from("value1"));
+            log.insert(key2, Bytes::from("value2"));
+            log.insert(key3, Bytes::from("value3"));
+        }, BatchSize::SmallInput)
     });
 
     c.bench_function("iterate all fields single-level", |b| {
@@ -35,18 +40,23 @@ fn benchmark_event(c: &mut Criterion) {
     });
 
     c.bench_function("create and insert nested-keys", |b| {
-        b.iter(|| {
-            let mut log = Event::new_empty_log().into_log();
-            log.insert(
-                LookupBuf::from_str("key1.nested1.nested2").unwrap(),
-                Bytes::from("value1"),
-            );
-            log.insert(
-                LookupBuf::from_str("key1.nested1.nested3").unwrap(),
-                Bytes::from("value4"),
-            );
-            log.insert(LookupBuf::from_str("key3").unwrap(), Bytes::from("value3"));
-        })
+        b.iter_batched(|| {
+            let key1 = LookupBuf::from_str("key1.nested1.nested2").unwrap();
+            let key2 = LookupBuf::from_str("key1.nested1.nested3").unwrap();
+            let key3 = LookupBuf::from_str("key3").unwrap();
+            (key1, key2, key3)
+        }, |(key1, key2, key3)| {
+                let mut log = Event::new_empty_log().into_log();
+                log.insert(
+                    key1,
+                    Bytes::from("value1"),
+                );
+                log.insert(
+                    key2,
+                    Bytes::from("value4"),
+                );
+                log.insert(key3, Bytes::from("value3"));
+            }, BatchSize::SmallInput)
     });
 
     c.bench_function("iterate all fields nested-keys", |b| {
@@ -69,9 +79,9 @@ fn benchmark_event(c: &mut Criterion) {
 
     c.bench_function("create and insert array", |b| {
         let str_1 = "key1.nested1[0]";
-        let lookup_1 = LookupBuf::from(str_1);
+        let lookup_1 = LookupBuf::from_str(str_1).unwrap();
         let str_2 = "key1.nested1[1]";
-        let lookup_2 = LookupBuf::from(str_2);
+        let lookup_2 = LookupBuf::from_str(str_2).unwrap();
         b.iter_batched(
             || (lookup_1.clone(), lookup_2.clone()),
             |(lookup_1, lookup_2)| {
