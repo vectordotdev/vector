@@ -615,7 +615,7 @@ mod test {
             event
                 .as_log()
                 .pairs(true)
-                .find(|(key, _)| (&key[..]).starts_with([Segment::field("empty")].as_ref()))
+                .find(|(key, _)| (&key[..]).starts_with([Segment::from("empty")].as_ref()))
                 == None
         }
 

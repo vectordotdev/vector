@@ -192,7 +192,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::field(k));
+                                l.push(Segment::from(k.as_str()));
                                 l
                             },
                         );
@@ -261,7 +261,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::field(k));
+                                l.push(Segment::from(k.as_str()));
                                 l
                             },
                         );

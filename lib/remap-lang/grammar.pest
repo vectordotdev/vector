@@ -105,12 +105,12 @@ WHITESPACE  = _{ " " | "\t" }
 // `lookup`s do not support coalescing: it is not safe to support.
 lookup         = ${ (lookup_segment) ~ (LOOKUP_PERIOD ~ (lookup_segment))* }
 lookup_segment = ${ (lookup_field | lookup_field_quoted) ~ lookup_array* }
-lookup_field   = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"" | "\\.")+ }
+lookup_field   = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"")+ }
 lookup_field_quoted = ${ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
 lookup_field_quoted_content  = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | " " | "." | "\\\"")+ }
 lookup_array = @{ LOOKUP_OPEN_BRACKET ~ lookup_array_index ~ LOOKUP_CLOSE_BRACKET }
 lookup_array_index =  ${ ASCII_DIGIT+ }
-LOOKUP_QUOTE = { "\""}
+LOOKUP_QUOTE = _{ "\""}
 LOOKUP_OPEN_BRACKET = _{ "[" }
 LOOKUP_CLOSE_BRACKET = _{ "]" }
 LOOKUP_PERIOD = _{ "." }

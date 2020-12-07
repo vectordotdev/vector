@@ -8,17 +8,21 @@ use std::fmt::{Display, Formatter};
 /// This is the owned, allocated side of a `Segement` for `LookupBuf.` It owns its fields unlike `Lookup`. Think of `String` to `&str` or `PathBuf` to `Path`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
-    Field(String),
+    Field {
+        name: String,
+        // This is a very lazy optimization to avoid having to scan for escapes.
+        requires_quoting: bool
+    },
     Index(usize),
 }
 
 impl SegmentBuf {
-    pub const fn field(v: String) -> SegmentBuf {
-        SegmentBuf::Field(v)
+    pub const fn field(name: String, requires_quoting: bool) -> SegmentBuf {
+        SegmentBuf::Field { name, requires_quoting }
     }
 
     pub fn is_field(&self) -> bool {
-        matches!(self, SegmentBuf::Field(_))
+        matches!(self, SegmentBuf::Field { name: _, requires_quoting: _ })
     }
 
     pub const fn index(v: usize) -> SegmentBuf {
@@ -32,7 +36,7 @@ impl SegmentBuf {
     #[instrument]
     pub(crate) fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
-            SegmentBuf::Field(f) => Segment::field(f.as_str()),
+            SegmentBuf::Field { name, requires_quoting} => Segment::field(name.as_str(), *requires_quoting),
             SegmentBuf::Index(i) => Segment::index(*i),
         }
     }
@@ -42,14 +46,16 @@ impl Display for SegmentBuf {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             SegmentBuf::Index(i) => write!(formatter, "{}", i),
-            SegmentBuf::Field(f) => write!(formatter, "{}", f),
+            SegmentBuf::Field { name, requires_quoting: false } => write!(formatter, "{}", name),
+            SegmentBuf::Field { name, requires_quoting: true } => write!(formatter, "\"{}\"", name),
         }
     }
 }
 
 impl From<String> for SegmentBuf {
-    fn from(s: String) -> Self {
-        Self::Field(s)
+    fn from(name: String) -> Self {
+        let requires_quoting = name.starts_with("\"");
+        Self::Field { name, requires_quoting }
     }
 }
 

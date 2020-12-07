@@ -9,17 +9,24 @@ use std::fmt::{Display, Formatter};
 /// If you need an owned, allocated version, see `SegmentBuf`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Segment<'a> {
-    Field(&'a str),
+    Field {
+        name: &'a str,
+        // This is a very lazy optimization to avoid having to scan for escapes.
+        requires_quoting: bool
+    },
     Index(usize),
 }
 
 impl<'a> Segment<'a> {
-    pub const fn field(v: &'a str) -> Segment<'a> {
-        Segment::Field(v)
+    pub const fn field(name: &'a str, requires_quoting: bool) -> Segment<'a> {
+        Segment::Field {
+            name,
+            requires_quoting,
+        }
     }
 
     pub fn is_field(&self) -> bool {
-        matches!(self, Segment::Field(_))
+        matches!(self, Segment::Field { name: _, requires_quoting: _  })
     }
 
     pub const fn index(v: usize) -> Segment<'a> {
@@ -94,7 +101,7 @@ impl<'a> Segment<'a> {
         let retval = match rule {
             ParserRule::lookup_field => {
                 tracing::trace!(segment = %segment_str, ?rule, action = %"push");
-                Segment::field(segment_str)
+                Segment::field(segment_str, false)
             },
             _ => Err(format!(
                 "Got invalid lookup rule. Got: {:?}. Want: {:?}",
@@ -116,8 +123,9 @@ impl<'a> Segment<'a> {
             match inner_segment.as_rule() {
                 ParserRule::lookup_field_quoted_content => {
                     debug_assert!(retval.is_none());
-                    tracing::trace!(segment = %full_segment, ?rule, action = %"push");
-                    retval = Some(Segment::field(full_segment));
+                    let segment_str = inner_segment.as_str();
+                    tracing::trace!(segment = %segment_str, ?rule, action = %"push");
+                    retval = Some(Segment::field(segment_str, true));
                 },
                 ParserRule::LOOKUP_QUOTE => continue,
                 _ => {
@@ -188,7 +196,7 @@ impl<'a> Segment<'a> {
     #[instrument]
     pub(crate) fn as_segment_buf(&self) -> SegmentBuf {
         match self {
-            Segment::Field(f) => SegmentBuf::field(f.to_string()),
+            Segment::Field { name, requires_quoting } => SegmentBuf::field(name.to_string(), *requires_quoting),
             Segment::Index(i) => SegmentBuf::index(*i),
         }
     }
@@ -198,14 +206,16 @@ impl<'a> Display for Segment<'a> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Segment::Index(i) => write!(formatter, "{}", i),
-            Segment::Field(f) => write!(formatter, "{}", f),
+            Segment::Field { name, requires_quoting: false } => write!(formatter, "{}", name),
+            Segment::Field { name, requires_quoting: true } => write!(formatter, "\"{}\"", name),
         }
     }
 }
 
 impl<'a> From<&'a str> for Segment<'a> {
-    fn from(s: &'a str) -> Self {
-        Self::Field(s)
+    fn from(name: &'a str) -> Self {
+        let requires_quoting = name.starts_with("\"");
+        Self::Field { name, requires_quoting }
     }
 }
 
@@ -218,8 +228,8 @@ impl<'a> From<usize> for Segment<'a> {
 impl<'a> From<&'a SegmentBuf> for Segment<'a> {
     fn from(v: &'a SegmentBuf) -> Self {
         match v {
-            SegmentBuf::Field(f) => Self::Field(f),
-            SegmentBuf::Index(i) => Self::Index(*i),
+            SegmentBuf::Field { name, requires_quoting } => Self::field(name, *requires_quoting),
+            SegmentBuf::Index(i) => Self::index(*i),
         }
     }
 }

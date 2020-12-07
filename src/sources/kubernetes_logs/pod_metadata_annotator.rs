@@ -125,7 +125,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = &fields_spec.pod_labels;
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push(Segment::field(key).into());
+            path.push(Segment::from(key.as_str()).into());
             log.insert(path, val.to_owned());
         }
     }
@@ -291,19 +291,19 @@ mod tests {
                         "sandbox0-uid",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label0").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.\"nested0.label0\"").unwrap(),
                         "val0",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label1").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.\"nested0.label1\"").unwrap(),
                         "val1",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.nested1\\.label0").unwrap(),
+                        LookupBuf::from_str("kubernetes.pod_labels.\"nested1.label0\"").unwrap(),
                         "val2",
                     );
                     log.insert(
-                        LookupBuf::from_str("kubernetes.pod_labels.nested2\\.label0\\.deep0")
+                        LookupBuf::from_str("kubernetes.pod_labels.\"nested2.label0.deep0\"")
                             .unwrap(),
                         "val3",
                     );

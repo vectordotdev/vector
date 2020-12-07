@@ -70,7 +70,7 @@ impl<'a> Display for Lookup<'a> {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                Segment::Field(_) => match maybe_next {
+                Segment::Field { name: _, requires_quoting: _ } => match maybe_next {
                     Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
@@ -181,7 +181,7 @@ impl<'a> IntoIterator for Lookup<'a> {
 impl<'a> From<&'a str> for Lookup<'a> {
     fn from(input: &'a str) -> Self {
         Self {
-            segments: vec![Segment::field(input)],
+            segments: vec![Segment::from(input)],
         }
         // We know this must be at least one segment.
     }
@@ -199,7 +199,7 @@ impl<'a> From<usize> for Lookup<'a> {
 impl<'a> From<&'a String> for Lookup<'a> {
     fn from(input: &'a String) -> Self {
         Self {
-            segments: vec![Segment::field(input.as_str())],
+            segments: vec![Segment::from(input.as_str())],
         }
         // We know this must be at least one segment.
     }
