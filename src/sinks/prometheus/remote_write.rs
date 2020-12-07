@@ -3,7 +3,6 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::Metric,
     http::HttpClient,
-    prometheus::proto,
     sinks::{
         self,
         util::{
@@ -137,12 +136,8 @@ impl RemoteWriteService {
                 &metric,
             );
         }
-        let timeseries = time_series.finish();
+        let request = time_series.finish();
 
-        let request = proto::WriteRequest {
-            timeseries,
-            metadata: vec![],
-        };
         let mut out = BytesMut::with_capacity(request.encoded_len());
         request.encode(&mut out).expect("Out of memory");
         out.freeze()
