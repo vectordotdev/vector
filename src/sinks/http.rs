@@ -2,6 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
+    internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -179,10 +180,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    warn!(
-                        message = "Event missing the message key; dropping event.",
-                        rate_limit_secs = 30,
-                    );
+                    emit!(HTTPEventMissingMessage);
                     return None;
                 }
             }
@@ -203,6 +201,10 @@ impl HttpSink for HttpSinkConfig {
                 b
             }
         };
+
+        emit!(HTTPEventEncoded {
+            byte_size: body.len(),
+        });
 
         Some(body)
     }

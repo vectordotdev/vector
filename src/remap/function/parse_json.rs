@@ -25,8 +25,8 @@ impl Function for ParseJson {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ParseJsonFn { value, default }))
     }

@@ -29,9 +29,9 @@ impl Function for Slice {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let start = arguments.required_expr("start")?;
-        let end = arguments.optional_expr("end")?;
+        let value = arguments.required("value")?.boxed();
+        let start = arguments.required("start")?.boxed();
+        let end = arguments.optional("end").map(Expr::boxed);
 
         Ok(Box::new(SliceFn { value, start, end }))
     }
@@ -137,7 +137,7 @@ mod tests {
 
         value_array {
             expr: |_| SliceFn {
-                value: Literal::from(vec!["foo"]).boxed(),
+                value: Array::from(vec!["foo"]).boxed(),
                 start: Literal::from(0).boxed(),
                 end: None,
             },
@@ -146,7 +146,7 @@ mod tests {
 
         value_unknown {
             expr: |_| SliceFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 start: Literal::from(0).boxed(),
                 end: None,
             },
@@ -219,7 +219,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -234,17 +235,17 @@ mod tests {
             (
                 map![],
                 Ok(vec![0, 1, 2].into()),
-                SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 0, None),
+                SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 0, None),
             ),
             (
                 map![],
                 Ok(vec![1, 2].into()),
-                SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 1, None),
+                SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 1, None),
             ),
             (
                 map![],
                 Ok(vec![1, 2].into()),
-                SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), -2, None),
+                SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), -2, None),
             ),
             (
                 map![],
@@ -268,7 +269,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -299,7 +301,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

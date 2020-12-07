@@ -1,7 +1,7 @@
 use std::convert::AsRef;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
     Multiply,
     Divide,
