@@ -25,7 +25,7 @@
 
 use k8s_openapi::{
     http::{Request, StatusCode},
-    RequestError, Resource, ResponseBody, WatchOptional, WatchResponse,
+    RequestError, ResponseBody, WatchOptional, WatchResponse,
 };
 use serde::de::DeserializeOwned;
 
@@ -34,7 +34,7 @@ use serde::de::DeserializeOwned;
 /// See module documentation.
 pub trait WatchRequestBuilder {
     /// The object type that's being watched.
-    type Object: Resource + DeserializeOwned;
+    type Object: DeserializeOwned;
 
     /// Build a watch request.
     fn build<'a>(
@@ -45,7 +45,7 @@ pub trait WatchRequestBuilder {
 
 impl<F, T> WatchRequestBuilder for F
 where
-    T: Resource + DeserializeOwned,
+    T: DeserializeOwned,
     F: for<'w> Fn(
         WatchOptional<'w>,
     ) -> Result<
@@ -77,7 +77,7 @@ pub struct Namespaced<N, F>(pub N, pub F);
 impl<N, F, T> WatchRequestBuilder for Namespaced<N, F>
 where
     N: AsRef<str>,
-    T: Resource + DeserializeOwned,
+    T: DeserializeOwned,
     F: for<'w> Fn(
         &'w str,
         WatchOptional<'w>,
