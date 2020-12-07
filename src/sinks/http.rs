@@ -125,7 +125,7 @@ impl SinkConfig for HttpSinkConfig {
         let client = HttpClient::new(tls)?;
 
         let mut config = self.clone();
-        config.uri.merge_auth_config(&mut config.auth)?;
+        Auth::merge_auth_config(&mut config.auth, &config.uri.auth)?;
         config.uri.uri = build_uri(&config.uri.uri);
 
         let batch = BatchSettings::default()
@@ -265,7 +265,7 @@ async fn healthcheck(
     mut auth: Option<Auth>,
     client: HttpClient,
 ) -> crate::Result<()> {
-    uri.merge_auth_config(&mut auth)?;
+    Auth::merge_auth_config(&mut auth, &uri.auth)?;
     let uri = build_uri(&uri.uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 

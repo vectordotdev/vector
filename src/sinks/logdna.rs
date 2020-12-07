@@ -236,10 +236,10 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host: Uri = self
+        let host = self
             .endpoint
             .clone()
-            .map(|uri| uri.uri)
+            .map(|endpoint| endpoint.uri)
             .unwrap_or_else(|| HOST.clone());
 
         let uri = format!("{}{}?{}", host, PATH, query);

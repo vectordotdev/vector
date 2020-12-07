@@ -23,7 +23,7 @@ use snafu::ResultExt;
 pub struct ClickhouseConfig {
     // Deprecated name
     #[serde(alias = "host")]
-    pub endpoint: String,
+    pub endpoint: UriSerde,
     pub table: String,
     pub database: Option<String>,
     #[serde(default = "Compression::gzip_default")]
@@ -77,9 +77,7 @@ impl SinkConfig for ClickhouseConfig {
         let client = HttpClient::new(tls_settings)?;
 
         let mut config = self.clone();
-        let uri = self.endpoint.parse::<UriSerde>()?;
-        uri.merge_auth_config(&mut config.auth)?;
-        config.endpoint = uri.uri.to_string();
+        Auth::merge_auth_config(&mut config.auth, &self.endpoint.auth)?;
 
         let sink = BatchedHttpSink::with_retry_logic(
             config.clone(),
@@ -128,7 +126,8 @@ impl HttpSink for ClickhouseConfig {
             "default"
         };
 
-        let uri = encode_uri(&self.endpoint, database, &self.table).expect("Unable to encode uri");
+        let uri =
+            set_uri_query(&self.endpoint.uri, database, &self.table).expect("Unable to encode uri");
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
@@ -163,7 +162,7 @@ async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Res
     }
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
+fn set_uri_query(uri: &Uri, database: &str, table: &str) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
@@ -176,13 +175,16 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         )
         .finish();
 
-    let url = if host.ends_with('/') {
-        format!("{}?{}", host, query)
-    } else {
-        format!("{}/?{}", host, query)
-    };
+    let mut uri = uri.to_string();
+    if !uri.ends_with('/') {
+        uri.push('/');
+    }
+    uri.push('?');
+    uri.push_str(query.as_str());
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    uri.parse::<Uri>()
+        .context(super::UriParseError)
+        .map_err(Into::into)
 }
 
 #[derive(Debug, Default, Clone)]
@@ -235,16 +237,26 @@ mod tests {
 
     #[test]
     fn encode_valid() {
-        let uri = encode_uri("http://localhost:80", "my_database", "my_table").unwrap();
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_table",
+        )
+        .unwrap();
         assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
-        let uri = encode_uri("http://localhost:80", "my_database", "my_\"table\"").unwrap();
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+        )
+        .unwrap();
         assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
     }
 
     #[test]
     fn encode_invalid() {
-        encode_uri("localhost:80", "my_database", "my_table").unwrap_err();
+        set_uri_query(&"localhost:80".parse().unwrap(), "my_database", "my_table").unwrap_err();
     }
 }
 

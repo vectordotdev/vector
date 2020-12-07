@@ -179,6 +179,16 @@ pub enum Auth {
 }
 
 impl Auth {
+    /// If both is `Some`, return an error. Otherwise, choose one of them and store in `auth`.
+    pub fn merge_auth_config(auth: &mut Option<Auth>, auth1: &Option<Auth>) -> crate::Result<()> {
+        if auth.is_some() && auth1.is_some() {
+            Err("Two authorization credentials was provided.".into())
+        } else {
+            *auth = auth.take().or_else(|| auth1.clone());
+            Ok(())
+        }
+    }
+
     pub fn apply<B>(&self, req: &mut Request<B>) {
         self.apply_headers_map(req.headers_mut())
     }

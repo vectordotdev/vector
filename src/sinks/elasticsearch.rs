@@ -346,7 +346,7 @@ impl ElasticSearchCommon {
             .into());
         }
 
-        let mut authorization = match &config.auth {
+        let authorization = match &config.auth {
             Some(ElasticSearchAuth::Basic { user, password }) => Some(Auth::Basic {
                 user: user.clone(),
                 password: password.clone(),
@@ -354,7 +354,7 @@ impl ElasticSearchCommon {
             _ => None,
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
-        uri.merge_auth_config(&mut authorization)?;
+        Auth::merge_auth_config(&mut authorization, &uri.auth)?;
         let base_url = uri.uri.to_string();
 
         let region = match &config.aws {

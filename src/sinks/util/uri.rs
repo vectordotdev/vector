@@ -14,20 +14,8 @@ use std::str::FromStr;
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,
+    #[must_use]
     pub auth: Option<Auth>,
-}
-
-impl UriSerde {
-    /// Used to combine existing authorization credentials with credentials in this URI.
-    /// If both is `Some`, return an error. Otherwise, choose one of them.
-    pub fn merge_auth_config(&self, auth: &mut Option<Auth>) -> crate::Result<()> {
-        if auth.is_some() && self.auth.is_some() {
-            Err("Two authorization credentials was provided.".into())
-        } else {
-            *auth = auth.take().or_else(|| self.auth.clone());
-            Ok(())
-        }
-    }
 }
 
 impl Serialize for UriSerde {
