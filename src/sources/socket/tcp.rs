@@ -2,6 +2,7 @@ use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
+    tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
 use bytes::Bytes;
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct TcpConfig {
     pub address: SocketListenAddr,
+    pub keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -32,6 +34,7 @@ impl TcpConfig {
     pub fn new(address: SocketListenAddr) -> Self {
         Self {
             address,
+            keepalive: None,
             max_length: default_max_length(),
             host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),

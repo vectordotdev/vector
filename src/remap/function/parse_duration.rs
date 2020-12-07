@@ -56,8 +56,8 @@ impl Function for ParseDuration {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let output = arguments.required_expr("output")?;
+        let value = arguments.required("value")?.boxed();
+        let output = arguments.required("output")?.boxed();
 
         Ok(Box::new(ParseDurationFn { value, output }))
     }
@@ -211,7 +211,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

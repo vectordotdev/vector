@@ -76,6 +76,7 @@ mod open;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
+mod pulsar;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
@@ -164,7 +165,8 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-pub use self::http::*;
+#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]
@@ -192,6 +194,7 @@ pub use self::open::*;
 pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
+pub use self::pulsar::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]

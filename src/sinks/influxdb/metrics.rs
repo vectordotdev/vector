@@ -38,6 +38,7 @@ struct InfluxDBSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBConfig {
+    #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]

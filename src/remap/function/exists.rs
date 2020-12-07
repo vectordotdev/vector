@@ -37,7 +37,7 @@ impl ExistsFn {
 
 impl Expression for ExistsFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let find = object.find(self.field.segments());
+        let find = object.get(self.field.as_ref());
         Ok(Value::from(!(find.is_err() || find.unwrap().is_none())))
     }
 
@@ -67,7 +67,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object = Value::Map(object);
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

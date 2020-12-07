@@ -1,5 +1,6 @@
 #![macro_use]
 
+mod assert;
 mod ceil;
 mod compact;
 mod contains;
@@ -7,6 +8,7 @@ mod del;
 mod downcase;
 mod ends_with;
 mod exists;
+mod flatten;
 mod floor;
 mod format_number;
 mod format_timestamp;
@@ -14,8 +16,10 @@ mod ip_cidr_contains;
 mod ip_subnet;
 mod ip_to_ipv6;
 mod ipv6_to_ipv4;
+mod log;
 mod r#match;
 mod md5;
+mod merge;
 mod now;
 mod only_fields;
 mod parse_duration;
@@ -24,6 +28,7 @@ mod parse_json;
 mod parse_syslog;
 mod parse_timestamp;
 mod parse_url;
+mod redact;
 mod replace;
 mod round;
 mod sha1;
@@ -44,6 +49,7 @@ mod truncate;
 mod upcase;
 mod uuid_v4;
 
+pub use self::assert::Assert;
 pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use self::sha2::Sha2;
@@ -55,6 +61,7 @@ pub use del::Del;
 pub use downcase::Downcase;
 pub use ends_with::EndsWith;
 pub use exists::Exists;
+pub use flatten::Flatten;
 pub use floor::Floor;
 pub use format_number::FormatNumber;
 pub use format_timestamp::FormatTimestamp;
@@ -62,6 +69,8 @@ pub use ip_cidr_contains::IpCidrContains;
 pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+pub use log::Log;
+pub use merge::Merge;
 pub use now::Now;
 pub use only_fields::OnlyFields;
 pub use parse_duration::ParseDuration;
@@ -71,6 +80,7 @@ pub use parse_syslog::ParseSyslog;
 pub use parse_timestamp::ParseTimestamp;
 pub use parse_url::ParseUrl;
 pub use r#match::Match;
+pub use redact::Redact;
 pub use replace::Replace;
 pub use round::Round;
 pub use slice::Slice;
@@ -107,7 +117,7 @@ fn is_scalar_value(value: &Value) -> bool {
 
     match value {
         Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
-        Timestamp(_) | Map(_) | Array(_) => false,
+        Timestamp(_) | Map(_) | Array(_) | Regex(_) => false,
     }
 }
 

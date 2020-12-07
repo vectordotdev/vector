@@ -139,7 +139,7 @@ impl InternalEvent for PrometheusRemoteWriteReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", self.count as u64);
+        counter!("processed_events_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -167,7 +167,12 @@ pub struct PrometheusServerRequestComplete {
 
 impl InternalEvent for PrometheusServerRequestComplete {
     fn emit_logs(&self) {
-        error!(message = "Request to prometheus server complete.", status_code = %self.status_code);
+        let message = "Request to prometheus server complete.";
+        if self.status_code.is_success() {
+            debug!(message, status_code = %self.status_code);
+        } else {
+            error!(message, status_code = %self.status_code);
+        }
     }
 
     fn emit_metrics(&self) {

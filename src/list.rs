@@ -6,7 +6,7 @@ use structopt::StructOpt;
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    #[structopt(long, default_value = "text", possible_values = &["text", "json", "avro"])]
     format: Format,
 }
 
@@ -14,6 +14,7 @@ pub struct Opts {
 enum Format {
     Text,
     Json,
+    Avro,
 }
 
 impl std::str::FromStr for Format {
@@ -23,6 +24,7 @@ impl std::str::FromStr for Format {
         match s {
             "text" => Ok(Format::Text),
             "json" => Ok(Format::Json),
+            "avro" => Ok(Format::Avro),
             s => Err(format!(
                 "{} is not a valid option, expected `text` or `json`",
                 s
@@ -61,6 +63,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             }
         }
         Format::Json => {
+            let list = EncodedList {
+                sources,
+                transforms,
+                sinks,
+            };
+            println!("{}", serde_json::to_string(&list).unwrap());
+        }
+        Format::Avro => {
             let list = EncodedList {
                 sources,
                 transforms,

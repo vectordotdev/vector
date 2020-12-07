@@ -3,6 +3,7 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
@@ -39,6 +40,7 @@ pub struct UdpConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TcpConfig {
     address: SocketListenAddr,
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -78,6 +80,7 @@ impl SourceConfig for StatsdConfig {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
                     config.address,
+                    config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
                     shutdown,
@@ -184,8 +187,8 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::{compat::Future01CompatExt, TryStreamExt};
-    use futures01::Stream;
+    use futures::compat::Future01CompatExt;
+    use hyper::body::to_bytes as body_to_bytes;
     use tokio::io::AsyncWriteExt;
     use tokio::sync::mpsc;
     use tokio::time::{delay_for, Duration};
@@ -209,19 +212,15 @@ mod test {
     async fn test_statsd_udp() {
         let in_addr = next_addr();
         let config = StatsdConfig::Udp(UdpConfig { address: in_addr });
-        let sender = {
-            let (sender, mut receiver) = mpsc::channel(200);
-            let addr = in_addr;
-            tokio::spawn(async move {
-                let bind_addr = next_addr();
-                let mut socket = UdpSocket::bind(bind_addr).await.unwrap();
-                socket.connect(addr).await.unwrap();
-                while let Some(bytes) = receiver.recv().await {
-                    socket.send(bytes).await.unwrap();
-                }
-            });
-            sender
-        };
+        let (sender, mut receiver) = mpsc::channel(200);
+        tokio::spawn(async move {
+            let bind_addr = next_addr();
+            let mut socket = UdpSocket::bind(bind_addr).await.unwrap();
+            socket.connect(in_addr).await.unwrap();
+            while let Some(bytes) = receiver.recv().await {
+                socket.send(bytes).await.unwrap();
+            }
+        });
         test_statsd(config, sender).await;
     }
 
@@ -230,24 +229,21 @@ mod test {
         let in_addr = next_addr();
         let config = StatsdConfig::Tcp(TcpConfig {
             address: in_addr.into(),
+            keepalive: None,
             tls: None,
             shutdown_timeout_secs: 30,
         });
-        let sender = {
-            let (sender, mut receiver) = mpsc::channel(200);
-            let addr = in_addr;
-            tokio::spawn(async move {
-                while let Some(bytes) = receiver.recv().await {
-                    tokio::net::TcpStream::connect(addr)
-                        .await
-                        .unwrap()
-                        .write_all(bytes)
-                        .await
-                        .unwrap();
-                }
-            });
-            sender
-        };
+        let (sender, mut receiver) = mpsc::channel(200);
+        tokio::spawn(async move {
+            while let Some(bytes) = receiver.recv().await {
+                tokio::net::TcpStream::connect(in_addr)
+                    .await
+                    .unwrap()
+                    .write_all(bytes)
+                    .await
+                    .unwrap();
+            }
+        });
         test_statsd(config, sender).await;
     }
 
@@ -258,21 +254,17 @@ mod test {
         let config = StatsdConfig::Unix(UnixConfig {
             path: in_path.clone(),
         });
-        let sender = {
-            let (sender, mut receiver) = mpsc::channel(200);
-            let path = in_path;
-            tokio::spawn(async move {
-                while let Some(bytes) = receiver.recv().await {
-                    tokio::net::UnixStream::connect(&path)
-                        .await
-                        .unwrap()
-                        .write_all(bytes)
-                        .await
-                        .unwrap();
-                }
-            });
-            sender
-        };
+        let (sender, mut receiver) = mpsc::channel(200);
+        tokio::spawn(async move {
+            while let Some(bytes) = receiver.recv().await {
+                tokio::net::UnixStream::connect(&in_path)
+                    .await
+                    .unwrap()
+                    .write_all(bytes)
+                    .await
+                    .unwrap();
+            }
+        });
         test_statsd(config, sender).await;
     }
 
@@ -321,14 +313,7 @@ mod test {
             .unwrap();
         assert!(response.status().is_success());
 
-        let body = response
-            .into_body()
-            .compat()
-            .map(|bytes| bytes.to_vec())
-            .concat2()
-            .compat()
-            .await
-            .unwrap();
+        let body = body_to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -375,14 +360,7 @@ mod test {
                 .unwrap();
             assert!(response.status().is_success());
 
-            let body = response
-                .into_body()
-                .compat()
-                .map(|bytes| bytes.to_vec())
-                .concat2()
-                .compat()
-                .await
-                .unwrap();
+            let body = body_to_bytes(response.into_body()).await.unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -403,14 +381,7 @@ mod test {
                 .unwrap();
             assert!(response.status().is_success());
 
-            let body = response
-                .into_body()
-                .compat()
-                .map(|bytes| bytes.to_vec())
-                .concat2()
-                .compat()
-                .await
-                .unwrap();
+            let body = body_to_bytes(response.into_body()).await.unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()

@@ -8,7 +8,7 @@ set -euo pipefail
 #   Pushes new versions produced by `make release` to the repository
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-VERSION="$(./scripts/version.sh | sed 's/-nightly$//')"
+VERSION="$(./scripts/version.sh)"
 VERSION_MINOR="$(echo "$VERSION" | grep -o '^[0-9]*\.[0-9]*')"
 CURRENT_BRANCH_NAME="$(git branch | awk '{ print $2 }')"
 

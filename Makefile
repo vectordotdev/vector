@@ -299,23 +299,23 @@ test-behavior: ## Runs behaviorial test
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-nginx test-integration-pulsar
-test-integration: test-integration-splunk
+test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
-start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-nginx
-start-test-integration: start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-gcp start-integration-humio start-integration-influxdb start-integration-kafka
+start-test-integration: start-integration-loki start-integration-mongodb_metrics start-integration-nats
+start-test-integration: start-integration-nginx start-integration-prometheus start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
-stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-mongodb_metrics stop-integration-nats stop-integration-nginx
-stop-test-integration: stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-gcp stop-integration-humio stop-integration-influxdb stop-integration-kafka
+stop-test-integration: stop-integration-loki stop-integration-mongodb_metrics stop-integration-nats
+stop-test-integration: stop-integration-nginx stop-integration-prometheus stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
@@ -989,7 +989,10 @@ package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
+
+.PHONY: package-x86_64-unknown-linux-musl-all
+package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl package-rpm-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
@@ -1023,9 +1026,13 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-li
 
 # debs
 
-.PHONY: package-deb-x86_64
-package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
+.PHONY: package-deb-x86_64-unknown-linux-gnu
+package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+
+.PHONY: package-deb-x86_64-unknown-linux-musl
+package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
@@ -1037,9 +1044,13 @@ package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-
 
 # rpms
 
-.PHONY: package-rpm-x86_64
-package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
+.PHONY: package-rpm-x86_64-unknown-linux-gnu
+package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+
+.PHONY: package-rpm-x86_64-unknown-linux-musl
+package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
@@ -1064,7 +1075,7 @@ release-docker: ## Release to Docker Hub
 
 .PHONY: release-github
 release-github: ## Release to Github
-	@scripts/release-github.rb
+	@scripts/release-github.sh
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to timberio Homebrew tap

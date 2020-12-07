@@ -283,9 +283,9 @@ impl Source {
                 strategy: FingerprintStrategy::FirstLineChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
-                    max_line_length: max_line_bytes,
                     ignored_header_bytes: 0,
                 },
+                max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
             // We expect the files distribution to not be a concern because of

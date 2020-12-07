@@ -310,13 +310,15 @@ components: sources: kubernetes_logs: {
 			body: """
 				Vector provides rich filtering options for Kubernetes log collection:
 
+				* Built-in [`Pod`](#pod-exclusion) and [`container`](#container-exclusion)
+				  exclusion rules.
 				* The `exclude_paths_glob_patterns` option allows you to exclude
 				  Kuberenetes log files by the file name and path.
 				* The `extra_field_selector` option specifies the field selector to
-				  filter Pods with, to be used in addition to the built-in Node filter.
+				  filter Pods with, to be used in addition to the built-in `Node` filter.
 				* The `extra_label_selector` option specifies the label selector to
-				  filter Pods with, to be used in addition to the built-in
-				  `vector.dev/exclude` filter.
+				  filter `Pod`s with, to be used in addition to the [built-in
+				  `vector.dev/exclude` filter](#pod-exclusion).
 				"""
 		}
 
