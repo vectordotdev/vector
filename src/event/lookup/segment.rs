@@ -213,8 +213,12 @@ impl<'a> Display for Segment<'a> {
 }
 
 impl<'a> From<&'a str> for Segment<'a> {
-    fn from(name: &'a str) -> Self {
+    fn from(mut name: &'a str) -> Self {
         let requires_quoting = name.starts_with("\"");
+        if requires_quoting {
+            let len = name.len();
+            name = &name[1..len - 1];
+        }
         Self::Field { name, requires_quoting }
     }
 }

@@ -119,7 +119,7 @@ mod tests {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        LookupBuf::from_str("foo\\.bar.baz").unwrap(),
+                        LookupBuf::from_str("\"foo.bar\".baz").unwrap(),
                         Value::Integer(20),
                     );
                     event
@@ -143,7 +143,7 @@ mod tests {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        LookupBuf::from_str("foo\\.bar[0].baz").unwrap(),
+                        LookupBuf::from_str("foo.bar[0].baz").unwrap(),
                         Value::Integer(20),
                     );
                     event

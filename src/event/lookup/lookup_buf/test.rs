@@ -44,6 +44,16 @@ fn simple() {
 }
 
 #[test]
+fn quoted() {
+    crate::test_util::trace_init();
+    let input = "\"start\".\"after\"";
+    let lookup = LookupBuf::from_str(input).unwrap();
+    assert_eq!(lookup[0], SegmentBuf::from(String::from("\"start\"")));
+    assert_eq!(lookup[1], SegmentBuf::from(String::from("\"after\"")));
+    assert_eq!(lookup.to_string(), input);
+}
+
+#[test]
 fn push() {
     crate::test_util::trace_init();
     let input = "some_key";

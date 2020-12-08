@@ -53,8 +53,15 @@ impl Display for SegmentBuf {
 }
 
 impl From<String> for SegmentBuf {
-    fn from(name: String) -> Self {
+    fn from(mut name: String) -> Self {
         let requires_quoting = name.starts_with("\"");
+        if requires_quoting {
+            // There is unfortunately not way to make an owned substring of a string.
+            // So we have to take a slice and clone it.
+            let len = name.len();
+            name = name[1..len - 1].to_string();
+
+        }
         Self::Field { name, requires_quoting }
     }
 }
