@@ -213,6 +213,7 @@ get_gnu_musl_glibc() {
   need_cmd awk
   # Detect both gnu and musl
   # Also detect glibc versions older than 2.18 and return musl for these
+  # Required until we address https://github.com/timberio/vector/issues/5412.
   local _ldd_version
   local _glibc_version
   _ldd_version=$(ldd --version)
@@ -226,7 +227,7 @@ get_gnu_musl_glibc() {
 elif [[ $_ldd_version =~ "musl" ]]; then
   echo "musl"
 else
-  err "Unknown architecture from ldd"
+  err "Unknown architecture from ldd: ${_ldd_version}"
 fi
 }
 
