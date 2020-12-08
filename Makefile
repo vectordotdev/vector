@@ -276,8 +276,8 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-test-components: $(WASM_MODULE_OUTPUTS)
 # TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# test-components: $(WASM_MODULE_OUTPUTS)
 test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches"
 test-components: test
 
@@ -1133,7 +1133,7 @@ ifeq (${CI}, true)
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
 	df -h
-	sudo apt-get --purge autoremove
+	sudo apt-get --purge autoremove --yes
 	sudo apt-get clean
 	sudo rm -rf "/opt/*" "/usr/local/*"
 	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
