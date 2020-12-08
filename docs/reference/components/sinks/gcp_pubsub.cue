@@ -131,19 +131,21 @@ components: sinks: gcp_pubsub: {
 		metrics: null
 	}
 
-	permissions: iam: {
-		platform: "gcp"
-		_service: "pubsub"
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "pubsub"
 
-		policies: [
-			{
-				_action: "topics.get"
-				required_for: ["healthcheck"]
-			},
-			{
-				_action: "topics.publish"
-				required_for: ["write"]
-			},
-		]
-	}
+			policies: [
+				{
+					_action: "topics.get"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "topics.publish"
+					required_for: ["write"]
+				},
+			]
+		},
+	]
 }

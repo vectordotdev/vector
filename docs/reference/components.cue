@@ -128,7 +128,7 @@ components: {
 
 		// Platform-specific policies, e.g. AWS IAM policies, that are
 		// required or recommended when using the component.
-		permissions?: iam: #IAM
+		permissions?: iam: [#IAM, ...#IAM]
 
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput

@@ -280,19 +280,21 @@ components: sinks: gcp_cloud_storage: {
 		}
 	}
 
-	permissions: iam: {
-		platform: "gcp"
-		_service: "storage"
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "storage"
 
-		policies: [
-			{
-				_action: "objects.create"
-				required_for: ["write"]
-			},
-			{
-				_action: "objects.get"
-				required_for: ["healthcheck"]
-			},
-		]
-	}
+			policies: [
+				{
+					_action: "objects.create"
+					required_for: ["write"]
+				},
+				{
+					_action: "objects.get"
+					required_for: ["healthcheck"]
+				},
+			]
+		},
+	]
 }
