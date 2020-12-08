@@ -68,15 +68,47 @@ macro_rules! test_function {
 }
 
 #[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
+macro_rules! array {
+    () => ({
+        let vec: Vec<$crate::Value> = ::std::vec::Vec::new();
+        $crate::expression::Array::from(vec)
+    });
+    ($($v:expr),+ $(,)?) => ({
+        let vec: Vec<$crate::Value> = vec![$($v.into()),+];
+        $crate::expression::Array::from(vec)
+    })
+}
+
+#[macro_export]
+macro_rules! value {
+    ([]) => ({
+        $crate::Value::Array(vec![])
+    });
+
+    ([$($v:tt),+ $(,)?]) => ({
+        let vec: Vec<$crate::Value> = vec![$($crate::value!($v)),+];
+        $crate::Value::Array(vec)
+    });
+
+    ({}) => ({
+        $crate::Value::Map(::std::collections::BTreeMap::default())
+    });
+
+    ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({
+        let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::value!($v))),+]
             .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
+            .collect::<::std::collections::BTreeMap<_, $crate::Value>>();
+
+        $crate::Value::Map(map)
+    });
+
+    (null) => ({
+        $crate::Value::Null
+    });
+
+    ($k:expr) => ({
+        $crate::Value::from($k)
+    });
 }
 
 #[doc(hidden)]

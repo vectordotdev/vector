@@ -539,13 +539,3 @@ macro_rules! map {
             .collect::<::std::collections::BTreeMap<_, _>>()
     };
 }
-
-#[macro_export]
-macro_rules! array {
-    () => (
-        ::std::vec::Vec::new().into()
-    );
-    ($($v:expr),+ $(,)?) => {
-        vec![$($v.into()),+]
-    }
-}
