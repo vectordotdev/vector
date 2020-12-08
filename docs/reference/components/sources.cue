@@ -60,6 +60,24 @@ components: sources: [Name=string]: {
 			}
 		}
 
+		if sources[Name].features.encoding.enabled {
+			encoding: {
+				description: "Configures the encoding specific source behavior."
+				required:    false
+				type: object: options: {
+					charset: {
+						common:      false
+						description: "Encoding of the source messages. Takes one of the encoding [label strings](\(urls.encoding_charset_labels)) defined as part of the [Encoding Standard](\(urls.encoding_standard)). When set, the messages are transcoded from the specified encoding to utf-8, which is the encoding vector assumes internally for string-like data. So it makes sense to rely on this operation only if you need your data to be in utf-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to utf-8) will be replaced with [replacement character](\(urls.unicode_replacement_character)) and warnings will be logged."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["utf-16le", "utf-16be"]
+						}
+					}
+				}
+			}
+		}
+
 		if sources[Name].features.collect != _|_ {
 			if sources[Name].features.collect.tls != _|_ {
 				if sources[Name].features.collect.tls.enabled {
