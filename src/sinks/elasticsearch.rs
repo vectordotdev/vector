@@ -214,6 +214,7 @@ impl HttpSink for ElasticSearchCommon {
 
             if let Some(ce) = self.compression.content_encoding() {
                 request.add_header("Content-Encoding", ce);
+                request.add_header("Accept-Encoding", ce);
             }
 
             if let Some(headers) = &self.config.headers {
@@ -241,6 +242,7 @@ impl HttpSink for ElasticSearchCommon {
 
             if let Some(ce) = self.compression.content_encoding() {
                 builder = builder.header("Content-Encoding", ce);
+                builder = builder.header("Accept-Encoding", ce);
             }
 
             if let Some(headers) = &self.config.headers {
