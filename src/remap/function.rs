@@ -28,6 +28,7 @@ mod parse_json;
 mod parse_syslog;
 mod parse_timestamp;
 mod parse_url;
+mod redact;
 mod replace;
 mod round;
 mod sha1;
@@ -79,6 +80,7 @@ pub use parse_syslog::ParseSyslog;
 pub use parse_timestamp::ParseTimestamp;
 pub use parse_url::ParseUrl;
 pub use r#match::Match;
+pub use redact::Redact;
 pub use replace::Replace;
 pub use round::Round;
 pub use slice::Slice;
@@ -115,7 +117,7 @@ fn is_scalar_value(value: &Value) -> bool {
 
     match value {
         Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
-        Timestamp(_) | Map(_) | Array(_) => false,
+        Timestamp(_) | Map(_) | Array(_) | Regex(_) => false,
     }
 }
 

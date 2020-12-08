@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -110,7 +110,7 @@ itertools = { version = "0.9.0", optional = true }
 # API client
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
-crossterm = { version = "0.18.0", optional = true }
+crossterm = { version = "0.18.2", optional = true }
 tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
 bus = { version = "2.2.3", optional = true }
 
@@ -131,7 +131,7 @@ openssl = "0.10.30"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
 async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
-structopt = "0.3.19"
+structopt = "0.3.21"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
@@ -194,7 +194,7 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = "0.11.0"
+avro-rs = "0.12.0"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -234,6 +234,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -337,13 +338,14 @@ sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tls", "sources-utils-unix"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
-sources-vector = ["listenfd" ,"sources-utils-tls"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
 sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-tcp-keepalive = []
 sources-utils-tls = []
 sources-utils-unix = []
 

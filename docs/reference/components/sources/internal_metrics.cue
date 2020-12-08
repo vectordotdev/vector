@@ -162,13 +162,13 @@ components: sources: internal_metrics: {
 			}
 		}
 		collect_completed_total: {
-			description:       "The total number of MongoDB metrics collections completed."
+			description:       "The total number of metrics collections completed for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
 		collect_duration_nanoseconds: {
-			description:       "The duration spent collecting MongoDB metrics."
+			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -187,7 +187,7 @@ components: sources: internal_metrics: {
 				mode: {
 					description: ""
 					required:    true
-					options: {
+					enum: {
 						udp: "User Datagram Protocol"
 					}
 				}
@@ -393,7 +393,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		parse_errors_total: {
-			description:       "The total number of errors parsing Prometheus metrics."
+			description:       "The total number of errors parsing metrics for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -418,14 +418,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		request_duration_nanoseconds: {
-			description:       "The request duration for this component (in nanoseconds)."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		request_error_total: {
-			description:       "The total number of MongoDB request errors."
+		request_errors_total: {
+			description:       "The total number of requests errors for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -499,9 +493,9 @@ components: sources: internal_metrics: {
 				ignore_type: {
 					description: "The reason for ignoring the S3 record"
 					required:    true
-					options: [
-						"invalid_event_kind",
-					]
+					enum: {
+						"invalid_event_kind": "The kind of invalid event."
+					}
 				}
 			}
 		}
@@ -546,7 +540,7 @@ components: sources: internal_metrics: {
 				mode: {
 					description: "The connection mode used by the component."
 					required:    true
-					options: {
+					enum: {
 						udp: "User Datagram Protocol"
 					}
 				}
@@ -631,17 +625,21 @@ components: sources: internal_metrics: {
 			required:    true
 		}
 		_component_kind: {
-			description: "The component's kind (options are `source`, `sink`, or `transform`)."
+			description: "The Vector component kind."
 			required:    true
-			options: ["sink", "source", "transform"]
+			enum: {
+				"sink":      "Vector sink components"
+				"source":    "Vector source components"
+				"transform": "Vector transform components"
+			}
 		}
 		_component_name: {
-			description: "The name of the component as specified in the Vector configuration."
+			description: "The Vector component ID."
 			required:    true
 			examples: ["file_source", "splunk_sink"]
 		}
 		_component_type: {
-			description: "The type of component (source, transform, or sink)."
+			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
 		}
@@ -653,18 +651,18 @@ components: sources: internal_metrics: {
 		_error_type: {
 			description: "The type of the error"
 			required:    true
-			options: [
-				"field_missing",
-				"invalid_metric",
-				"mapping_failed",
-				"match_failed",
-				"parse_failed",
-				"render_error",
-				"type_conversion_failed",
-				"type_field_does_not_exist",
-				"type_ip_address_parse_error",
-				"value_invalid",
-			]
+			enum: {
+				"field_missing":               "The event field was missing."
+				"invalid_metric":              "The metric was invalid."
+				"mapping_failed":              "The mapping failed."
+				"match_failed":                "The match operation failed."
+				"parse_failed":                "The parsing operation failed."
+				"render_error":                "The rendering operation failed."
+				"type_conversion_failed":      "The type conversion operating failed."
+				"type_field_does_not_exist":   "The type field does not exist."
+				"type_ip_address_parse_error": "The IP address did not parse."
+				"value_invalid":               "The value was invalid."
+			}
 		}
 		_file: {
 			description: "The file that produced the error"

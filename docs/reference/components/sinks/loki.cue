@@ -48,6 +48,22 @@ components: sinks: loki: {
 				can_verify_hostname:    true
 				enabled_default:        false
 			}
+			to: {
+				service: {
+					name:     "Loki"
+					thing:    "a \(name) database"
+					url:      urls.loki
+					versions: null
+				}
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
