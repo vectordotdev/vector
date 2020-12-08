@@ -1365,18 +1365,17 @@ mod integration_tests {
         trace_init();
 
         let will_be_read = "12";
-        let include_prefix = "include_me_plz";
-        let included0 = "include_me_plz_0";
-        let included1 = "include_me_plz_1";
 
-        let exclude_prefix = "exclude_me_plz";
-        let excluded0 = "exclude_me_plz_0";
+        let prefix = "vector_test_exclude_containers";
+        let included0 = format!("{}_{}", prefix, "include0");
+        let included1 = format!("{}_{}", prefix, "include1");
+        let excluded0 = format!("{}_{}", prefix, "excluded0");
 
         let docker = docker().unwrap();
 
         let out = source_with_config(DockerLogsConfig {
-            include_containers: Some(vec![include_prefix.to_owned()]),
-            exclude_containers: Some(vec![exclude_prefix.to_owned()]),
+            include_containers: Some(vec![prefix.to_owned()]),
+            exclude_containers: Some(vec![excluded0.to_owned()]),
             ..DockerLogsConfig::default()
         });
 
