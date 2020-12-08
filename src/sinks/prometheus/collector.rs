@@ -3,7 +3,8 @@ use crate::{
     prometheus::{proto, METRIC_NAME_LABEL},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use indexmap::map::IndexMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {
@@ -282,8 +283,8 @@ impl StringCollector {
 type Labels = Vec<proto::Label>;
 
 pub(super) struct TimeSeries {
-    buffer: HashMap<Labels, Vec<proto::Sample>>,
-    metadata: HashMap<String, proto::MetricMetadata>,
+    buffer: IndexMap<Labels, Vec<proto::Sample>>,
+    metadata: IndexMap<String, proto::MetricMetadata>,
 }
 
 impl TimeSeries {
