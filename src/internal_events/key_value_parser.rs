@@ -6,10 +6,7 @@ pub(crate) struct KeyValueEventProcessed;
 
 impl InternalEvent for KeyValueEventProcessed {
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value",
-        );
+        counter!("processed_events_total", 1);
     }
 
     fn emit_metrics_wrapped(&self) {}
@@ -33,8 +30,6 @@ impl InternalEvent for KeyValueParseFailed {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
         );
     }
@@ -56,8 +51,6 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "target_field_exists",
         );
     }
@@ -79,8 +72,6 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
         );
     }
