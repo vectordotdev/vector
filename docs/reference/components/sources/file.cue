@@ -391,8 +391,9 @@ components: sources: file: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (by default, `\n` i.e. the `0xA` byte)
-        or `EOF` is found. If needed, the default line delimiter can be overriden via the `line_delimiter` option.
+				Each line is read until a new line delimiter (by default, `\n` i.e.
+				the `0xA` byte) or `EOF` is found. If needed, the default line
+				delimiter can be overriden via the `line_delimiter` option.
 				"""
 		}
 

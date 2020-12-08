@@ -205,7 +205,7 @@ pub fn file_source(
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
         .expect("invalid glob patterns");
 
-    let encoding_charset = config.encoding.clone().and_then(|e| *(e.charset()));
+    let encoding_charset = config.encoding.clone().and_then(|e| e.charset);
 
     // if file encoding is specified, need to convert the line delimiter (present as utf8)
     // to the specified encoding, so that delimiter-based line splitting can work properly

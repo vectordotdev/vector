@@ -6,9 +6,3 @@ pub struct EncodingConfig {
     #[serde(default)]
     pub charset: Option<&'static encoding_rs::Encoding>,
 }
-
-impl EncodingConfig {
-    pub fn charset(&self) -> &Option<&'static encoding_rs::Encoding> {
-        &self.charset
-    }
-}
