@@ -51,6 +51,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
@@ -63,6 +64,7 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            exclude_containers: None,
             include_containers: None,
             include_labels: None,
             include_images: None,
@@ -75,26 +77,29 @@ impl Default for DockerLogsConfig {
 }
 
 impl DockerLogsConfig {
-    fn container_name_included<'a>(
+    fn container_name_or_id_included<'a>(
         &self,
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
-        if let Some(include_containers) = &self.include_containers {
-            let id_flag = include_containers
+        let containers: Vec<String> = names.into_iter().map(Into::into).collect();
+
+        self.include_containers
+            .as_ref()
+            .map(|include_list| Self::name_or_id_matches(id, &containers, include_list))
+            .unwrap_or(true)
+            && !(self
+                .exclude_containers
+                .as_ref()
+                .map(|exclude_list| Self::name_or_id_matches(id, &containers, exclude_list))
+                .unwrap_or(false))
+    }
+
+    fn name_or_id_matches(id: &str, names: &[String], items: &[String]) -> bool {
+        items.iter().any(|flag| id.starts_with(flag))
+            || names
                 .iter()
-                .any(|include| id.starts_with(include));
-
-            let name_flag = names.into_iter().any(|name| {
-                include_containers
-                    .iter()
-                    .any(|include| name.starts_with(include))
-            });
-
-            id_flag || name_flag
-        } else {
-            true
-        }
+                .any(|name| items.iter().any(|item| name.starts_with(item)))
     }
 
     fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
@@ -303,11 +308,20 @@ impl DockerLogsSource {
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = config
+        let include_containers_specified = config
             .include_containers
-            .clone()
-            .unwrap_or_default()
-            .is_empty()
+            .as_ref()
+            .map(Vec::is_empty)
+            .unwrap_or(false);
+
+        let exclude_containers_specified = config
+            .exclude_containers
+            .as_ref()
+            .map(Vec::is_empty)
+            .unwrap_or(false);
+
+        let exclude_self = include_containers_specified
+            && !exclude_containers_specified
             && config.include_labels.clone().unwrap_or_default().is_empty();
 
         let backoff_secs = config.retry_backoff_secs;
@@ -383,7 +397,7 @@ impl DockerLogsSource {
                     return;
                 }
 
-                if !self.esb.core.config.container_name_included(
+                if !self.esb.core.config.container_name_or_id_included(
                     id.as_str(),
                     names.iter().map(|s| {
                         // In this case bollard / shiplift gives names with starting '/' so it needs to be removed.
@@ -466,7 +480,7 @@ impl DockerLogsSource {
                                         self.esb.restart(state);
                                     } else {
                                         let include_name =
-                                            self.esb.core.config.container_name_included(
+                                            self.esb.core.config.container_name_or_id_included(
                                                 id.as_str(),
                                                 attributes.get("name").map(|s| s.as_str()),
                                             );
@@ -1027,7 +1041,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        test_util::{collect_n, trace_init},
+        test_util::{collect_n, collect_ready, trace_init},
         Pipeline,
     };
     use bollard::{
@@ -1334,7 +1348,7 @@ mod integration_tests {
 
         let docker = docker().unwrap();
 
-        let id0 = container_log_n(1, name0, None, "13", &docker).await;
+        let id0 = container_log_n(1, name0, None, "11", &docker).await;
         let id1 = container_log_n(1, name1, None, message, &docker).await;
         let events = collect_n(out, 1).await.unwrap();
         container_remove(&id0, &docker).await;
@@ -1347,10 +1361,49 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn exclude_containers() {
+        trace_init();
+
+        let will_be_read = "12";
+
+        let prefix = "vector_test_exclude_containers";
+        let included0 = format!("{}_{}", prefix, "include0");
+        let included1 = format!("{}_{}", prefix, "include1");
+        let excluded0 = format!("{}_{}", prefix, "excluded0");
+
+        let docker = docker().unwrap();
+
+        let out = source_with_config(DockerLogsConfig {
+            include_containers: Some(vec![prefix.to_owned()]),
+            exclude_containers: Some(vec![excluded0.to_owned()]),
+            ..DockerLogsConfig::default()
+        });
+
+        let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
+        let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
+        let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
+        let events = collect_ready(out).await.unwrap();
+        container_remove(&id0, &docker).await;
+        container_remove(&id1, &docker).await;
+        container_remove(&id2, &docker).await;
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            will_be_read.into()
+        );
+
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            will_be_read.into()
+        );
+    }
+
+    #[tokio::test]
     async fn include_labels() {
         trace_init();
 
-        let message = "12";
+        let message = "13";
         let name0 = "vector_test_include_labels_0";
         let name1 = "vector_test_include_labels_1";
         let label = "vector_test_include_label";
