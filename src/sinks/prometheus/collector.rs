@@ -214,7 +214,7 @@ impl MetricCollector for StringCollector {
 
     fn emit_value(
         &mut self,
-        _timestamp_millis: i64,
+        timestamp_millis: i64,
         name: &str,
         suffix: &str,
         value: f64,
@@ -224,7 +224,10 @@ impl MetricCollector for StringCollector {
         self.result.push_str(name);
         self.result.push_str(suffix);
         self.encode_tags(tags, extra);
-        writeln!(&mut self.result, " {}", value).ok();
+        let _ = match timestamp_millis {
+            0 => writeln!(&mut self.result, " {}", value),
+            _ => writeln!(&mut self.result, " {} {}", value, timestamp_millis),
+        };
     }
 
     fn finish(self) -> String {
@@ -790,5 +793,40 @@ ns_requests_avg{code="200"} 1.875
             false,
             &metric,
         )
+    }
+
+    #[test]
+    fn encodes_timestamp_text() {
+        assert_eq!(
+            encode_timestamp::<StringCollector>(),
+            r#"# HELP temperature temperature
+# TYPE temperature counter
+temperature 2 1234567890123
+"#
+        );
+    }
+
+    #[test]
+    fn encodes_timestamp_request() {
+        assert_eq!(
+            encode_timestamp::<TimeSeries>(),
+            write_request!("temperature", "temperature", Counter ["" @ 1234567890123 = 2.0 []])
+        );
+    }
+
+    fn encode_timestamp<T: MetricCollector>() -> T::Output {
+        use chrono::{DateTime, NaiveDateTime, Utc};
+        let metric = Metric {
+            name: "temperature".to_owned(),
+            namespace: None,
+            timestamp: Some(DateTime::<Utc>::from_utc(
+                NaiveDateTime::from_timestamp(1234567890, 123456789),
+                Utc,
+            )),
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 2.0 },
+        };
+        encode_one::<T>(None, &[], &[], false, &metric)
     }
 }
