@@ -33,7 +33,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod tests {
     use super::*;
     use crate::function::ArgumentList;
-    use crate::map;
+    use crate::value;
 
     #[test]
     fn it_works() {
@@ -145,14 +145,14 @@ mod tests {
             (r#"null || false"#, Ok(()), Ok(false.into())),
             (r#"false || null"#, Ok(()), Ok(().into())),
             (r#"null || "foo""#, Ok(()), Ok("foo".into())),
-            (r#". = .foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
-            (r#"."#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
-            (r#" . "#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
-            (r#".foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#". = .foo"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
+            (r#"."#, Ok(()), Ok(value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}}))),
+            (r#" . "#, Ok(()), Ok(value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}}))),
+            (r#".foo"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
             (r#".foo.qux[0]"#, Ok(()), Ok(1.into())),
             (r#".foo.bar"#, Ok(()), Ok("baz".into())),
-            (r#".(nope | foo)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
-            (r#".(foo | nope)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(nope | foo)"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
+            (r#".(foo | nope)"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
             (r#".(nope | foo).bar"#, Ok(()), Ok("baz".into())),
             (r#".foo.(nope | bar)"#, Ok(()), Ok("baz".into())),
             (r#".foo.(nope | no)"#, Ok(()), Ok(().into())),
@@ -163,18 +163,7 @@ mod tests {
                     .foo
                 "#,
                 Ok(()),
-                Ok(map![
-                    "bar": map![
-                        "bar2": map![
-                            "baz": vec![
-                                Value::Null,
-                                Value::Null,
-                                "qux".into(),
-                            ],
-                        ],
-                    ],
-                    "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()]),
-                ].into()),
+                Ok(value!({"bar": {"bar2": {"baz": [null, null, "qux"]}}, "qux": [1, 2, {"quux": true}]})),
             ),
             (
                 r#"
@@ -193,7 +182,7 @@ mod tests {
                 Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
                 Ok(().into()),
             ),
-            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),
+            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(value!(["foo", "bar", "baz"]))),
             (
                 r#"
                     .foo = [
@@ -204,19 +193,19 @@ mod tests {
                     .foo
                 "#,
                 Ok(()),
-                Ok(vec!["foo".into(), 5.into(), Value::Array(vec!["bar".into()])].into()),
+                Ok(value!(["foo", 5, ["bar"]])),
             ),
             (
                 r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/])"#,
                 Ok(()),
-                Ok(vec![
-                    r#"Bytes(b"foo")"#,
-                    r#"Regex(bar)"#,
-                    r#"Integer(5)"#,
-                    r#"[Bytes(b"baz"), Float(4.2)]"#,
-                    r#"Boolean(true)"#,
-                    r#"Regex(qu+x)"#,
-                ].into()),
+                Ok(value!([
+                        r#"Bytes(b"foo")"#,
+                        r#"Regex(bar)"#,
+                        r#"Integer(5)"#,
+                        r#"[Bytes(b"baz"), Float(4.2)]"#,
+                        r#"Boolean(true)"#,
+                        r#"Regex(qu+x)"#,
+                ])),
             ),
             (
                 r#"
@@ -259,11 +248,11 @@ mod tests {
             (
                 r#"$foo = 1;$nork = $foo + 3;$nork"#,
                 Ok(()),
-                Ok(4.into())
-            )
+                Ok(4.into()),
+            ),
             (r#"{ "foo" }"#, Ok(()), Ok("foo".into())),
-            (r#"{ "foo": "bar" }"#, Ok(()), Ok(map!["foo": "bar"].into())),
-            (r#"{ "foo": true, "bar": true, "baz": false }"#, Ok(()), Ok(map!["foo": true, "bar": true, "baz": false].into())),
+            (r#"{ "foo": "bar" }"#, Ok(()), Ok(value!({"foo": "bar"}))),
+            (r#"{ "foo": true, "bar": true, "baz": false }"#, Ok(()), Ok(value!({"foo": true, "bar": true, "baz": false}))),
             (
                 r#"
                     .result = {
@@ -275,20 +264,20 @@ mod tests {
                     { "result": .result }
                 "#,
                 Ok(()),
-                Ok(map!["result": map!["foo": true, "bar": 5, "baz": "qux"]].into()),
+                Ok(value!({"result": {"foo": true, "bar": 5, "baz": "qux"}})),
             ),
-            ("{}", Ok(()), Ok(map![].into())),
+            ("{}", Ok(()), Ok(value!({}))),
             (
                 r#"map_printer({"a": "foo", "b": /bar/, "c": 5, "d": ["baz", 4.2], "e": true, "f": /qu+x/})"#,
                 Ok(()),
-                Ok(map![
-                    "a": r#"Bytes(b"foo")"#,
-                    "b": r#"Regex(bar)"#,
-                    "c": r#"Integer(5)"#,
-                    "d": r#"[Bytes(b"baz"), Float(4.2)]"#,
-                    "e": r#"Boolean(true)"#,
-                    "f": r#"Regex(qu+x)"#,
-                ].into()),
+                Ok(value!({
+                        "a": r#"Bytes(b"foo")"#,
+                        "b": r#"Regex(bar)"#,
+                        "c": r#"Integer(5)"#,
+                        "d": r#"[Bytes(b"baz"), Float(4.2)]"#,
+                        "e": r#"Boolean(true)"#,
+                        "f": r#"Regex(qu+x)"#,
+                })),
             ),
         ];
 
@@ -316,20 +305,7 @@ mod tests {
 
             let program = program.unwrap();
             let mut runtime = Runtime::new(state::Program::default());
-            let mut event: Value = map![
-                "foo":
-                    map![
-                        "bar": "baz",
-                        "qux": Value::Array(vec![
-                            1.into(),
-                            2.into(),
-                            map![
-                                "quux": true,
-                            ].into(),
-                        ]),
-                    ],
-            ]
-            .into();
+            let mut event = value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}});
 
             let result = runtime
                 .execute(&mut event, &program)

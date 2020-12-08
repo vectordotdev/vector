@@ -88,8 +88,6 @@ impl Expression for ToFloatFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
-    use std::collections::BTreeMap;
     use value::Kind;
 
     remap::test_type_def![
@@ -119,7 +117,7 @@ mod tests {
         }
 
         map_fallible {
-            expr: |_| ToFloatFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            expr: |_| ToFloatFn { value: map!{}.boxed(), default: None },
             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
@@ -193,32 +191,26 @@ mod tests {
 
     #[test]
     fn to_float() {
-        use crate::map;
-
         let cases = vec![
             (
-                map![],
                 Ok(Value::Float(10.0)),
-                ToFloatFn::new(Array::from(vec![0]).boxed(), Some(10.0.into())),
+                ToFloatFn::new(array![0].boxed(), Some(10.0.into())),
             ),
             (
-                map!["foo": "20.5"],
                 Ok(Value::Float(20.5)),
-                ToFloatFn::new(Box::new(Path::from("foo")), None),
+                ToFloatFn::new(Literal::from(value!(20.5)).boxed(), None),
             ),
             (
-                map!["foo": 20],
                 Ok(Value::Float(20.0)),
-                ToFloatFn::new(Box::new(Path::from("foo")), None),
+                ToFloatFn::new(Literal::from(value!(20)).boxed(), None),
             ),
         ];
 
         let mut state = state::Program::default();
 
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
+        for (exp, func) in cases {
             let got = func
-                .execute(&mut state, &mut object)
+                .execute(&mut state, &mut value!({}))
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

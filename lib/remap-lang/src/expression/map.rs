@@ -65,9 +65,24 @@ impl Expression for Map {
             .map(|(_, e)| e.type_def(state))
             .any(|d| d.is_fallible());
 
+        let inner_type_def = if self.expressions.is_empty() {
+            None
+        } else {
+            let type_def = self.expressions.iter().fold(
+                TypeDef {
+                    kind: value::Kind::empty(),
+                    ..Default::default()
+                },
+                |type_def, (_, expression)| type_def.merge(expression.type_def(state)),
+            );
+
+            Some(type_def.boxed())
+        };
+
         TypeDef {
             fallible,
             kind: value::Kind::Map,
+            inner_type_def,
         }
     }
 }
@@ -75,64 +90,88 @@ impl Expression for Map {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        expression::{Arithmetic, Array, Literal},
-        map, test_type_def,
-        value::Kind,
-        Operator,
-    };
+    use crate::{array, expression::Arithmetic, map, test_type_def, value::Kind, Operator};
 
     test_type_def![
         no_expression {
-            expr: |_| Map::new(map![]),
+            expr: |_| map!{},
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Map,
+                ..Default::default()
             },
         }
 
         one_expression {
-            expr: |_| Map::new(map!["a": Expr::from(Literal::from(true))]),
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
+            expr: |_| map!{"a": true},
+            def: TypeDef {
+                kind: Kind::Map,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Boolean,
+                    ..Default::default()
+                }.boxed()),
+                ..Default::default()
+            },
         }
 
         multiple_expressions {
-            expr: |_| Map::new(map![
-                        "a": Expr::from(Literal::from("foo")),
-                        "b": Expr::from(Literal::from(true)),
-                        "c": Expr::from(Literal::from(1234)),
-            ]),
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
+            expr: |_| map!{
+                "a": "foo",
+                "b": true,
+                "c": 1234,
+            },
+            def: TypeDef {
+                kind: Kind::Map,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
+                    ..Default::default()
+                }.boxed()),
+                ..Default::default()
+            },
         }
 
         last_one_fallible {
-            expr: |_| Map::new(map![
-                        "a": Expr::from(Literal::from(true)),
-                        "b": Expr::from(Arithmetic::new(
-                          Box::new(Expr::from(Literal::from(12))),
-                          Box::new(Expr::from(Literal::from(true))),
-                          Operator::Multiply,
-                        )),
-            ]),
+            expr: |_| map!{
+                "a": value!(true),
+                "b": Arithmetic::new(
+                    Box::new(value!(12).into()),
+                    Box::new(value!(true).into()),
+                    Operator::Multiply,
+                ),
+            },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean,
+                    fallible: true,
+                    ..Default::default()
+                }.boxed()),
             },
         }
 
         any_fallible {
-            expr: |_| Map::new(map![
-                        "a": Expr::from(Literal::from(true)),
-                        "b": Expr::from(Arithmetic::new(
-                          Box::new(Expr::from(Literal::from(12))),
-                          Box::new(Expr::from(Literal::from(true))),
-                          Operator::Multiply,
-                        )),
-                        "c": Expr::from(Array::from(vec![1])),
-            ]),
+            expr: |_| map!{
+                "a": value!(true),
+                "b": Arithmetic::new(
+                    Box::new(value!(12).into()),
+                    Box::new(value!(true).into()),
+                    Operator::Multiply,
+                ),
+                "c": array![1],
+            },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean | Kind::Array,
+                    fallible: true,
+                    inner_type_def: Some(TypeDef {
+                        kind: Kind::Integer,
+                        fallible: false,
+                        ..Default::default()
+                    }.boxed()),
+                }.boxed()),
             },
         }
     ];

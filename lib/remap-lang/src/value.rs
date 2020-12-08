@@ -791,19 +791,19 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use remap_lang::{Path, Value, map};
+    /// # use remap_lang::{value, Path, Value, map};
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
     ///
-    /// let mut value = Value::Array(vec![false.into(), true.into()]);
+    /// let mut value = value!([false, true]);
     /// let path = Path::from_str(".[1].foo").unwrap();
     ///
     /// value.insert_by_path(&path, "bar".into());
     ///
     /// assert_eq!(
     ///     value.get_by_path(&Path::from_str(".").unwrap()),
-    ///     Some(&Value::Array(vec![false.into(), map!["foo": "bar"].into()])),
+    ///     Some(&value!([false, {foo: "bar"}])),
     /// )
     /// ```
     ///

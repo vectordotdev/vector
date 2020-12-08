@@ -174,6 +174,7 @@ impl<T: Into<Value>> From<T> for Expr {
 
         match value {
             Value::Array(array) => Array::from(array).into(),
+            Value::Map(map) => Map::from(map).into(),
             _ => Literal::from(value).into(),
         }
     }
