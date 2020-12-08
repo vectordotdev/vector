@@ -1,46 +1,38 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
-pub struct ElasticSearchEventReceived {
+pub struct ElasticSearchEventEncoded {
     pub byte_size: usize,
+    pub index: String,
 }
 
-impl InternalEvent for ElasticSearchEventReceived {
+impl InternalEvent for ElasticSearchEventEncoded {
+    fn emit_logs(&self) {
+        trace!(message = "Inserting event.", index = %self.index);
+    }
+
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
+        counter!("processed_events_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
 #[derive(Debug)]
-pub struct ElasticSearchMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct ElasticSearchMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for ElasticSearchMissingKeys {
+impl<'a> InternalEvent for ElasticSearchMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "keys do not exist on the event; dropping event.",
+            message = "Keys do not exist on the event; dropping event.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
+        counter!("missing_keys_total", 1);
     }
 }

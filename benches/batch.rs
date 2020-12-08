@@ -1,132 +1,99 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::{future, Sink, Stream};
-use std::convert::Infallible;
-use std::time::Duration;
-use vector::buffers::Acker;
-use vector::sinks::util::{Batch, BatchSettings, BatchSink, Buffer, Partition, PartitionBatchSink};
-use vector::test_util::random_lines;
-
-fn batching(
-    bench_name: &'static str,
-    gzip: bool,
-    max_size: usize,
-    num_events: usize,
-    event_len: usize,
-) -> Benchmark {
-    Benchmark::new(bench_name, move |b| {
-        b.iter_with_setup(
-            move || {
-                let input = random_lines(event_len)
-                    .take(num_events)
-                    .map(|s| s.into_bytes())
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
-            },
-            |input| {
-                let mut rt = vector::test_util::runtime();
-                let (acker, _) = Acker::new_for_testing();
-                let batch_sink = BatchSink::new(
-                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    Buffer::new(gzip),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
-                    acker,
-                )
-                .sink_map_err(|e| panic!(e));
-
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
-            },
-        )
-    })
-    .sample_size(10)
-    .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_events * event_len) as u64))
-}
-
-fn partitioned_batching(
-    bench_name: &'static str,
-    gzip: bool,
-    max_size: usize,
-    num_events: usize,
-    event_len: usize,
-) -> Benchmark {
-    Benchmark::new(bench_name, move |b| {
-        b.iter_with_setup(
-            move || {
-                let key = Bytes::from("key");
-                let input = random_lines(event_len)
-                    .take(num_events)
-                    .map(|s| s.into_bytes())
-                    .map(|b| InnerBuffer {
-                        inner: b,
-                        key: key.clone(),
-                    })
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
-            },
-            |input| {
-                let mut rt = vector::test_util::runtime();
-                let (acker, _) = Acker::new_for_testing();
-                let batch_sink = PartitionBatchSink::new(
-                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    PartitionedBuffer::new(gzip),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
-                    acker,
-                )
-                .sink_map_err(|e| panic!(e));
-
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
-            },
-        )
-    })
-    .sample_size(10)
-    .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_events * event_len) as u64))
-}
+use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
+use futures::{future, stream, SinkExt, StreamExt};
+use std::{convert::Infallible, time::Duration};
+use vector::{
+    buffers::Acker,
+    sinks::util::{
+        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+        BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+    },
+    test_util::{random_lines, runtime},
+};
 
 fn benchmark_batching(c: &mut Criterion) {
-    c.bench(
-        "batch",
-        batching(
-            "no compression 10mb with 2mb batches",
-            false,
-            2_000_000,
-            100_000,
-            100,
-        ),
-    );
-    c.bench(
-        "batch",
-        batching("gzip 10mb with 2mb batches", true, 2_000_000, 100_000, 100),
-    );
-    c.bench(
-        "batch",
-        batching("gzip 10mb with 500kb batches", true, 500_000, 100_000, 100),
-    );
+    let event_len: usize = 100;
+    let num_events: usize = 100_000;
 
-    c.bench(
-        "partitioned_batch",
-        partitioned_batching(
-            "no compression 10mb with 2mb batches",
-            false,
-            2_000_000,
-            100_000,
-            100,
-        ),
-    );
-    c.bench(
-        "partitioned_batch",
-        partitioned_batching("gzip 10mb with 2mb batches", true, 2_000_000, 100_000, 100),
-    );
+    let mut group = c.benchmark_group("partitioned_batching");
+    group.throughput(Throughput::Bytes((event_len * num_events) as u64));
+    group.sampling_mode(SamplingMode::Flat);
+
+    let cases = [
+        (Compression::None, bytesize::mib(2u64)),
+        (Compression::None, bytesize::kib(500u64)),
+        (Compression::gzip_default(), bytesize::mib(2u64)),
+        (Compression::gzip_default(), bytesize::kib(500u64)),
+    ];
+
+    let input: Vec<_> = random_lines(event_len)
+        .take(num_events)
+        .map(|s| s.into_bytes())
+        .collect();
+
+    for (compression, batch_size) in cases.iter() {
+        group.bench_function(
+            format!("partitioned_batching_{}_{}", compression, batch_size),
+            |b| {
+                b.iter_batched(
+                    || {
+                        let rt = runtime();
+                        let (acker, _) = Acker::new_for_testing();
+                        let batch = BatchSettings::default()
+                            .bytes(*batch_size as u64)
+                            .events(num_events)
+                            .size;
+                        let batch_sink = PartitionBatchSink::new(
+                            tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                            PartitionedBuffer::new(batch, *compression),
+                            Duration::from_secs(1),
+                            acker,
+                        )
+                        .sink_map_err(|error| panic!(error));
+
+                        (
+                            rt,
+                            stream::iter(input.clone().into_iter().map(|b| InnerBuffer {
+                                inner: b,
+                                key: Bytes::from("key"),
+                            }))
+                            .map(Ok),
+                            batch_sink,
+                        )
+                    },
+                    |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                    criterion::BatchSize::LargeInput,
+                )
+            },
+        );
+
+        group.bench_function(format!("batching_{}_{}", compression, batch_size), |b| {
+            b.iter_batched(
+                || {
+                    let rt = runtime();
+                    let (acker, _) = Acker::new_for_testing();
+                    let batch = BatchSettings::default()
+                        .bytes(*batch_size as u64)
+                        .events(num_events)
+                        .size;
+                    let batch_sink = BatchSink::new(
+                        tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                        Buffer::new(batch, *compression),
+                        Duration::from_secs(1),
+                        acker,
+                    )
+                    .sink_map_err(|error| panic!(error));
+
+                    (rt, stream::iter(input.clone()).map(Ok), batch_sink)
+                },
+                |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                criterion::BatchSize::LargeInput,
+            )
+        });
+    }
 }
 
-criterion_group!(batch, benchmark_batching);
+criterion_group!(benches, benchmark_batching);
 
 pub struct PartitionedBuffer {
     inner: Buffer,
@@ -146,9 +113,9 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(gzip: bool) -> Self {
+    pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(gzip),
+            inner: Buffer::new(batch, compression),
             key: None,
         }
     }
@@ -158,14 +125,22 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn len(&self) -> usize {
-        self.inner.len()
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
     }
 
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(&item.inner[..])
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let key = item.key;
+        match Batch::push(&mut self.inner, item.inner) {
+            PushResult::Ok(full) => {
+                self.key = Some(key);
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(inner) => PushResult::Overflow(InnerBuffer { inner, key }),
+        }
     }
 
     fn is_empty(&self) -> bool {

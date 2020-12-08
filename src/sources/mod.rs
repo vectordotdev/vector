@@ -1,24 +1,38 @@
-use futures01::Future;
+use futures::future::BoxFuture;
 use snafu::Snafu;
 
-#[cfg(feature = "sources-docker")]
-pub mod docker;
+#[cfg(feature = "sources-apache_metrics")]
+pub mod apache_metrics;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub mod aws_ecs_metrics;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub mod aws_kinesis_firehose;
+#[cfg(feature = "sources-aws_s3")]
+pub mod aws_s3;
+#[cfg(feature = "sources-docker_logs")]
+pub mod docker_logs;
 #[cfg(feature = "sources-file")]
 pub mod file;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
+#[cfg(feature = "sources-host_metrics")]
+pub mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
-#[cfg(feature = "sources-journald")]
+#[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
-#[cfg(feature = "sources-kubernetes")]
-pub mod kubernetes;
+#[cfg(feature = "sources-kubernetes-logs")]
+pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub mod mongodb_metrics;
+#[cfg(feature = "sources-nginx_metrics")]
+pub mod nginx_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]
@@ -36,7 +50,7 @@ pub mod vector;
 
 mod util;
 
-pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
+pub type Source = BoxFuture<'static, Result<(), ()>>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

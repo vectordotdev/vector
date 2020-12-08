@@ -1,120 +1,116 @@
-use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    sinks::util::http::HttpClient,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    http::HttpClient,
+    internal_events::{
+        AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
+    },
+    transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
-use futures01::Stream;
+use futures01::Stream as Stream01;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::RandomState, HashSet};
-use std::time::{Duration, Instant};
-use string_cache::DefaultAtom as Atom;
-use tokio01::timer::Delay;
+use snafu::ResultExt as _;
+use std::{
+    collections::{hash_map::RandomState, HashSet},
+    error, fmt,
+};
+use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
-type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<Atom, Bytes, (), RandomState>;
+type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
+type ReadHandle = evmap::ReadHandle<String, Bytes, (), RandomState>;
+
+const AMI_ID_KEY: &str = "ami-id";
+const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
+const INSTANCE_ID_KEY: &str = "instance-id";
+const INSTANCE_TYPE_KEY: &str = "instance-type";
+const LOCAL_HOSTNAME_KEY: &str = "local-hostname";
+const LOCAL_IPV4_KEY: &str = "local-ipv4";
+const PUBLIC_HOSTNAME_KEY: &str = "public-hostname";
+const PUBLIC_IPV4_KEY: &str = "public-ipv4";
+const REGION_KEY: &str = "region";
+const SUBNET_ID_KEY: &str = "subnet-id";
+const VPC_ID_KEY: &str = "vpc-id";
+const ROLE_NAME_KEY: &str = "role-name";
 
 lazy_static::lazy_static! {
     static ref AMI_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/ami-id");
-    static ref AMI_ID_KEY: Atom = Atom::from("ami-id");
-
     static ref AVAILABILITY_ZONE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/placement/availability-zone");
-    static ref AVAILABILITY_ZONE_KEY: Atom = Atom::from("availability-zone");
-
     static ref INSTANCE_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-id");
-    static ref INSTANCE_ID_KEY: Atom = Atom::from("instance-id");
-
     static ref INSTANCE_TYPE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-type");
-    static ref INSTANCE_TYPE_KEY: Atom = Atom::from("instance-type");
-
     static ref LOCAL_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-hostname");
-    static ref LOCAL_HOSTNAME_KEY: Atom = Atom::from("local-hostname");
-
     static ref LOCAL_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-ipv4");
-    static ref LOCAL_IPV4_KEY: Atom = Atom::from("local-ipv4");
-
     static ref PUBLIC_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-hostname");
-    static ref PUBLIC_HOSTNAME_KEY: Atom = Atom::from("public-hostname");
-
     static ref PUBLIC_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-ipv4");
-    static ref PUBLIC_IPV4_KEY: Atom = Atom::from("public-ipv4");
-
     static ref REGION: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/region");
-    static ref REGION_KEY: Atom = Atom::from("region");
-
     static ref SUBNET_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/subnet-id");
-    static ref SUBNET_ID_KEY: Atom = Atom::from("subnet-id");
-
     static ref VPC_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/vpc-id");
-    static ref VPC_ID_KEY: Atom = Atom::from("vpc-id");
-
     static ref ROLE_NAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/");
-    static ref ROLE_NAME_KEY: Atom = Atom::from("role-name");
-
     static ref MAC: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/mac");
-
     static ref DYNAMIC_DOCUMENT: PathAndQuery = PathAndQuery::from_static("/latest/dynamic/instance-identity/document");
-
-    static ref DEFAULT_FIELD_WHITELIST: Vec<Atom> = vec![
-        AMI_ID_KEY.clone(),
-        AVAILABILITY_ZONE_KEY.clone(),
-        INSTANCE_ID_KEY.clone(),
-        INSTANCE_TYPE_KEY.clone(),
-        LOCAL_HOSTNAME_KEY.clone(),
-        LOCAL_IPV4_KEY.clone(),
-        PUBLIC_HOSTNAME_KEY.clone(),
-        PUBLIC_IPV4_KEY.clone(),
-        REGION_KEY.clone(),
-        SUBNET_ID_KEY.clone(),
-        VPC_ID_KEY.clone(),
-        ROLE_NAME_KEY.clone(),
+    static ref DEFAULT_FIELD_WHITELIST: Vec<String> = vec![
+        AMI_ID_KEY.to_string(),
+        AVAILABILITY_ZONE_KEY.to_string(),
+        INSTANCE_ID_KEY.to_string(),
+        INSTANCE_TYPE_KEY.to_string(),
+        LOCAL_HOSTNAME_KEY.to_string(),
+        LOCAL_IPV4_KEY.to_string(),
+        PUBLIC_HOSTNAME_KEY.to_string(),
+        PUBLIC_IPV4_KEY.to_string(),
+        REGION_KEY.to_string(),
+        SUBNET_ID_KEY.to_string(),
+        VPC_ID_KEY.to_string(),
+        ROLE_NAME_KEY.to_string(),
     ];
-
     static ref API_TOKEN: PathAndQuery = PathAndQuery::from_static("/latest/api/token");
     static ref TOKEN_HEADER: Bytes = Bytes::from("X-aws-ec2-metadata-token");
     static ref HOST: Uri = Uri::from_static("http://169.254.169.254");
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Ec2Metadata {
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
     state: ReadHandle,
 }
 
 #[derive(Debug, Clone)]
 struct Keys {
-    ami_id_key: Atom,
-    availability_zone_key: Atom,
-    instance_id_key: Atom,
-    instance_type_key: Atom,
-    local_hostname_key: Atom,
-    local_ipv4_key: Atom,
-    public_hostname_key: Atom,
-    public_ipv4_key: Atom,
-    region_key: Atom,
-    subnet_id_key: Atom,
-    vpc_id_key: Atom,
-    role_name_key: Atom,
+    ami_id_key: String,
+    availability_zone_key: String,
+    instance_id_key: String,
+    instance_type_key: String,
+    local_hostname_key: String,
+    local_ipv4_key: String,
+    public_hostname_key: String,
+    public_ipv4_key: String,
+    region_key: String,
+    subnet_id_key: String,
+    vpc_id_key: String,
+    role_name_key: String,
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<Ec2Metadata>("aws_ec2_metadata")
+    TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
 }
 
+impl_generate_config_from_default!(Ec2Metadata);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -130,35 +126,36 @@ impl TransformConfig for Ec2Metadata {
         let keys = Keys::new(&namespace);
 
         let host = self
-            .host
+            .endpoint
             .clone()
-            .map(|s| Uri::from_shared(s.into()).unwrap())
-            .unwrap_or(HOST.clone());
+            .map(|s| Uri::from_maybe_shared(s).unwrap())
+            .unwrap_or_else(|| HOST.clone());
 
         let refresh_interval = self
             .refresh_interval_secs
             .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(10));
+            .unwrap_or_else(|| Duration::from_secs(10));
         let fields = self
             .fields
             .clone()
-            .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(cx.resolver(), None)?;
+        let http_client = HttpClient::new(None)?;
 
-        cx.executor().spawn_std(
+        let mut client =
+            MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
+
+        client.refresh_metadata().await?;
+
+        tokio::spawn(
             async move {
-                let mut client =
-                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
-
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Box::new(Ec2MetadataTransform { state: read }))
+        Ok(Transform::task(Ec2MetadataTransform { state: read }))
     }
 
     fn input_type(&self) -> DataType {
@@ -174,15 +171,32 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl Transform for Ec2MetadataTransform {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl TaskTransform for Ec2MetadataTransform {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |event| inner.transform_one(event)))
+    }
+}
+
+impl Ec2MetadataTransform {
+    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        self.state.for_each(|k, v| {
-            if let Some(value) = v.get(0) {
-                log.insert(k.clone(), value.clone());
-            }
-        });
+        if let Some(read_ref) = self.state.read() {
+            read_ref.into_iter().for_each(|(k, v)| {
+                if let Some(value) = v.get_one() {
+                    log.insert(k.clone(), value.clone());
+                }
+            });
+        }
+
+        emit!(AwsEc2MetadataEventProcessed);
 
         Some(event)
     }
@@ -195,7 +209,7 @@ struct MetadataClient {
     keys: Keys,
     state: WriteHandle,
     refresh_interval: Duration,
-    fields: HashSet<Atom>,
+    fields: HashSet<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -218,7 +232,7 @@ impl MetadataClient {
         keys: Keys,
         state: WriteHandle,
         refresh_interval: Duration,
-        fields: Vec<Atom>,
+        fields: Vec<String>,
     ) -> Self {
         Self {
             client,
@@ -233,20 +247,16 @@ impl MetadataClient {
 
     async fn run(&mut self) {
         loop {
-            if let Err(error) = self.refresh_metadata().await {
-                error!(message="Unable to fetch EC2 metadata; Retrying.", %error);
-
-                Delay::new(Instant::now() + Duration::from_secs(1))
-                    .compat()
-                    .await
-                    .expect("Timer not set.");
-
-                continue;
+            match self.refresh_metadata().await {
+                Ok(_) => {
+                    emit!(AwsEc2MetadataRefreshSuccessful);
+                }
+                Err(error) => {
+                    emit!(AwsEc2MetadataRefreshFailed { error });
+                }
             }
 
-            let deadline = Instant::now() + self.refresh_interval;
-
-            Delay::new(deadline).compat().await.expect("Timer not set.");
+            delay_for(self.refresh_interval).await;
         }
     }
 
@@ -268,14 +278,20 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self.client.send(req).await?;
+        let res = self
+            .client
+            .send(req)
+            .await
+            .map_err(crate::Error::from)
+            .and_then(|res| match res.status() {
+                StatusCode::OK => Ok(res),
+                status_code => Err(UnexpectedHTTPStatusError {
+                    status: status_code,
+                }
+                .into()),
+            })?;
 
-        if res.status() != StatusCode::OK {
-            return Err(Ec2MetadataError::UnableToFetchToken.into());
-        }
-
-        let body = res.into_body().concat2().compat().await?;
-        let token = body.into_bytes();
+        let token = body_to_bytes(res.into_body()).await?;
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -283,36 +299,122 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
-        let token = self.get_token().await?;
-
-        let mut parts = self.host.clone().into_parts();
-        parts.path_and_query = Some(DYNAMIC_DOCUMENT.clone());
-        let uri = Uri::from_parts(parts)?;
-
-        let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
-            .body(Body::empty())?;
-
-        let res = self.client.send(req).await?;
-
-        if res.status() != StatusCode::OK {
-            warn!(message="Identity document request failed.", status = %res.status());
-            return Ok(None);
-        }
-
-        let body = res.into_body().concat2().compat().await?;
+    pub async fn get_document(&mut self) -> Result<IdentityDocument, crate::Error> {
+        let body = self.get_metadata(&DYNAMIC_DOCUMENT).await?;
 
         serde_json::from_slice(&body[..])
+            .context(ParseIdentityDocument {})
             .map_err(Into::into)
-            .map(Some)
     }
 
-    pub async fn get_metadata(
-        &mut self,
-        path: &PathAndQuery,
-    ) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await?;
+    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+        use std::collections::HashMap;
+
+        let mut state: HashMap<String, Bytes> = HashMap::new();
+
+        // Fetch all resources, _then_ add them to the state map.
+        let document = self.get_document().await?;
+
+        if self.fields.contains(AMI_ID_KEY) {
+            state.insert(self.keys.ami_id_key.clone(), document.image_id.into());
+        }
+
+        if self.fields.contains(INSTANCE_ID_KEY) {
+            state.insert(
+                self.keys.instance_id_key.clone(),
+                document.instance_id.into(),
+            );
+        }
+
+        if self.fields.contains(INSTANCE_TYPE_KEY) {
+            state.insert(
+                self.keys.instance_type_key.clone(),
+                document.instance_type.into(),
+            );
+        }
+
+        if self.fields.contains(REGION_KEY) {
+            state.insert(self.keys.region_key.clone(), document.region.into());
+        }
+
+        if self.fields.contains(AVAILABILITY_ZONE_KEY) {
+            let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
+            state.insert(self.keys.availability_zone_key.clone(), availability_zone);
+        }
+
+        if self.fields.contains(LOCAL_HOSTNAME_KEY) {
+            let local_hostname = self.get_metadata(&LOCAL_HOSTNAME).await?;
+            state.insert(self.keys.local_hostname_key.clone(), local_hostname);
+        }
+
+        if self.fields.contains(LOCAL_IPV4_KEY) {
+            let local_ipv4 = self.get_metadata(&LOCAL_IPV4).await?;
+            state.insert(self.keys.local_ipv4_key.clone(), local_ipv4);
+        }
+
+        if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
+            let public_hostname = self.get_metadata(&PUBLIC_HOSTNAME).await?;
+            state.insert(self.keys.public_hostname_key.clone(), public_hostname);
+        }
+
+        if self.fields.contains(PUBLIC_IPV4_KEY) {
+            let public_ipv4 = self.get_metadata(&PUBLIC_IPV4).await?;
+            state.insert(self.keys.public_ipv4_key.clone(), public_ipv4);
+        }
+
+        if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
+            let mac = self.get_metadata(&MAC).await?;
+            let mac = String::from_utf8_lossy(&mac[..]);
+
+            if self.fields.contains(SUBNET_ID_KEY) {
+                let subnet_path = format!(
+                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
+                    mac
+                );
+
+                let subnet_path = subnet_path.parse().context(ParsePath {
+                    value: subnet_path.clone(),
+                })?;
+
+                let subnet_id = self.get_metadata(&subnet_path).await?;
+                state.insert(self.keys.subnet_id_key.clone(), subnet_id);
+            }
+
+            if self.fields.contains(VPC_ID_KEY) {
+                let vpc_path = format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+
+                let vpc_path = vpc_path.parse().context(ParsePath {
+                    value: vpc_path.clone(),
+                })?;
+
+                let vpc_id = self.get_metadata(&vpc_path).await?;
+                state.insert(self.keys.vpc_id_key.clone(), vpc_id);
+            }
+        }
+
+        if self.fields.contains(ROLE_NAME_KEY) {
+            let role_names = self.get_metadata(&ROLE_NAME).await?;
+            let role_names = String::from_utf8_lossy(&role_names[..]);
+
+            for (i, role_name) in role_names.lines().enumerate() {
+                state.insert(
+                    format!("{}[{}]", self.keys.role_name_key, i),
+                    role_name.to_string().into(),
+                );
+            }
+        }
+
+        self.state.extend(state);
+
+        // Make changes viewable to the transform. This may block if
+        // readers are still reading.
+        self.state.refresh();
+
+        Ok(())
+    }
+
+    async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Bytes, crate::Error> {
+        let token = self.get_token().await.with_context(|| FetchToken {})?;
 
         let mut parts = self.host.clone().into_parts();
 
@@ -323,131 +425,25 @@ impl MetadataClient {
         debug!(message = "Sending metadata request.", %uri);
 
         let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
+            .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
-        let res = self.client.send(req).await?;
-
-        if StatusCode::OK != res.status() {
-            warn!(message="Metadata request failed.", status = %res.status());
-            return Ok(None);
-        }
-
-        let body = res.into_body().concat2().compat().await?;
-
-        Ok(Some(body.into_bytes()))
-    }
-
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        // Fetch all resources, _then_ add them to the state map.
-        let identity_document = self.get_document().await?;
-
-        if let Some(document) = identity_document {
-            if self.fields.contains(&AMI_ID_KEY) {
-                self.state
-                    .update(self.keys.ami_id_key.clone(), document.image_id.into());
-            }
-
-            if self.fields.contains(&INSTANCE_ID_KEY) {
-                self.state.update(
-                    self.keys.instance_id_key.clone(),
-                    document.instance_id.into(),
-                );
-            }
-
-            if self.fields.contains(&INSTANCE_TYPE_KEY) {
-                self.state.update(
-                    self.keys.instance_type_key.clone(),
-                    document.instance_type.into(),
-                );
-            }
-
-            if self.fields.contains(&REGION_KEY) {
-                self.state
-                    .update(self.keys.region_key.clone(), document.region.into());
-            }
-        }
-
-        if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
-            if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
-                self.state
-                    .update(self.keys.availability_zone_key.clone(), availability_zone);
-            }
-        }
-
-        if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
-            if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
-                self.state
-                    .update(self.keys.local_hostname_key.clone(), local_hostname);
-            }
-        }
-
-        if self.fields.contains(&LOCAL_IPV4_KEY) {
-            if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
-                self.state
-                    .update(self.keys.local_ipv4_key.clone(), local_ipv4);
-            }
-        }
-
-        if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
-            if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
-                self.state
-                    .update(self.keys.public_hostname_key.clone(), public_hostname);
-            }
-        }
-
-        if self.fields.contains(&PUBLIC_IPV4_KEY) {
-            if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
-                self.state
-                    .update(self.keys.public_ipv4_key.clone(), public_ipv4);
-            }
-        }
-
-        if self.fields.contains(&SUBNET_ID_KEY) || self.fields.contains(&VPC_ID_KEY) {
-            if let Some(mac) = self.get_metadata(&MAC).await? {
-                let mac = String::from_utf8_lossy(&mac[..]);
-
-                let subnet_path = format!(
-                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                    mac
-                )
-                .parse()?;
-                let vpc_path =
-                    format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
-
-                if self.fields.contains(&SUBNET_ID_KEY) {
-                    if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                        self.state
-                            .update(self.keys.subnet_id_key.clone(), subnet_id);
-                    }
+        let res = self
+            .client
+            .send(req)
+            .await
+            .map_err(crate::Error::from)
+            .and_then(|res| match res.status() {
+                StatusCode::OK => Ok(res),
+                status_code => Err(UnexpectedHTTPStatusError {
+                    status: status_code,
                 }
+                .into()),
+            })?;
 
-                if self.fields.contains(&VPC_ID_KEY) {
-                    if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                        self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
-                    }
-                }
-            }
-        }
+        let body = body_to_bytes(res.into_body()).await?;
 
-        if self.fields.contains(&ROLE_NAME_KEY) {
-            if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
-                let role_names = String::from_utf8_lossy(&role_names[..]);
-
-                for (i, role_name) in role_names.lines().enumerate() {
-                    self.state.update(
-                        format!("{}[{}]", self.keys.role_name_key, i).into(),
-                        role_name.into(),
-                    );
-                }
-            }
-        }
-
-        // Make changes viewable to the transform. This may block if
-        // readers are still reading.
-        self.state.refresh();
-
-        Ok(())
+        Ok(body)
     }
 }
 
@@ -455,190 +451,208 @@ impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
         if let Some(namespace) = &namespace {
             Keys {
-                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY.clone()).into(),
-                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY.clone())
-                    .into(),
-                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY.clone()).into(),
-                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY.clone()).into(),
-                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY.clone()).into(),
-                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY.clone()).into(),
-                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY.clone())
-                    .into(),
-                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY.clone()).into(),
-                region_key: format!("{}.{}", namespace, REGION_KEY.clone()).into(),
-                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY.clone()).into(),
-                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
-                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
+                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY),
+                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY),
+                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY),
+                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY),
+                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY),
+                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY),
+                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY),
+                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY),
+                region_key: format!("{}.{}", namespace, REGION_KEY),
+                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY),
+                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY),
+                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY),
             }
         } else {
             Keys {
-                ami_id_key: AMI_ID_KEY.clone(),
-                availability_zone_key: AVAILABILITY_ZONE_KEY.clone(),
-                instance_id_key: INSTANCE_ID_KEY.clone(),
-                instance_type_key: INSTANCE_TYPE_KEY.clone(),
-                local_hostname_key: LOCAL_HOSTNAME_KEY.clone(),
-                local_ipv4_key: LOCAL_IPV4_KEY.clone(),
-                public_hostname_key: PUBLIC_HOSTNAME_KEY.clone(),
-                public_ipv4_key: PUBLIC_IPV4_KEY.clone(),
-                region_key: REGION_KEY.clone(),
-                subnet_id_key: SUBNET_ID_KEY.clone(),
-                vpc_id_key: VPC_ID_KEY.clone(),
-                role_name_key: ROLE_NAME_KEY.clone(),
+                ami_id_key: AMI_ID_KEY.into(),
+                availability_zone_key: AVAILABILITY_ZONE_KEY.into(),
+                instance_id_key: INSTANCE_ID_KEY.into(),
+                instance_type_key: INSTANCE_TYPE_KEY.into(),
+                local_hostname_key: LOCAL_HOSTNAME_KEY.into(),
+                local_ipv4_key: LOCAL_IPV4_KEY.into(),
+                public_hostname_key: PUBLIC_HOSTNAME_KEY.into(),
+                public_ipv4_key: PUBLIC_IPV4_KEY.into(),
+                region_key: REGION_KEY.into(),
+                subnet_id_key: SUBNET_ID_KEY.into(),
+                vpc_id_key: VPC_ID_KEY.into(),
+                role_name_key: ROLE_NAME_KEY.into(),
             }
         }
     }
 }
 
-#[derive(Debug, snafu::Snafu)]
-enum Ec2MetadataError {
-    #[snafu(display("Unable to fetch token."))]
-    UnableToFetchToken,
+#[derive(Debug)]
+struct UnexpectedHTTPStatusError {
+    status: http::StatusCode,
 }
 
-#[cfg(test)]
-#[cfg(feature = "aws-ec2-metadata-integration-tests")]
-mod tests {
-    use super::*;
-    use crate::{event::Event, test_util::runtime};
-
-    lazy_static::lazy_static! {
-        static ref HOST: String = "http://localhost:8111".to_string();
+impl fmt::Display for UnexpectedHTTPStatusError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "got unexpected status code: {}", self.status)
     }
+}
+
+impl error::Error for UnexpectedHTTPStatusError {}
+
+#[derive(Debug, snafu::Snafu)]
+enum Ec2MetadataError {
+    #[snafu(display("Unable to fetch metadata authentication token: {}.", source))]
+    FetchToken { source: crate::Error },
+    #[snafu(display("Unable to parse identity document: {}.", source))]
+    ParseIdentityDocument { source: serde_json::Error },
+    #[snafu(display("Unable to parse metadata path {}, {}.", value, source))]
+    ParsePath {
+        value: String,
+        source: http::uri::InvalidUri,
+    },
+}
+
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::{event::Event, test_util::trace_init};
+    use futures::{
+        compat::{Future01CompatExt, Stream01CompatExt},
+        StreamExt,
+    };
+    use futures01::Sink;
+
+    const HOST: &str = "http://localhost:8111";
 
     #[test]
-    fn enrich() {
-        crate::test_util::trace_init();
-        let rt = runtime();
+    fn generate_config() {
+        crate::test_util::test_generate_config::<Ec2Metadata>();
+    }
+
+    #[tokio::test]
+    async fn enrich() {
+        trace_init();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let transform = config.build().await.unwrap().into_task();
+
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let mut rx = transform.transform(Box::new(rx)).compat();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
+        tx.send(event).compat().await.unwrap();
 
-        let event = transform.transform(event).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         let log = event.as_log();
 
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         assert_eq!(
-            log.get(&"availability-zone".into()),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
-        assert_eq!(
-            log.get(&"public-hostname".into()),
+            log.get("public-hostname"),
             Some(&"mock-public-hostname".into())
         );
-        assert_eq!(log.get(&"local-ipv4".into()), Some(&"192.1.1.2".into()));
-        assert_eq!(
-            log.get(&"local-hostname".into()),
-            Some(&"mock-hostname".into())
-        );
-        assert_eq!(
-            log.get(&"instance-id".into()),
-            Some(&"i-096fba6d03d36d262".into())
-        );
-        assert_eq!(
-            log.get(&"ami-id".into()),
-            Some(&"ami-05f27d4d6770a43d2".into())
-        );
-        assert_eq!(log.get(&"instance-type".into()), Some(&"m5a.xlarge".into()));
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
-        assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
-        assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
-        assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
+        assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
+        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
+        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
+        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
+        assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
+        assert_eq!(log.get("role-name[0]"), Some(&"mock-user".into()));
     }
 
-    #[test]
-    fn fields() {
-        let rt = runtime();
-
+    #[tokio::test]
+    async fn fields() {
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        let transform = config.build().await.unwrap().into_task();
+
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let mut rx = transform.transform(Box::new(rx)).compat();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
+        tx.send(event).compat().await.unwrap();
 
-        let event = transform.transform(event).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get(&"availability-zone".into()), None);
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
-        assert_eq!(log.get(&"public-hostname".into()), None);
-        assert_eq!(log.get(&"local-ipv4".into()), None);
-        assert_eq!(log.get(&"local-hostname".into()), None);
-        assert_eq!(log.get(&"instance-id".into()), None,);
-        assert_eq!(log.get(&"instance-type".into()), None,);
-        assert_eq!(log.get(&"ami-id".into()), None);
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
+        assert_eq!(log.get("availability-zone"), None);
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("public-hostname"), None);
+        assert_eq!(log.get("local-ipv4"), None);
+        assert_eq!(log.get("local-hostname"), None);
+        assert_eq!(log.get("instance-id"), None,);
+        assert_eq!(log.get("instance-type"), None,);
+        assert_eq!(log.get("ami-id"), None);
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
     }
 
-    #[test]
-    fn namespace() {
-        let rt = runtime();
+    #[tokio::test]
+    async fn namespace() {
+        {
+            let config = Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("ec2.metadata".into()),
+                ..Default::default()
+            };
+            let transform = config.build().await.unwrap().into_task();
 
-        let config = Ec2Metadata {
-            host: Some(HOST.clone()),
-            namespace: Some("ec2.metadata".into()),
-            ..Default::default()
-        };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+            let (tx, rx) = futures01::sync::mpsc::channel(100);
+            let mut rx = transform.transform(Box::new(rx)).compat();
 
-        // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+            // We need to sleep to let the background task fetch the data.
+            delay_for(Duration::from_secs(1)).await;
 
-        let event = Event::new_empty_log();
+            let event = Event::new_empty_log();
+            tx.send(event).compat().await.unwrap();
 
-        let event = transform.transform(event).unwrap();
-        let log = event.as_log();
+            let event = rx.next().await.unwrap().unwrap();
+            let log = event.as_log();
 
-        assert_eq!(
-            log.get(&"ec2.metadata.availability-zone".into()),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(
-            log.get(&"ec2.metadata.public-ipv4".into()),
-            Some(&"192.1.1.1".into())
-        );
+            assert_eq!(
+                log.get("ec2.metadata.availability-zone"),
+                Some(&"ww-region-1a".into())
+            );
+            assert_eq!(
+                log.get("ec2.metadata.public-ipv4"),
+                Some(&"192.1.1.1".into())
+            );
+        }
 
-        // Set an empty namespace to ensure we don't prepend one.
-        let config = Ec2Metadata {
-            host: Some(HOST.clone()),
-            namespace: Some("".into()),
-            ..Default::default()
-        };
-        let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
-            .unwrap();
+        {
+            // Set an empty namespace to ensure we don't prepend one.
+            let config = Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("".into()),
+                ..Default::default()
+            };
+            let transform = config.build().await.unwrap().into_task();
 
-        // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+            let (tx, rx) = futures01::sync::mpsc::channel(100);
+            let mut rx = transform.transform(Box::new(rx)).compat();
 
-        let event = Event::new_empty_log();
+            // We need to sleep to let the background task fetch the data.
+            delay_for(Duration::from_secs(1)).await;
 
-        let event = transform.transform(event).unwrap();
-        let log = event.as_log();
+            let event = Event::new_empty_log();
+            tx.send(event).compat().await.unwrap();
 
-        assert_eq!(
-            log.get(&"availability-zone".into()),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
+            let event = rx.next().await.unwrap().unwrap();
+            let log = event.as_log();
+
+            assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+            assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        }
     }
 }

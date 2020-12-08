@@ -1,25 +1,26 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::Event,
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures01::{Future, Sink};
+use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
-use tower::Service;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -35,6 +36,7 @@ pub struct StackdriverConfig {
     pub log_id: String,
 
     pub resource: StackdriverResource,
+    pub severity_key: Option<String>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -45,7 +47,7 @@ pub struct StackdriverConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -56,6 +58,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
+    severity_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -92,6 +95,8 @@ inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         rate_limit_num: Some(1000),
@@ -103,33 +108,39 @@ lazy_static! {
         .unwrap();
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
-        let batch = self.batch.unwrap_or(bytesize::kib(5000u64), 1);
+        let batch = BatchSettings::default()
+            .bytes(bytesize::kib(5000u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
+            severity_key: self.severity_key.clone(),
         };
 
-        let healthcheck = self.healthcheck(&cx, sink.clone())?;
+        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::default(),
+            JsonArrayBuffer::new(batch.size),
             request,
-            batch,
-            tls_settings,
-            &cx,
+            batch.timeout,
+            client,
+            cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -141,21 +152,38 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+        let mut log = event.into_log();
+        let severity = self
+            .severity_key
+            .as_ref()
+            .and_then(|key| log.remove(key))
+            .map(remap_severity)
+            .unwrap_or_else(|| 0.into());
+
+        let mut event = Event::Log(log);
         self.config.encoding.apply_rules(&mut event);
 
-        let entry = serde_json::json!({
-            "jsonPayload": event.into_log(),
-        });
+        let log = event.into_log();
 
-        Some(entry)
+        let mut entry = map::Map::with_capacity(3);
+        entry.insert("jsonPayload".into(), json!(log));
+        entry.insert("severity".into(), json!(severity));
+
+        // If the event contains a timestamp, send it in the main message so gcp can pick it up.
+        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
+            entry.insert("timestamp".into(), json!(timestamp));
+        }
+
+        Some(json!(entry))
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
@@ -176,27 +204,58 @@ impl HttpSink for StackdriverSink {
             creds.apply(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
+fn remap_severity(severity: Value) -> Value {
+    let n = match severity {
+        Value::Integer(n) => n - n % 100,
+        Value::Bytes(s) => {
+            let s = String::from_utf8_lossy(&s);
+            match s.parse::<usize>() {
+                Ok(n) => (n - n % 100) as i64,
+                Err(_) => match s.to_uppercase() {
+                    s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
+                    s if s.starts_with("ALERT") => 700,
+                    s if s.starts_with("CRIT") => 600,
+                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("WARN") => 400,
+                    s if s.starts_with("NOTICE") => 300,
+                    s if s.starts_with("INFO") => 200,
+                    s if s.starts_with("DEBUG") || s.starts_with("TRACE") => 100,
+                    s if s.starts_with("DEFAULT") => 0,
+                    _ => {
+                        warn!(
+                            message = "Unknown severity value string, using DEFAULT.",
+                            value = %s,
+                            rate_limit_secs = 10
+                        );
+                        0
+                    }
+                },
+            }
+        }
+        value => {
+            warn!(
+                message = "Unknown severity value type, using DEFAULT.",
+                ?value,
+                rate_limit_secs = 10
+            );
+            0
+        }
+    };
+    Value::Integer(n)
+}
+
+async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+    let request = sink.build_request(vec![]).await?.map(Body::from);
+
+    let response = client.send(request).await?;
+    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+}
+
 impl StackdriverConfig {
-    fn healthcheck(&self, cx: &SinkContext, sink: StackdriverSink) -> crate::Result<Healthcheck> {
-        let request = sink.build_request(vec![]).map(Body::from);
-
-        let mut client = HttpClient::new(cx.resolver(), TlsSettings::from_options(&self.tls)?)?;
-
-        let healthcheck = client
-            .call(request)
-            .map_err(Into::into)
-            .and_then(healthcheck_response(
-                sink.creds.clone(),
-                HealthcheckError::NotFound.into(),
-            ));
-
-        Ok(Box::new(healthcheck))
-    }
-
     fn log_name(&self) -> String {
         use StackdriverLogName::*;
         match &self.log_name {
@@ -211,9 +270,15 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, test_util::runtime};
+    use crate::event::{LogEvent, Value};
+    use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
 
     #[test]
     fn encode_valid() {
@@ -223,6 +288,7 @@ mod tests {
            log_id = "testlogs"
            resource.type = "generic_node"
            resource.namespace = "office"
+           encoding.except_fields = ["anumber"]
         "#,
         )
         .unwrap();
@@ -230,16 +296,24 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: Some("anumber".into()),
         };
 
-        let log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let log = LogEvent::from_iter(
+            [("message", "hello world"), ("anumber", "100")]
+                .iter()
+                .copied(),
+        );
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
-        assert_eq!(body, "{\"jsonPayload\":{\"message\":\"hello world\"}}");
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
     }
 
     #[test]
-    fn correct_request() {
+    fn encode_inserts_timestamp() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -253,10 +327,73 @@ mod tests {
         let sink = StackdriverSink {
             config,
             creds: None,
+            severity_key: Some("anumber".into()),
         };
 
-        let log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
-        let log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let mut log = LogEvent::default();
+        log.insert("message", Value::Bytes("hello world".into()));
+        log.insert("anumber", Value::Bytes("100".into()));
+        log.insert(
+            "timestamp",
+            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+        );
+
+        let json = sink.encode_event(Event::from(log)).unwrap();
+        let body = serde_json::to_string(&json).unwrap();
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\",\"timestamp\":\"2020-01-01T12:30:00Z\"},\"severity\":100,\"timestamp\":\"2020-01-01T12:30:00Z\"}"
+        );
+    }
+
+    #[test]
+    fn severity_remaps_strings() {
+        for &(s, n) in &[
+            ("EMERGENCY", 800), // Handles full upper case
+            ("EMERG", 800),     // Handles abbreviations
+            ("FATAL", 800),     // Handles highest alternate
+            ("alert", 700),     // Handles lower case
+            ("CrIt1c", 600),    // Handles mixed case and suffixes
+            ("err404", 500),    // Handles lower case and suffixes
+            ("warnings", 400),
+            ("notice", 300),
+            ("info", 200),
+            ("DEBUG2", 100), // Handles upper case and suffixes
+            ("trace", 100),  // Handles lowest alternate
+            ("nothing", 0),  // Maps unknown terms to DEFAULT
+            ("123", 100),    // Handles numbers in strings
+            ("-100", 0),     // Maps negatives to DEFAULT
+        ] {
+            assert_eq!(
+                remap_severity(s.into()),
+                Value::Integer(n),
+                "remap_severity({:?}) != {}",
+                s,
+                n
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn correct_request() {
+        let config: StackdriverConfig = toml::from_str(
+            r#"
+           project_id = "project"
+           log_id = "testlogs"
+           resource.type = "generic_node"
+           resource.namespace = "office"
+        "#,
+        )
+        .unwrap();
+
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+            severity_key: None,
+        };
+
+        let log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
+        let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
         let event2 = sink.encode_event(Event::from(log2)).unwrap();
 
@@ -267,7 +404,7 @@ mod tests {
 
         let events = vec![raw1, raw2];
 
-        let request = sink.build_request(events);
+        let request = sink.build_request(events).await.unwrap();
 
         let (parts, body) = request.into_parts();
 
@@ -282,11 +419,13 @@ mod tests {
             serde_json::json!({
                 "entries": [
                     {
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "hello"
                         }
                     },
                     {
+                        "severity": 0,
                         "jsonPayload": {
                             "message": "world"
                         }
@@ -303,8 +442,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -314,10 +453,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

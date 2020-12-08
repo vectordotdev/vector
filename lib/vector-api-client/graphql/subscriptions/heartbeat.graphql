@@ -1,0 +1,5 @@
+subscription HeartbeatSubscription($interval: Int!) {
+  heartbeat(interval: $interval) {
+    utc
+  }
+}

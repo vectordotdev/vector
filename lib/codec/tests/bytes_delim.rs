@@ -1,10 +1,10 @@
 use bytes::{BufMut, BytesMut};
 use codec::BytesDelimitedCodec;
 use std::collections::HashMap;
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
-fn bytes_delim_decod() {
+fn bytes_delim_decode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
     buf.put_slice(b"abc\n");
@@ -16,7 +16,7 @@ fn bytes_delim_encode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
 
     let mut buf = BytesMut::new();
-    codec.encode("abc".into(), &mut buf).unwrap();
+    codec.encode(b"abc", &mut buf).unwrap();
 
     assert_eq!(b"abc\n", &buf[..]);
 }
@@ -36,6 +36,22 @@ fn bytes_decode_max_length() {
     assert!(codec.decode(buf).unwrap().is_some());
     assert!(codec.decode_eof(buf).unwrap().is_none());
     assert!(codec.decode_eof(buf).unwrap().is_some());
+}
+
+// Regression test for [infinite loop bug](https://github.com/timberio/vector/issues/2564)
+// Derived from https://github.com/tokio-rs/tokio/issues/1483
+#[test]
+fn bytes_decoder_discard_repeat() {
+    const MAX_LENGTH: usize = 1;
+
+    let mut codec = BytesDelimitedCodec::new_with_max_length(b'\n', MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put(&b"aa"[..]);
+    assert!(codec.decode(buf).unwrap().is_none());
+    buf.put(&b"a"[..]);
+    assert!(codec.decode(buf).unwrap().is_none());
 }
 
 #[test]
@@ -121,7 +137,7 @@ fn bytes_decode_json_multiline() {
     buf.extend(events.to_string().as_bytes());
 
     let mut i = 0;
-    while let Some(_) = codec.decode(buf).unwrap() {
+    while codec.decode(buf).unwrap().is_some() {
         i += 1;
     }
 

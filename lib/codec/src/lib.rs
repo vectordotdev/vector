@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate tracing;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::{cmp, io, usize};
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BytesDelimitedCodec {
@@ -36,23 +36,6 @@ impl BytesDelimitedCodec {
     pub fn max_length(&self) -> usize {
         self.max_length
     }
-
-    fn discard(&mut self, newline_offset: Option<usize>, read_to: usize, buf: &mut BytesMut) {
-        let discard_to = if let Some(offset) = newline_offset {
-            // If we found a newline, discard up to that offset and
-            // then stop discarding. On the next iteration, we'll try
-            // to read a line normally.
-            self.is_discarding = false;
-            offset + self.next_index + 1
-        } else {
-            // Otherwise, we didn't find a newline, so we'll discard
-            // everything we read. On the next iteration, we'll continue
-            // discarding up to max_len bytes unless we find a newline.
-            read_to
-        };
-        buf.advance(discard_to);
-        self.next_index = 0;
-    }
 }
 
 impl Decoder for BytesDelimitedCodec {
@@ -69,42 +52,60 @@ impl Decoder for BytesDelimitedCodec {
                 .iter()
                 .position(|b| *b == self.delim);
 
-            if self.is_discarding {
-                self.discard(newline_pos, read_to, buf);
-            } else {
-                return if let Some(pos) = newline_pos {
+            match (self.is_discarding, newline_pos) {
+                (true, Some(offset)) => {
+                    // If we found a newline, discard up to that offset and
+                    // then stop discarding. On the next iteration, we'll try
+                    // to read a line normally.
+                    buf.advance(offset + self.next_index + 1);
+                    self.is_discarding = false;
+                    self.next_index = 0;
+                }
+                (true, None) => {
+                    // Otherwise, we didn't find a newline, so we'll discard
+                    // everything we read. On the next iteration, we'll continue
+                    // discarding up to max_len bytes unless we find a newline.
+                    buf.advance(read_to);
+                    self.next_index = 0;
+                    if buf.is_empty() {
+                        return Ok(None);
+                    }
+                }
+                (false, Some(pos)) => {
                     // We found a correct frame
 
                     let newpos_index = pos + self.next_index;
                     self.next_index = 0;
-                    let frame = buf.split_to(newpos_index + 1);
+                    let mut frame = buf.split_to(newpos_index + 1);
 
                     trace!(
-                        message = "decoding the frame.",
+                        message = "Decoding the frame.",
                         bytes_proccesed = frame.len()
                     );
 
-                    let frame = &frame[..frame.len() - 1];
+                    let frame = frame.split_to(frame.len() - 1);
 
-                    Ok(Some(frame.into()))
-                } else if buf.len() > self.max_length {
+                    return Ok(Some(frame.freeze()));
+                }
+                (false, None) if buf.len() > self.max_length => {
                     // We reached the max length without finding the
                     // delimiter so must discard the rest until we
                     // reach the next delimiter
                     self.is_discarding = true;
                     warn!(
-                        message = "discarding frame larger than max_length",
+                        message = "Discarding frame larger than max_length.",
                         buf_len = buf.len(),
-                        max_len = self.max_length,
+                        max_length = self.max_length,
                         rate_limit_secs = 30
                     );
-                    Ok(None)
-                } else {
+                    return Ok(None);
+                }
+                (false, None) => {
                     // We didn't find the delimiter and didn't
                     // reach the max frame length.
                     self.next_index = read_to;
-                    Ok(None)
-                };
+                    return Ok(None);
+                }
             }
         }
     }
@@ -113,7 +114,7 @@ impl Decoder for BytesDelimitedCodec {
         let frame = match self.decode(buf)? {
             Some(frame) => Some(frame),
             None if !buf.is_empty() && !self.is_discarding => {
-                let frame = buf.take();
+                let frame = buf.split_to(buf.len());
                 self.next_index = 0;
 
                 Some(frame.into())
@@ -125,11 +126,14 @@ impl Decoder for BytesDelimitedCodec {
     }
 }
 
-impl Encoder for BytesDelimitedCodec {
-    type Item = Bytes;
+impl<T> Encoder<T> for BytesDelimitedCodec
+where
+    T: AsRef<[u8]>,
+{
     type Error = io::Error;
 
-    fn encode(&mut self, item: Bytes, buf: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, item: T, buf: &mut BytesMut) -> Result<(), io::Error> {
+        let item = item.as_ref();
         buf.reserve(item.len() + 1);
         buf.put(item);
         buf.put_u8(self.delim);

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # package-rpm.sh
 #
@@ -10,22 +11,22 @@
 #
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
+TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+
 #
 # Local vars
 #
 
-project_root=$(pwd)
-archive_name="vector-$TARGET.tar.gz"
-archive_path="target/artifacts/$archive_name"
-package_version="$($project_root/scripts/version.sh)"
+PROJECT_ROOT="$(pwd)"
+ARCHIVE_NAME="vector-$TARGET.tar.gz"
+ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
+PACKAGE_VERSION="$("$PROJECT_ROOT/scripts/version.sh")"
 
 #
 # Header
 #
 
-set -eu
-
-echo "Packaging .rpm for $archive_name"
+echo "Packaging .rpm for $ARCHIVE_NAME"
 echo "TARGET: $TARGET"
 
 #
@@ -39,31 +40,51 @@ export RELEASE=1
 # The RPM spec does not like a leading `v` or `-` in the version name.
 # Therefore we clean the version so that the `rpmbuild` command does
 # not fail.
-export CLEANED_VERSION=$package_version
-CLEANED_VERSION=$(echo $CLEANED_VERSION | sed 's/-/\./g')
+export CLEANED_VERSION="${PACKAGE_VERSION//-/.}"
 
 # The arch is the first part of the target
 # For some architectures, like armv7hl it doesn't match the arch
 # from Rust target triple and needs to be specified manually.
-ARCH=${ARCH:-$(echo $TARGET | cut -d'-' -f1)}
+ARCH="${ARCH:-"$(echo "$TARGET" | cut -d'-' -f1)"}"
 
-# Create source dir
-rm -rf /root/rpmbuild/SOURCES
-mkdir -p /root/rpmbuild/SOURCES
-mkdir -p /root/rpmbuild/SOURCES/init.d
-mkdir -p /root/rpmbuild/SOURCES/systemd
-cp -av distribution/init.d/. /root/rpmbuild/SOURCES/init.d
-cp -av distribution/systemd/. /root/rpmbuild/SOURCES/systemd
+# Prepare rpmbuild dir
+RPMBUILD_DIR="$(mktemp -td "rpmbuild.XXXX")"
+
+# Create build dirs
+for ITEM in RPMS SOURCES SPECS SRPMS BUILD; do
+  rm -rf "${RPMBUILD_DIR:?}/${ITEM:?}"
+  mkdir -p "$RPMBUILD_DIR/$ITEM"
+done
+
+# Init support data
+mkdir -p \
+  "$RPMBUILD_DIR/SOURCES/systemd"
+cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 
 # Copy the archive into the sources dir
-cp -av $archive_path "/root/rpmbuild/SOURCES/vector-$ARCH.tar.gz"
+cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
 # Perform the build.
-rpmbuild --target "$ARCH-redhat-linux" --define "_arch $ARCH" -ba distribution/rpm/vector.spec
+rpmbuild \
+  --define "_topdir $RPMBUILD_DIR" \
+  --target "$ARCH-redhat-linux" \
+  --define "_arch $ARCH" \
+  --nodebuginfo \
+  -ba distribution/rpm/vector.spec
+
+#
+# Set the type of RPM - gnu or musl
+#
+
+if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
+  TYPE="-musl"
+else
+  TYPE=""
+fi
 
 #
 # Move the RPM into the artifacts dir
 #
 
-ls "/root/rpmbuild/RPMS/$ARCH"
-mv -v "/root/rpmbuild/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
+ls "$RPMBUILD_DIR/RPMS/$ARCH"
+mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-${CLEANED_VERSION}-${RELEASE}${TYPE}.${ARCH}.rpm"

@@ -1,174 +1,234 @@
 use crate::{
-    internal_events::TcpConnectionError,
+    config::Resource,
+    internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
-    tls::{MaybeTlsListener, MaybeTlsSettings},
-    Event,
+    tcp::TcpKeepaliveConfig,
+    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    Event, Pipeline,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures::{
+    compat::Sink01CompatExt, future::BoxFuture, stream, FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::Sink;
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{
-    fmt, io,
-    net::SocketAddr,
-    time::{Duration, Instant},
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    time::delay_for,
 };
-use stream_cancel::Tripwire;
-use tokio01::{
-    codec::{Decoder, FramedRead},
-    net::TcpListener,
-    prelude::AsyncRead,
-    reactor::Handle,
-    timer,
-};
-use tracing::{field, Span};
+use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
 
-fn make_listener(
+async fn make_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
 ) -> Option<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr) {
+        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
-            Err(err) => {
-                error!("Failed to bind to listener socket: {}", err);
+            Err(error) => {
+                error!(message = "Failed to bind to listener socket.", %error);
                 None
             }
         },
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
-            Ok(Some(listener)) => match TcpListener::from_std(listener, &Handle::default()) {
+            Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
-                Err(err) => {
-                    error!("Failed to bind to listener socket: {}", err);
+                Err(error) => {
+                    error!(message = "Failed to bind to listener socket.", %error);
                     None
                 }
             },
             Ok(None) => {
-                error!("Failed to take listen FD, not open or already taken");
+                error!("Failed to take listen FD, not open or already taken.");
                 None
             }
-            Err(err) => {
-                error!("Failed to take listen FD: {}", err);
+            Err(error) => {
+                error!(message = "Failed to take listen FD.", %error);
                 None
             }
         },
     }
 }
 
-pub trait TcpSource: Clone + Send + 'static {
-    type Decoder: Decoder<Error = io::Error> + Send + 'static;
+pub trait TcpSource: Clone + Send + Sync + 'static {
+    // Should be default: `std::io::Error`.
+    // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
+    type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
+    type Decoder: Decoder<Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(
-        &self,
-        frame: <Self::Decoder as tokio01::codec::Decoder>::Item,
-        host: Bytes,
-    ) -> Option<Event>;
+    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
 
     fn run(
         self,
         addr: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+        let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
         let listenfd = ListenFd::from_env();
 
-        let source = future::lazy(move || {
-            let listener = match make_listener(addr, listenfd, &tls) {
-                None => return future::Either::B(future::err(())),
+        Ok(Box::pin(async move {
+            let listener = match make_listener(addr, listenfd, &tls).await {
+                None => return Err(()),
                 Some(listener) => listener,
             };
 
             info!(
-                message = "listening.",
-                addr = field::display(
-                    listener
-                        .local_addr()
-                        .map(|addr| SocketListenAddr::SocketAddr(addr))
-                        .unwrap_or(addr)
-                )
+                message = "Listening.",
+                addr = %listener
+                    .local_addr()
+                    .map(SocketListenAddr::SocketAddr)
+                    .unwrap_or(addr)
             );
 
-            let (trigger, tripwire) = Tripwire::new();
-            let tripwire = tripwire.select2(shutdown.clone());
-            let tripwire = tripwire
-                .and_then(move |_| {
-                    timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
-                        .map_err(|err| panic!("Timer error: {:?}", err))
-                })
-                .shared();
+            let tripwire = shutdown.clone();
+            let tripwire = async move {
+                let _ = tripwire.await;
+                delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
+            }
+            .shared();
 
-            let future = listener
-                .incoming()
-                .take_until(shutdown)
-                .map_err(|error| {
-                    error!(
-                        message = "failed to accept socket",
-                        %error
-                    )
-                })
-                .for_each(move |socket| {
-                    let peer_addr = socket.peer_addr().ip().to_string();
+            let connection_gauge = OpenGauge::new();
 
-                    let span = info_span!("connection", %peer_addr);
-
-                    let host = Bytes::from(peer_addr);
-
-                    let tripwire = tripwire
-                        .clone()
-                        .map(move |_| {
-                            info!(
-                                "Resetting connection (still open after {} seconds).",
-                                shutdown_timeout_secs
-                            )
-                        })
-                        .map_err(|_| ());
-
+            listener
+                .accept_stream()
+                .take_until(shutdown.clone())
+                .for_each(|connection| {
+                    let shutdown = shutdown.clone();
+                    let tripwire = tripwire.clone();
                     let source = self.clone();
-                    span.in_scope(|| {
-                        let peer_addr = socket.peer_addr();
-                        debug!(message = "accepted a new connection", %peer_addr);
-                        handle_stream(span.clone(), socket, source, tripwire, host, out.clone())
-                    });
-                    Ok(())
-                })
-                .inspect(|_| trigger.cancel());
-            future::Either::A(future)
-        });
+                    let out = out.clone();
+                    let connection_gauge = connection_gauge.clone();
 
-        Ok(Box::new(source))
+                    async move {
+                        let socket = match connection {
+                            Ok(socket) => socket,
+                            Err(error) => {
+                                error!(
+                                    message = "Failed to accept socket.",
+                                    %error
+                                );
+                                return;
+                            }
+                        };
+
+                        let peer_addr = socket.peer_addr().ip().to_string();
+                        let span = info_span!("connection", %peer_addr);
+                        let host = Bytes::from(peer_addr);
+
+                        let tripwire = tripwire
+                            .map(move |_| {
+                                info!(
+                                    message = "Resetting connection (still open after seconds).",
+                                    seconds = ?shutdown_timeout_secs
+                                );
+                            })
+                            .boxed();
+
+                        span.in_scope(|| {
+                            let peer_addr = socket.peer_addr();
+                            debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
+
+                            let open_token =
+                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+
+                            let fut = handle_stream(
+                                shutdown, socket, keepalive, source, tripwire, host, out,
+                            );
+                            tokio::spawn(
+                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                            );
+                        });
+                    }
+                })
+                .map(Ok)
+                .await
+        }))
     }
 }
 
-fn handle_stream(
-    span: Span,
-    socket: impl AsyncRead + Send + 'static,
+async fn handle_stream(
+    mut shutdown: ShutdownSignal,
+    mut socket: MaybeTlsIncomingStream<TcpStream>,
+    keepalive: Option<TcpKeepaliveConfig>,
     source: impl TcpSource,
-    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
+    tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
-    let handler = FramedRead::new(socket, source.decoder())
-        .take_until(tripwire)
-        .filter_map(move |frame| {
+    tokio::select! {
+        result = socket.handshake() => {
+            if let Err(error) = result {
+                emit!(TcpSocketConnectionError { error });
+                return;
+            }
+        },
+        _ = &mut shutdown => {
+            return;
+        }
+    };
+
+    if let Some(keepalive) = keepalive {
+        if let Err(error) = socket.set_keepalive(keepalive) {
+            warn!(message = "Failed configuring TCP keepalive.", %error);
+        }
+    }
+
+    let mut _token = None;
+    let mut shutdown = Some(shutdown);
+    let mut reader = FramedRead::new(socket, source.decoder());
+    stream::poll_fn(move |cx| {
+        if let Some(fut) = shutdown.as_mut() {
+            match fut.poll_unpin(cx) {
+                Poll::Ready(token) => {
+                    debug!("Start graceful shutdown.");
+                    // Close our write part of TCP socket to signal the other side
+                    // that it should stop writing and close the channel.
+                    let socket: Option<&TcpStream> = reader.get_ref().get_ref();
+                    if let Some(socket) = socket {
+                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+                        }
+                    } else {
+                        // Connection hasn't yet been established so we are done here.
+                        debug!("Closing connection that hasn't yet been fully established.");
+                        return Poll::Ready(None);
+                    }
+
+                    _token = Some(token);
+                    shutdown = None;
+                }
+                Poll::Pending => {}
+            }
+        }
+
+        reader.poll_next_unpin(cx)
+    })
+    .take_until(tripwire)
+    .filter_map(move |frame| ready(match frame {
+        Ok(frame) => {
             let host = host.clone();
-            source.build_event(frame, host)
-        })
-        .map_err(|error| {
-            emit!(TcpConnectionError { error });
-        })
-        .forward(out)
-        .map(|_| debug!("connection closed."))
-        .map_err(|_| warn!("Error received while processing TCP source"));
-    tokio01::spawn(handler.instrument(span));
+            source.build_event(frame, host).map(Ok)
+        }
+        Err(error) => {
+            warn!(message = "Failed to read data from TCP source.", %error);
+            None
+        }
+    }))
+    .forward(out.sink_compat())
+    .map_err(|_| warn!(message = "Error received while processing TCP source."))
+    .map(|_| debug!("Connection closed."))
+    .await
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
@@ -194,6 +254,15 @@ impl From<SocketAddr> for SocketListenAddr {
     }
 }
 
+impl From<SocketListenAddr> for Resource {
+    fn from(addr: SocketListenAddr) -> Resource {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.into(),
+            SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
+        }
+    }
+}
+
 fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
 where
     D: Deserializer<'de>,
@@ -201,9 +270,11 @@ where
     let s: &'de str = Deserialize::deserialize(des)?;
     match s {
         "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => {
-            Ok(s[8..].parse::<usize>().map_err(de::Error::custom)? - 1)
-        }
+        s if s.starts_with("systemd#") => s[8..]
+            .parse::<usize>()
+            .map_err(de::Error::custom)?
+            .checked_sub(1)
+            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
         _ => Err(de::Error::custom("must start with \"systemd\"")),
     }
 }

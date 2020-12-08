@@ -1,5 +1,5 @@
-#!/bin/bash
-set -eo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
 # check-style.sh
 #
@@ -7,69 +7,78 @@ set -eo pipefail
 #
 #   Checks that all text files have correct line endings and no trailing spaces.
 
-exit_code=0
-if [ "$1" == "--fix" ]; then
-  mode="fix"
+if [ "${1:-}" == "--fix" ]; then
+  MODE="fix"
 else
-  mode="check"
+  MODE="check"
 fi
 
-function ised() {
+ised() {
+  local PAT="$1"
+  local FILE="$2"
+
   # In-place `sed` that uses the form of `sed -i` which works
   # on both GNU and macOS.
-  sed -i.bak "$1" "$2"
-  rm "$2.bak"
+  sed -i.bak "$PAT" "$FILE"
+  rm "$FILE.bak"
 }
 
-for i in $(git ls-files); do
-  # ignore binary files
-  case $i in
+EXIT_CODE=0
+for FILE in $(git ls-files); do
+  # Ignore binary files and generated files.
+  case "$FILE" in
     *png) continue;;
     *svg) continue;;
+    *gif) continue;;
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
-    website/plugins/*) continue;;
-    website/sidebars.js) continue;;
+    distribution/kubernetes/*/*.yaml) continue;;
   esac
 
+  # Skip all directories (usually theis only happens when we have symlinks).
+  if [[ -d "$FILE" ]]; then
+    continue
+  fi
+
   # check that the file contains trailing newline
-  if [ -n "$(tail -c1 $i | tr -d $'\n')" ]; then
-    case $mode in
+  if [ -n "$(tail -c1 "$FILE" | tr -d $'\n')" ]; then
+    case "$MODE" in
       check)
-        echo "File \"$i\" doesn't end with a newline"
-        exit_code=1
+        echo "File \"$FILE\" doesn't end with a newline"
+        EXIT_CODE=1
         ;;
       fix)
-        echo >> $i
+        echo >> "$FILE"
         ;;
     esac
   fi
 
   # check that the file uses LF line breaks
-  if grep $'\r$' $i > /dev/null; then
-    case $mode in
+  if grep $'\r$' "$FILE" > /dev/null; then
+    case "$MODE" in
       check)
-        echo "File \"$i\" contains CRLF line breaks instead of LF line breaks"
-        exit_code=1
+        echo "File \"$FILE\" contains CRLF line breaks instead of LF line breaks"
+        EXIT_CODE=1
         ;;
       fix)
-        ised 's/\r$//' $i
+        ised 's/\r$//' "$FILE"
         ;;
     esac
   fi
 
   # check that the lines don't contain trailing spaces
-  if grep ' $' $i > /dev/null; then
-    case $mode in
+  if grep ' $' "$FILE" > /dev/null; then
+    case "$MODE" in
       check)
-        echo "File \"$i\" contains trailing spaces in some of the lines"
-        exit_code=1
+        echo "File \"$FILE\" contains trailing spaces in some of the lines"
+        EXIT_CODE=1
         ;;
       fix)
-        ised 's/ *$//' $i
+        ised 's/ *$//' "$FILE"
         ;;
     esac
   fi
 done
-exit $exit_code
+
+exit "$EXIT_CODE"

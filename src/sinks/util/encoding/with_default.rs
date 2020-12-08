@@ -10,7 +10,6 @@ use std::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
-use string_cache::DefaultAtom as Atom;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
@@ -25,6 +24,11 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub(crate) codec: E,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(
         default,
@@ -37,7 +41,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<String>>,
     /// Format for outgoing timestamps.
     #[serde(
         default,
@@ -50,11 +54,14 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
+    fn schema(&self) -> &Option<String> {
+        &self.schema
+    }
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
-    fn except_fields(&self) -> &Option<Vec<Atom>> {
+    fn except_fields(&self) -> &Option<Vec<String>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
@@ -73,6 +80,7 @@ where
     {
         EncodingConfigWithDefault {
             codec: self.codec.into(),
+            schema: self.schema,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -85,6 +93,7 @@ where
     {
         EncodingConfig {
             codec: self.codec.into(),
+            schema: self.schema,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -99,12 +108,14 @@ where
     fn into(self) -> EncodingConfig<E> {
         let Self {
             codec,
+            schema,
             only_fields,
             except_fields,
             timestamp_format,
         } = self;
         EncodingConfig {
             codec,
+            schema,
             only_fields,
             except_fields,
             timestamp_format,
@@ -115,7 +126,8 @@ where
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec: codec,
+            codec,
+            schema: Default::default(),
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -158,6 +170,7 @@ where
             {
                 Ok(Self::Value {
                     codec: T::deserialize(value.into_deserializer())?,
+                    schema: Default::default(),
                     only_fields: Default::default(),
                     except_fields: Default::default(),
                     timestamp_format: Default::default(),
@@ -180,6 +193,7 @@ where
 
         let concrete = Self {
             codec: inner.codec,
+            schema: inner.schema,
             // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
             only_fields: inner.only_fields.map(|fields| {
                 fields
@@ -191,9 +205,7 @@ where
             timestamp_format: inner.timestamp_format,
         };
 
-        concrete
-            .validate()
-            .map_err(|e| serde::de::Error::custom(e))?;
+        concrete.validate().map_err(serde::de::Error::custom)?;
         Ok(concrete)
     }
 }
@@ -203,9 +215,11 @@ pub struct InnerWithDefault<E: Default> {
     #[serde(default)]
     codec: E,
     #[serde(default)]
+    schema: Option<String>,
+    #[serde(default)]
     only_fields: Option<Vec<String>>,
     #[serde(default)]
-    except_fields: Option<Vec<Atom>>,
+    except_fields: Option<Vec<String>>,
     #[serde(default)]
     timestamp_format: Option<TimestampFormat>,
 }

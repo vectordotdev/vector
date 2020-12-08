@@ -1,70 +1,74 @@
-module Printer
-  PROMPT = "---> "
-  INDENT = "     "
-  SEPARATOR = "-" * 80
-  TITLE_PROMPT = "#### "
+require "paint"
 
-  extend self
+module Util
+  module Printer
+    PROMPT = "---> "
+    INDENT = "     "
+    SEPARATOR = "-" * 80
+    TITLE_PROMPT = "#### "
 
-  def error!(message)
-    Printer.say(message, color: :red)
-    exit(1)
-  end
+    extend self
 
-  def Printer.get(words, choices = nil)
-    question = "#{words.strip}"
-
-    if !choices.nil?
-      question += " (" + choices.join("/") + ")"
+    def error!(message)
+      Printer.say(message, color: :red)
+      exit(1)
     end
 
-    Printer.say(question)
+    def Printer.get(words, choices = nil)
+      question = "#{words.strip}"
 
-    print INDENT
+      if !choices.nil?
+        question += " (" + choices.join("/") + ")"
+      end
 
-    input = gets().chomp
+      Printer.say(question)
 
-    if choices && !choices.include?(input)
-      Printer.say("You must enter one of #{choices.join(", ")}", color: :red)
-      Printer.get(words, choices)
-    else
-      input
-    end
-  end
+      print INDENT
 
-  def invalid(words)
-    Printer.say(words, color: :yellow)
-  end
+      input = gets().chomp
 
-  def say(words, color: nil, new: true, prompt: PROMPT)
-    prefix = new ? prompt : INDENT
-
-    if color
-      words = Paint[prefix + words, color]
-    else
-      words = prefix + words
+      if choices && !choices.include?(input)
+        Printer.say("You must enter one of #{choices.join(", ")}", color: :red)
+        Printer.get(words, choices)
+      else
+        input
+      end
     end
 
-    puts words.gsub("\n", "\n#{INDENT}")
-  end
-
-  def separate(color: nil)
-    string = SEPARATOR
-
-    if color
-      string = Paint[string, color]
+    def invalid(words)
+      Printer.say(words, color: :yellow)
     end
 
-    puts ""
-    puts string
-  end
+    def say(words, color: nil, new: true, prompt: PROMPT)
+      prefix = new ? prompt : INDENT
 
-  def success(words)
-    Printer.say(words, color: :green)
-  end
+      if color
+        words = Paint[prefix + words, color]
+      else
+        words = prefix + words
+      end
 
-  def title(words)
-    separate(color: :cyan)
-    Printer.say(words, color: :cyan, prompt: TITLE_PROMPT)
+      puts words.gsub("\n", "\n#{INDENT}")
+    end
+
+    def separate(color: nil)
+      string = SEPARATOR
+
+      if color
+        string = Paint[string, color]
+      end
+
+      puts ""
+      puts string
+    end
+
+    def success(words)
+      Printer.say(words, color: :green)
+    end
+
+    def title(words)
+      separate(color: :cyan)
+      Printer.say(words, color: :cyan, prompt: TITLE_PROMPT)
+    end
   end
 end

@@ -1,51 +1,57 @@
 use crate::{
-    dns::Resolver,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::region_from_endpoint,
+    http::{Auth, HttpClient},
+    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
+    rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchBytesConfig, Buffer, Compression, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
-    template::Template,
+    template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures01::{Future, Sink};
-use http::{status::StatusCode, uri::InvalidUri, Uri};
-use hyper::{
+use futures::{FutureExt, SinkExt};
+use http::{
     header::{HeaderName, HeaderValue},
-    Body, Request,
+    uri::InvalidUri,
+    Request, StatusCode, Uri,
 };
+use hyper::Body;
 use lazy_static::lazy_static;
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::{DefaultCredentialsProvider, ProvideAwsCredentials, Region};
-use rusoto_credential::{AwsCredentials, CredentialsError};
+use rusoto_core::Region;
+use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
+use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use tower::Service;
+use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
-    pub compression: Option<Compression>,
+    pub pipeline: Option<String>,
+
+    #[serde(default)]
+    pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -53,6 +59,7 @@ pub struct ElasticSearchConfig {
     pub headers: Option<HashMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
+    pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
 }
 
@@ -74,47 +81,47 @@ pub enum Encoding {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
-    Aws,
-}
-
-impl ElasticSearchAuth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        if let Self::Basic { user, password } = &self {
-            use headers::HeaderMapExt;
-            let auth = headers::Authorization::basic(&user, &password);
-            req.headers_mut().typed_insert(auth);
-        }
-    }
+    Aws { assume_role: Option<String> },
 }
 
 inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+impl_generate_config_from_default!(ElasticSearchConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let healthcheck = healthcheck(cx.resolver(), &common)?;
+        let client = HttpClient::new(common.tls_settings.clone())?;
 
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+        let healthcheck = healthcheck(client.clone(), common).boxed();
+
+        let common = ElasticSearchCommon::parse_config(&self)?;
+        let compression = common.compression;
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
-        let tls_settings = common.tls_settings.clone();
-
-        let gzip = common.compression == Compression::Gzip;
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
-            Buffer::new(gzip),
+            Buffer::new(batch.size, compression),
             ElasticSearchRetryLogic,
             request,
-            batch,
-            tls_settings,
-            &cx,
+            batch.timeout,
+            client,
+            cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -130,8 +137,8 @@ impl SinkConfig for ElasticSearchConfig {
 pub struct ElasticSearchCommon {
     pub base_url: String,
     bulk_uri: Uri,
-    authorization: Option<String>,
-    credentials: Option<AwsCredentials>,
+    authorization: Option<Auth>,
+    credentials: Option<rusoto::AwsCredentialsProvider>,
     index: Template,
     doc_type: String,
     tls_settings: TlsSettings,
@@ -147,27 +154,27 @@ enum ParseError {
     InvalidHost { host: String, source: InvalidUri },
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
-    #[snafu(display("Could not create AWS credentials provider: {:?}", source))]
-    AWSCredentialsProviderFailed { source: CredentialsError },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
+    #[snafu(display("Index template parse error: {}", source))]
+    IndexTemplate { source: TemplateError },
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.config.encoding.apply_rules(&mut event);
-
         let index = self
             .index
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys { keys: missing_keys });
+                emit!(ElasticSearchMissingKeys {
+                    keys: &missing_keys
+                });
             })
             .ok()?;
-        info!("inserting into index: {}", index);
 
         let mut action = json!({
             "index": {
@@ -178,29 +185,36 @@ impl HttpSink for ElasticSearchCommon {
         maybe_set_id(
             self.config.id_key.as_ref(),
             action.pointer_mut("/index").unwrap(),
-            &event,
+            &mut event,
         );
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
 
+        self.config.encoding.apply_rules(&mut event);
+
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventReceived {
-            byte_size: body.len()
+        emit!(ElasticSearchEventEncoded {
+            byte_size: body.len(),
+            index
         });
 
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let mut builder = Request::post(&self.bulk_uri);
 
-        if let Some(credentials) = &self.credentials {
+        if let Some(credentials_provider) = &self.credentials {
             let mut request = self.signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression.content_encoding() {
+                request.add_header("Content-Encoding", ce);
+            }
 
             if let Some(headers) = &self.config.headers {
                 for (header, value) in headers {
@@ -210,33 +224,36 @@ impl HttpSink for ElasticSearchCommon {
 
             request.set_payload(Some(events));
 
-            finish_signer(&mut request, &credentials, &mut builder);
+            // mut builder?
+            builder = finish_signer(&mut request, &credentials_provider, builder).await?;
 
             // The SignedRequest ends up owning the body, so we have
             // to play games here
             let body = request.payload.take().unwrap();
             match body {
-                SignedRequestPayload::Buffer(body) => builder.body(body.to_vec()).unwrap(),
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body.to_vec()).map_err(Into::into)
+                }
                 _ => unreachable!(),
             }
         } else {
-            builder.header("Content-Type", "application/x-ndjson");
+            builder = builder.header("Content-Type", "application/x-ndjson");
 
-            if self.compression == Compression::Gzip {
-                builder.header("Content-Encoding", "gzip");
+            if let Some(ce) = self.compression.content_encoding() {
+                builder = builder.header("Content-Encoding", ce);
             }
 
             if let Some(headers) = &self.config.headers {
                 for (header, value) in headers {
-                    builder.header(&header[..], &value[..]);
+                    builder = builder.header(&header[..], &value[..]);
                 }
             }
 
             if let Some(auth) = &self.authorization {
-                builder.header("Authorization", &auth[..]);
+                builder = auth.apply_builder(builder);
             }
 
-            builder.body(events).unwrap()
+            builder.body(events).map_err(Into::into)
         }
     }
 }
@@ -244,35 +261,57 @@ impl HttpSink for ElasticSearchCommon {
 #[derive(Clone)]
 struct ElasticSearchRetryLogic;
 
+#[derive(Deserialize, Debug)]
+struct ESResultResponse {
+    items: Vec<ESResultItem>,
+}
+#[derive(Deserialize, Debug)]
+struct ESResultItem {
+    index: ESIndexResult,
+}
+#[derive(Deserialize, Debug)]
+struct ESIndexResult {
+    error: Option<ESErrorDetails>,
+}
+#[derive(Deserialize, Debug)]
+struct ESErrorDetails {
+    reason: String,
+    #[serde(rename = "type")]
+    err_type: String,
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
+            _ if status.is_server_error() => RetryAction::Retry(format!(
+                "{}: {}",
+                status,
+                String::from_utf8_lossy(response.body())
+            )),
+            _ if status.is_client_error() => {
+                let body = String::from_utf8_lossy(response.body());
+                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body))
+            }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.body());
-                match body.find("\"errors\":true") {
-                    Some(_) => match serde_json::from_str::<Value>(&body) {
-                        Err(_) => RetryAction::DontRetry(
-                            "some messages failed, and invalid response from elasticsearch".into(),
-                        ),
-                        Ok(_data) => RetryAction::DontRetry("some messages failed".into()),
-                    },
-                    None => RetryAction::Successful,
+
+                if body.contains("\"errors\":true") {
+                    RetryAction::DontRetry(get_error_reason(&body))
+                } else {
+                    RetryAction::Successful
                 }
             }
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
@@ -280,67 +319,68 @@ impl RetryLogic for ElasticSearchRetryLogic {
     }
 }
 
+fn get_error_reason(body: &str) -> String {
+    match serde_json::from_str::<ESResultResponse>(&body) {
+        Err(json_error) => format!(
+            "some messages failed, could not parse response, error: {}",
+            json_error
+        ),
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+            Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
+            None => format!("error response: {}", body),
+        },
+    }
+}
+
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = match &config.auth {
-            Some(ElasticSearchAuth::Basic { user, password }) => {
-                let token = format!("{}:{}", user, password);
-                Some(format!("Basic {}", base64::encode(token.as_bytes())))
-            }
-            _ => None,
-        };
-
-        let base_url = config.host.clone();
-        let region = region_from_endpoint(&config.host)?;
-
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.host);
-        let uri = uri
-            .parse::<Uri>()
-            .with_context(|| InvalidHost { host: &base_url })?;
+        let uri = format!("{}/_test", &config.endpoint);
+        let uri = uri.parse::<Uri>().with_context(|| InvalidHost {
+            host: &config.endpoint,
+        })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.host.clone(),
+                host: config.endpoint.clone(),
             }
             .into());
         }
 
+        let (base_url, mut authorization) = Auth::get_and_strip_basic_auth(&config.endpoint);
+
+        if let Some(ElasticSearchAuth::Basic { user, password }) = config.auth.clone() {
+            if authorization.is_some() {
+                warn!("Overwriting authorization config in `endpoint`.");
+            }
+            authorization = Some(Auth::Basic { user, password });
+        }
+
+        let region = match &config.aws {
+            Some(region) => Region::try_from(region)?,
+            None => region_from_endpoint(&base_url)?,
+        };
+
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws) => {
-                let provider =
-                    DefaultCredentialsProvider::new().context(AWSCredentialsProviderFailed)?;
-
-                let mut rt = tokio01::runtime::current_thread::Runtime::new()?;
-
-                let credentials = rt
-                    .block_on(provider.credentials())
-                    .context(AWSCredentialsGenerateFailed)?;
-
-                Some(credentials)
-            }
+            Some(ElasticSearchAuth::Aws { assume_role }) => Some(
+                rusoto::AwsCredentialsProvider::new(&region, assume_role.clone())?,
+            ),
         };
 
-        // Only apply compression if explicitly selected and we are
-        // running with no AWS credentials.
-        let compression = match (&credentials, config.compression) {
-            (Some(_), _) => Compression::None,
-            (_, None) => Compression::None,
-            (None, Some(c)) => c,
-        };
+        let compression = config.compression;
+        let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
+        let index = Template::try_from(index).context(IndexTemplate)?;
 
-        let index = if let Some(idx) = &config.index {
-            Template::from(idx.as_str())
-        } else {
-            Template::from("vector-%Y.%m.%d")
-        };
-
-        let doc_type = config.doc_type.clone().unwrap_or("_doc".into());
+        let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
+
+        if let Some(pipeline) = &config.pipeline {
+            query_params.insert("pipeline".into(), pipeline.into());
+        }
 
         let mut query = url::form_urlencoded::Serializer::new(String::new());
         for (p, v) in &query_params {
@@ -378,42 +418,40 @@ impl ElasticSearchCommon {
     }
 }
 
-fn healthcheck(
-    resolver: Resolver,
-    common: &ElasticSearchCommon,
-) -> crate::Result<super::Healthcheck> {
+async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
     let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
     match &common.credentials {
         None => {
             if let Some(authorization) = &common.authorization {
-                builder.header("Authorization", authorization.clone());
+                builder = authorization.apply_builder(builder);
             }
         }
-        Some(credentials) => {
+        Some(credentials_provider) => {
             let mut signer = common.signed_request("GET", builder.uri_ref().unwrap(), false);
-            finish_signer(&mut signer, &credentials, &mut builder);
+            builder = finish_signer(&mut signer, &credentials_provider, builder).await?;
         }
     }
     let request = builder.body(Body::empty())?;
+    let response = client.send(request).await?;
 
-    Ok(Box::new(
-        HttpClient::new(resolver, common.tls_settings.clone())?
-            .call(request)
-            .map_err(|err| err.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => Ok(()),
-                status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
-            }),
-    ))
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
+    }
 }
 
-fn finish_signer(
+async fn finish_signer(
     signer: &mut SignedRequest,
-    credentials: &AwsCredentials,
-    builder: &mut http::request::Builder,
-) {
-    signer.sign_with_plus(&credentials, true);
+    credentials_provider: &rusoto::AwsCredentialsProvider,
+    mut builder: http::request::Builder,
+) -> crate::Result<http::request::Builder> {
+    let credentials = credentials_provider
+        .credentials()
+        .await
+        .context(AWSCredentialsGenerateFailed)?;
+
+    signer.sign(&credentials);
 
     for (name, values) in signer.headers() {
         let header_name = name
@@ -422,13 +460,15 @@ fn finish_signer(
         for value in values {
             let header_value =
                 HeaderValue::from_bytes(value).expect("Could not parse header value.");
-            builder.header(&header_name, header_value);
+            builder = builder.header(&header_name, header_value);
         }
     }
+
+    Ok(builder)
 }
 
-fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &Event) {
-    if let Some(val) = key.and_then(|k| event.as_log().get(&k.as_ref().into())) {
+fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -440,21 +480,27 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::retries::RetryAction;
-    use crate::Event;
+    use crate::{sinks::util::retries::RetryAction, Event};
     use http::{Response, StatusCode};
+    use pretty_assertions::assert_eq;
     use serde_json::json;
 
     #[test]
-    fn sets_id_from_custom_field() {
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
+
+    #[test]
+    fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
         event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
+        assert_eq!(None, event.as_log().get("foo"));
     }
 
     #[test]
@@ -464,7 +510,7 @@ mod tests {
         event.as_mut_log().insert("not_foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
@@ -476,7 +522,7 @@ mod tests {
         event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &event);
+        maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
@@ -494,6 +540,31 @@ mod tests {
             RetryAction::DontRetry(_)
         ));
     }
+
+    #[test]
+    fn allows_using_excepted_fields() {
+        let config = ElasticSearchConfig {
+            index: Some(String::from("{{ idx }}")),
+            encoding: EncodingConfigWithDefault {
+                codec: Encoding::Default,
+                except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
+                ..Default::default()
+            },
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert("idx", "purple");
+
+        let encoded = es.encode_event(event).unwrap();
+        let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
+{"foo":"bar","message":"hello there"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+    }
 }
 
 #[cfg(test)]
@@ -501,165 +572,215 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        event,
-        sinks::util::http::HttpClient,
-        test_util::{random_events_with_stream, random_string, runtime},
+        config::{SinkConfig, SinkContext},
+        http::HttpClient,
+        test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
-        topology::config::{SinkConfig, SinkContext},
         Event,
     };
-    use futures01::{Future, Sink, Stream};
-    use hyper::{Body, Request};
+    use futures::{stream, StreamExt};
+    use http::{Request, StatusCode};
+    use hyper::Body;
     use serde_json::{json, Value};
-    use std::fs::File;
-    use std::io::Read;
-    use tower::Service;
+    use std::{fs::File, future::ready, io::Read};
 
     #[test]
-    fn structures_events_correctly() {
-        let mut rt = runtime();
-
+    fn ensure_pipeline_in_params() {
         let index = gen_index();
+        let pipeline = String::from("test-pipeline");
+
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
-            index: Some(index.clone()),
-            doc_type: Some("log_lines".into()),
-            id_key: Some("my_id".into()),
-            compression: Some(Compression::None),
+            endpoint: "http://localhost:9200".into(),
+            index: Some(index),
+            pipeline: Some(pipeline.clone()),
             ..config()
         };
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-        let cx = SinkContext::new_test(rt.executor());
-        let (sink, _hc) = config.build(cx.clone()).unwrap();
+        assert_eq!(common.query_params["pipeline"], pipeline);
+    }
+
+    #[tokio::test]
+    async fn structures_events_correctly() {
+        let index = gen_index();
+        let config = ElasticSearchConfig {
+            endpoint: "http://localhost:9200".into(),
+            index: Some(index.clone()),
+            doc_type: Some("log_lines".into()),
+            id_key: Some("my_id".into()),
+            compression: Compression::None,
+            ..config()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let base_url = common.base_url.clone();
+
+        let cx = SinkContext::new_test();
+        let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        sink.run(stream::once(ready(input_event.clone())))
+            .await
+            .unwrap();
 
         // make sure writes all all visible
-        rt.block_on(flush(cx.resolver(), &common)).unwrap();
+        flush(common).await.unwrap();
 
         let response = reqwest::Client::new()
-            .get(&format!("{}/{}/_search", common.base_url, index))
+            .get(&format!("{}/{}/_search", base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
+            .await
             .unwrap();
 
-        assert_eq!(1, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
+        assert_eq!(1, total);
 
-        let hit = response.into_hits().next().unwrap();
-        let doc = hit.document().unwrap();
-        assert_eq!(Some("42"), doc["my_id"].as_str());
+        let hits = response["hits"]["hits"]
+            .as_array()
+            .expect("Elasticsearch response does not include hits->hits");
 
-        let value = hit.into_document().unwrap();
+        let hit = hits.iter().next().unwrap();
+        assert_eq!("42", hit["_id"]);
+
+        let value = hit
+            .get("_source")
+            .expect("Elasticsearch hit missing _source");
+        assert_eq!(None, value["my_id"].as_str());
+
         let expected = json!({
             "message": "raw log line",
-            "my_id": "42",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
         });
-        assert_eq!(expected, value);
+        assert_eq!(&expected, value);
     }
 
-    #[test]
-    fn insert_events_over_http() {
+    #[tokio::test]
+    async fn insert_events_over_http() {
+        trace_init();
+
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 ..config()
             },
             false,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn insert_events_over_https() {
+    #[tokio::test]
+    async fn insert_events_over_https() {
+        trace_init();
+
         run_insert_tests(
             ElasticSearchConfig {
-                host: "https://localhost:9201".into(),
+                endpoint: "https://localhost:9201".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 tls: Some(TlsOptions {
-                    ca_path: Some("tests/data/Vector_CA.crt".into()),
+                    ca_file: Some("tests/data/Vector_CA.crt".into()),
                     ..Default::default()
                 }),
                 ..config()
             },
             false,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn insert_events_on_aws() {
+    #[tokio::test]
+    async fn insert_events_on_aws() {
+        trace_init();
+
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws),
-                host: "http://localhost:4571".into(),
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                endpoint: "http://localhost:4571".into(),
                 ..config()
             },
             false,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn insert_events_with_failure() {
+    #[tokio::test]
+    async fn insert_events_on_aws_with_compression() {
+        trace_init();
+
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                endpoint: "http://localhost:4571".into(),
+                compression: Compression::gzip_default(),
+                ..config()
+            },
+            false,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn insert_events_with_failure() {
+        trace_init();
+
+        run_insert_tests(
+            ElasticSearchConfig {
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
-                compression: Some(Compression::None),
+                compression: Compression::None,
                 ..config()
             },
             true,
-        );
+        )
+        .await;
     }
 
-    fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
-
+    async fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
         let index = gen_index();
         config.index = Some(index.clone());
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let base_url = common.base_url.clone();
 
-        let cx = SinkContext::new_test(rt.executor());
-        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
+        let cx = SinkContext::new_test();
+        let (sink, healthcheck) = config
+            .build(cx.clone())
+            .await
+            .expect("Building config failed");
 
-        rt.block_on(healthcheck).expect("Health check failed");
+        healthcheck.await.expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                let pump = sink.send_all(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("message", 1);
-                    }
-                    doit = true;
-                    event
-                }));
-                let _ = rt.block_on(pump).expect("Sending events failed");
-            }
-            false => {
-                let pump = sink.send_all(events);
-                let _ = rt.block_on(pump).expect("Sending events failed");
-            }
-        };
+        if break_events {
+            // Break all but the first event to simulate some kind of partial failure
+            let mut doit = false;
+            sink.run(events.map(move |mut event| {
+                if doit {
+                    event.as_mut_log().insert("_type", 1);
+                }
+                doit = true;
+                event
+            }))
+            .await
+            .expect("Sending events failed");
+        } else {
+            sink.run(events).await.expect("Sending events failed");
+        }
 
         // make sure writes all all visible
-        rt.block_on(flush(cx.resolver(), &common))
-            .expect("Flushing writes failed");
+        flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -674,27 +795,38 @@ mod integration_tests {
             .expect("Could not build HTTP client");
 
         let response = client
-            .get(&format!("{}/{}/_search", common.base_url, index))
+            .get(&format!("{}/{}/_search", base_url, index))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
+            .await
             .unwrap();
 
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
 
+        if break_events {
+            assert_ne!(input.len() as u64, total);
+        } else {
+            assert_eq!(input.len() as u64, total);
+
+            let hits = response["hits"]["hits"]
+                .as_array()
+                .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
+            for hit in hits {
+                let hit = hit
+                    .get("_source")
+                    .expect("Elasticsearch hit missing _source");
+                assert!(input.contains(&hit));
             }
         }
     }
@@ -703,29 +835,24 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    fn flush(
-        resolver: Resolver,
-        common: &ElasticSearchCommon,
-    ) -> impl Future<Item = (), Error = crate::Error> {
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush");
-        client
-            .call(request)
-            .map_err(|source| source.into())
-            .and_then(|response| match response.status() {
-                hyper::StatusCode::OK => Ok(()),
-                status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
-            })
+        let client =
+            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
+        let response = client.send(request).await?;
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            status => Err(super::super::HealthcheckError::UnexpectedStatus { status }.into()),
+        }
     }
 
     fn config() -> ElasticSearchConfig {
         ElasticSearchConfig {
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             ..Default::default()
         }

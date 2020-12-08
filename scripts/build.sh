@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # build.sh
 #
@@ -8,28 +9,24 @@
 #
 # ENV VARS
 #
-#   $ABORT          abort if the Vector binary already exists (default "false")
-#   $CHANNEL        the release channel for the build, "nighly" or "stable" (default `scripts/util/release-channel.sh`)
+#   $OVERWRITE      overwrite Vector binary even if it already exists (default "true")
+#   $CHANNEL        the release channel for the build, "nightly" or "stable" (default `scripts/release-channel.sh`)
 #   $FEATURES       a list of Vector features to include when building (default "default")
 #   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
-#   $STRIP          whether or not to strip the binary (default "false")
+#   $KEEP_SYMBOLS   whether to keep the any debug symbols in the binaries or not (default "true")
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
 #
 # Env Vars
 #
 
-ABORT=${ABORT:-false}
-FEATURES=${FEATURES:-}
-NATIVE_BUILD=${NATIVE_BUILD:-true}
-STRIP=${STRIP:-false}
-TARGET=${TARGET:-}
+OVERWRITE=${OVERWRITE:-"true"}
+FEATURES="${FEATURES:-"default"}"
+NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
+KEEP_SYMBOLS=${KEEP_SYMBOLS:-"true"}
+TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
-if [ -z "$FEATURES" ]; then
-  FEATURES="default"
-fi
-
-CHANNEL=${CHANNEL:-$(scripts/util/release-channel.sh)}
+CHANNEL=${CHANNEL:-"$(scripts/release-channel.sh)"}
 if [ "$CHANNEL" == "nightly" ]; then
   FEATURES="$FEATURES nightly"
 fi
@@ -39,21 +36,21 @@ fi
 #
 
 if [ "$NATIVE_BUILD" != "true" ]; then
-  target_dir="target/$TARGET"
+  TARGET_DIR="target/$TARGET"
 else
-  target_dir="target"
+  TARGET_DIR="target"
 fi
 
-binary_path="$target_dir/release/vector"
+BINARY_PATH="$TARGET_DIR/release/vector"
 
 #
 # Abort early if possible
 #
 
-if [ -f "$binary_path" ] && [ "$ABORT" == "true" ]; then
+if [ -f "$BINARY_PATH" ] && [ "$OVERWRITE" == "false" ]; then
   echo "Vector binary already exists at:"
   echo ""
-  echo "    $binary_path"
+  echo "    $BINARY_PATH"
   echo ""
   echo "Remove the binary or set ABORT to \"false\"."
 
@@ -64,38 +61,34 @@ fi
 # Header
 #
 
-set -eu
-
 echo "Building Vector binary"
-echo "ABORT: $ABORT"
+echo "OVERWRITE: $OVERWRITE"
 echo "FEATURES: $FEATURES"
 echo "NATIVE_BUILD: $NATIVE_BUILD"
-echo "STRIP: $STRIP"
+echo "KEEP_SYMBOLS: $KEEP_SYMBOLS"
 echo "TARGET: $TARGET"
-echo "Binary path: $binary_path"
+echo "Binary path: $BINARY_PATH"
 
 #
 # Build
 #
 
-build_flags="--release"
+BUILD_FLAGS=("--release")
 
 if [ "$NATIVE_BUILD" != "true" ]; then
-  build_flags="$build_flags --target $TARGET"
+  BUILD_FLAGS+=("--target" "$TARGET")
 fi
 
-on_exit=""
-
-if [ "$FEATURES" != "default" ]; then
-  cargo build $build_flags --no-default-features --features "$FEATURES"
+if [ "$FEATURES" == "default" ]; then
+  cargo build "${BUILD_FLAGS[@]}"
 else
-  cargo build $build_flags
+  cargo build "${BUILD_FLAGS[@]}" --no-default-features --features "$FEATURES"
 fi
 
 #
 # Strip the output binary
 #
 
-if [ "$STRIP" == "true" ]; then
-  strip $binary_path
+if [ "$KEEP_SYMBOLS" == "false" ]; then
+  strip "$BINARY_PATH"
 fi

@@ -14,7 +14,7 @@ start_at_beginning = true
 [transforms.regex_parser]
 inputs = ["file"]
 type = "regex_parser"
-regex = '^(?P<host>[\w\.]+) - (?P<user>[\w-]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$'
+patterns = ['^(?P<host>[\w\.]+) - (?P<user>[\w-]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$']
 
 # Transform into metrics
 [transforms.log_to_metric]

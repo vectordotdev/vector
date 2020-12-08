@@ -13,7 +13,7 @@ use tracing::{field, span, Event, Id, Metadata};
 use tracing_limit::Limit;
 use tracing_subscriber::layer::SubscriberExt;
 
-const INPUTS: &'static [usize] = &[1, 100, 500, 1000];
+const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
 fn bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
@@ -25,11 +25,11 @@ fn bench(c: &mut Criterion) {
                 b.iter(|| {
                     for _ in 0..**n {
                         info!(
-                            message = "hello world",
+                            message = "Hello world!",
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                         )
                     }
                 })
@@ -47,11 +47,11 @@ fn bench(c: &mut Criterion) {
                 b.iter(|| {
                     for _ in 0..**n {
                         info!(
-                            message = "hello world",
+                            message = "Hello world!",
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                             rate_limit_secs = 5
                         )
                     }

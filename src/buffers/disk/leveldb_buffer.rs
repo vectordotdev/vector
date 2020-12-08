@@ -1,4 +1,5 @@
 use crate::event::{proto, Event};
+use bytes::Bytes;
 use futures01::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,
@@ -7,7 +8,6 @@ use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
     iterator::{Iterable, LevelDBIterator},
-    kv::KV,
     options::{Options, ReadOptions, WriteOptions},
     Database,
 };
@@ -96,7 +96,8 @@ impl Sink for Writer {
 
             self.poll_complete()?;
 
-            let event = proto::EventWrapper::decode(value).unwrap().into();
+            let buf = Bytes::from(value);
+            let event = proto::EventWrapper::decode(buf).unwrap().into();
             return Ok(AsyncSink::NotReady(event));
         }
 
@@ -155,6 +156,7 @@ pub struct Reader {
     current_size: Arc<AtomicUsize>,
     ack_counter: Arc<AtomicUsize>,
     unacked_sizes: VecDeque<usize>,
+    buffer: Vec<Vec<u8>>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -171,25 +173,32 @@ impl Stream for Reader {
         // using write_notifier to wake this task up after the next write.
         self.write_notifier.register();
 
-        // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
-        // the app), this will have to go to disk.
-        let next = tokio::task::block_in_place(|| {
-            self.db
-                .get(ReadOptions::new(), Key(self.read_offset))
-                .unwrap()
-        });
+        if self.buffer.is_empty() {
+            // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
+            // the app), this will have to go to disk.
+            let new_data = tokio::task::block_in_place(|| {
+                self.db
+                    .value_iter(ReadOptions::new())
+                    .from(&Key(self.read_offset))
+                    .to(&Key(self.read_offset + 100))
+                    .collect()
+            });
+            self.buffer = new_data;
+            self.buffer.reverse(); // so we can pop
+        }
 
-        if let Some(value) = next {
+        if let Some(value) = self.buffer.pop() {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 
-            match proto::EventWrapper::decode(value) {
+            let buf = Bytes::from(value);
+            match proto::EventWrapper::decode(buf) {
                 Ok(event) => {
                     let event = Event::from(event);
                     Ok(Async::Ready(Some(event)))
                 }
-                Err(err) => {
-                    error!("Error deserializing proto: {:?}", err);
+                Err(error) => {
+                    error!(message = "Error deserializing proto.", %error);
                     debug_assert!(false);
                     self.poll()
                 }
@@ -297,6 +306,7 @@ impl super::DiskBuffer for Buffer {
             current_size,
             ack_counter,
             unacked_sizes: VecDeque::new(),
+            buffer: Vec::new(),
         };
 
         Ok((writer, reader, acker))

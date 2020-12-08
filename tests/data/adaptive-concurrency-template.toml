@@ -1,0 +1,50 @@
+[params]
+requests = 000
+delay = 0.050
+# Delete any of these that are not needed
+interval =
+jitter = 0
+
+concurrency_limit_params.scale = 0
+concurrency_limit_params.knee_start = 0
+concurrency_limit_params.knee_exp = 0.0
+concurrency_limit_params.limit = 0
+concurrency_limit_params.action = "defer" | "drop"
+
+rate.scale = 0
+rate.knee_start = 0
+rate.knee_exp = 0.0
+rate.limit = 0
+rate.action = "defer" | "drop"
+
+concurrency = "auto"
+
+[stats.in_flight]
+max = [,]
+mean = [,]
+mode = [,]
+
+[stats.rate]
+max = [,]
+mean = [,]
+mode = [,]
+
+[controller.concurrency_limit]
+max = [,]
+mean = [,]
+mode = [,]
+
+[controller.in_flight]
+max = [,]
+mean = [,]
+mode = [,]
+
+[controller.observed_rtt]
+min = [,]
+max = [,]
+mean = [,]
+
+[controller.averaged_rtt]
+min = [,]
+max = [,]
+mean = [,]

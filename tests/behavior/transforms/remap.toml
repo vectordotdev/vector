@@ -1,0 +1,1227 @@
+[transforms.remap_nested]
+  inputs = []
+  type = "remap"
+  source = """
+    .a.b = 123
+    .x.y = 456
+    .x.z = 789
+  """
+[[tests]]
+  name = "remap_nested"
+  [tests.input]
+    insert_at = "remap_nested"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 123
+      "x.y.equals" = 456
+      "x.z.equals" = 789
+
+[transforms.remap_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .a[0] = 0
+    .a[1] = "1"
+    .a[2] = 2.0
+    .b[2] = "two"
+    .b[0] = 0
+  """
+[[tests]]
+  name = "remap_array"
+  [tests.input]
+    insert_at = "remap_array"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_array"
+    [[tests.outputs.conditions]]
+      "a[0].equals" = 0
+      "a[1].equals" = "1"
+      "a[2].equals" = 2.0
+
+      "b[0].equals" = 0
+      "b[1].equals" = "<null>"
+      "b[2].equals" = "two"
+
+[transforms.remap_arithmetic]
+  inputs = []
+  type = "remap"
+  source = """
+    .result_a = .a * .b + .c - .d
+    .result_b = .a * (.b + .c) - .d
+    .result_c = .a + .b * .c / .d
+    .result_d = (.a + .b) * (.c / .d)
+  """
+[[tests]]
+  name = "remap_arithmetic"
+  [tests.input]
+    insert_at = "remap_arithmetic"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 7
+      c = 12
+      d = 6
+  [[tests.outputs]]
+    extract_from = "remap_arithmetic"
+    [[tests.outputs.conditions]]
+      "result_a.equals" = 27
+      "result_b.equals" = 51
+      "result_c.equals" = 17
+      "result_d.equals" = 20
+
+[transforms.remap_boolean_arithmetic]
+  inputs = []
+  type = "remap"
+  source = """
+    .result_a = .a + .b > 9
+    .result_b = .a * .b < 20
+    .result_c = 1 >= .a / .b
+    .result_d = .a + .b > .c + .d
+  """
+[[tests]]
+  name = "remap_boolean_arithmetic"
+  [tests.input]
+    insert_at = "remap_boolean_arithmetic"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 7
+      c = 12
+      d = 6
+  [[tests.outputs]]
+    extract_from = "remap_boolean_arithmetic"
+    [[tests.outputs.conditions]]
+      "result_a.equals" = true
+      "result_b.equals" = false
+      "result_c.equals" = true
+      "result_d.equals" = false
+
+[transforms.remap_delete_only_fields]
+  inputs = []
+  type = "remap"
+  source = """
+    only_fields(.foo, .bar, .buz.second)
+    del(.foo.second)
+  """
+[[tests]]
+  name = "remap_delete_only_fields"
+  [tests.input]
+    insert_at = "remap_delete_only_fields"
+    type = "log"
+    [tests.input.log_fields]
+      "foo.first" = "foo first value"
+      "foo.second" = "foo second value"
+      bar = "bar value"
+      baz = "baz value"
+      "buz.first" = "buz first value"
+      "buz.second" = "buz second value"
+  [[tests.outputs]]
+    extract_from = "remap_delete_only_fields"
+    [[tests.outputs.conditions]]
+      "foo.first.equals" = "foo first value"
+      "foo.second.exists" = false
+      "bar.equals" = "bar value"
+      "baz.exists" = false
+      "buz.first.exists" = false
+      "buz.second.equals" = "buz second value"
+
+[transforms.remap_coercion]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = to_string(.foo)
+    .bar = to_int(.bar)
+    .baz = to_float(.baz)
+    .bev = to_bool(.bev)
+    .a = to_timestamp(.a)
+    .b = to_timestamp(.nope, 10)
+    .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
+  """
+[[tests]]
+  name = "remap_coercion"
+  [tests.input]
+    insert_at = "remap_coercion"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+      bar = "20"
+      baz = "30.3"
+      bev = "true"
+      quix = "19/06/2019:17:20:49 -0400"
+      a = "2020-09-14T12:53:44+03:00"
+  [[tests.outputs]]
+    extract_from = "remap_coercion"
+    [[tests.outputs.conditions]]
+      "foo.equals" = "10"
+      "bar.equals" = 20
+      "baz.equals" = 30.3
+      "bev.equals" = true
+      "a.equals" = "2020-09-14T09:53:44Z"
+      "b.equals" = "1970-01-01T00:00:10Z"
+      "c.equals" = "2020-09-14T10:51:12Z"
+
+[transforms.remap_quoted_path]
+  inputs = []
+  type = "remap"
+  source = """
+    .a."b.c" = ."d.e"
+  """
+[[tests]]
+  name = "remap_quoted_path"
+  [tests.input]
+    insert_at = "remap_quoted_path"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b\\.c" = "bar"
+      "d\\.e" = "baz"
+  [[tests.outputs]]
+    extract_from = "remap_quoted_path"
+    [[tests.outputs.conditions]]
+      "a.b\\.c.equals" = "baz"
+
+[transforms.remap_function_arguments]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = to_string(.in)
+    .b = to_string(value = .in)
+    .c = to_string(.in, 20)
+    .d = to_string(.in, default = 20)
+    .e = to_string(.nope, 20)
+    .f = to_string(.nope, default = 20)
+    .g = to_string(value = .in, default = 20)
+    .h = to_string(value = .in, 20)
+    .i = to_string(default = 20, .in)
+    .j = to_string(default = 20, value = .in)
+    .k = to_string(default = 20, value = .nope)
+    .l = to_string(default = .other, value = .nope)
+  """
+[[tests]]
+  name = "remap_function_arguments"
+  [tests.input]
+    insert_at = "remap_function_arguments"
+    type = "log"
+    [tests.input.log_fields]
+      in = 10
+      other = 30
+  [[tests.outputs]]
+    extract_from = "remap_function_arguments"
+    [[tests.outputs.conditions]]
+      "a.equals" = "10"
+      "b.equals" = "10"
+      "c.equals" = "10"
+      "d.equals" = "10"
+      "e.equals" = ""
+      "f.equals" = ""
+      "g.equals" = "10"
+      "h.equals" = "10"
+      "i.equals" = "10"
+      "j.equals" = "10"
+      "k.equals" = ""
+      "l.equals" = ""
+
+[transforms.remap_function_upcase]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+    .c.c = upcase(.c.c)
+
+    if upcase(.f) == "F" {
+        .f = "ff"
+    }
+  """
+[[tests]]
+  name = "remap_function_upcase"
+  [tests.input]
+    insert_at = "remap_function_upcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "bbb bb"
+      "c.c" = "c.c"
+      f = "f"
+  [[tests.outputs]]
+    extract_from = "remap_function_upcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "A"
+      "b.equals" = "BBB BB"
+      "c.c.equals" = "C.C"
+      "f.equals" = "ff"
+
+[transforms.remap_function_upcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+  """
+[[tests]]
+  name = "remap_function_upcase_error"
+  no_outputs_from = ["remap_function_upcase_error"]
+  [tests.input]
+    insert_at = "remap_function_upcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = true
+
+[transforms.remap_function_downcase]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+    .c.c = downcase(.c.c)
+
+    if downcase(.f) == "f" {
+        .f = "FF"
+    }
+  """
+[[tests]]
+  name = "remap_function_downcase"
+  [tests.input]
+    insert_at = "remap_function_downcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = "BBB BB"
+      "c.c" = "C.C"
+      f = "F"
+  [[tests.outputs]]
+    extract_from = "remap_function_downcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "a"
+      "b.equals" = "bbb bb"
+      "c.c.equals" = "c.c"
+      "f.equals" = "FF"
+
+[transforms.remap_function_downcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+  """
+[[tests]]
+  name = "remap_function_downcase_error"
+  no_outputs_from = ["remap_function_downcase_error"]
+  [tests.input]
+    insert_at = "remap_function_downcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = 10
+
+[transforms.remap_function_uuid_v4]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = uuid_v4()
+
+    if uuid_v4() != "" {
+        .b = "bar"
+    }
+  """
+[[tests]]
+  name = "remap_function_uuid_v4"
+  [tests.input]
+    insert_at = "remap_function_uuid_v4"
+    type = "log"
+    [tests.input.log_fields]
+      b = "foo"
+  [[tests.outputs]]
+    extract_from = "remap_function_uuid_v4"
+    [[tests.outputs.conditions]]
+      "a.regex" = "(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "b.equals" = "bar"
+
+[transforms.remap_function_sha1]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = sha1(.a)
+
+    if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+        .b = sha1(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha1"
+  [tests.input]
+    insert_at = "remap_function_sha1"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha1"
+    [[tests.outputs.conditions]]
+      "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+      "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
+
+[transforms.remap_function_sha1_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = sha1(.a)
+    .b = sha1(.b)
+  """
+[[tests]]
+  name = "remap_function_sha1_error"
+  no_outputs_from = ["remap_function_sha1_error"]
+  [tests.input]
+    insert_at = "remap_function_sha1_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_md5]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = md5(.a)
+
+    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+        .b = md5(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_md5"
+  [tests.input]
+    insert_at = "remap_function_md5"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_md5"
+    [[tests.outputs.conditions]]
+      "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
+      "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
+
+[transforms.remap_function_md5_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = md5(.a)
+    .b = md5(.b)
+  """
+[[tests]]
+  name = "remap_function_md5_error"
+  no_outputs_from = ["remap_function_md5_error"]
+  [tests.input]
+    insert_at = "remap_function_md5_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_now]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = now()
+  """
+[[tests]]
+  name = "remap_function_now"
+  [tests.input]
+    insert_at = "remap_function_now"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_now"
+    [[tests.outputs.conditions]]
+      "a.ends_with" = "Z"
+
+[transforms.remap_function_format_timestamp]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = format_timestamp(to_timestamp(.foo), format = "%+")
+  """
+[[tests]]
+  name = "remap_function_format_timestamp"
+  [tests.input]
+    insert_at = "remap_function_format_timestamp"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+  [[tests.outputs]]
+    extract_from = "remap_function_format_timestamp"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1970-01-01T00:00:10+00:00"
+
+[transforms.remap_function_contains]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = contains(.foo, substring = .bar)
+    .b = contains(.bar, substring = "bar")
+    .c = contains(.bar, substring = "BAR", case_sensitive = true)
+    .d = contains(.bar, substring = "BAR", case_sensitive = false)
+    .e = contains(.foobar, substring = "oba")
+    .f = contains(.foobar, substring = "OBA", case_sensitive = true)
+    .g = contains(.foobar, substring = "OBA", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_contains"
+  [tests.input]
+    insert_at = "remap_function_contains"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_contains"
+    [[tests.outputs.conditions]]
+      "a.equals" = false
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = true
+      "e.equals" = true
+      "f.equals" = false
+      "g.equals" = true
+
+[transforms.remap_function_starts_with]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = starts_with(.foobar, substring = .foo)
+    .b = starts_with(.foobar, substring = "foo")
+    .c = starts_with(.foobar, substring = "bar")
+    .d = starts_with(.foobar, substring = "FOO", case_sensitive = true)
+    .e = starts_with(.foobar, substring = "FOO", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_starts_with"
+  [tests.input]
+    insert_at = "remap_function_starts_with"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_starts_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
+
+[transforms.remap_function_ends_with]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ends_with(.foobar, substring = .bar)
+    .b = ends_with(.foobar, substring = "bar")
+    .c = ends_with(.foobar, substring = "foo")
+    .d = ends_with(.foobar, substring = "BAR", case_sensitive = true)
+    .e = ends_with(.foobar, substring = "BAR", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_ends_with"
+  [tests.input]
+    insert_at = "remap_function_ends_with"
+    type = "log"
+    [tests.input.log_fields]
+      bar = "bar"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_ends_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
+
+[transforms.remap_function_slice]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = slice(.foo + .bar, 1)
+    .b = slice(.foo + .bar, 0, 1)
+    .c = slice(.foo + .bar, start = -2)
+    .d = slice(.foo + .bar, start = 1, end = -1)
+  """
+[[tests]]
+  name = "remap_function_slice"
+  [tests.input]
+    insert_at = "remap_function_slice"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_slice"
+    [[tests.outputs.conditions]]
+      "a.equals" = "oobar"
+      "b.equals" = "f"
+      "c.equals" = "ar"
+      "d.equals" = "ooba"
+
+[transforms.remap_function_tokenize]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = tokenize(.a)
+    .b = tokenize(.b)
+  """
+[[tests]]
+  name = "remap_function_tokenize"
+  [tests.input]
+    insert_at = "remap_function_tokenize"
+    type = "log"
+    [tests.input.log_fields]
+      a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_tokenize"
+    [[tests.outputs.conditions]]
+      "a.length_eq" = 7
+      "a[0].equals" = "217.250.207.207"
+      "a[1].equals" = "<null>"
+      "a[2].equals" = "<null>"
+      "a[3].equals" = "07/Sep/2020:16:38:00 -0400"
+      "a[4].equals" = "DELETE /deliverables/next-generation/user-centric HTTP/1.1"
+      "a[5].equals" = "205"
+      "a[6].equals" = "11881"
+      "b.length_eq" = 1
+      "b[0].equals" = "bar"
+
+[transforms.remap_function_sha2]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = sha2(.a)
+
+    if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
+        .b = sha2(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha2"
+  [tests.input]
+    insert_at = "remap_function_sha2"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha2"
+    [[tests.outputs.conditions]]
+      "a.equals" = "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"
+      "b.equals" = "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
+
+[transforms.remap_function_sha3]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = sha3(.a)
+
+    if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
+        .b = sha3(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha3"
+  [tests.input]
+    insert_at = "remap_function_sha3"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha3"
+    [[tests.outputs.conditions]]
+      "a.equals" = "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"
+      "b.equals" = "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
+
+[transforms.remap_function_parse_duration]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = parse_duration(.a, "ms")
+    .b = parse_duration("100ms", output = .b)
+  """
+[[tests]]
+  name = "remap_function_parse_duration"
+  [tests.input]
+    insert_at = "remap_function_parse_duration"
+    type = "log"
+    [tests.input.log_fields]
+      a = "2s"
+      b = "s"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_duration"
+    [[tests.outputs.conditions]]
+      "a.equals" = 2000
+      "b.equals" = 0.1
+
+[transforms.remap_function_format_number]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = format_number(.a, scale = 2, decimal_separator = ",", grouping_separator = ".")
+  """
+[[tests]]
+  name = "remap_function_format_number"
+  [tests.input]
+    insert_at = "remap_function_format_number"
+    type = "log"
+    [tests.input.log_fields]
+      a = 1234.567
+  [[tests.outputs]]
+    extract_from = "remap_function_format_number"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1.234,56"
+
+[transforms.remap_function_parse_url]
+  inputs = []
+  type = "remap"
+  source = """
+    .parts = parse_url(.url)
+  """
+[[tests]]
+  name = "remap_function_parse_url"
+  [tests.input]
+    insert_at = "remap_function_parse_url"
+    type = "log"
+    [tests.input.log_fields]
+      url = "https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_url"
+    [[tests.outputs.conditions]]
+      "parts.scheme.equals" = "https"
+      "parts.username.equals" = ""
+      "parts.password.equals" = ""
+      "parts.host.equals" = "master.vector.dev"
+      "parts.port.equals" = "<null>"
+      "parts.path.equals" = "/docs/reference/transforms/merge/"
+      "parts.query.length_eq" = 1
+      "parts.query.hello.equals" = "world"
+      "parts.fragment.equals" = "configuration"
+
+[transforms.remap_function_ceil]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ceil(.num)
+    .b = ceil(.num, precision = 1)
+    .c = ceil(.num, precision = 2)
+  """
+[[tests]]
+  name = "remap_function_ceil"
+  [tests.input]
+    insert_at = "remap_function_ceil"
+    type = "log"
+    [tests.input.log_fields]
+      num = 92.489
+  [[tests.outputs]]
+    extract_from = "remap_function_ceil"
+    [[tests.outputs.conditions]]
+      "a.equals" = 93
+      "b.equals" = 92.5
+      "c.equals" = 92.49
+
+[transforms.remap_function_floor]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = floor(.num)
+    .b = floor(.num, precision = 1)
+    .c = floor(.num, precision = 2)
+  """
+[[tests]]
+  name = "remap_function_floor"
+  [tests.input]
+    insert_at = "remap_function_floor"
+    type = "log"
+    [tests.input.log_fields]
+      num = 92.489
+  [[tests.outputs]]
+    extract_from = "remap_function_floor"
+    [[tests.outputs.conditions]]
+      "a.equals" = 92
+      "b.equals" = 92.4
+      "c.equals" = 92.48
+
+[transforms.remap_function_round]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = round(.num)
+    .b = round(.num, precision = 1)
+    .c = round(.num, precision = 2)
+  """
+[[tests]]
+  name = "remap_function_round"
+  [tests.input]
+    insert_at = "remap_function_round"
+    type = "log"
+    [tests.input.log_fields]
+      num = 92.489
+  [[tests.outputs]]
+    extract_from = "remap_function_round"
+    [[tests.outputs.conditions]]
+      "a.equals" = 92
+      "b.equals" = 92.5
+      "c.equals" = 92.49
+
+[transforms.remap_function_parse_syslog]
+  inputs = []
+  type = "remap"
+  source = """
+   .a = parse_syslog(.a)
+   """
+[[tests]]
+  name = "remap_function_parse_syslog"
+  [tests.input]
+    insert_at = "remap_function_parse_syslog"
+    type = "log"
+    [tests.input.log_fields]
+      a = "<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+  [[tests.outputs]]
+  extract_from = "remap_function_parse_syslog"
+  [[tests.outputs.conditions]]
+    "a.facility.equals" = "daemon"
+    "a.severity.equals" = "warning"
+    "a.timestamp.equals" = "2020-05-22T17:59:09.250Z"
+    "a.hostname.equals" = "OX-XXX-MX204"
+    "a.appname.equals" = "OX-XXX-CONTEUDO:rpd"
+    "a.procid.equals" = 6589
+    "a.message.equals" = "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+
+[transforms.remap_function_split_regex]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = split(.foo, /a.b/i, 3)
+  """
+[[tests]]
+  name = "remap_function_split_regex"
+  [tests.input]
+    insert_at = "remap_function_split_regex"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "barAbBbataabfizzaxbbuzz"
+  [[tests.outputs]]
+    extract_from = "remap_function_split_regex"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = "bar"
+    "foo[1].equals" = "bat"
+    "foo[2].equals" = "fizzaxbbuzz"
+
+[transforms.remap_function_split_string]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = split(.foo, " ", 3)
+  """
+[[tests]]
+  name = "remap_function_split_string"
+  [tests.input]
+    insert_at = "remap_function_split_string"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "bar bat fizz buzz"
+  [[tests.outputs]]
+    extract_from = "remap_function_split_string"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = "bar"
+    "foo[1].equals" = "bat"
+    "foo[2].equals" = "fizz buzz"
+
+[transforms.remap_function_parse_timestamp]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = parse_timestamp("10", "%s")
+  """
+[[tests]]
+  name = "remap_function_parse_timestamp"
+  [tests.input]
+    insert_at = "remap_function_parse_timestamp"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_timestamp"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "1970-01-01T00:00:10Z"
+
+[transforms.remap_function_truncate]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = truncate("foobar", limit = 3)
+    .bar = truncate("foobar", limit = 4, ellipsis = true)
+  """
+[[tests]]
+  name = "remap_function_truncate"
+  [tests.input]
+    insert_at = "remap_function_truncate"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_truncate"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "foo"
+    "bar.equals" = "foob..."
+
+[transforms.remap_function_strip_whitespace]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = strip_whitespace("  foobar  ")
+  """
+[[tests]]
+  name = "remap_function_strip_whitespace"
+  [tests.input]
+    insert_at = "remap_function_strip_whitespace"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_strip_whitespace"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "foobar"
+
+[transforms.remap_function_parse_grok]
+  inputs = []
+  type = "remap"
+  source = """
+    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+    """
+[[tests]]
+  name = "remap_function_parse_grok"
+  [tests.input]
+    insert_at = "remap_function_parse_grok"
+    type = "log"
+    [tests.input.log_fields]
+      message = "2020-10-02T23:22:12.223222Z info Hello world"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_grok"
+    [[tests.outputs.conditions]]
+    "grokked.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
+    "grokked.level.equals" = "info"
+    "grokked.message.equals" = "Hello world"
+
+[transforms.remap_function_ip_subnet]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_subnet("192.168.10.23", "255.255.0.0")
+    .b = ip_subnet("192.168.10.23", "/8")
+    .c = ip_subnet("2404:6800:4003:c02::64", "ffff:ffff::")
+    .d = ip_subnet("2404:6800:4003:c02::64", "/16")
+  """
+[[tests]]
+  name = "remap_function_ip_subnet"
+  [tests.input]
+    insert_at = "remap_function_ip_subnet"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_subnet"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.0.0"
+    "b.equals" = "192.0.0.0"
+    "c.equals" = "2404:6800::"
+    "d.equals" = "2404::"
+
+[transforms.remap_function_ip_cidr_contains]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.168.10.2")
+    .b = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.169.10.2")
+    .c = ip_cidr_contains(cidr = "2404:6800:4003:c02::/64", value = "2404:6800:4003:c02::aaaa")
+    .d = ip_cidr_contains("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
+  """
+[[tests]]
+  name = "remap_function_ip_cidr_contains"
+  [tests.input]
+    insert_at = "remap_function_ip_cidr_contains"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_cidr_contains"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+
+[transforms.remap_function_ip_to_ipv6]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_to_ipv6("192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ip_to_ipv6"
+  [tests.input]
+    insert_at = "remap_function_ip_to_ipv6"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_to_ipv6"
+    [[tests.outputs.conditions]]
+    "a.equals" = "::ffff:192.168.10.2"
+
+[transforms.remap_function_ipv6_to_ipv4]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ipv6_to_ipv4("::ffff:192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ipv6_to_ipv4"
+  [tests.input]
+    insert_at = "remap_function_ipv6_to_ipv4"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ipv6_to_ipv4"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.10.2"
+
+[transforms.remap_function_exists]
+  inputs = []
+  type = "remap"
+  source = """
+    .data = parse_json(.data)
+    .a = exists(.foo)
+    .b = exists(.bar)
+    .c = exists(.data.child)
+    .d = exists(.data.nochild)
+    .e = exists(.data.arr[2])
+    .f = exists(.data.arr[3])
+  """
+[[tests]]
+  name = "remap_function_exists"
+  [tests.input]
+    insert_at = "remap_function_exists"
+    type = "log"
+    [tests.input.log_fields]
+      data = """
+        { "child": 42, "arr": [1,3,3] }
+      """
+      foo = 42
+  [[tests.outputs]]
+    extract_from = "remap_function_exists"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+    "e.equals" = true
+    "f.equals" = false
+
+[transforms.remap_function_compact]
+  inputs = []
+  type = "remap"
+  source = """
+    .compactarr = compact(parse_json(.arr))
+    .compactmap = compact(parse_json(.map))
+    .a = exists(.compactmap.field1)
+    .b = exists(.compactmap.field2)
+    .c = exists(.compactmap.field3)
+    .d = exists(.compactmap.field4.nested1)
+    .e = exists(.compactmap.field4.nested2)
+  """
+[[tests]]
+  name = "remap_function_compact"
+  [tests.input]
+    insert_at = "remap_function_compact"
+    type = "log"
+    [tests.input.log_fields]
+      arr = """
+          [null, "", [], 1]
+          """
+      map = """
+          {"field1": null,
+           "field2": 32,
+           "field3": "",
+           "field4": { "nested1": 3,
+                       "nested2": null } }
+            """
+  [[tests.outputs]]
+    extract_from = "remap_function_compact"
+    [[tests.outputs.conditions]]
+    "a.equals" = false
+    "b.equals" = true
+    "c.equals" = false
+    "d.equals" = true
+    "e.equals" = false
+    "compactarr[0].equals" = 1
+
+[transforms.remap_function_assert_pass]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+    .check = "checked"
+  """
+[[tests]]
+  name = "remap_function_assert_pass"
+  [tests.input]
+    insert_at = "remap_function_assert_pass"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+  extract_from = "remap_function_assert_pass"
+  [[tests.outputs.conditions]]
+  "check.equals" = "checked"
+
+[transforms.remap_function_assert_fail]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+  """
+[[tests]]
+  name = "remap_function_assert_fail"
+  no_outputs_from = ["remap_function_assert_fail"]
+  [tests.input]
+    insert_at = "remap_function_assert_fail"
+    type = "log"
+    [tests.input.log_fields]
+      foo = false
+
+[transforms.remap_function_log]
+  inputs=[]
+  type = "remap"
+  source = """
+    log(.foo, level="info")
+  """
+[[tests]]
+  name = "remap_function_log"
+  [tests.input]
+    insert_at = "remap_function_log"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "this should be unchanged"
+  [[tests.outputs]]
+    extract_from = "remap_function_log"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "this should be unchanged"
+
+[transforms.remap_function_merge]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = parse_json(.foo)
+    .bar = parse_json(.bar)
+    merge(.bar, .foo, deep = true)
+  """
+[[tests]]
+  name = "remap_function_merge"
+  [tests.input]
+    insert_at = "remap_function_merge"
+    type = "log"
+    [tests.input.log_fields]
+      bar = """
+        {"field1": "ook"}
+      """
+      foo = """
+        {"field2": "ook ook"}
+      """
+  [[tests.outputs]]
+    extract_from = "remap_function_merge"
+    [[tests.outputs.conditions]]
+    "bar.field1.equals" = "ook"
+    "bar.field2.equals" = "ook ook"
+
+[transforms.remap_function_flatten]
+  inputs = []
+  type = "remap"
+  source = """
+      .arr = flatten(parse_json(.arr))
+      .map = flatten(parse_json(.map))
+      .a = .map."field1.field2"
+      .b = .map."field1.field3"
+      """
+[[tests]]
+  name = "remap_function_flatten"
+  [tests.input]
+    insert_at = "remap_function_flatten"
+    type = "log"
+    [tests.input.log_fields]
+      arr = "[1, 2, [3, 4, [5, 6]]]"
+      map = """
+        {"field1": {"field2": 1, "field3": 2} }
+        """
+  [[tests.outputs]]
+    extract_from = "remap_function_flatten"
+    [[tests.outputs.conditions]]
+    "arr[0].equals" = 1
+    "arr[1].equals" = 2
+    "arr[2].equals" = 3
+    "arr[3].equals" = 4
+    "arr[4].equals" = 5
+    "arr[5].equals" = 6
+    "a.equals" = 1
+    "b.equals" = 2
+
+[transforms.remap_function_redact]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = redact(.input, filters = ["pattern"], patterns = ["hello"])
+    .b = redact(.input, filters = ["pattern"], patterns = ["hello", "wor"])
+    .c = redact(.input, filters = ["pattern"], patterns = [/world|universe/])
+    .d = redact(.input, filters = ["pattern"], patterns = [])
+    .e = redact(.input, filters = ["pattern"], patterns = ["hello", /[uieao]/])
+  """
+[[tests]]
+  name = "remap_function_redact"
+  [tests.input]
+    insert_at = "remap_function_redact"
+    type = "log"
+    [tests.input.log_fields]
+      input = "hello world, hello universe"
+  [[tests.outputs]]
+    extract_from = "remap_function_redact"
+    [[tests.outputs.conditions]]
+    "a.equals" = "**** world, **** universe"
+    "b.equals" = "**** ****ld, **** universe"
+    "c.equals" = "hello ****, hello ****"
+    "d.equals" = "hello world, hello universe"
+    "e.equals" = "**** w****rld, **** ****n****v****rs****"
+
+[transforms.remap_function_replace]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = replace("foo", pattern = "o", with = "bar", 1)
+    .b = replace("foo", pattern = /o/, with = "bar")
+  """
+[[tests]]
+  name = "remap_function_replace"
+  [tests.input]
+    insert_at = "remap_function_replace"
+    type = "log"
+    [tests.input.log_fields]
+      input = "hello world, hello universe"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace"
+    [[tests.outputs.conditions]]
+    "a.equals" = "fbaro"
+    "b.equals" = "fbarbar"

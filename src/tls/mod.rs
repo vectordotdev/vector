@@ -1,26 +1,25 @@
+use crate::tcp::TcpKeepaliveConfig;
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::fmt::Debug;
-use std::io::Error as IoError;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use tokio01::net::TcpStream;
-use tokio_openssl::SslStream;
+use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
+use tokio::net::TcpStream;
+use tokio_openssl::{HandshakeError, SslStream};
 
-#[cfg(feature = "sources-tls")]
+#[cfg(feature = "sources-utils-tls")]
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(feature = "sources-tls")]
-pub(crate) use incoming::MaybeTlsListener;
+#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
+pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
-pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
+#[cfg(test)]
+pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
 
@@ -32,13 +31,13 @@ pub enum TlsError {
     FileOpenFailed {
         note: &'static str,
         filename: PathBuf,
-        source: IoError,
+        source: std::io::Error,
     },
     #[snafu(display("Could not read {} file {:?}: {}", note, filename, source))]
     FileReadFailed {
         note: &'static str,
         filename: PathBuf,
-        source: IoError,
+        source: std::io::Error,
     },
     #[snafu(display("Could not build TLS connector: {}", source))]
     TlsBuildConnector { source: ErrorStack },
@@ -46,6 +45,10 @@ pub enum TlsError {
     TlsIdentityError { source: ErrorStack },
     #[snafu(display("Could not export identity to DER: {}", source))]
     DerExportError { source: ErrorStack },
+    #[snafu(display("Identity certificate is missing a key"))]
+    MissingKey,
+    #[snafu(display("Certificate file contains no certificates"))]
+    MissingCertificate,
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,
@@ -73,13 +76,9 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: openssl::ssl::Error },
-    #[snafu(display("Not ready for I/O during TLS handshake"))]
-    HandshakeNotReady,
-    #[snafu(display("TLS handshake setup failed: {}", source))]
-    HandshakeSetup { source: ErrorStack },
+    Handshake { source: HandshakeError<TcpStream> },
     #[snafu(display("Incoming listener failed: {}", source))]
-    IncomingListener { source: crate::Error },
+    IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
     CreateAcceptor { source: ErrorStack },
     #[snafu(display("Error setting up the TLS certificate: {}", source))]
@@ -90,16 +89,16 @@ pub enum TlsError {
     AddExtraChainCert { source: ErrorStack },
     #[snafu(display("Error creating a certificate store: {}", source))]
     NewStoreBuilder { source: ErrorStack },
-    #[snafu(display("Error adding a certifcate to a store: {}", source))]
+    #[snafu(display("Error adding a certificate to a store: {}", source))]
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
     #[snafu(display("PKCS#12 parse failed: {}", source))]
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]
-    TcpBind { source: IoError },
+    TcpBind { source: tokio::io::Error },
     #[snafu(display("{}", source))]
-    Connect { source: std::io::Error },
+    Connect { source: tokio::io::Error },
     #[snafu(display("Could not get peer address: {}", source))]
     PeerAddress { source: std::io::Error },
     #[snafu(display("Security Framework Error: {}", source))]
@@ -110,14 +109,32 @@ pub enum TlsError {
     #[snafu(display("Schannel Error: {}", source))]
     #[cfg(windows)]
     Schannel { source: std::io::Error },
+    #[cfg(any(windows, target_os = "macos"))]
+    #[snafu(display("Unable to parse X509 from system cert: {}", source))]
+    X509SystemParseError { source: ErrorStack },
+    #[snafu(display("Creating an empty CA stack failed"))]
+    NewCaStack { source: ErrorStack },
+    #[snafu(display("Could not push intermediate certificate onto stack"))]
+    CaStackPush { source: ErrorStack },
 }
 
 impl MaybeTlsStream<TcpStream> {
     pub fn peer_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
         match self {
             Self::Raw(raw) => raw.peer_addr(),
-            Self::Tls(tls) => tls.get_ref().get_ref().peer_addr(),
+            Self::Tls(tls) => tls.get_ref().peer_addr(),
         }
+    }
+
+    pub fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+
+        Ok(())
     }
 }
 

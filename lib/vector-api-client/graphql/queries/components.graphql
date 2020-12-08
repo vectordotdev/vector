@@ -1,0 +1,13 @@
+query ComponentsQuery {
+  components {
+    __typename
+    name
+    componentType
+    processedEventsTotal {
+      processedEventsTotal
+    }
+    processedBytesTotal {
+      processedBytesTotal
+    }
+  }
+}

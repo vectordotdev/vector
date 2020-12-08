@@ -1,14 +1,21 @@
-#[cfg(feature = "sources-http")]
+#[cfg(feature = "sources-utils-http")]
 mod http;
-#[cfg(feature = "sources-socket")]
+pub mod multiline_config;
+#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
 #[cfg(all(unix, feature = "sources-socket"))]
-mod unix;
+mod unix_datagram;
+#[cfg(all(unix, feature = "sources-utils-unix"))]
+mod unix_stream;
 
-#[cfg(feature = "sources-http")]
-pub use self::http::{ErrorMessage, HttpSource};
-#[cfg(feature = "sources-socket")]
+#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
+pub(crate) use self::http::add_query_parameters;
+#[cfg(feature = "sources-utils-http")]
+pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub use multiline_config::MultilineConfig;
+#[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
-
-#[cfg(all(unix, feature = "sources-socket"))]
-pub use unix::build_unix_source;
+#[cfg(all(unix, feature = "sources-socket",))]
+pub use unix_datagram::build_unix_datagram_source;
+#[cfg(all(unix, feature = "sources-utils-unix",))]
+pub use unix_stream::build_unix_stream_source;

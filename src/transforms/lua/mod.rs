@@ -2,18 +2,18 @@ pub mod v1;
 pub mod v2;
 
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
     #[serde(rename = "1")]
     V1,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV1 {
     version: Option<V1>,
@@ -21,13 +21,13 @@ pub struct LuaConfigV1 {
     config: v1::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum V2 {
     #[serde(rename = "2")]
     V2,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV2 {
     version: V2,
@@ -35,7 +35,7 @@ pub struct LuaConfigV2 {
     config: v2::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum LuaConfig {
     V1(LuaConfigV1),
@@ -43,15 +43,26 @@ pub enum LuaConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<LuaConfig>("lua")
+    TransformDescription::new::<LuaConfig>("lua")
 }
 
+impl GenerateConfig for LuaConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"version = "2"
+            hooks.process = """#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         match self {
-            LuaConfig::V1(v1) => v1.config.build(cx),
-            LuaConfig::V2(v2) => v2.config.build(cx),
+            LuaConfig::V1(v1) => v1.config.build(),
+            LuaConfig::V2(v2) => v2.config.build(),
         }
     }
 
@@ -74,5 +85,13 @@ impl TransformConfig for LuaConfig {
             LuaConfig::V1(v1) => v1.config.transform_type(),
             LuaConfig::V2(v2) => v2.config.transform_type(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::LuaConfig>();
     }
 }

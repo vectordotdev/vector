@@ -1,0 +1,630 @@
+[transforms.reduce]
+  inputs = []
+  type = "reduce"
+  group_by = [ "request_id" ]
+  [transforms.reduce.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "reduce_basic"
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "first message value"
+      request_id = "1"
+      host = "host1"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "second message value"
+      request_id = "1"
+      host = "host2"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce one"
+      request_id = "2"
+      host = "host3"
+      counter = 11
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third message value"
+      request_id = "1"
+      host = "host4"
+      counter = 9
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce two"
+      request_id = "2"
+      host = "host5"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "reduce"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce three"
+      request_id = "2"
+      host = "host6"
+      counter = 2
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "reduce"
+    [[tests.outputs.conditions]]
+      "message.equals" = "first message value"
+      "host.equals" = "host1"
+      "request_id.equals" = "1"
+      "counter.equals" = 21
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "message.equals" = "other reduce one"
+      "host.equals" = "host3"
+      "request_id.equals" = "2"
+      "counter.equals" = 20
+      "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.reduce_strats]
+  inputs = []
+  type = "reduce"
+  group_by = [ "request_id" ]
+
+  [transforms.reduce_strats.merge_strategies]
+    "message" = "concat"
+    "other_value" = "array"
+    "another" = "concat_newline"
+    "concat_array" = "concat"
+
+  [transforms.reduce_strats.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "reduce_merge_strategies"
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "first message value"
+      another = "foo"
+      request_id = "1"
+      other_value = "first"
+      host = "host1"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "second message value"
+      another = "bar baz"
+      other_value = 2
+      request_id = "1"
+      host = "host2"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce one"
+      "concat_array[0]" = "foo"
+      "concat_array[1]" = "bar"
+      request_id = "2"
+      host = "host3"
+      counter = 11
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third message value"
+      another = "qux\nquux"
+      request_id = "1"
+      host = "host4"
+      counter = 9
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce two"
+      "concat_array[0]" = "baz"
+      other_value = "1"
+      request_id = "2"
+      host = "host5"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "reduce_strats"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "other reduce three"
+      request_id = "2"
+      other_value = true
+      host = "host6"
+      counter = 2
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "reduce_strats"
+    [[tests.outputs.conditions]]
+      "message.equals" = "first message value second message value third message value"
+      "another.equals" = "foo\nbar baz\nqux\nquux"
+      "host.equals" = "host1"
+      "request_id.equals" = "1"
+      "counter.equals" = 21
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "message.equals" = "other reduce one other reduce two other reduce three"
+      "concat_array[0].equals" = "foo"
+      "concat_array[1].equals" = "bar"
+      "concat_array[2].equals" = "baz"
+      "host.equals" = "host3"
+      "request_id.equals" = "2"
+      "counter.equals" = 20
+      "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.reduce_numbers]
+  inputs = []
+  type = "reduce"
+
+  [transforms.reduce_numbers.merge_strategies]
+    "mins" = "min"
+    "maxs" = "max"
+
+  [transforms.reduce_numbers.ends_when]
+    "test_end_message.exists" = true
+
+[[tests]]
+  name = "reduce_number_strategies_1"
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5.1
+      maxs = 3.3
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 9
+      maxs = 7.2
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5.2
+      maxs = 6
+      test_end_message = "exists"
+
+  [[tests.outputs]]
+    extract_from = "reduce_numbers"
+    [[tests.outputs.conditions]]
+      "mins.equals" = 5.1
+      "maxs.equals" = 7.2
+      "timestamp_end.exists" = true
+
+[[tests]]
+  name = "reduce_number_strategies_2"
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5
+      maxs = 3
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 9.1
+      maxs = 7
+
+  [[tests.inputs]]
+    insert_at = "reduce_numbers"
+    type = "log"
+    [tests.inputs.log_fields]
+      mins = 5
+      maxs = 6.2
+      test_end_message = "exists"
+
+  [[tests.outputs]]
+    extract_from = "reduce_numbers"
+    [[tests.outputs.conditions]]
+      "mins.equals" = 5
+      "maxs.equals" = 7
+      "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.ends_when_remap]
+  inputs = []
+  type = "reduce"
+  group_by = ["request_id"]
+
+  [transforms.ends_when_remap.ends_when]
+    type = "remap"
+    source = """
+        .test_end_message == true
+    """
+
+[[tests]]
+  name = "reduce_ends_when_remap"
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 1
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 3
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "2"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 2
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "2"
+      counter = 2
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "3"
+      counter = 5
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "ends_when_remap"
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "1"
+      "counter.equals" = 6
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "2"
+      "counter.equals" = 7
+      "test_end_message.exists" = true
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "3"
+      "counter.equals" = 5
+      "test_end_message.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.ruby_exception]
+    inputs = []
+    type = "reduce"
+    merge_strategies.message = "concat_newline"
+    starts_when.type = "remap"
+    starts_when.source = "match(.message, /^\\w.*/)"
+
+[[tests]]
+  name = "reduce_ruby_exception"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "  from foobar.rb:6:in `bar'"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "  from foobar.rb:2:in `foo'"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "  from foobar.rb:9:in `<main>'"
+
+  [[tests.inputs]]
+    insert_at = "ruby_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "Started GET \"/\" for 127.0.0.1 at 2012-03-11 14:28:14 +0100"
+
+  [[tests.outputs]]
+    extract_from = "ruby_exception"
+    [[tests.outputs.conditions]]
+      "message.equals" = "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"
+    [[tests.outputs.conditions]]
+      "message.equals" = "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
+
+##------------------------------------------------------------------------------
+
+[transforms.line_continuation]
+    inputs = []
+    type = "reduce"
+    merge_strategies.message = "concat"
+    ends_when.type = "remap"
+    ends_when.source = """!ends_with(strip_whitespace(.message), "\\\\")"""
+
+[[tests]]
+  name = "reduce_line_continuation"
+
+  [[tests.inputs]]
+    insert_at = "line_continuation"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "First-line"
+
+  [[tests.inputs]]
+    insert_at = "line_continuation"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "Second line\\"
+
+  [[tests.inputs]]
+    insert_at = "line_continuation"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "more second line\\     "
+
+  [[tests.inputs]]
+    insert_at = "line_continuation"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "end of second line"
+
+  [[tests.inputs]]
+    insert_at = "line_continuation"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third line"
+
+  [[tests.outputs]]
+    extract_from = "line_continuation"
+    [[tests.outputs.conditions]]
+      "message.equals" = "First-line"
+    [[tests.outputs.conditions]]
+      "message.equals" = "Second line\\ more second line\\      end of second line"
+    [[tests.outputs.conditions]]
+      "message.equals" = "third line"
+
+##------------------------------------------------------------------------------
+
+[transforms.line_termination]
+    inputs = []
+    type = "reduce"
+    merge_strategies.message = "concat"
+    ends_when.type = "remap"
+    ends_when.source = """ends_with(strip_whitespace(.message), ";")"""
+
+[[tests]]
+  name = "reduce_line_termination"
+
+  [[tests.inputs]]
+    insert_at = "line_termination"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "first line;"
+
+  [[tests.inputs]]
+    insert_at = "line_termination"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "second line"
+
+  [[tests.inputs]]
+    insert_at = "line_termination"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "more of the second line"
+
+  [[tests.inputs]]
+    insert_at = "line_termination"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "end of second line;         "
+
+  [[tests.inputs]]
+    insert_at = "line_termination"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "third line;"
+
+  [[tests.outputs]]
+    extract_from = "line_termination"
+    [[tests.outputs.conditions]]
+      "message.equals" = "first line;"
+    [[tests.outputs.conditions]]
+      "message.equals" = "second line more of the second line end of second line;         "
+    [[tests.outputs.conditions]]
+      "message.equals" = "third line;"
+
+##------------------------------------------------------------------------------
+
+[transforms.log_stream]
+    inputs = []
+    type = "reduce"
+    merge_strategies.message = "concat"
+    starts_when.type = "remap"
+    starts_when.source = "match(.message, /^<\\d\\d> /)"
+
+[[tests]]
+  name = "reduce_log_stream"
+
+  [[tests.inputs]]
+    insert_at = "log_stream"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "<12> first line "
+
+  [[tests.inputs]]
+    insert_at = "log_stream"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = " more of the first line"
+
+  [[tests.inputs]]
+    insert_at = "log_stream"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "<22> second line"
+
+  [[tests.inputs]]
+    insert_at = "log_stream"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "<17> third line"
+
+  [[tests.inputs]]
+    insert_at = "log_stream"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "<99> fourth line"
+
+  [[tests.outputs]]
+    extract_from = "log_stream"
+    [[tests.outputs.conditions]]
+      "message.equals" = "<12> first line   more of the first line"
+    [[tests.outputs.conditions]]
+      "message.equals" = "<22> second line"
+    [[tests.outputs.conditions]]
+      "message.equals" = "<17> third line"
+
+##------------------------------------------------------------------------------
+
+[transforms.java_exception]
+    inputs = []
+    type = "reduce"
+    merge_strategies.message = "concat_newline"
+    starts_when.type = "remap"
+    starts_when.source = "match(.message, /^\\d{4}-\\d{2}-\\d{2} .+/)"
+
+[[tests]]
+  name = "reduce_java_exception"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "2020-10-19 04:34:15,389 - org.apache.skywalking.oap.server.starter.OAPServerBootstrap -571727 [main] ERROR [] - method [HEAD], host [http://localhost:9200], URI [/], status line [HTTP/1.1 503 Service Unavailable]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "org.elasticsearch.ElasticsearchStatusException: method [HEAD], host [http://localhost:9200], URI [/], status line [HTTP/1.1 503 Service Unavailable]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "at org.elasticsearch.client.RestHighLevelClient.parseResponseException(RestHighLevelClient.java:625) ~[elasticsearch-rest-high-level-client-6.3.2.jar:6.3.2]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "at org.elasticsearch.client.RestHighLevelClient.performRequest(RestHighLevelClient.java:535) ~[elasticsearch-rest-high-level-client-6.3.2.jar:6.3.2]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "at org.elasticsearch.client.RestHighLevelClient.ping(RestHighLevelClient.java:275) ~[elasticsearch-rest-high-level-client-6.3.2.jar:6.3.2]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "Caused by: org.elasticsearch.client.ResponseException: method [HEAD], host [http://localhost:9200], URI [/], status line [HTTP/1.1 503 Service Unavailable]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "... 7 more"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "Caused by: org.elasticsearch.client.ResponseException: method [HEAD], host [http://localhost:9200], URI [/], status line [HTTP/1.1 503 Service Unavailable]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "at java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]"
+
+  [[tests.inputs]]
+    insert_at = "java_exception"
+    type = "log"
+    [tests.inputs.log_fields]
+      message = "2020-10-19 05:34:15,389 - org.apache.skywalking.oap.server.starter.OAPServerBootstrap -571727 [main] ERROR [] - method [HEAD], host [http://localhost:9200], URI [/], status line [HTTP/1.1 503 Service Unavailable]"
+
+  [[tests.outputs]]
+    extract_from = "java_exception"
+    [[tests.outputs.conditions]]
+      "message.starts_with" = "2020-10-19 04:34:15,389"
+      "message.ends_with" = "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]"

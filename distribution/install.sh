@@ -11,7 +11,8 @@
 set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
-PACKAGE_ROOT="${PACKAGE_ROOT:-https://packages.timber.io/vector}"
+PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
+VECTOR_VERSION="0.11.0"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -82,7 +83,7 @@ main() {
         echo ""
 
         while true; do
-            read -p "$_prompt " _choice </dev/tty
+            read -rp "$_prompt " _choice </dev/tty
             case $_choice in
                 n)
                     err "exiting"
@@ -127,36 +128,41 @@ install_from_archive() {
         x86_64-apple-darwin)
             _archive_arch=$_arch
             ;;
-        x86_64-*linux*)
-            _archive_arch="x86_64-unknown-linux-musl"
+        x86_64-*linux*-gnu)
+            _archive_arch="x86_64-unknown-linux-gnu"
             ;;
-        armv7-*linux*hf)
-            _archive_arch="armv7-unknown-linux-musleabihf"
+        x86_64-*linux*-musl)
+            _archive_arch="x86_64-unknown-linux-musl"
             ;;
         aarch64-*linux*)
             _archive_arch="aarch64-unknown-linux-musl"
+            ;;
+	armv7-*linux*-gnu)
+            _archive_arch="armv7-unknown-linux-gnueabihf"
+            ;;
+	armv7-*linux*-musl)
+            _archive_arch="armv7-unknown-linux-musleabihf"
             ;;
         *)
             err "unsupported arch: $_arch"
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/latest/vector-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_ROOT}/latest/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
 
-    local _file="${_dir}/vector-${_archive_arch}.tar.gz"
+    local _file="${_dir}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     ensure mkdir -p "$_dir"
 
-    printf "$_prompt Downloading Vector via $_url"
+    printf "%s Downloading Vector via %s" "$_prompt" "$_url"
     ensure downloader "$_url" "$_file"
     printf " ✓\n"
 
-    printf "$_prompt Unpacking archive to $HOME/.vector ..."
+    printf "%s Unpacking archive to $HOME/.vector ..." "$_prompt"
     ensure mkdir -p "$HOME/.vector"
-    local _dir_name=$(tar -tzf ${_file} | head -1 | sed -e 's/\.\/\(.*\)\//\1/')
     ensure tar -xzf "$_file" --directory="$HOME/.vector" --strip-components=2
 
     printf " ✓\n"
@@ -168,12 +174,12 @@ install_from_archive() {
       printf " ✓\n"
     fi
 
-    printf "$_prompt Install succeeded! 🚀\n"
-    printf "$_prompt To start Vector:\n"
+    printf "%s Install succeeded! 🚀\n" "$_prompt"
+    printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "$_indent vector --config ~/.vector/vector.toml\n"
+    printf "%s vector --config ~/.vector/vector.toml\n" "$_indent"
     printf "\n"
-    printf "$_prompt More information at https://vector.dev/docs/\n"
+    printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 
     local _retval=$?
 
@@ -187,7 +193,7 @@ add_to_path() {
   local file="$1"
   local new_path="$2"
 
-  printf "${_prompt} Adding Vector path to ${file}"
+  printf "%s Adding Vector path to ${file}" "$_prompt"
 
   if [ ! -f "$file" ]; then
     echo "${new_path}" >> "${file}"
@@ -265,7 +271,18 @@ get_architecture() {
             ;;
 
         Linux)
-            _ostype=unknown-linux-gnu
+            case $(ldd --version 2>&1 | grep -Fq 'musl' >/dev/null; echo $?) in
+              0)
+                _ostype=unknown-linux-musl
+                ;;
+              1)
+                _ostype=unknown-linux-gnu
+                ;;
+              # Fallback
+              *)
+                _ostype=unknown-linux-gnu
+                ;;
+            esac
             _bitness=$(get_bitness)
             ;;
 
@@ -428,7 +445,8 @@ assert_nz() {
 # will immediately terminate with an error showing the failing
 # command.
 ensure() {
-    local output="$($@ 2>&1 > /dev/null)"
+    local output
+    output="$("$@" 2>&1 > /dev/null)"
 
     if [ "$output" ]; then
         echo ""

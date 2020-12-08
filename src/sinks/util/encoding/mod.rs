@@ -40,16 +40,16 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt::Debug};
-use string_cache::DefaultAtom as Atom;
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
+    fn schema(&self) -> &Option<String>;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
-    fn except_fields(&self) -> &Option<Vec<Atom>>;
+    fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
@@ -62,16 +62,12 @@ pub trait EncodingConfiguration<E> {
                             let field_path = PathIter::new(field).collect::<Vec<_>>();
                             !only_fields.iter().any(|only| {
                                 // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                                if field_path.starts_with(&only[..]) {
-                                    true
-                                } else {
-                                    false
-                                }
+                                field_path.starts_with(&only[..])
                             })
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(&Atom::from(removal));
+                        log_event.remove(removal);
                     }
                 }
                 Event::Metric(_) => {
@@ -131,7 +127,9 @@ pub trait EncodingConfiguration<E> {
                 let path_iter = PathIter::new(f).collect::<Vec<_>>();
                 only_fields.iter().any(|v| v == &path_iter)
             }) {
-                Err("`except_fields` and `only_fields` should be mutually exclusive.")?;
+                return Err(
+                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
+                );
             }
         }
         Ok(())
@@ -158,7 +156,8 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event;
+    use crate::config::log_schema;
+
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
         Snoot,
@@ -234,13 +233,13 @@ mod tests {
             log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains(&Atom::from("a.b.c")));
-        assert!(!event.as_mut_log().contains(&Atom::from("b")));
-        assert!(!event.as_mut_log().contains(&Atom::from("b[1].x")));
-        assert!(!event.as_mut_log().contains(&Atom::from("c[0].y")));
+        assert!(!event.as_mut_log().contains("a.b.c"));
+        assert!(!event.as_mut_log().contains("b"));
+        assert!(!event.as_mut_log().contains("b[1].x"));
+        assert!(!event.as_mut_log().contains("c[0].y"));
 
-        assert!(event.as_mut_log().contains(&Atom::from("a.b.d")));
-        assert!(event.as_mut_log().contains(&Atom::from("c[0].x")));
+        assert!(event.as_mut_log().contains("a.b.d"));
+        assert!(event.as_mut_log().contains("c[0].x"));
     }
 
     const TOML_ONLY_FIELD: &str = r#"
@@ -264,13 +263,13 @@ mod tests {
             log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains(&Atom::from("a.b.c")));
-        assert!(event.as_mut_log().contains(&Atom::from("b")));
-        assert!(event.as_mut_log().contains(&Atom::from("b[1].x")));
-        assert!(event.as_mut_log().contains(&Atom::from("c[0].y")));
+        assert!(event.as_mut_log().contains("a.b.c"));
+        assert!(event.as_mut_log().contains("b"));
+        assert!(event.as_mut_log().contains("b[1].x"));
+        assert!(event.as_mut_log().contains("c[0].y"));
 
-        assert!(!event.as_mut_log().contains(&Atom::from("a.b.d")));
-        assert!(!event.as_mut_log().contains(&Atom::from("c[0].x")));
+        assert!(!event.as_mut_log().contains("a.b.d"));
+        assert!(!event.as_mut_log().contains("c[0].x"));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = r#"
@@ -284,19 +283,19 @@ mod tests {
         let mut event = Event::from("Demo");
         let timestamp = event
             .as_mut_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(log_schema().timestamp_key())
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
         event
             .as_mut_log()
-            .insert("another", Value::Timestamp(timestamp.clone()));
+            .insert("another", Value::Timestamp(*timestamp));
 
         config.encoding.apply_rules(&mut event);
 
         match event
             .as_mut_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(log_schema().timestamp_key())
             .unwrap()
         {
             Value::Integer(_) => {}
@@ -305,7 +304,7 @@ mod tests {
                 e
             ),
         }
-        match event.as_mut_log().get(&Atom::from("another")).unwrap() {
+        match event.as_mut_log().get("another").unwrap() {
             Value::Integer(_) => {}
             e => panic!(
                 "Timestamp was not transformed into a Unix timestamp. Was {:?}",

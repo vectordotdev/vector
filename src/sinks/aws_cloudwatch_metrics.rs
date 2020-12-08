@@ -1,24 +1,28 @@
 use crate::{
-    dns::Resolver,
-    event::metric::{Metric, MetricKind, MetricValue},
-    region::RegionOrEndpoint,
-    sinks::util::{
-        retries::RetryLogic,
-        rusoto::{self, AwsCredentialsProvider},
-        BatchEventsConfig, MetricBuffer, TowerRequestConfig,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    rusoto::{self, RegionOrEndpoint},
+    sinks::util::{
+        retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
+        PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+    },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures01::{Future, Poll, Sink};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::{
+    collections::BTreeMap,
+    convert::TryInto,
+    task::{Context, Poll},
+};
 use tower::Service;
 
 #[derive(Clone)]
@@ -30,11 +34,14 @@ pub struct CloudWatchMetricsSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
-    pub namespace: String,
+    #[serde(alias = "namespace")]
+    pub default_namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub compression: Compression,
+    #[serde(default)]
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -52,11 +59,18 @@ inventory::submit! {
     SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
 
+impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = CloudWatchMetricsSvc::healthcheck(self, cx.resolver())?;
-        let sink = CloudWatchMetricsSvc::new(self.clone(), cx)?;
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let client = self.create_client()?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, healthcheck))
     }
 
@@ -69,66 +83,23 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     }
 }
 
-impl CloudWatchMetricsSvc {
-    pub fn new(
-        config: CloudWatchMetricsSinkConfig,
-        cx: SinkContext,
-    ) -> crate::Result<super::RouterSink> {
-        let client = Self::create_client(
-            config.region.clone().try_into()?,
-            config.assume_role.clone(),
-            cx.resolver(),
-        )?;
-
-        let batch = config.batch.unwrap_or(20, 1);
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
-
-        let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
-
-        let sink = request
-            .batch_sink(
-                CloudWatchMetricsRetryLogic,
-                cloudwatch_metrics,
-                MetricBuffer::new(),
-                batch,
-                cx.acker(),
-            )
-            .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
-
-        Ok(Box::new(sink))
-    }
-
-    fn healthcheck(
-        config: &CloudWatchMetricsSinkConfig,
-        resolver: Resolver,
-    ) -> crate::Result<super::Healthcheck> {
-        let client = Self::create_client(
-            config.region.clone().try_into()?,
-            config.assume_role.clone(),
-            resolver,
-        )?;
-
+impl CloudWatchMetricsSinkConfig {
+    async fn healthcheck(self, client: CloudWatchClient) -> crate::Result<()> {
         let datum = MetricDatum {
             metric_name: "healthcheck".into(),
             value: Some(1.0),
             ..Default::default()
         };
         let request = PutMetricDataInput {
-            namespace: config.namespace.clone(),
+            namespace: self.default_namespace.clone(),
             metric_data: vec![datum],
         };
 
-        let response = client.put_metric_data(request);
-        let healthcheck = response.map_err(|err| err.into());
-
-        Ok(Box::new(healthcheck))
+        client.put_metric_data(request).await.map_err(Into::into)
     }
 
-    fn create_client(
-        region: Region,
-        assume_role: Option<String>,
-        resolver: Resolver,
-    ) -> crate::Result<CloudWatchClient> {
+    fn create_client(&self) -> crate::Result<CloudWatchClient> {
+        let region = (&self.region).try_into()?;
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
             match region {
@@ -141,14 +112,50 @@ impl CloudWatchMetricsSvc {
         } else {
             region
         };
-        let d = rusoto::client(resolver)?;
-        let p = AwsCredentialsProvider::new(&region, assume_role)?;
 
-        Ok(CloudWatchClient::new_with(d, p, region))
+        let client = rusoto::client()?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+
+        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        Ok(CloudWatchClient::new_with_client(client, region))
+    }
+}
+
+impl CloudWatchMetricsSvc {
+    pub fn new(
+        config: CloudWatchMetricsSinkConfig,
+        client: CloudWatchClient,
+        cx: SinkContext,
+    ) -> crate::Result<super::VectorSink> {
+        let default_namespace = config.default_namespace.clone();
+        let batch = BatchSettings::default()
+            .events(20)
+            .timeout(1)
+            .parse_config(config.batch)?;
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
+
+        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
+
+        let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
+            .with_flat_map(move |mut event: Event| {
+                let namespace = event
+                    .as_mut_metric()
+                    .namespace
+                    .take()
+                    .unwrap_or_else(|| default_namespace.clone());
+                stream::iter(Some(PartitionInnerBuffer::new(event, namespace))).map(Ok)
+            });
+
+        Ok(super::VectorSink::Sink(Box::new(sink)))
     }
 
-    fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
-        let metric_data: Vec<_> = events
+    fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
+        events
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name.to_string();
@@ -166,6 +173,7 @@ impl CloudWatchMetricsSvc {
                         MetricValue::Distribution {
                             values,
                             sample_rates,
+                            statistic: _,
                         } => Some(MetricDatum {
                             metric_name,
                             values: Some(values.to_vec()),
@@ -195,35 +203,34 @@ impl CloudWatchMetricsSvc {
                     },
                 }
             })
-            .collect();
-
-        let namespace = self.config.namespace.clone();
-
-        PutMetricDataInput {
-            namespace,
-            metric_data,
-        }
+            .collect()
     }
 }
 
-impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
+impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc {
     type Response = ();
     type Error = RusotoError<PutMetricDataError>;
-    type Future = RusotoFuture<(), PutMetricDataError>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = self.encode_events(items);
-
-        if !input.metric_data.is_empty() {
-            debug!(message = "sending data.", ?input);
-            self.client.put_metric_data(input)
-        } else {
-            Ok(()).into()
+    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
+        let (items, namespace) = items.into_parts();
+        let metric_data = self.encode_events(items);
+        if metric_data.is_empty() {
+            return future::ok(()).boxed();
         }
+
+        let input = PutMetricDataInput {
+            namespace,
+            metric_data,
+        };
+
+        debug!(message = "Sending data.", input = ?input);
+        let client = self.client.clone();
+        Box::pin(async move { client.put_metric_data(input).await })
     }
 }
 
@@ -236,15 +243,8 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
-            RusotoError::Unknown(res)
-                if res.status.is_server_error()
-                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-            {
-                true
-            }
-            _ => false,
+            error => rusoto::is_retriable_error(error),
         }
     }
 }
@@ -267,28 +267,26 @@ fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dns::Resolver;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use crate::test_util::runtime;
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
-    use rusoto_cloudwatch::PutMetricDataInput;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CloudWatchMetricsSinkConfig>();
+    }
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
-            namespace: "vector".into(),
+            default_namespace: "vector".into(),
             region: RegionOrEndpoint::with_endpoint("local".to_owned()),
             ..Default::default()
         }
     }
 
     fn svc() -> CloudWatchMetricsSvc {
-        let rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
         let config = config();
-        let region = config.region.clone().try_into().unwrap();
-        let client = CloudWatchMetricsSvc::create_client(region, None, resolver).unwrap();
-
+        let client = config.create_client().unwrap();
         CloudWatchMetricsSvc { client, config }
     }
 
@@ -297,6 +295,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -304,6 +303,7 @@ mod tests {
             },
             Metric {
                 name: "bytes_out".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -311,6 +311,7 @@ mod tests {
             },
             Metric {
                 name: "healthcheck".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: Some(
                     vec![("region".to_owned(), "local".to_owned())]
@@ -324,32 +325,29 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![
-                    MetricDatum {
-                        metric_name: "exception_total".into(),
-                        value: Some(1.0),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "bytes_out".into(),
-                        value: Some(2.5),
-                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "healthcheck".into(),
-                        value: Some(1.0),
-                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                        dimensions: Some(vec![Dimension {
-                            name: "region".into(),
-                            value: "local".into()
-                        }]),
-                        ..Default::default()
-                    },
-                ],
-            }
+            vec![
+                MetricDatum {
+                    metric_name: "exception_total".into(),
+                    value: Some(1.0),
+                    ..Default::default()
+                },
+                MetricDatum {
+                    metric_name: "bytes_out".into(),
+                    value: Some(2.5),
+                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                    ..Default::default()
+                },
+                MetricDatum {
+                    metric_name: "healthcheck".into(),
+                    value: Some(1.0),
+                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                    dimensions: Some(vec![Dimension {
+                        name: "region".into(),
+                        value: "local".into()
+                    }]),
+                    ..Default::default()
+                },
+            ]
         );
     }
 
@@ -357,6 +355,7 @@ mod tests {
     fn encode_events_absolute_gauge() {
         let events = vec![Metric {
             name: "temperature".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -365,14 +364,11 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "temperature".into(),
-                    value: Some(10.0),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "temperature".into(),
+                value: Some(10.0),
+                ..Default::default()
+            }]
         );
     }
 
@@ -380,26 +376,25 @@ mod tests {
     fn encode_events_distribution() {
         let events = vec![Metric {
             name: "latency".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
+                statistic: StatisticKind::Histogram,
             },
         }];
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "latency".into(),
-                    values: Some(vec![11.0, 12.0]),
-                    counts: Some(vec![100.0, 50.0]),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "latency".into(),
+                values: Some(vec![11.0, 12.0]),
+                counts: Some(vec![100.0, 50.0]),
+                ..Default::default()
+            }]
         );
     }
 
@@ -407,6 +402,7 @@ mod tests {
     fn encode_events_set() {
         let events = vec![Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -417,14 +413,11 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "users".into(),
-                    value: Some(2.0),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "users".into(),
+                value: Some(2.0),
+                ..Default::default()
+            }]
         );
     }
 }
@@ -433,40 +426,38 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::event::Event;
-    use crate::region::RegionOrEndpoint;
-    use crate::test_util::{random_string, runtime};
-    use crate::topology::config::SinkContext;
+    use crate::{event::metric::StatisticKind, test_util::random_string, Event};
     use chrono::offset::TimeZone;
-    use futures01::{stream, Sink};
+    use rand::seq::SliceRandom;
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
-            namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4582".to_owned()),
+            default_namespace: "vector".into(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
     }
 
-    #[test]
-    fn cloudwatch_metrics_healthchecks() {
-        let mut rt = runtime();
-        let resolver = Resolver::new(Vec::new(), rt.executor()).unwrap();
-        let healthcheck = CloudWatchMetricsSvc::healthcheck(&config(), resolver).unwrap();
-        rt.block_on(healthcheck).unwrap();
+    #[tokio::test]
+    async fn cloudwatch_metrics_healthchecks() {
+        let config = config();
+        let client = config.create_client().unwrap();
+        config.healthcheck(client).await.unwrap();
     }
 
-    #[test]
-    fn cloudwatch_metrics_put_data() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
-        let sink = CloudWatchMetricsSvc::new(config(), cx).unwrap();
+    #[tokio::test]
+    async fn cloudwatch_metrics_put_data() {
+        let cx = SinkContext::new_test();
+        let config = config();
+        let client = config.create_client().unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();
 
         for i in 0..100 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", 0),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -487,6 +478,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", gauge_name),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -499,20 +491,49 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("distribution-{}", distribution_name),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![100],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
         }
 
-        let stream = stream::iter_ok(events.clone().into_iter());
+        let stream = stream::iter(events).map(Into::into);
+        sink.run(stream).await.unwrap();
+    }
 
-        let pump = sink.send_all(stream);
-        let _ = rt.block_on(pump).unwrap();
+    #[tokio::test]
+    async fn cloudwatch_metrics_namespace_partitioning() {
+        let cx = SinkContext::new_test();
+        let config = config();
+        let client = config.create_client().unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+
+        let mut events = Vec::new();
+
+        for namespace in ["ns1", "ns2", "ns3", "ns4"].iter() {
+            for _ in 0..100 {
+                let event = Event::Metric(Metric {
+                    name: "counter".to_string(),
+                    namespace: Some(namespace.to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.0 },
+                });
+                events.push(event);
+            }
+        }
+
+        events.shuffle(&mut rand::thread_rng());
+
+        let stream = stream::iter(events).map(Into::into);
+        sink.run(stream).await.unwrap();
     }
 }

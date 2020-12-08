@@ -1,7 +1,9 @@
-use futures01::{Future, Sink};
+use crate::Event;
+use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
+use std::fmt;
 
-pub mod streaming_sink;
+pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
@@ -13,6 +15,10 @@ pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+pub mod aws_sqs;
+#[cfg(feature = "sinks-azure_monitor_logs")]
+pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -31,16 +37,18 @@ pub mod gcp;
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
 pub mod http;
-#[cfg(feature = "sinks-humio_logs")]
-pub mod humio_logs;
-#[cfg(feature = "sinks-influxdb_metrics")]
-pub mod influxdb_metrics;
+#[cfg(feature = "sinks-humio")]
+pub mod humio;
+#[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
+pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;
 #[cfg(feature = "sinks-logdna")]
 pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-nats")]
+pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -49,10 +57,10 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
-#[cfg(feature = "sinks-sematext_logs")]
-pub mod sematext_logs;
 #[cfg(feature = "sinks-signalfx")]
 pub mod signalfx;
+#[cfg(feature = "sinks-sematext")]
+pub mod sematext;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]
@@ -62,13 +70,12 @@ pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
 
-pub mod util;
+pub enum VectorSink {
+    Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
+    Stream(Box<dyn util::StreamSink + Send>),
+}
 
-use crate::Event;
-
-pub type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
-
-pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
+pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -88,4 +95,29 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+}
+
+impl VectorSink {
+    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
+    where
+        S: Stream<Item = Event> + Send + 'static,
+    {
+        match self {
+            Self::Sink(sink) => input.map(Ok).forward(sink).await,
+            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
+        }
+    }
+
+    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
+        match self {
+            Self::Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
+        }
+    }
+}
+
+impl fmt::Debug for VectorSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VectorSink").finish()
+    }
 }

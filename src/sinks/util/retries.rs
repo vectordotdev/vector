@@ -1,12 +1,14 @@
-use super::service::Elapsed;
 use crate::Error;
-use futures01::{try_ready, Async, Future, Poll};
+use futures::FutureExt;
 use std::{
     cmp,
-    time::{Duration, Instant},
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
 };
-use tokio01::timer::Delay;
-use tower::retry::Policy;
+use tokio::time::{delay_for, Delay};
+use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -17,7 +19,7 @@ pub enum RetryAction {
     Successful,
 }
 
-pub trait RetryLogic: Clone {
+pub trait RetryLogic: Clone + Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Response;
 
@@ -77,10 +79,9 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
 
     fn build_retry(&self) -> RetryPolicyFuture<L> {
         let policy = self.advance();
-        let next = Instant::now() + policy.backoff();
-        let delay = Delay::new(next);
+        let delay = delay_for(self.backoff());
 
-        debug!(message = "retrying request.", delay_ms = %self.backoff().as_millis());
+        debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
         RetryPolicyFuture { delay, policy }
     }
 }
@@ -96,18 +97,18 @@ where
         match result {
             Ok(response) => {
                 if self.remaining_attempts == 0 {
-                    error!("retries exhausted");
+                    error!("Retries exhausted; dropping the request.");
                     return None;
                 }
 
                 match self.logic.should_retry_response(response) {
                     RetryAction::Retry(reason) => {
-                        warn!(message = "retrying after response.", %reason);
+                        warn!(message = "Retrying after response.", reason = %reason);
                         Some(self.build_retry())
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        warn!(message = "request is not retryable; dropping the request.", %reason);
+                        error!(message = "Not retriable; dropping the request.", reason = ?reason);
                         None
                     }
 
@@ -116,23 +117,29 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "retries exhausted.", %error);
+                    error!(message = "Retries exhausted; dropping the request.", %error);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!("retrying after error: {}", expected);
+                        warn!(message = "Retrying after error.", error = ?expected);
                         Some(self.build_retry())
                     } else {
-                        error!(message = "encountered non-retriable error.", %error);
+                        error!(
+                            message = "Non-retriable error; dropping the request.",
+                            %error
+                        );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("request timedout.");
+                    warn!("Request timed out.");
                     Some(self.build_retry())
                 } else {
-                    warn!(message = "unexpected error type.", %error);
+                    error!(
+                        message = "Unexpected error type; dropping the request.",
+                        %error
+                    );
                     None
                 }
             }
@@ -144,91 +151,151 @@ where
     }
 }
 
-impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
-    type Item = FixedRetryPolicy<L>;
-    type Error = ();
+// Safety: `L` is never pinned and we use no unsafe pin projections
+// therefore this safe.
+impl<L: RetryLogic> Unpin for RetryPolicyFuture<L> {}
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        try_ready!(self
-            .delay
-            .poll()
-            .map_err(|error| panic!("timer error: {}; this is a bug!", error)));
-        Ok(Async::Ready(self.policy.clone()))
+impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
+    type Output = FixedRetryPolicy<L>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        futures::ready!(self.delay.poll_unpin(cx));
+        Poll::Ready(self.policy.clone())
     }
 }
 
 impl RetryAction {
     pub fn is_retryable(&self) -> bool {
-        if let RetryAction::Retry(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::Retry(_))
     }
 
     pub fn is_not_retryable(&self) -> bool {
-        if let RetryAction::DontRetry(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::DontRetry(_))
     }
 
     pub fn is_successful(&self) -> bool {
-        if let RetryAction::Successful = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RetryAction::Successful)
     }
 }
 
-// Disabling these tests because somehow I triggered a rustc
-// bug where we can only have one assert_eq in play.
+// `tokio-retry` crate
+// MIT License
+// Copyright (c) 2017 Sam Rijs
 //
-// rustc issue: https://github.com/rust-lang/rust/issues/71259
-#[cfg(feature = "disabled")]
+/// A retry strategy driven by exponential back-off.
+///
+/// The power corresponds to the number of past attempts.
+#[derive(Debug, Clone)]
+pub struct ExponentialBackoff {
+    current: u64,
+    base: u64,
+    factor: u64,
+    max_delay: Option<Duration>,
+}
+
+impl ExponentialBackoff {
+    /// Constructs a new exponential back-off strategy,
+    /// given a base duration in milliseconds.
+    ///
+    /// The resulting duration is calculated by taking the base to the `n`-th power,
+    /// where `n` denotes the number of past attempts.
+    pub fn from_millis(base: u64) -> ExponentialBackoff {
+        ExponentialBackoff {
+            current: base,
+            base,
+            factor: 1u64,
+            max_delay: None,
+        }
+    }
+
+    /// A multiplicative factor that will be applied to the retry delay.
+    ///
+    /// For example, using a factor of `1000` will make each delay in units of seconds.
+    ///
+    /// Default factor is `1`.
+    pub fn factor(mut self, factor: u64) -> ExponentialBackoff {
+        self.factor = factor;
+        self
+    }
+
+    /// Apply a maximum delay. No retry delay will be longer than this `Duration`.
+    pub fn max_delay(mut self, duration: Duration) -> ExponentialBackoff {
+        self.max_delay = Some(duration);
+        self
+    }
+}
+
+impl Iterator for ExponentialBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Duration> {
+        // set delay duration by applying factor
+        let duration = if let Some(duration) = self.current.checked_mul(self.factor) {
+            Duration::from_millis(duration)
+        } else {
+            Duration::from_millis(std::u64::MAX)
+        };
+
+        // check if we reached max delay
+        if let Some(ref max_delay) = self.max_delay {
+            if duration > *max_delay {
+                return Some(*max_delay);
+            }
+        }
+
+        if let Some(next) = self.current.checked_mul(self.base) {
+            self.current = next;
+        } else {
+            self.current = std::u64::MAX;
+        }
+
+        Some(duration)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_util::trace_init;
-    use futures01::Future;
     use std::{fmt, time::Duration};
-    use tokio01_test::{assert_err, assert_not_ready, assert_ready, clock};
-    use tower::{retry::Retry, Service};
-    use tower_test01::{assert_request_eq, mock};
+    use tokio::time;
+    use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
+    use tower::retry::RetryLayer;
+    use tower_test::{assert_request_eq, mock};
 
-    #[test]
-    fn service_error_retry() {
-        clock::mock(|clock| {
-            trace_init();
+    #[tokio::test]
+    async fn service_error_retry() {
+        trace_init();
 
-            let policy = FixedRetryPolicy::new(
-                5,
-                Duration::from_secs(1),
-                Duration::from_secs(10),
-                SvcRetryLogic,
-            );
+        time::pause();
 
-            let (service, mut handle) = mock::pair();
-            let mut svc = Retry::new(policy, service);
+        let policy = FixedRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            SvcRetryLogic,
+        );
 
-            assert_ready!(svc.poll_ready());
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
 
-            let mut fut = svc.call("hello");
-            assert_request_eq!(handle, "hello").send_error(Error(true));
-            assert_not_ready!(fut.poll());
+        assert_ready_ok!(svc.poll_ready());
 
-            clock.advance(Duration::from_secs(2));
-            assert_not_ready!(fut.poll());
+        let fut = svc.call("hello");
+        let mut fut = task::spawn(fut);
 
-            assert_request_eq!(handle, "hello").send_response("world");
-            assert_eq!(fut.wait().unwrap(), "world");
-        });
+        assert_request_eq!(handle, "hello").send_error(Error(true));
+
+        assert_pending!(fut.poll());
+
+        time::advance(Duration::from_secs(2)).await;
+        assert_pending!(fut.poll());
+
+        assert_request_eq!(handle, "hello").send_response("world");
+        assert_eq!(fut.await.unwrap(), "world");
     }
 
-    #[test]
-    fn service_error_no_retry() {
+    #[tokio::test]
+    async fn service_error_no_retry() {
         trace_init();
 
         let policy = FixedRetryPolicy::new(
@@ -238,43 +305,41 @@ mod tests {
             SvcRetryLogic,
         );
 
-        let (service, mut handle) = mock::pair();
-        let mut svc = Retry::new(policy, service);
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
 
-        assert_ready!(svc.poll_ready());
+        assert_ready_ok!(svc.poll_ready());
 
-        let mut fut = svc.call("hello");
+        let mut fut = task::spawn(svc.call("hello"));
         assert_request_eq!(handle, "hello").send_error(Error(false));
-        assert_err!(fut.poll());
+        assert_ready_err!(fut.poll());
     }
 
-    #[test]
-    fn timeout_error() {
-        clock::mock(|clock| {
-            trace_init();
+    #[tokio::test]
+    async fn timeout_error() {
+        trace_init();
 
-            let policy = FixedRetryPolicy::new(
-                5,
-                Duration::from_secs(1),
-                Duration::from_secs(10),
-                SvcRetryLogic,
-            );
+        time::pause();
 
-            let (service, mut handle) = mock::pair();
-            let mut svc = Retry::new(policy, service);
+        let policy = FixedRetryPolicy::new(
+            5,
+            Duration::from_secs(1),
+            Duration::from_secs(10),
+            SvcRetryLogic,
+        );
 
-            assert_ready!(svc.poll_ready());
+        let (mut svc, mut handle) = mock::spawn_layer(RetryLayer::new(policy));
 
-            let mut fut = svc.call("hello");
-            assert_request_eq!(handle, "hello").send_error(super::super::service::Elapsed::new());
-            assert_not_ready!(fut.poll());
+        assert_ready_ok!(svc.poll_ready());
 
-            clock.advance(Duration::from_secs(2));
-            assert_not_ready!(fut.poll());
+        let mut fut = task::spawn(svc.call("hello"));
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
+        assert_pending!(fut.poll());
 
-            assert_request_eq!(handle, "hello").send_response("world");
-            assert_eq!(fut.wait().unwrap(), "world");
-        });
+        time::advance(Duration::from_secs(2)).await;
+        assert_pending!(fut.poll());
+
+        assert_request_eq!(handle, "hello").send_response("world");
+        assert_eq!(fut.await.unwrap(), "world");
     }
 
     #[test]

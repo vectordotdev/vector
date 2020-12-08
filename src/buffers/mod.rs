@@ -15,12 +15,15 @@ pub mod disk;
 #[serde(rename_all = "snake_case")]
 pub enum BufferConfig {
     Memory {
+        #[serde(default = "BufferConfig::memory_max_events")]
         max_events: usize,
+        #[serde(default)]
         when_full: WhenFull,
     },
     #[cfg(feature = "leveldb")]
     Disk {
         max_size: usize,
+        #[serde(default)]
         when_full: WhenFull,
     },
 }
@@ -28,7 +31,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         BufferConfig::Memory {
-            max_events: 500,
+            max_events: BufferConfig::memory_max_events(),
             when_full: Default::default(),
         }
     }
@@ -57,7 +60,9 @@ impl BufferInputCloner {
     pub fn get(&self) -> Box<dyn Sink<SinkItem = Event, SinkError = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
-                let inner = tx.clone().sink_map_err(|e| error!("sender error: {:?}", e));
+                let inner = tx
+                    .clone()
+                    .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull { inner })
                 } else {
@@ -80,6 +85,11 @@ impl BufferInputCloner {
 }
 
 impl BufferConfig {
+    #[inline]
+    const fn memory_max_events() -> usize {
+        500
+    }
+
     #[cfg_attr(not(feature = "leveldb"), allow(unused))]
     pub fn build(
         &self,
@@ -115,7 +125,7 @@ impl BufferConfig {
                 let buffer_dir = format!("{}_buffer", sink_name);
 
                 let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
-                    .map_err(|err| err.to_string())?;
+                    .map_err(|error| error.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
@@ -187,15 +197,15 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 
 #[cfg(test)]
 mod test {
-    use super::{Acker, DropWhenFull};
-    use crate::test_util::block_on;
+    use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
+    use futures::compat::Future01CompatExt;
     use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
     use tokio01_test::task::MockTask;
 
-    #[test]
-    fn drop_when_full() {
-        block_on::<_, _, ()>(future::lazy(|| {
+    #[tokio::test]
+    async fn drop_when_full() {
+        future::lazy(|| {
             let (tx, mut rx) = mpsc::channel(2);
 
             let mut tx = DropWhenFull { inner: tx };
@@ -210,8 +220,10 @@ mod test {
             assert_eq!(rx.poll(), Ok(Async::Ready(Some(3))));
             assert_eq!(rx.poll(), Ok(Async::NotReady));
 
-            future::ok(())
-        }))
+            future::ok::<(), ()>(())
+        })
+        .compat()
+        .await
         .unwrap();
     }
 
@@ -219,7 +231,7 @@ mod test {
     fn ack_with_none() {
         let counter = Arc::new(AtomicUsize::new(0));
         let task = Arc::new(AtomicTask::new());
-        let acker = Acker::Disk(counter, task.clone());
+        let acker = Acker::Disk(counter, Arc::clone(&task));
 
         let mut mock = MockTask::new();
 
@@ -230,5 +242,57 @@ mod test {
         assert!(!mock.is_notified());
         acker.ack(1);
         assert!(mock.is_notified());
+    }
+
+    #[test]
+    fn config_default_values() {
+        fn check(source: &str, config: BufferConfig) {
+            let conf: BufferConfig = toml::from_str(source).unwrap();
+            assert_eq!(toml::to_string(&conf), toml::to_string(&config));
+        }
+
+        check(
+            r#"
+          type = "memory"
+          "#,
+            BufferConfig::Memory {
+                max_events: 500,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check(
+            r#"
+          type = "memory"
+          max_events = 100
+          "#,
+            BufferConfig::Memory {
+                max_events: 100,
+                when_full: WhenFull::Block,
+            },
+        );
+
+        check(
+            r#"
+          type = "memory"
+          when_full = "drop_newest"
+          "#,
+            BufferConfig::Memory {
+                max_events: 500,
+                when_full: WhenFull::DropNewest,
+            },
+        );
+
+        #[cfg(feature = "leveldb")]
+        check(
+            r#"
+          type = "disk"
+          max_size = 1024
+          "#,
+            BufferConfig::Disk {
+                max_size: 1024,
+                when_full: WhenFull::Block,
+            },
+        );
     }
 }

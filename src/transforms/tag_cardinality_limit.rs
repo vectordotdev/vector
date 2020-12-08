@@ -1,11 +1,21 @@
-use super::Transform;
+use crate::transforms::TaskTransform;
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    internal_events::{
+        TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
+        TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
+    },
+    transforms::Transform,
     Event,
 };
 use bloom::{BloomFilter, ASMS};
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::fmt::Formatter;
+use std::{
+    borrow::{Borrow, Cow},
+    collections::{HashMap, HashSet},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -41,6 +51,7 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
+#[derive(Debug)]
 pub struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
     accepted_tags: HashMap<String, TagValueSet>,
@@ -59,13 +70,25 @@ fn default_cache_size() -> usize {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<TagCardinalityLimitConfig>("tag_cardinality_limit")
+    TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
+impl GenerateConfig for TagCardinalityLimitConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: Mode::Exact,
+            value_limit: default_value_limit(),
+            limit_exceeded_action: default_limit_exceeded_action(),
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(TagCardinalityLimit::new(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -82,6 +105,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
 }
 
 /// Container for storing the set of accepted values for a given tag key.
+#[derive(Debug)]
 struct TagValueSet {
     storage: TagValueSetStorage,
     num_elements: usize,
@@ -90,6 +114,15 @@ struct TagValueSet {
 enum TagValueSetStorage {
     Set(HashSet<String>),
     Bloom(BloomFilter),
+}
+
+impl std::fmt::Debug for TagValueSetStorage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
+            TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
+        }
+    }
 }
 
 impl TagValueSet {
@@ -113,10 +146,10 @@ impl TagValueSet {
         }
     }
 
-    fn contains(&self, val: &String) -> bool {
+    fn contains(&self, value: Cow<'_, String>) -> bool {
         match &self.storage {
-            TagValueSetStorage::Set(set) => set.contains(val),
-            TagValueSetStorage::Bloom(bloom) => bloom.contains(val),
+            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &String),
+            TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
         }
     }
 
@@ -124,10 +157,10 @@ impl TagValueSet {
         self.num_elements
     }
 
-    fn insert(&mut self, val: &String) -> bool {
+    fn insert(&mut self, value: Cow<'_, String>) -> bool {
         let inserted = match &mut self.storage {
-            TagValueSetStorage::Set(set) => set.insert(val.clone()),
-            TagValueSetStorage::Bloom(bloom) => bloom.insert(val),
+            TagValueSetStorage::Set(set) => set.insert(value.into_owned()),
+            TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
         };
         if inserted {
             self.num_elements += 1
@@ -151,16 +184,16 @@ impl TagCardinalityLimit {
     /// accepted values for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this key, and the
     /// configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &String, value: &String) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
-                key.clone(),
+                key.to_string(),
                 TagValueSet::new(self.config.value_limit, &self.config.mode),
             );
         }
         let tag_value_set = self.accepted_tags.get_mut(key).unwrap();
 
-        if tag_value_set.contains(value) {
+        if tag_value_set.contains(value.clone()) {
             // Tag value has already been accepted, nothing more to do.
             return true;
         }
@@ -171,10 +204,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                warn!(
-                    "value_limit reached for key {}. New values for this key will be rejected",
-                    key
-                );
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -183,22 +213,19 @@ impl TagCardinalityLimit {
             false
         }
     }
-}
 
-impl Transform for TagCardinalityLimit {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
+        emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
                 match self.config.limit_exceeded_action {
                     LimitExceededAction::DropEvent => {
                         for (key, value) in tags_map {
-                            if !self.try_accept_tag(key, value) {
-                                info!(
-                                    message = "Rejecting Metric Event containing tag with new value after hitting configured 'value_limit'",
-                                    tag_key = key.as_str(),
-                                    tag_value = &value.as_str(),
-                                    rate_limit_secs = 10,
-                                );
+                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                                emit!(TagCardinalityLimitRejectingEvent {
+                                    tag_key: &key,
+                                    tag_value: &value,
+                                });
                                 return None;
                             }
                         }
@@ -206,14 +233,11 @@ impl Transform for TagCardinalityLimit {
                     LimitExceededAction::DropTag => {
                         let mut to_delete = Vec::new();
                         for (key, value) in tags_map.iter() {
-                            if !self.try_accept_tag(key, value) {
-                                info!(
-                                    message =
-                                        "Rejecting tag after hitting configured 'value_limit'",
-                                    tag_key = key.as_str(),
-                                    tag_value = value.as_str(),
-                                    rate_limit_secs = 10,
-                                );
+                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
+                                emit!(TagCardinalityLimitRejectingTag {
+                                    tag_key: &key,
+                                    tag_value: &value,
+                                });
                                 to_delete.push(key.clone());
                             }
                         }
@@ -229,16 +253,35 @@ impl Transform for TagCardinalityLimit {
     }
 }
 
+impl TaskTransform for TagCardinalityLimit {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
+    use super::*;
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
-    use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
+    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    }
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(Metric {
             name: "event".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags),
             kind: metric::MetricKind::Incremental,
@@ -293,9 +336,9 @@ mod tests {
             vec![("tag1".into(), "val3".into())].into_iter().collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone());
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3);
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -338,9 +381,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -402,9 +445,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);

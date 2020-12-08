@@ -1,11 +1,12 @@
 use crate::FilePosition;
+use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
 use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
-    thread,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 
 use crate::metadata_ext::PortableFileExt;
@@ -27,6 +28,8 @@ pub struct FileWatcher {
     is_dead: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    max_line_bytes: usize,
+    buf: BytesMut,
 }
 
 impl FileWatcher {
@@ -38,16 +41,18 @@ impl FileWatcher {
     pub fn new(
         path: PathBuf,
         file_position: FilePosition,
-        ignore_before: Option<SystemTime>,
+        ignore_before: Option<DateTime<Utc>>,
+        max_line_bytes: usize,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
         let metadata = f.metadata()?;
         let mut reader = io::BufReader::new(f);
 
-        let too_old = if let (Some(ignore_before), Ok(modified_time)) =
-            (ignore_before, metadata.modified())
-        {
+        let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
+            ignore_before,
+            metadata.modified().map(DateTime::<Utc>::from),
+        ) {
             modified_time < ignore_before
         } else {
             false
@@ -60,7 +65,7 @@ impl FileWatcher {
                 // the entire thing, so for now we simply refuse to read gzipped files for which we
                 // already have a stored file position from a previous run.
                 debug!(
-                    message = "Not re-reading gzipped file with existing stored offset",
+                    message = "Not re-reading gzipped file with existing stored offset.",
                     ?path,
                     %file_position
                 );
@@ -88,11 +93,13 @@ impl FileWatcher {
             findable: true,
             reader,
             file_position,
-            devno: devno,
+            devno,
             inode: ino,
             is_dead: false,
-            last_read_attempt: ts.clone(),
+            last_read_attempt: ts,
             last_read_success: ts,
+            max_line_bytes,
+            buf: BytesMut::new(),
         })
     }
 
@@ -144,24 +151,32 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
+    pub fn read_line(&mut self) -> io::Result<Option<Bytes>> {
         self.track_read_attempt();
 
-        // ensure buffer is re-initialized
-        buffer.clear();
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
-        match read_until_with_max_size(reader, file_position, b'\n', &mut buffer, max_size) {
-            Ok(sz) => {
-                if sz > 0 {
-                    self.track_read_success()
-                }
-
-                if sz == 0 && !self.file_findable() {
+        match read_until_with_max_size(
+            reader,
+            file_position,
+            b'\n',
+            &mut self.buf,
+            self.max_line_bytes,
+        ) {
+            Ok(Some(_)) => {
+                self.track_read_success();
+                Ok(Some(self.buf.split().freeze()))
+            }
+            Ok(None) => {
+                if !self.file_findable() {
                     self.set_dead();
+                    // File has been deleted, so return what we have in the buffer, even though it
+                    // didn't end with a newline. This is not a perfect signal for when we should
+                    // give up waiting for a newline, but it's decent.
+                    Ok(Some(self.buf.split().freeze()))
+                } else {
+                    Ok(None)
                 }
-
-                Ok(sz)
             }
             Err(e) => {
                 if let io::ErrorKind::NotFound = e.kind() {
@@ -178,6 +193,10 @@ impl FileWatcher {
 
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
+    }
+
+    pub fn last_read_success(&self) -> Instant {
+        self.last_read_success
     }
 
     pub fn should_read(&self) -> bool {
@@ -202,12 +221,11 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
     r: &mut R,
     p: &mut FilePosition,
     delim: u8,
-    buf: &mut Vec<u8>,
+    buf: &mut BytesMut,
     max_size: usize,
-) -> io::Result<usize> {
+) -> io::Result<Option<usize>> {
     let mut total_read = 0;
     let mut discarding = false;
-    let mut already_slept = false;
     loop {
         let available = match r.fill_buf() {
             Ok(n) => n,
@@ -244,17 +262,19 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
             discarding = true;
         }
 
-        if done && discarding {
-            discarding = false;
-            buf.clear();
-        } else if done || (used == 0 && already_slept) {
-            return Ok(total_read);
+        if done {
+            if !discarding {
+                return Ok(Some(total_read));
+            } else {
+                discarding = false;
+                buf.clear();
+            }
         } else if used == 0 {
             // We've hit EOF but not yet seen a newline. This can happen when unlucky timing causes
-            // us to observe an incomplete write, so a short sleep gives the rest of the write
-            // a chance to become visible before we give up and accept the EOF.
-            thread::sleep(Duration::from_millis(1));
-            already_slept = true;
+            // us to observe an incomplete write. We return None here and let the loop continue
+            // next time the method is called. This is safe because the buffer is specific to this
+            // FileWatcher.
+            return Ok(None);
         }
     }
 }
@@ -262,52 +282,58 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 #[cfg(test)]
 mod test {
     use super::read_until_with_max_size;
+    use bytes::BytesMut;
     use std::io::Cursor;
 
     #[test]
     fn test_read_until_with_max_size() {
         let mut buf = Cursor::new(&b"12"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 2);
-        assert_eq!(p, 2);
-        assert_eq!(v, b"12");
+        assert_eq!(p, None);
+        assert_eq!(&*v, b"12");
+        let mut buf = Cursor::new(&b"34"[..]);
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        assert_eq!(pos, 3);
+        assert_eq!(p, Some(1));
+        assert_eq!(&*v, b"12");
 
         let mut buf = Cursor::new(&b"1233"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 3);
-        assert_eq!(p, 3);
-        assert_eq!(v, b"12");
+        assert_eq!(p, Some(3));
+        assert_eq!(&*v, b"12");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 4);
-        assert_eq!(p, 1);
-        assert_eq!(v, b"");
+        assert_eq!(p, Some(1));
+        assert_eq!(&*v, b"");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 4);
-        assert_eq!(p, 0);
-        assert_eq!(v, []);
+        assert_eq!(p, None);
+        assert_eq!(&*v, [0; 0]);
 
         let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 6);
-        assert_eq!(p, 6);
-        assert_eq!(v, b"short");
+        assert_eq!(p, Some(6));
+        assert_eq!(&*v, b"short");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 34);
-        assert_eq!(p, 28);
-        assert_eq!(v, b"exact size");
+        assert_eq!(p, Some(28));
+        assert_eq!(&*v, b"exact size");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 46);
-        assert_eq!(p, 12);
-        assert_eq!(v, []);
+        assert_eq!(p, None);
+        assert_eq!(&*v, [0; 0]);
     }
 }
