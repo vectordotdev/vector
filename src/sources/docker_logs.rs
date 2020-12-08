@@ -1379,9 +1379,9 @@ mod integration_tests {
             ..DockerLogsConfig::default()
         });
 
-        let id0 = container_log_n(1, excluded0, None, "will not be read", &docker).await;
-        let id1 = container_log_n(1, included0, None, will_be_read, &docker).await;
-        let id2 = container_log_n(1, included1, None, will_be_read, &docker).await;
+        let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
+        let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
+        let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
         let events = collect_ready(out).await.unwrap();
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
