@@ -14,4 +14,6 @@ impl InternalEvent for HostMetricsEventReceived {
     fn emit_metrics(&self) {
         counter!("processed_events_total", self.count as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }

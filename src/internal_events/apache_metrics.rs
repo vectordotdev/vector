@@ -18,6 +18,8 @@ impl InternalEvent for ApacheMetricsEventReceived {
         counter!("processed_events_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]

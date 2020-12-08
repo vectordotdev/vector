@@ -15,6 +15,8 @@ impl InternalEvent for SplunkEventSent {
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]
@@ -91,6 +93,8 @@ mod source {
         fn emit_metrics(&self) {
             counter!("processed_events_total", 1);
         }
+
+        fn emit_metrics_wrapped(&self) {}
     }
 
     #[derive(Debug)]

@@ -12,4 +12,6 @@ impl InternalEvent for GeneratorEventProcessed {
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }

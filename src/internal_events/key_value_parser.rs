@@ -11,6 +11,8 @@ impl InternalEvent for KeyValueEventProcessed {
             "component_type" => "key_value",
         );
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]

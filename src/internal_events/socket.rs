@@ -33,6 +33,8 @@ impl InternalEvent for SocketEventReceived {
         counter!("processed_events_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]
@@ -51,6 +53,8 @@ impl InternalEvent for SocketEventsSent {
         counter!("processed_events_total", self.count, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]

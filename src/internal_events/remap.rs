@@ -8,6 +8,8 @@ impl InternalEvent for RemapEventProcessed {
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]

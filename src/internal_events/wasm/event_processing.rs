@@ -66,14 +66,21 @@ impl InternalEvent for EventProcessingProgress {
     }
 
     fn emit_metrics(&self) {
+        self.emit_metrics_wrapped();
+        match self.state {
+            State::Completed => counter!("processed_events_total", 1,
+                "component_role" => self.role.as_const_str(),
+            ),
+            _ => (),
+        }
+    }
+
+    fn emit_metrics_wrapped(&self) {
         counter!("wasm_event_processing_total", 1,
             "component_role" => self.role.as_const_str(),
             "state" => self.state.as_const_str(),
         );
         match self.state {
-            State::Completed => counter!("processed_events_total", 1,
-                "component_role" => self.role.as_const_str(),
-            ),
             State::Errored => counter!("processing_errors_total", 1,
                 "component_role" => self.role.as_const_str(),
             ),

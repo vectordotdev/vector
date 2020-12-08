@@ -20,6 +20,8 @@ impl InternalEvent for HTTPEventsReceived {
         counter!("processed_events_total", self.events_count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]
@@ -73,4 +75,6 @@ impl InternalEvent for HTTPEventEncoded {
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }

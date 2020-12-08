@@ -47,6 +47,8 @@ mod source {
                 "file" => self.file.to_owned(),
             );
         }
+
+        fn emit_metrics_wrapped(&self) {}
     }
 
     #[derive(Debug)]

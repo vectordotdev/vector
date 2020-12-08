@@ -20,6 +20,8 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
 
 #[derive(Debug)]

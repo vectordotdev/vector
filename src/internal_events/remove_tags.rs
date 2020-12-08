@@ -8,4 +8,6 @@ impl InternalEvent for RemoveTagsEventProcessed {
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
     }
+
+    fn emit_metrics_wrapped(&self) {}
 }
