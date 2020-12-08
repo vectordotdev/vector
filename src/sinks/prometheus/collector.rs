@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {
+    type Output;
+
     fn new() -> Self;
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue);
@@ -20,6 +22,8 @@ pub(super) trait MetricCollector {
         tags: &Option<BTreeMap<String, String>>,
         extra: Option<(&str, String)>,
     );
+
+    fn finish(self) -> Self::Output;
 
     fn encode_metric(
         &mut self,
@@ -187,11 +191,13 @@ pub(super) trait MetricCollector {
 }
 
 pub(super) struct StringCollector {
-    pub result: String,
+    result: String,
     processed: HashSet<String>,
 }
 
 impl MetricCollector for StringCollector {
+    type Output = String;
+
     fn new() -> Self {
         let result = String::new();
         let processed = HashSet::new();
@@ -218,6 +224,10 @@ impl MetricCollector for StringCollector {
         self.result.push_str(suffix);
         self.encode_tags(tags, extra);
         writeln!(&mut self.result, " {}", value).ok();
+    }
+
+    fn finish(self) -> String {
+        self.result
     }
 }
 
@@ -302,26 +312,11 @@ impl TimeSeries {
         labels.sort();
         labels
     }
-
-    pub(super) fn finish(self) -> proto::WriteRequest {
-        let timeseries = self
-            .buffer
-            .into_iter()
-            .map(|(labels, samples)| proto::TimeSeries { labels, samples })
-            .collect();
-        let metadata = self
-            .metadata
-            .into_iter()
-            .map(|(_, metadata)| metadata)
-            .collect();
-        proto::WriteRequest {
-            timeseries,
-            metadata,
-        }
-    }
 }
 
 impl MetricCollector for TimeSeries {
+    type Output = proto::WriteRequest;
+
     fn new() -> Self {
         Self {
             buffer: Default::default(),
@@ -373,6 +368,23 @@ impl MetricCollector for TimeSeries {
                 value,
                 timestamp: timestamp_millis,
             });
+    }
+
+    fn finish(self) -> proto::WriteRequest {
+        let timeseries = self
+            .buffer
+            .into_iter()
+            .map(|(labels, samples)| proto::TimeSeries { labels, samples })
+            .collect();
+        let metadata = self
+            .metadata
+            .into_iter()
+            .map(|(_, metadata)| metadata)
+            .collect();
+        proto::WriteRequest {
+            timeseries,
+            metadata,
+        }
     }
 }
 

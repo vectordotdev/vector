@@ -173,7 +173,7 @@ fn handle(
                 s.encode_metric(default_namespace, &buckets, quantiles, expired, &metric.0);
             }
 
-            *response.body_mut() = s.result.into();
+            *response.body_mut() = s.finish().into();
 
             response.headers_mut().insert(
                 "Content-Type",
