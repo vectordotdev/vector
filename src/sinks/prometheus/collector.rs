@@ -16,7 +16,7 @@ pub(super) trait MetricCollector {
 
     fn emit_value(
         &mut self,
-        timestamp_millis: i64,
+        timestamp_millis: Option<i64>,
         name: &str,
         suffix: &str,
         value: f64,
@@ -40,7 +40,7 @@ pub(super) trait MetricCollector {
             &metric.name,
         );
         let name = &name;
-        let timestamp = metric.timestamp.map(|t| t.timestamp_millis()).unwrap_or(0);
+        let timestamp = metric.timestamp.map(|t| t.timestamp_millis());
 
         if metric.kind.is_absolute() {
             let tags = &metric.tags;
@@ -214,7 +214,7 @@ impl MetricCollector for StringCollector {
 
     fn emit_value(
         &mut self,
-        timestamp_millis: i64,
+        timestamp_millis: Option<i64>,
         name: &str,
         suffix: &str,
         value: f64,
@@ -225,8 +225,8 @@ impl MetricCollector for StringCollector {
         self.result.push_str(suffix);
         self.encode_tags(tags, extra);
         let _ = match timestamp_millis {
-            0 => writeln!(&mut self.result, " {}", value),
-            _ => writeln!(&mut self.result, " {} {}", value, timestamp_millis),
+            None => writeln!(&mut self.result, " {}", value),
+            Some(timestamp) => writeln!(&mut self.result, " {} {}", value, timestamp),
         };
     }
 
@@ -358,7 +358,7 @@ impl MetricCollector for TimeSeries {
 
     fn emit_value(
         &mut self,
-        timestamp_millis: i64,
+        timestamp_millis: Option<i64>,
         name: &str,
         suffix: &str,
         value: f64,
@@ -370,7 +370,7 @@ impl MetricCollector for TimeSeries {
             .or_default()
             .push(proto::Sample {
                 value,
-                timestamp: timestamp_millis,
+                timestamp: timestamp_millis.unwrap_or(0),
             });
     }
 
