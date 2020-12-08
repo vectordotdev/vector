@@ -197,6 +197,7 @@ scopes:
   - pulsar sink # Anything `pulsar` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
   - sematext_metrics sink # Anything `sematext_metrics` sink related
+  - signalfx_metrics sink # Anything `signalfx_metrics` sink related
   - socket sink # Anything `socket` sink related
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
