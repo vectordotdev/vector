@@ -37,6 +37,7 @@ components: sources: mongodb_metrics: {
 			}
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	support: {

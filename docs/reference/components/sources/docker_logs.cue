@@ -78,6 +78,7 @@ components: sources: docker_logs: {
 			}
 		}
 		multiline: enabled: true
+		encoding: enabled:  false
 	}
 
 	support: {

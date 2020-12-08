@@ -13,6 +13,7 @@ components: sources: generator: {
 
 	features: {
 		multiline: enabled: false
+		encoding: enabled:  false
 		generate: {}
 	}
 

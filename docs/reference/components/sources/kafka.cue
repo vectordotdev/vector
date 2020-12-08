@@ -19,6 +19,7 @@ components: sources: kafka: {
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	classes: {

@@ -13,6 +13,7 @@ components: sources: stdin: {
 
 	features: {
 		multiline: enabled: false
+		encoding: enabled:  false
 		receive: {
 			from: {
 				service: {

@@ -62,6 +62,7 @@ components: sources: [Name=string]: {
 
 		if sources[Name].features.encoding.enabled {
 			encoding: {
+				common:      false
 				description: "Configures the encoding specific source behavior."
 				required:    false
 				type: object: options: {

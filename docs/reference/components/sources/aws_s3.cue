@@ -6,6 +6,9 @@ components: sources: aws_s3: components._aws & {
 
 	features: {
 		multiline: enabled: true
+
+		encoding: enabled: false
+
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false

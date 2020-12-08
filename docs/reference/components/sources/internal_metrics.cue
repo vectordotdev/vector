@@ -23,6 +23,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	support: {

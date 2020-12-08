@@ -23,6 +23,7 @@ components: sources: host_metrics: {
 			}
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	support: {

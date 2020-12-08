@@ -30,6 +30,7 @@ components: sources: journald: {
 			}
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	support: {

@@ -43,6 +43,7 @@ components: sources: prometheus_scrape: {
 			}
 		}
 		multiline: enabled: false
+		encoding: enabled:  false
 	}
 
 	support: {
