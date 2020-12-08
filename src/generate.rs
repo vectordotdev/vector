@@ -371,8 +371,6 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use tempfile::tempdir;
-
     #[test]
     fn generate_all() {
         let mut errors = Vec::new();
@@ -414,6 +412,8 @@ mod tests {
     ))]
     #[test]
     fn generate_configfile() {
+        use tempfile::tempdir;
+
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
         let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
