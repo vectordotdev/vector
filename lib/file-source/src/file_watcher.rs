@@ -340,5 +340,24 @@ mod test {
         assert_eq!(pos, 46);
         assert_eq!(p, None);
         assert_eq!(&*v, [0; 0]);
+
+        let mut buf =
+            Cursor::new(&b"short\r\nthis is too long\r\nexact size\r\n11 eleven11\r\n"[..]);
+        let mut pos = 0;
+        let mut v = BytesMut::new();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
+        assert_eq!(pos, 7);
+        assert_eq!(p, Some(7));
+        assert_eq!(&*v, b"short");
+        v.truncate(0);
+        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
+        assert_eq!(pos, 37);
+        assert_eq!(p, Some(30));
+        assert_eq!(&*v, b"exact size");
+        v.truncate(0);
+        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
+        assert_eq!(pos, 50);
+        assert_eq!(p, None);
+        assert_eq!(&*v, [0; 0]);
     }
 }
