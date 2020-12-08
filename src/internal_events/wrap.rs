@@ -136,11 +136,11 @@ mod tests {
 
     #[test]
     fn wrapped() {
-        assert!(wrap(|| is_wrapped()));
+        assert!(!is_wrapped() && wrap(is_wrapped) && !is_wrapped());
     }
 
     #[test]
     fn multi_wrap() {
-        assert!(wrap(|| is_wrapped() && wrap(|| is_wrapped())));
+        assert!(wrap(|| is_wrapped() && wrap(is_wrapped) && is_wrapped()));
     }
 }
