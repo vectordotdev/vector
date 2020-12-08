@@ -124,3 +124,23 @@ impl<S: Stream> Stream for StreamEmitWrapper<S> {
         wrap(|| self.0.poll())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unwrapped() {
+        assert!(!is_wrapped());
+    }
+
+    #[test]
+    fn wrapped() {
+        assert!(wrap(|| is_wrapped()));
+    }
+
+    #[test]
+    fn multi_wrap() {
+        assert!(wrap(|| is_wrapped() && wrap(|| is_wrapped())));
+    }
+}
