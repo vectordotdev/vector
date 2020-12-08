@@ -292,7 +292,7 @@ mod integration_tests {
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -337,7 +337,7 @@ mod integration_tests {
         encoding.timestamp_format = Some(TimestampFormat::Unix);
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             encoding,
@@ -458,7 +458,7 @@ timestamp_format = "unix""#,
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -511,7 +511,7 @@ timestamp_format = "unix""#,
         let host = String::from("http://localhost:8124");
 
         let config = ClickhouseConfig {
-            endpoint: host,
+            endpoint: host.parse().unwrap(),
             table: gen_table(),
             batch: BatchConfig {
                 max_events: Some(1),
