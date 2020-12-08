@@ -3,7 +3,6 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
-use std::iter::FromIterator;
 
 pub mod discriminant;
 pub mod merge;
@@ -421,86 +420,6 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
-    }
-}
-
-impl remap::Object for Event {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
-        if path.is_root() {
-            let iter = self
-                .as_log()
-                .as_map()
-                .clone()
-                .into_iter()
-                .map(|(k, v)| (k, v.into()));
-
-            return Ok(Some(remap::Value::from_iter(iter)));
-        }
-
-        let value = path
-            .to_alternative_strings()
-            .iter()
-            .find_map(|key| self.as_log().get(key))
-            .cloned()
-            .map(Into::into);
-
-        Ok(value)
-    }
-
-    fn remove(&mut self, path: &remap::Path, compact: bool) -> Result<(), String> {
-        if path.is_root() {
-            for key in self.as_log().keys().collect::<Vec<_>>() {
-                self.as_mut_log().remove_prune(key, compact);
-            }
-
-            return Ok(());
-        };
-
-        // loop until we find a path that exists.
-        for key in path.to_alternative_strings() {
-            if !self.as_log().contains(&key) {
-                continue;
-            }
-
-            self.as_mut_log().remove_prune(&key, compact);
-            break;
-        }
-
-        Ok(())
-    }
-
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
-        if path.is_root() {
-            match value {
-                remap::Value::Map(map) => {
-                    *self = map
-                        .into_iter()
-                        .map(|(k, v)| (k, v.into()))
-                        .collect::<BTreeMap<_, _>>()
-                        .into();
-
-                    return Ok(());
-                }
-                _ => return Err("tried to assign non-map value to event root path".to_owned()),
-            }
-        }
-
-        if let Some(path) = path.to_alternative_strings().first() {
-            self.as_mut_log().insert(path, value);
-        }
-
-        Ok(())
-    }
-
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        if self.as_log().is_empty() {
-            return Ok(vec![remap::Path::root()]);
-        }
-
-        self.as_log()
-            .keys()
-            .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
-            .collect::<Result<Vec<_>, String>>()
     }
 }
 

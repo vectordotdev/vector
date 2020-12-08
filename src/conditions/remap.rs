@@ -68,7 +68,7 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        Runtime::default().execute(&mut event.clone(), &self.program)
+        Runtime::default().execute(&mut event.as_log().clone(), &self.program)
     }
 }
 

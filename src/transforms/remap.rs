@@ -72,7 +72,7 @@ impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let mut runtime = Runtime::default();
 
-        if let Err(error) = runtime.execute(&mut event, &self.program) {
+        if let Err(error) = runtime.execute(event.as_mut_log(), &self.program) {
             emit!(RemapMappingError {
                 error: error.to_string(),
                 event_dropped: self.drop_on_err,
