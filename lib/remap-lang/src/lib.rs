@@ -277,6 +277,7 @@ mod tests {
                 Ok(()),
                 Ok(map!["result": map!["foo": true, "bar": 5, "baz": "qux"]].into()),
             ),
+            ("{}", Ok(()), Ok(map![].into())),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
