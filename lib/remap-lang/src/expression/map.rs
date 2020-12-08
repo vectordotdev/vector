@@ -1,7 +1,8 @@
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 use std::collections::BTreeMap;
+use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Map {
     expressions: BTreeMap<String, Expr>,
 }
@@ -9,6 +10,42 @@ pub struct Map {
 impl Map {
     pub fn new(expressions: BTreeMap<String, Expr>) -> Self {
         Self { expressions }
+    }
+
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
+}
+
+impl fmt::Debug for Map {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expressions.fmt(f)
+    }
+}
+
+impl From<Map> for BTreeMap<String, Expr> {
+    fn from(map: Map) -> Self {
+        map.expressions
+    }
+}
+
+impl<T: Into<Value>> From<BTreeMap<String, T>> for Map {
+    fn from(values: BTreeMap<String, T>) -> Self {
+        Self::new(
+            values
+                .into_iter()
+                .map(|(k, v)| (k, Expr::from(v)))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+}
+
+impl IntoIterator for Map {
+    type Item = (String, Expr);
+    type IntoIter = std::collections::btree_map::IntoIter<String, Expr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.expressions.into_iter()
     }
 }
 

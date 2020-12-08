@@ -5,7 +5,7 @@ pub use crate::{expression, function, state, value};
 pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
 // commonly used expressions
-pub use crate::expression::{Array, Literal, Noop, Path, Variable};
+pub use crate::expression::{Array, Literal, Map, Noop, Path, Variable};
 
 // commonly used function types
 pub use crate::function::{ArgumentList, Parameter};

@@ -278,6 +278,18 @@ mod tests {
                 Ok(map!["result": map!["foo": true, "bar": 5, "baz": "qux"]].into()),
             ),
             ("{}", Ok(()), Ok(map![].into())),
+            (
+                r#"map_printer({"a": "foo", "b": /bar/, "c": 5, "d": ["baz", 4.2], "e": true, "f": /qu+x/})"#,
+                Ok(()),
+                Ok(map![
+                    "a": r#"Bytes(b"foo")"#,
+                    "b": r#"Regex(bar)"#,
+                    "c": r#"Integer(5)"#,
+                    "d": r#"[Bytes(b"baz"), Float(4.2)]"#,
+                    "e": r#"Boolean(true)"#,
+                    "f": r#"Regex(qu+x)"#,
+                ].into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -288,6 +300,7 @@ mod tests {
                     Box::new(test_functions::EnumValidator),
                     Box::new(test_functions::EnumListValidator),
                     Box::new(test_functions::ArrayPrinter),
+                    Box::new(test_functions::MapPrinter),
                 ],
                 None,
             );
@@ -328,7 +341,9 @@ mod tests {
 
     mod test_functions {
         use super::*;
-        use crate::expression::Array;
+        use crate::expression::{Array, Map};
+        use std::collections::BTreeMap;
+        use std::convert::TryFrom;
 
         #[derive(Debug, Clone)]
         pub(super) struct EnumValidator;
@@ -431,6 +446,43 @@ mod tests {
                     .into_iter()
                     .map(|v| format!("{:?}", v))
                     .collect::<Vec<_>>()
+                    .into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct MapPrinter;
+        impl Function for MapPrinter {
+            fn identifier(&self) -> &'static str {
+                "map_printer"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(MapPrinterFn(arguments.required("value")?)))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct MapPrinterFn(Expr);
+        impl Expression for MapPrinterFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(Map::try_from(self.0.clone())
+                    .unwrap()
+                    .into_iter()
+                    .map(|(k, v)| (k, format!("{:?}", v).into()))
+                    .collect::<BTreeMap<_, _>>()
                     .into())
             }
 
