@@ -342,10 +342,7 @@ impl<'a> Parser<'a> {
     /// Parse a [`Value`] into a [`Literal`] expression.
     fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         Ok(match pair.as_rule() {
-            R::string => {
-                let string = pair.into_inner().next().ok_or(e(R::string))?;
-                Literal::from(self.escaped_string_from_pair(string)?).into()
-            }
+            R::string => self.string_from_pair(pair)?.into(),
             R::null => Literal::from(Value::Null).into(),
             R::boolean => Literal::from(pair.as_str() == "true").into(),
             R::integer => {
@@ -513,10 +510,7 @@ impl<'a> Parser<'a> {
         let field = pair.into_inner().next().ok_or(e(Rule::path_field))?;
 
         match field.as_rule() {
-            R::string => {
-                let string = field.into_inner().next().ok_or(e(R::string))?;
-                Ok(path::Field::Quoted(self.escaped_string_from_pair(string)?))
-            }
+            R::string => Ok(path::Field::Quoted(self.string_from_pair(field)?)),
             R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
             _ => Err(e(R::path_field)),
         }
