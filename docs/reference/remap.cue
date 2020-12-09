@@ -54,7 +54,7 @@ remap: {
 			category:    "coerce" | "numeric" | "object" | "parse" | "text" | "hash" | "event" | "networking"
 			description: string
 			examples: [#RemapExample, ...#RemapExample]
-			name: Name
+			name:   Name
 			status: #Status
 		}
 	}
