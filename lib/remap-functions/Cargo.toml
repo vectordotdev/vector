@@ -57,6 +57,7 @@ default = [
     "merge",
     "now",
     "ok",
+    "ok_or",
     "only_fields",
     "parse_duration",
     "parse_grok",
@@ -109,6 +110,7 @@ md5 = ["md-5", "hex"]
 merge = []
 now = []
 ok = []
+ok_or = []
 only_fields = []
 parse_duration = []
 parse_grok = ["grok"]
