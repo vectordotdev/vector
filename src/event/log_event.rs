@@ -1,4 +1,5 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
+use remap::{object::Error as RemapError, Object, Path};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -243,8 +244,8 @@ impl Serialize for LogEvent {
     }
 }
 
-impl remap::Object for LogEvent {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+impl Object for LogEvent {
+    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, RemapError> {
         if path.is_root() {
             let iter = self
                 .as_map()
@@ -265,7 +266,7 @@ impl remap::Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &remap::Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), RemapError> {
         if path.is_root() {
             for key in self.keys().collect::<Vec<_>>() {
                 self.remove_prune(key, compact);
@@ -287,7 +288,7 @@ impl remap::Object for LogEvent {
         Ok(())
     }
 
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), RemapError> {
         if path.is_root() {
             match value {
                 remap::Value::Map(map) => {
@@ -299,7 +300,11 @@ impl remap::Object for LogEvent {
 
                     return Ok(());
                 }
-                _ => return Err("tried to assign non-map value to event root path".to_owned()),
+                _ => {
+                    return Err(RemapError::Other(
+                        "tried to assign non-map value to event root path".to_owned(),
+                    ))
+                }
             }
         }
 
@@ -310,14 +315,17 @@ impl remap::Object for LogEvent {
         Ok(())
     }
 
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
+    fn paths(&self) -> Result<Vec<remap::Path>, RemapError> {
         if self.is_empty() {
             return Ok(vec![remap::Path::root()]);
         }
 
         self.keys()
-            .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
-            .collect::<Result<Vec<_>, String>>()
+            .map(|key| {
+                remap::Path::from_alternative_string(key)
+                    .map_err(|err| RemapError::Other(err.to_string()))
+            })
+            .collect::<Result<Vec<_>, RemapError>>()
     }
 }
 
@@ -579,10 +587,7 @@ mod test {
             let value: remap::Value = value;
             let path = Path::new_unchecked(segments);
 
-            assert_eq!(
-                Object::insert(&mut event, &path, value.clone()),
-                result
-            );
+            assert_eq!(Object::insert(&mut event, &path, value.clone()), result);
             assert_eq!(event, expect);
             assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
         }

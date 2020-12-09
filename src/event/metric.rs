@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use remap::{Object, Path, Segment};
+use remap::{object::Error as RemapError, Object, Path, Segment};
 use serde::{Deserialize, Serialize};
-use std::{collections::{BTreeMap, BTreeSet}, str::FromStr};
 use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    str::FromStr,
+};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
@@ -261,12 +264,9 @@ impl Metric {
 
     /// Sets or updates the string value of a tag
     pub fn set_tag_value(&mut self, name: String, value: String) {
-        if self.tags.is_none() {
-            let map = BTreeMap::new();
-            self.tags = Some(map);
-        }
-
-        self.tags.as_mut().and_then(|tags| tags.insert(name, value));
+        self.tags
+            .get_or_insert_with(BTreeMap::new)
+            .insert(name, value);
     }
 
     /// Deletes the tag, if it exists.
@@ -377,38 +377,48 @@ impl Display for Metric {
 }
 
 impl Object for Metric {
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), RemapError> {
         if path.is_root() {
-            return Err("cannot set root path for a metric event".into());
+            return Err(RemapError::SetRoot);
         }
 
         match path.segments() {
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
-                let value = value.as_bytes().ok_or("value must be a string")?;
+                let value = value
+                    .try_bytes()
+                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
                 self.set_tag_value(
                     field.as_str().to_owned(),
-                    String::from_utf8_lossy(value).into_owned(),
+                    String::from_utf8_lossy(&value).into_owned(),
                 );
                 Ok(())
             }
             [Segment::Field(name)] if name.as_str() == "name" => {
-                let value = value.as_bytes().ok_or("value must be a string")?;
-                self.name = String::from_utf8_lossy(value).into_owned();
+                let value = value
+                    .try_bytes()
+                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
+                self.name = String::from_utf8_lossy(&value).into_owned();
                 Ok(())
             }
             [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
-                let value = value.as_bytes().ok_or("value must be a string")?;
-                self.namespace = Some(String::from_utf8_lossy(value).into_owned());
+                let value = value
+                    .try_bytes()
+                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
+                self.namespace = Some(String::from_utf8_lossy(&value).into_owned());
                 Ok(())
             }
             [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
-                let value = value.as_timestamp().ok_or("value must be a timestamp")?;
-                self.timestamp = Some(value.clone());
+                let value = value
+                    .try_timestamp()
+                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
+                self.timestamp = Some(value);
                 Ok(())
             }
             [Segment::Field(kind)] if kind.as_str() == "kind" => {
-                let value = value.as_bytes().ok_or("value must be a string")?;
-                match String::from_utf8_lossy(value).as_ref() {
+                let value = value
+                    .try_bytes()
+                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
+                match String::from_utf8_lossy(&value).as_ref() {
                     "absolute" => {
                         self.kind = MetricKind::Absolute;
                         Ok(())
@@ -417,17 +427,28 @@ impl Object for Metric {
                         self.kind = MetricKind::Incremental;
                         Ok(())
                     }
-                    _ => Err("metric kind must be `absolute` or `incremental`".into()),
+                    _ => Err(RemapError::Other(
+                        "metric kind must be `absolute` or `incremental`".into(),
+                    )),
                 }
             }
-            _ => Err("invalid path".into()),
+            _ => Err(RemapError::InvalidPath(
+                format!("{}", path),
+                remap::object::ValidPaths(vec![
+                    ".name",
+                    ".namespace",
+                    ".timestamp",
+                    ".kind",
+                    ".tags",
+                ]),
+            )),
         }
     }
 
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, RemapError> {
         // TODO construct a map of the whole metric.
         if path.is_root() {
-            return Err("cannot set root path for a metric event".into());
+            return Err(RemapError::SetRoot);
         }
 
         match path.segments() {
@@ -448,20 +469,29 @@ impl Object for Metric {
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
-            _ => Err("invalid path".into()),
+            _ => Err(RemapError::InvalidPath(
+                format!("{}", path),
+                remap::object::ValidPaths(vec![
+                    ".name",
+                    ".namespace",
+                    ".timestamp",
+                    ".kind",
+                    ".tags",
+                ]),
+            )),
         }
     }
 
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
+    fn paths(&self) -> Result<Vec<remap::Path>, RemapError> {
         Ok(["name", "namespace", "timestamp", "tags"]
             .iter()
             .map(|path| Path::from_str(path).expect("invalid path"))
             .collect())
     }
 
-    fn remove(&mut self, path: &remap::Path, _compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &remap::Path, _compact: bool) -> Result<(), RemapError> {
         if path.is_root() {
-            return Err("cannot set root path for a metric event".into());
+            return Err(RemapError::SetRoot);
         }
 
         match path.segments() {
@@ -477,7 +507,16 @@ impl Object for Metric {
                 self.delete_tag(field.as_str());
                 Ok(())
             }
-            _ => Err("invalid path".into()),
+            _ => Err(RemapError::InvalidPath(
+                format!("{}", path),
+                remap::object::ValidPaths(vec![
+                    ".name",
+                    ".namespace",
+                    ".timestamp",
+                    ".kind",
+                    ".tags",
+                ]),
+            )),
         }
     }
 }
@@ -847,7 +886,7 @@ mod test {
             (
                 "timestamp",
                 None,
-                Utc.ymd(2020, 12, 08).and_hms(12, 0, 0).into(),
+                Utc.ymd(2020, 12, 8).and_hms(12, 0, 0).into(),
                 true,
             ),
             (
@@ -884,23 +923,29 @@ mod test {
             value: MetricValue::Counter { value: 1.23 },
         };
 
+        let validpaths =
+            remap::object::ValidPaths(vec![".name", ".namespace", ".timestamp", ".kind", ".tags"]);
+
         assert_eq!(
-            Err("invalid path".into()),
+            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
             metric.get(&Path::from_str("zork").unwrap())
         );
 
         assert_eq!(
-            Err("invalid path".into()),
+            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
             metric.insert(&Path::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
-            Err("invalid path".into()),
+            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
             metric.remove(&Path::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
-            Err("invalid path".into()),
+            Err(RemapError::InvalidPath(
+                ".tags.foo.flork".into(),
+                validpaths
+            )),
             metric.get(&Path::from_str("tags.foo.flork").unwrap())
         );
     }

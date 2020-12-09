@@ -1,20 +1,20 @@
-use crate::{Object, Path, Value};
+use crate::{object::Error, Object, Path, Value};
 
 impl Object for Value {
-    fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
+    fn insert(&mut self, path: &Path, value: Value) -> Result<(), Error> {
         self.insert_by_path(path, value);
         Ok(())
     }
 
-    fn get(&self, path: &Path) -> Result<Option<Value>, String> {
+    fn get(&self, path: &Path) -> Result<Option<Value>, Error> {
         Ok(self.get_by_path(path).cloned())
     }
 
-    fn paths(&self) -> Result<Vec<Path>, String> {
-        self.paths().map_err(|err| err.to_string())
+    fn paths(&self) -> Result<Vec<Path>, Error> {
+        self.paths().map_err(|err| Error::Other(err.to_string()))
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), Error> {
         self.remove_by_path(path, compact);
         Ok(())
     }

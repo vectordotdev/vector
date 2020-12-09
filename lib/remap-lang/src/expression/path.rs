@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{path, state, Expression, Object, Result, TypeDef, Value};
+use crate::{path, state, object, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -8,7 +8,7 @@ pub enum Error {
     Missing(String),
 
     #[error("unable to resolve path: {0}")]
-    Resolve(String),
+    Resolve(object::Error),
 }
 
 #[derive(Debug, Clone, PartialEq)]
