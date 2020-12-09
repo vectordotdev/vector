@@ -992,7 +992,7 @@ package: build ## Build the Vector archive
 package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
 
 .PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl package-rpm-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
+package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl package-rpm-x86_64-unknown-linux-musl package-deb-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
