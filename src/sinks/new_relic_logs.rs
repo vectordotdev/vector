@@ -1,10 +1,9 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::EncodingConfigWithDefault, BatchConfig, Compression, Concurrency,
-            TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, TowerRequestConfig,
         },
     },
 };
@@ -38,17 +37,12 @@ pub enum NewRelicLogsRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
-#[derivative(Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -62,13 +56,15 @@ inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
 }
 
-impl_generate_config_from_default!(NewRelicLogsConfig);
+impl GenerateConfig for NewRelicLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self::with_encoding(Encoding::Json)).unwrap()
+    }
+}
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Json,
 }
 
@@ -101,6 +97,18 @@ impl SinkConfig for NewRelicLogsConfig {
 }
 
 impl NewRelicLogsConfig {
+    fn with_encoding(encoding: Encoding) -> Self {
+        Self {
+            license_key: None,
+            insert_key: None,
+            region: None,
+            encoding: encoding.into(),
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+        }
+    }
+
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
 
@@ -143,7 +151,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: Some(headers),
             compression: self.compression,
-            encoding: self.encoding.clone().without_default(),
+            encoding: self.encoding.clone().into_encoding(),
 
             batch,
             request,
@@ -178,7 +186,9 @@ mod tests {
         assert_eq!(
             format!(
                 "{}",
-                NewRelicLogsConfig::default().create_config().unwrap_err()
+                NewRelicLogsConfig::with_encoding(Encoding::Json)
+                    .create_config()
+                    .unwrap_err()
             ),
             "Missing authentication key, must provide either 'license_key' or 'insert_key'"
                 .to_owned(),
@@ -187,7 +197,7 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_defaults() {
-        let mut nr_config = NewRelicLogsConfig::default();
+        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
         nr_config.license_key = Some("foo".to_owned());
         let http_config = nr_config.create_config().unwrap();
 
@@ -210,7 +220,7 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_custom() {
-        let mut nr_config = NewRelicLogsConfig::default();
+        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
         nr_config.batch.max_size = Some(MAX_PAYLOAD_SIZE);
@@ -293,7 +303,7 @@ mod tests {
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
-        let mut nr_config = NewRelicLogsConfig::default();
+        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
         nr_config.license_key = Some("foo".to_owned());
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
