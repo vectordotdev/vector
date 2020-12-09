@@ -47,8 +47,9 @@ be filed as issues, once development is a bit further along.
 > The CLI is running in REPL (Read-eval-print loop) mode.
 >
 > Type `help` to learn more.
-> Type `next` to load the next object (if any).
-> Type `exit` to terminate the program.
+>      `next` to load the next object (if any).
+>      `prev` to load the previous object (if any).
+>      `exit` to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
 >
@@ -63,8 +64,14 @@ $ .foo
 $ next
 { "foo": 42 }
 
-$ .foo
-42
+$ .foo = 3.14159
+3.14159
+
+$ next
+null
+
+$ prev
+{ "foo": 3.14159 }
 
 $ exit
 ```
