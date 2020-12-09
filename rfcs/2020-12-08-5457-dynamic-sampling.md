@@ -171,6 +171,9 @@ If no fallthrough behavior is specified, I propose `keep` as the default behavio
 unbucketed events by default is more likely to produce unexpected data loss for users (which is here
 presumed to be a worse outcome than e.g. cost overruns).
 
+Please note that there is a related discussion in issue [4644]. Changes to Vector made in response
+to that discussion may change the recommendation here.
+
 ### Dynamic buckets
 
 With named buckets you can dictate precisely which buckets you want in advance. There are cases,
@@ -341,6 +344,7 @@ important.
 
 TBD
 
+[4644]: https://github.com/timberio/vector/issues/4644
 [arc]: https://vector.dev/blog/adaptive-request-concurrency
 [crates]: https://crates.io
 [exclude]: https://vector.dev/docs/reference/transforms/sampler/#exclude
