@@ -97,6 +97,7 @@ impl Display for LookupBuf {
                     Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
+                SegmentBuf::Coalesce(_) => unimplemented!(),
             }
             next = peeker.next();
             maybe_next = peeker.peek();

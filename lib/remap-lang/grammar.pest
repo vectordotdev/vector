@@ -95,18 +95,11 @@ WHITESPACE  = _{ " " | "\t" }
 // Lookups -----------------------------------------------------------------------
 // Used by `src/event/lookup.rs`.
 // Changing this will have far reaching impacts on Vector's core event API.
-//
-// The notable difference between a `lookup`, and a `path` above, are:
-//
-// * the lookup is used in the serialization/serialization path of some components.
-// * the lookup  has certain rules which would be unsafe in the greater remap language,
-//   but allow the internal API to be slightly more permissive on input data.
-//
-// `lookup`s do not support coalescing: it is not safe to support.
 lookup         = ${ (lookup_segment) ~ (LOOKUP_PERIOD ~ (lookup_segment))* }
-lookup_segment = ${ (lookup_field | lookup_field_quoted) ~ lookup_array* }
-lookup_field   = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"")+ }
-lookup_field_quoted = ${ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
+lookup_segment = ${ ((lookup_field | lookup_field_quoted) ~ lookup_array*) | lookup_coalesce }
+lookup_coalesce = !{ "(" ~ lookup_segment ~ ("|" ~ lookup_segment)+ ~ ")" }
+lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"")+ }
+lookup_field_quoted = @{ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
 lookup_field_quoted_content  = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | " " | "." | "\\\"")+ }
 lookup_array = @{ LOOKUP_OPEN_BRACKET ~ lookup_array_index ~ LOOKUP_CLOSE_BRACKET }
 lookup_array_index =  ${ ASCII_DIGIT+ }

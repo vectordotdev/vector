@@ -32,6 +32,7 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
+            Segment::Coalesce(_) => unimplemented!(),
             Segment::Field { name, requires_quoting: _ } => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
@@ -58,6 +59,7 @@ impl LogEvent {
                 break;
             }
             cursor = match (segment, cursor) {
+                (Segment::Coalesce(_), _) => unimplemented!(),
                 // Fields access maps.
                 (Segment::Field { ref name, requires_quoting: _ }, Some(Value::Map(map))) => {
                     trace!(key = ?name, "Descending into map.");
@@ -93,6 +95,7 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
+            Segment::Coalesce(v) => unimplemented!(),
             Segment::Field { name, requires_quoting: _ } => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
@@ -110,7 +113,7 @@ impl LogEvent {
                         Please report your config."
                 );
                 return None;
-            }
+            },
         };
 
         for (_index, segment) in lookup_iter {
@@ -119,6 +122,7 @@ impl LogEvent {
                 break;
             }
             cursor = match (segment, cursor) {
+                (Segment::Coalesce(v), _) => unimplemented!(),
                 // Fields access maps.
                 (Segment::Field { name, requires_quoting: _ }, Some(Value::Map(map))) => {
                     trace!(key = ?name, "Descending into map.");
@@ -133,7 +137,7 @@ impl LogEvent {
                 (Segment::Index(_), _) | (Segment::Field  { name: _, requires_quoting: _ }, _) => {
                     trace!("Unmatched lookup.");
                     None
-                }
+                },
             }
         }
 
@@ -162,6 +166,7 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
+            SegmentBuf::Coalesce(v) => unimplemented!(),
             SegmentBuf::Field { name, requires_quoting: _ } => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
@@ -182,13 +187,14 @@ impl LogEvent {
                         Please report your config."
                 );
                 return None;
-            }
+            },
         };
 
         let retval = None;
 
         for (lookup_index, segment) in lookup_iter {
             cursor = match (segment.clone(), cursor) {
+                (SegmentBuf::Coalesce(v), _) => unimplemented!(),
                 // Fields access maps.
                 (SegmentBuf::Field { ref name, requires_quoting: _ }, &mut Value::Map(ref mut map)) => {
                     if lookup_index == lookup_len.saturating_sub(1) {
@@ -318,6 +324,7 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
+            Segment::Coalesce(v) => unimplemented!(),
             Segment::Field { name, requires_quoting: _ } => {
                 if lookup_len == 1 {
                     trace!(key = ?name, "Removed from root.");
@@ -341,6 +348,7 @@ impl LogEvent {
         let mut needs_prune = None;
         for (index, segment) in lookup_iter {
             cursor = match (segment, cursor) {
+                (Segment::Coalesce(v), _) => unimplemented!(),
                 // Fields access maps.
                 (Segment::Field { name, requires_quoting: _ }, Some(Value::Map(map))) => {
                     if index == lookup_len.saturating_sub(1) {
@@ -379,7 +387,7 @@ impl LogEvent {
                 (Segment::Index(_), _) | (Segment::Field { name: _, requires_quoting: _ }, _) => {
                     trace!("Unmatched lookup.");
                     None
-                }
+                },
             }
         }
 

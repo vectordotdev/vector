@@ -14,6 +14,7 @@ pub enum SegmentBuf {
         requires_quoting: bool
     },
     Index(usize),
+    Coalesce(Vec<Self>),
 }
 
 impl SegmentBuf {
@@ -33,11 +34,21 @@ impl SegmentBuf {
         matches!(self, SegmentBuf::Index(_))
     }
 
+    pub const fn coalesce(v: Vec<Self>) -> SegmentBuf {
+        SegmentBuf::Coalesce(v)
+    }
+
+    pub fn is_coalesce(&self) -> bool {
+        matches!(self, SegmentBuf::Coalesce(_))
+    }
+
+
     #[instrument]
     pub(crate) fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
             SegmentBuf::Field { name, requires_quoting} => Segment::field(name.as_str(), *requires_quoting),
             SegmentBuf::Index(i) => Segment::index(*i),
+            SegmentBuf::Coalesce(v) => Segment::coalesce(v.iter().map(|v| v.as_segment()).collect()),
         }
     }
 }
@@ -48,6 +59,7 @@ impl Display for SegmentBuf {
             SegmentBuf::Index(i) => write!(formatter, "{}", i),
             SegmentBuf::Field { name, requires_quoting: false } => write!(formatter, "{}", name),
             SegmentBuf::Field { name, requires_quoting: true } => write!(formatter, "\"{}\"", name),
+            SegmentBuf::Coalesce(v) => write!(formatter, "{}", v.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" | ")),
         }
     }
 }
@@ -67,8 +79,14 @@ impl From<String> for SegmentBuf {
 }
 
 impl From<usize> for SegmentBuf {
-    fn from(u: usize) -> Self {
-        Self::index(u)
+    fn from(value: usize) -> Self {
+        Self::index(value)
+    }
+}
+
+impl From<Vec<SegmentBuf>> for SegmentBuf {
+    fn from(value: Vec<SegmentBuf>) -> Self {
+        Self::coalesce(value)
     }
 }
 

@@ -78,6 +78,10 @@ impl<'a> Display for Lookup<'a> {
                     Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
+                Segment::Coalesce(_) => match maybe_next {
+                    Some(next) if next.is_field() => write!(f, r#"({})."#, segment)?,
+                    None | Some(_) => write!(f, "{}", segment)?,
+                },
             }
             next = peeker.next();
             maybe_next = peeker.peek();

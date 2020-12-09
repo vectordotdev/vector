@@ -104,6 +104,18 @@ fn fields_with_quotes() {
 }
 
 #[test]
+fn coalesced() {
+    crate::test_util::trace_init();
+    let input = "plain.(option_one | option_two)";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::from(String::from("plain")));
+    assert_eq!(lookup[1], Segment::from(vec![
+        Segment::from("option_one"),
+        Segment::from("option_two"),
+    ]));
+}
+
+#[test]
 fn to_string() {
     crate::test_util::trace_init();
     let input = SUFFICIENTLY_COMPLEX;

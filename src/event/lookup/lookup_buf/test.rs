@@ -54,6 +54,18 @@ fn quoted() {
 }
 
 #[test]
+fn coalesced() {
+    crate::test_util::trace_init();
+    let input = "plain.(option_one | option_two)";
+    let lookup = LookupBuf::from_str(input).unwrap();
+    assert_eq!(lookup[0], SegmentBuf::from(String::from("plain")));
+    assert_eq!(lookup[1], SegmentBuf::from(vec![
+        SegmentBuf::from("option_one".to_string()),
+        SegmentBuf::from("option_two".to_string())
+    ]));
+}
+
+#[test]
 fn push() {
     crate::test_util::trace_init();
     let input = "some_key";
