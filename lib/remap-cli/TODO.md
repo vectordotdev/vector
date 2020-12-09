@@ -37,9 +37,9 @@ be filed as issues, once development is a bit further along.
 - program state is kept for the duration of CLI execution
 - this means variable state is available between expression evaluations
 
-**example**
+### example
 
-```
+```text
 '{ "foo": "bar" }\n{ "foo": 42 }' | trl
 
 > Welcome to TRL: Timber Remap Language
