@@ -27,7 +27,7 @@ pub mod journald;
 pub mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub mod kubernetes_logs;
-#[cfg(feature = "sources-logplex")]
+#[cfg(feature = "sources-heroku-logs")]
 pub mod logplex;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
