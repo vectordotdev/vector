@@ -1,4 +1,4 @@
-# RFC 5448 - <2020-12-08> - Dynamic sampling in the `sampler` transform
+# RFC 5457 - <2020-12-08> - Dynamic sampling in the `sampler` transform
 
 The addition of **dynamic sampling** capabilities (**DS** henceforth) to Vector would enable us to
 cover a much broader range of sampling use cases than we currently can. A qualitatively better
