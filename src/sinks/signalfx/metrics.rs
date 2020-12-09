@@ -217,7 +217,7 @@ impl SinkConfig for SignalFxConfig {
         };
 
         let sink = BatchedHttpSink::new(sink, MetricBuffer::new(), request, batch, None, &cx)
-            .sink_map_err(|e| error!("Fatal SignalFx error: {}", e));
+            .sink_map_err(|e| error!("Fatal SignalFx error: {}.", e));
 
         Ok((Box::new(sink), healthcheck))
     }
