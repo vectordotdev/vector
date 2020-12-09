@@ -1,3 +1,4 @@
+#[cfg(features = "sources-generator")]
 pub mod fake;
 #[cfg(feature = "sources-utils-http")]
 mod http;
