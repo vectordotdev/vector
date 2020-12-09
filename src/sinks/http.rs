@@ -120,13 +120,20 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
+        let healthcheck = match self.healthcheck_uri.clone() {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
+
         let mut config = self.clone();
-        Auth::merge_auth_config(&mut config.auth, &config.uri.auth)?;
+        config.auth = Auth::merge_auth_config(&config.auth, &config.uri.auth)?;
         config.uri.uri = build_uri(&config.uri.uri);
+        validate_headers(&config.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -139,20 +146,14 @@ impl SinkConfig for HttpSinkConfig {
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
-            client.clone(),
+            client,
             cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
         let sink = super::VectorSink::Sink(Box::new(sink));
 
-        match self.healthcheck_uri.clone() {
-            Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client).boxed();
-                Ok((sink, healthcheck))
-            }
-            None => Ok((sink, future::ok(()).boxed())),
-        }
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -260,12 +261,8 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-async fn healthcheck(
-    uri: UriSerde,
-    mut auth: Option<Auth>,
-    client: HttpClient,
-) -> crate::Result<()> {
-    Auth::merge_auth_config(&mut auth, &uri.auth)?;
+async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
+    let auth = Auth::merge_auth_config(&auth, &uri.auth)?;
     let uri = build_uri(&uri.uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 

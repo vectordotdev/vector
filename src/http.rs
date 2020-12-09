@@ -191,13 +191,15 @@ pub enum Auth {
 }
 
 impl Auth {
-    /// If both is `Some`, return an error. Otherwise, choose one of them and store in `auth`.
-    pub fn merge_auth_config(auth: &mut Option<Auth>, auth1: &Option<Auth>) -> crate::Result<()> {
+    /// If both is `Some`, return an error. Otherwise, return one of them.
+    pub fn merge_auth_config(
+        auth: &Option<Auth>,
+        auth1: &Option<Auth>,
+    ) -> crate::Result<Option<Auth>> {
         if auth.is_some() && auth1.is_some() {
             Err("Two authorization credentials was provided.".into())
         } else {
-            *auth = auth.take().or_else(|| auth1.clone());
-            Ok(())
+            Ok(auth.clone().take().or_else(|| auth1.clone()))
         }
     }
 
@@ -229,7 +231,6 @@ impl Auth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use http::HeaderMap;
 
     #[test]
     fn test_default_request_headers_defaults() {

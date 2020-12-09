@@ -77,7 +77,7 @@ impl SinkConfig for ClickhouseConfig {
         let client = HttpClient::new(tls_settings)?;
 
         let mut config = self.clone();
-        Auth::merge_auth_config(&mut config.auth, &self.endpoint.auth)?;
+        config.auth = Auth::merge_auth_config(&config.auth, &self.endpoint.auth)?;
 
         let sink = BatchedHttpSink::with_retry_logic(
             config.clone(),

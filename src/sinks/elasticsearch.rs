@@ -354,7 +354,7 @@ impl ElasticSearchCommon {
             _ => None,
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
-        Auth::merge_auth_config(&mut authorization, &uri.auth)?;
+        authorization = Auth::merge_auth_config(&authorization, &uri.auth)?;
         let base_url = uri.uri.to_string();
 
         let region = match &config.aws {

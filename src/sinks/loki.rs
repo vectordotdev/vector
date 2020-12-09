@@ -101,7 +101,7 @@ impl SinkConfig for LokiConfig {
         let client = HttpClient::new(tls)?;
 
         let mut config = self.clone();
-        Auth::merge_auth_config(&mut config.auth, &config.endpoint.auth)?;
+        config.auth = Auth::merge_auth_config(&config.auth, &config.endpoint.auth)?;
 
         let sink = PartitionHttpSink::new(
             config.clone(),
