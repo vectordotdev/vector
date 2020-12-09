@@ -4,6 +4,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
+use std::collections::HashMap;
 use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
@@ -126,7 +127,7 @@ async fn validate_components(
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff).await {
+    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -157,7 +158,7 @@ async fn validate_healthchecks(
         };
 
         match tokio::spawn(healthcheck).await {
-            Ok(Ok(())) => {
+            Ok(Ok(_)) => {
                 if config
                     .sinks
                     .get(&name)
