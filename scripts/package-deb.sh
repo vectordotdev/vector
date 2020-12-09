@@ -86,11 +86,9 @@ for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//_/-}
   if [ "${TYPE}" = 'musl' ]; then
-    n2base=${nbase//amd64.deb/musl-amd64.deb}
-    mv "${file}" target/"${TARGET}"/debian/"${n2base}";
-  else
-    mv "${file}" target/"${TARGET}"/debian/"${nbase}";
+    nbase=${nbase//amd64.deb/musl-amd64.deb}
   fi
+    mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 
 #
