@@ -15,10 +15,12 @@ parameters and the introduction of the **bucket** concept to Vector.
 The purpose of the RFC is to achieve consensus around a set of desired features. Thus, the RFC does
 *not* cover:
 
-* Any Vector internals that would affect other components, e.g. the processing pipeline or configuration system
+* Any Vector internals that would affect other components, e.g. the processing pipeline or
+  configuration system
 * Implementation details on the Rust side
 * Finalized names for configuration parameters
-* The specifics of sampling algorithms; consensus around that should be deferred to the development process or another RFC
+* The specifics of sampling algorithms; consensus around that should be deferred to the development
+  process or another RFC
 
 ### Domains
 
@@ -48,9 +50,10 @@ know about your systems).
 Some common rules of thumb for sampling:
 
 * Frequent events should be sampled more heavily than rare events
-* Success events (e.g. `200 OK`) should be sampled more heavily than error events (e.g. `400 Bad Request`)
-* Events closer to business logic (e.g. paying customer transactions) should be sampled less heavily than
-  events related to general system behavior
+* Success events (e.g. `200 OK`) should be sampled more heavily than error events (e.g. `400 Bad
+  Request`)
+* Events closer to business logic (e.g. paying customer transactions) should be sampled less heavily
+  than events related to general system behavior
 
 Correspondingly, any robust sampling system should provide the ability to:
 
@@ -105,17 +108,19 @@ properties within a single configuration block.
 
 ## Internal Proposal
 
-I propose one major change to the `sampler` transform: the ability to create and configure
-[named buckets](#named-buckets) and [dynamic buckets](#dynamic-buckets). Named buckets are created
-using Remap conditions while dynamic buckets are created via configuration. Both named and dynamic
-buckets can then be assigned [behavior](#bucket-behavior) that suits specific use cases.
+I propose two major change to the `sampler` transform:
 
-I will also propose changes to the [metric output](#metrics) of the `sampler` transform.
+1. User should be able to create [named](#named-buckets) and [dynamic](#dynamic-buckets) sampling
+    buckets. Named buckets are to be created using Remap conditions, dynamic buckets via
+    configuration.
+2. Users should be able to assign [sampling behavior](#sampling-behavior) to event buckets.
+
+I propose related changes to the [metric output](#metrics) of the transform.
 
 ### Named buckets
 
-Named buckets are created when a user specifies a Remap condition for inclusion in that bucket. The
-proposed `sampler` would enable you to do this:
+Named buckets are defined using Remap conditions. All events that match the condition are placed
+in the bucket when processed. Here's an example configuration with two named buckets:
 
 ```toml
 [transforms.sample_customer_data]
@@ -132,9 +137,10 @@ condition = """
 .status == 500 && .user.plan == "deluxe" && len(.shopping_cart.items) > 10
 """
 rate = 1
-
-# Other buckets
 ```
+
+Named buckets are useful because they enable you to route events using arbitrarily complex criteria.
+Any Remap expression that returns a Boolean can be used as a condition.
 
 #### Order of application
 
@@ -144,7 +150,7 @@ in the first bucket whose condition it matches; when a match occurs, condition c
 
 This raises the question of fallthrough behavior, i.e. what happens if an event doesn't meet any
 condition and thus doesn't fall into a named bucket. I propose a component-level `fallthrough`
-configuration parameter with two possible values:
+parameter with two possible values:
 
 * `drop` means that unbucketed events are sampled at a rate of 1 and thus disappear from the stream
 * `keep` means that unbucketed events aren't sampled
@@ -190,11 +196,11 @@ With this configuration...
 key_fields = ["username", "status"]
 ```
 
-...these two events would end up in the same bucket:
+...these two events would end up in the same bucket...
 
 ```json
 {
-  "status": 500,
+  "status": 200,
   "username": "hoverbear",
   "action": "purchase",
   "transaction": {
@@ -202,16 +208,16 @@ key_fields = ["username", "status"]
   }
 }
 {
-  "status": 500,
+  "status": 200,
   "username": "hoverbear",
   "action": "delete_account",
   "transaction": {
-    "id": "4d3c2b1a"
+    "id": "z9y8x7"
   }
 }
 ```
 
-...whereas these two would end up in different buckets:
+...whereas these two would end up in different buckets despite the `username` matching:
 
 ```json
 {
@@ -236,18 +242,19 @@ key_fields = ["username", "status"]
 
 Dynamic buckets bear the risk of a species of high cardinality problem. If you specify, say, 4
 fields for `key_combination` and each of those fields can have many different values, you may end up
-with performance degradation. Controlling bucket explosion via setting a hard limit, however, bears
-the downside that it's not clear which bucketing strategy should take over if too many buckets are
-being created. Thus, for a first iteration I propose adding [metrics](#metrics) to the `sampler`
-transform that would enable users to keep track of bucket creation behavior to inform their
-decisions but not to provide an explicit lever.
+with many, many buckets and thereby high memory usage, performance degradation, etc. Controlling
+bucket explosion via setting a hard limit, however, bears the downside that it's not clear which
+bucketing strategy should take over if too many buckets are being created. Thus, for a first
+iteration I propose adding [metrics](#metrics) to the `sampler` transform that would enable users to
+keep track of bucket creation behavior to inform their decisions but not providing an explicit
+lever.
 
 #### Named + dynamic?
 
 It's not inconceivable that named and dynamic buckets could coexist for the same event stream. It's
 not clear, however, that this behavior serves any particular use case, and thus I propose initially
 allowing for either named or dynamic buckets but not both. If users need to apply both approaches
-to an event stream, they should use swimlanes to split the stream and apply two separate `sampler`s.
+to an event stream, they should use swimlanes to split the stream and apply separate `sampler`s.
 
 ### Exclusion
 
@@ -258,30 +265,41 @@ to specifiy criteria via `check_fields` *or Remap* (only `check_fields` is curre
 ### Bucket behavior
 
 With events separated into buckets you can begin specifying *how* events in those buckets are
-sampled. The sections below list proposed per-bucket parameters. All of these parameters can apply
-to named or dynamic buckets. For dynamic buckets, the parameters would be set at the transform
-level and apply to all created buckets.
+sampled. The sections below propose per-bucket parameters. All of these parameters can apply to
+named *or* dynamic buckets. For named buckets, these parameters are set with the bucket definition;
+for dynamic buckets, the parameters would be set at the transform level and apply to all created
+buckets.
 
 #### `rate`
 
-The sampling rate for the bucket. If only this parameter is specified, the bucket is constantly
-sampled.
+The base sampling rate for the bucket. If only this parameter is specified, the bucket is constantly
+sampled at a rate of 1/N.
 
 #### `sensitivity`
 
-If this parameter is specified, that means that dynamic sampling is applied to the bucket. It
-determines how Vector adjusts the sample rate, using `rate` as the baseline, in light of changes in
-event frequency. A sensitivity close to 0 would mean only small adjustments whereas a sensitivity
-close to 1 would mean much more dramatic adjustments.
+If this parameter is specified, that means that a dynamic sampling algorithm is applied to the
+bucket. This determines how Vector adjusts the sample rate, using `rate` as the baseline, in light
+of changes in event frequency. A sensitivity close to 0 would mean only small adjustments whereas a
+sensitivity close to 1 would mean more dramatic adjustments.
 
 > [Adaptive Request Concurrency][arc]'s `decrease_ratio` parameter serves as a rough analogy.
+
+The parameters below only make sense if `sensitivity` is defined.
+
+#### `max_rate` / `min_rate`
+
+Optional parameters to keep the sample rate within hard limits.
+
+#### `min_event_threshold`
+
+The minimum number of events needed, within the time window, to begin adjusting the sample rate.
+Below this threshold, `rate` applies. Defaults to 0, meaning no threshold.
 
 #### `window_secs`
 
 This specifies the length of the time window, in seconds, during which the sampling rate is
-calculated.
-
-This parameter only makes sense if dynamic sampling is used.
+calculated. No dynamic rate can be calculated without a window. I propose 15 seconds as a default
+but this can be determined during the development process.
 
 ### Metrics
 
@@ -312,31 +330,20 @@ libraries.
 
 On the development side, providing more robust dynamic sampling would be far less trivial than e.g.
 adding a new sink for a messaging service provided by `$CLOUD_PLATFORM` or a new Remap function, but
-potentially less labor intensive than e.g. Adaptive Request Concurrency.
+likely less labor intensive than e.g. the Adaptive Request Concurrency feature.
 
-On the user side, the drawbacks would be largely cognitive. Dynamic sampling concepts are less
-intuitive than others in the observability realm. This is an area where good documentation and a
-careful approach to terminology and developer experience would be extremely important.
+On the user side, the drawbacks would be largely cognitive. Concepts like bucketing and dynamic
+sampling behavior are less intuitive than others in the observability realm. This is an area where
+good documentation and a careful approach to terminology and developer experience would be extremely
+important.
 
 ## Plan Of Attack
 
 TBD
 
-### Misc
-
-The examples given thus far have involved a pre-defined set of buckets, e.g. splitting HTTP server
-logs into three buckets, `success`, `error`, and `failure`, based on the response code. But there
-are sampling use cases for which you can't know in advance which buckets need to be created. You may
-want to sample based on a [combination of keys][honeycomb_pdf] across a time window. In that case,
-you may be interested in two different keys: customer plan and transaction ID. If two events have
-the same value for both keys, i.e. both have `enterprise` as the customer plan and `a1b2c3d4` as the
-transaction ID, they belong in the same bucket. Every time a new customer plan/transaction ID
-combination arises in the stream, a new bucket needs to be created.
-
 [arc]: https://vector.dev/blog/adaptive-request-concurrency
 [crates]: https://crates.io
 [exclude]: https://vector.dev/docs/reference/transforms/sampler/#exclude
-[honeycomb_pdf]: https://www.honeycomb.io/wp-content/uploads/2019/05/the_new_rules_of_sampling_-_typeset_final.pdf
 [key_field]: https://vector.dev/docs/reference/transforms/sampler/#key_field
 [rate]: https://vector.dev/docs/reference/transforms/sampler/#rate
 [sampler]: https://vector.dev/docs/reference/transforms/sampler
