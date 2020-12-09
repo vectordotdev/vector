@@ -47,6 +47,7 @@ remap: {
 				source: string
 				output: #Fields
 			}
+			#Status: *"stable" | "experimental"
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
@@ -54,6 +55,7 @@ remap: {
 			description: string
 			examples: [#RemapExample, ...#RemapExample]
 			name: Name
+			status: #Status
 		}
 	}
 
