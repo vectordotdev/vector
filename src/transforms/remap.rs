@@ -30,11 +30,11 @@ impl TransformConfig for RemapConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn transform_type(&self) -> &'static str {
@@ -71,8 +71,12 @@ impl Remap {
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let mut runtime = Runtime::default();
+        let result = match event {
+            Event::Log(ref mut event) => runtime.execute(event, &self.program),
+            Event::Metric(ref mut event) => runtime.execute(event, &self.program),
+        };
 
-        if let Err(error) = runtime.execute(event.as_mut_log(), &self.program) {
+        if let Err(error) = result {
             emit!(RemapMappingError {
                 error: error.to_string(),
                 event_dropped: self.drop_on_err,
@@ -90,6 +94,11 @@ impl FunctionTransform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        Metric,
+    };
+    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
@@ -124,5 +133,44 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
+    }
+
+    #[test]
+    fn check_remap_metric() {
+        let metric = Event::Metric(Metric {
+            name: "counter".into(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.0 },
+        });
+
+        let conf = RemapConfig {
+            source: r#".tags.host = "zoobub"
+                       .name = "zork"
+                       .namespace = "zerk"
+                       .kind = "incremental""#
+                .to_string(),
+            drop_on_err: true,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let result = tform.transform_one(metric).unwrap();
+        assert_eq!(
+            result,
+            Event::Metric(Metric {
+                name: "zork".into(),
+                namespace: Some("zerk".into()),
+                timestamp: None,
+                tags: Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("host".into(), "zoobub".into());
+                    tags
+                }),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.0 },
+            })
+        );
     }
 }
