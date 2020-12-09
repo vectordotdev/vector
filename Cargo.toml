@@ -442,6 +442,7 @@ sinks = [
   "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext",
+  "sinks-signalfx",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
@@ -473,6 +474,7 @@ sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = ["snap"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
+sinks-signalfx = []
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
