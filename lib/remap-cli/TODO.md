@@ -61,7 +61,7 @@ $ .foo
 "bar"
 
 $ next
-{ "foo": true }
+{ "foo": 42 }
 
 $ .foo
 42
