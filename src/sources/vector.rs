@@ -4,6 +4,7 @@ use crate::{
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
@@ -16,6 +17,7 @@ use tokio_util::codec::LengthDelimitedCodec;
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     pub address: SocketListenAddr,
+    pub keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     tls: Option<TlsConfig>,
@@ -27,9 +29,14 @@ fn default_shutdown_timeout_secs() -> u64 {
 
 #[cfg(test)]
 impl VectorConfig {
-    pub fn new(address: SocketListenAddr, tls: Option<TlsConfig>) -> Self {
+    pub fn new(
+        address: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
+        tls: Option<TlsConfig>,
+    ) -> Self {
         Self {
             address,
+            keepalive,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls,
         }
@@ -44,6 +51,7 @@ impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:9000".parse().unwrap()),
+            keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
         })
@@ -63,7 +71,14 @@ impl SourceConfig for VectorConfig {
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        vector.run(self.address, self.shutdown_timeout_secs, tls, shutdown, out)
+        vector.run(
+            self.address,
+            self.keepalive,
+            self.shutdown_timeout_secs,
+            tls,
+            shutdown,
+            out,
+        )
     }
 
     fn output_type(&self) -> DataType {
@@ -180,9 +195,10 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(addr.into(), None),
+            VectorConfig::new(addr.into(), None, None),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
+                keepalive: None,
                 tls: None,
             },
         )
@@ -194,9 +210,10 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(addr.into(), Some(TlsConfig::test_config())),
+            VectorConfig::new(addr.into(), None, Some(TlsConfig::test_config())),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
+                keepalive: None,
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {

@@ -2,13 +2,13 @@
 pub use crate::{expression, function, state, value};
 
 // commonly used top-level crate types
-pub use crate::{Error, Expression, Function, Object, Result, TypeDef, Value};
+pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
 // commonly used expressions
-pub use crate::expression::{Literal, Noop, Path, Variable};
+pub use crate::expression::{Array, Literal, Noop, Path, Variable};
 
 // commonly used function types
-pub use crate::function::{Argument, ArgumentList, Parameter};
+pub use crate::function::{ArgumentList, Parameter};
 
 // commonly used macros
 pub use crate::generate_param_list;

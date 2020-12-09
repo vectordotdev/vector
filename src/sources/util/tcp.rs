@@ -2,6 +2,7 @@ use crate::{
     config::Resource,
     internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
 };
@@ -63,6 +64,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     fn run(
         self,
         addr: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
@@ -137,7 +139,9 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             let open_token =
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
-                            let fut = handle_stream(shutdown, socket, source, tripwire, host, out);
+                            let fut = handle_stream(
+                                shutdown, socket, keepalive, source, tripwire, host, out,
+                            );
                             tokio::spawn(
                                 fut.map(move |()| drop(open_token)).instrument(span.clone()),
                             );
@@ -153,6 +157,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 async fn handle_stream(
     mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
+    keepalive: Option<TcpKeepaliveConfig>,
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
@@ -169,6 +174,12 @@ async fn handle_stream(
             return;
         }
     };
+
+    if let Some(keepalive) = keepalive {
+        if let Err(error) = socket.set_keepalive(keepalive) {
+            warn!(message = "Failed configuring TCP keepalive.", %error);
+        }
+    }
 
     let mut _token = None;
     let mut shutdown = Some(shutdown);

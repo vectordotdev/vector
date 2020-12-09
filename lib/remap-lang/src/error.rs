@@ -1,11 +1,15 @@
-use crate::{expression, function, parser::Rule, program, value};
+use crate::{
+    expression, function,
+    parser::{self, Rule},
+    path, program, value,
+};
 use std::error::Error as StdError;
 use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("parser error: {0}")]
-    Parser(String),
+    #[error("parser error")]
+    Parser(#[from] parser::Error),
 
     #[error("program error")]
     Program(#[from] program::Error),
@@ -19,9 +23,6 @@ pub enum Error {
     #[error("function error")]
     Function(#[from] function::Error),
 
-    #[error("regex error")]
-    Regex(#[from] regex::Error),
-
     #[error("value error")]
     Value(#[from] value::Error),
 
@@ -30,6 +31,9 @@ pub enum Error {
 
     #[error("assertion failed: {0}")]
     Assert(String),
+
+    #[error("path error")]
+    Path(#[from] path::Error),
 
     #[error("unknown error")]
     Unknown,
@@ -67,6 +71,7 @@ impl fmt::Display for Rule {
             addition,
             argument,
             arguments,
+            array,
             assignment,
             block,
             boolean,
@@ -96,14 +101,17 @@ impl fmt::Display for Rule {
             path_field,
             path_index,
             path_index_inner,
-            path_root,
             path_segment,
+            path_segments,
             primary,
             program,
             regex,
             regex_char,
             regex_flags,
             regex_inner,
+            rule_ident,
+            rule_path,
+            rule_string_inner,
             string,
             string_inner,
             target,
@@ -115,7 +123,7 @@ impl fmt::Display for Rule {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RemapError(pub(crate) Error);
+pub struct RemapError(Error);
 
 impl StdError for RemapError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
