@@ -26,7 +26,7 @@ pub struct GeneratorConfig {
 
 #[derive(Debug, PartialEq, Snafu)]
 pub enum GeneratorConfigError {
-    #[snafu(display("Expected a non-empty items list for round_robin but got an empty list"))]
+    #[snafu(display("Expected a non-empty list of lines for round_robin but got an empty list"))]
     RoundRobinItemsEmpty,
 }
 
@@ -38,8 +38,7 @@ pub enum OutputFormat {
     RoundRobin {
         #[serde(default)]
         sequence: bool,
-        #[serde(alias = "lines")]
-        items: Vec<String>,
+        lines: Vec<String>,
     },
     ApacheCommon,
     ApacheError,
@@ -56,17 +55,17 @@ impl OutputFormat {
         match self {
             Self::RoundRobin {
                 sequence,
-                ref items,
-            } => Self::round_robin_generate(sequence, items, n),
+                ref lines,
+            } => Self::round_robin_generate(sequence, lines, n),
             Self::ApacheCommon => events_from_log_line(apache_common_log_line()),
             Self::ApacheError => events_from_log_line(apache_error_log_line()),
             Self::Syslog => events_from_log_line(syslog_5424_log_line()),
         }
     }
 
-    fn round_robin_generate(sequence: &bool, items: &[String], n: usize) -> Vec<Event> {
-        // unwrap can be called here because items cannot be empty
-        let line: String = items.choose(&mut rand::thread_rng()).unwrap().into();
+    fn round_robin_generate(sequence: &bool, lines: &[String], n: usize) -> Vec<Event> {
+        // unwrap can be called here because lines cannot be empty
+        let line: String = lines.choose(&mut rand::thread_rng()).unwrap().into();
 
         let event = if *sequence {
             Event::from(&format!("{} {}", n, line)[..])
@@ -77,11 +76,11 @@ impl OutputFormat {
         vec![event]
     }
 
-    // Ensures that the items list is non-empty if RoundRobin is chosen
+    // Ensures that the lines list is non-empty if RoundRobin is chosen
     pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
         match self {
-            Self::RoundRobin { items, .. } => {
-                if items.is_empty() {
+            Self::RoundRobin { lines, .. } => {
+                if lines.is_empty() {
                     Err(GeneratorConfigError::RoundRobinItemsEmpty)
                 } else {
                     Ok(())
@@ -98,12 +97,12 @@ impl GeneratorConfig {
     }
 
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(items: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
         Self {
             count,
             batch_interval,
             format: OutputFormat::RoundRobin {
-                items,
+                lines,
                 sequence: false,
             },
         }
@@ -190,13 +189,13 @@ mod tests {
     }
 
     #[test]
-    fn config_round_robin_items_not_empty() {
-        let empty_items: Vec<String> = Vec::new();
+    fn config_round_robin_lines_not_empty() {
+        let empty_lines: Vec<String> = Vec::new();
 
         let errant_config = GeneratorConfig {
             format: OutputFormat::RoundRobin {
                 sequence: false,
-                items: empty_items,
+                lines: empty_lines,
             },
             ..GeneratorConfig::default()
         };
@@ -212,7 +211,7 @@ mod tests {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "round_robin"
-               items = ["one", "two", "three", "four"]
+               lines = ["one", "two", "three", "four"]
                count = 5"#,
         )
         .await;
@@ -239,7 +238,7 @@ mod tests {
     async fn round_robin_limits_count() {
         let mut rx = runit(
             r#"format = "round_robin"
-               items = ["one", "two"]
+               lines = ["one", "two"]
                count = 5"#,
         )
         .await;
@@ -255,7 +254,7 @@ mod tests {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "round_robin"
-               items = ["one", "two"]
+               lines = ["one", "two"]
                sequence = true
                count = 5"#,
         )
@@ -281,7 +280,7 @@ mod tests {
         let start = Instant::now();
         let mut rx = runit(
             r#"format = "round_robin"
-               items = ["one", "two"]
+               lines = ["one", "two"]
                count = 3
                batch_interval = 1.0"#,
         )
