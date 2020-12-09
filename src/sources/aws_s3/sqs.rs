@@ -368,8 +368,7 @@ impl Ingestor {
                         for (key, value) in metadata {
                             // If the input key happens to be an invalid lookup somehow, still try to insert it plainly.
                             log.insert(
-                                LookupBuf::from_str(key)
-                                    .unwrap_or_else(|_| LookupBuf::from(key.clone())),
+                                LookupBuf::from(key.clone()),
                                 value.clone(),
                             );
                         }

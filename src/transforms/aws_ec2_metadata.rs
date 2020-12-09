@@ -192,7 +192,7 @@ impl Ec2MetadataTransform {
             read_ref.into_iter().for_each(|(k, v)| {
                 if let Some(value) = v.get_one() {
                     log.insert(
-                        LookupBuf::from_str(k).unwrap_or_else(|_| LookupBuf::from(k.clone())),
+                        LookupBuf::from(k.clone()),
                         value.clone(),
                     );
                 }
@@ -556,43 +556,43 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get(Lookup::from_str("availability-zone").unwrap()),
+            log.get(Lookup::from("availability-zone")),
             Some(&"ww-region-1a".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("public-ipv4").unwrap()),
+            log.get(Lookup::from("public-ipv4")),
             Some(&"192.1.1.1".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("public-hostname").unwrap()),
+            log.get(Lookup::from("public-hostname")),
             Some(&"mock-public-hostname".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("local-ipv4").unwrap()),
+            log.get(Lookup::from("local-ipv4")),
             Some(&"192.1.1.2".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("local-hostname").unwrap()),
+            log.get(Lookup::from("local-hostname")),
             Some(&"mock-hostname".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("instance-id").unwrap()),
+            log.get(Lookup::from("instance-id")),
             Some(&"i-096fba6d03d36d262".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("ami-id").unwrap()),
+            log.get(Lookup::from("ami-id")),
             Some(&"ami-05f27d4d6770a43d2".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("instance-type").unwrap()),
+            log.get(Lookup::from("instance-type")),
             Some(&"t2.micro".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("region").unwrap()),
+            log.get(Lookup::from("region")),
             Some(&"us-east-1".into())
         );
         assert_eq!(
-            log.get(Lookup::from_str("vpc-id").unwrap()),
+            log.get(Lookup::from("vpc-id")),
             Some(&"mock-vpc-id".into())
         );
         assert_eq!(

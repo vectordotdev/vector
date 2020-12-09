@@ -154,7 +154,7 @@ mod tests {
 
         let new_event = augment.transform_one(event).unwrap();
 
-        let key = LookupBuf::from_str("some_key").unwrap();
+        let key = LookupBuf::from("some_key");
         let kv = new_event.as_log().get(&key);
 
         let val = "some_val".to_string();
@@ -170,7 +170,7 @@ mod tests {
 
         let new_event = augment.transform_one(event).unwrap();
 
-        let key = LookupBuf::from_str("some_key").unwrap();
+        let key = LookupBuf::from("some_key");
         let kv = new_event.as_log().get(&key);
 
         let val = "augment me augment me".to_string();

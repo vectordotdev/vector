@@ -101,7 +101,7 @@ impl ReduceState {
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<LookupBuf, MergeStrategy>) {
         for (k, v) in e.into_iter() {
-            let k_lookup = LookupBuf::from_str(&k).unwrap_or_else(|_| LookupBuf::from(k));
+            let k_lookup = LookupBuf::from(k);
             let strategy = strategies.get(&k_lookup);
             match self.fields.entry(k_lookup) {
                 hash_map::Entry::Vacant(entry) => {

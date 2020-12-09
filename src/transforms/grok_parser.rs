@@ -115,7 +115,7 @@ impl FunctionTransform for GrokParser {
                 for (name, value) in matches.iter() {
                     let conv = self
                         .types
-                        .get(&LookupBuf::from_str(name).unwrap_or_else(|_| LookupBuf::from(name)))
+                        .get(&LookupBuf::from(name))
                         .unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.to_string().into()) {
                         Ok(value) => {

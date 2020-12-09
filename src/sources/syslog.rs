@@ -427,8 +427,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     }
 
     for element in parsed.structured_data.into_iter() {
-        let element_lookup =
-            LookupBuf::from_str(element.id).unwrap_or_else(|_| LookupBuf::from(element.id));
+        let element_lookup = LookupBuf::from(element.id);
         for (name, value) in element.params.into_iter() {
             let mut key_lookup = element_lookup.clone();
             key_lookup.push(SegmentBuf::from(name.to_string()));
