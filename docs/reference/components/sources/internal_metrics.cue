@@ -521,7 +521,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		timestamp_parse_errors_total: {
-			description:       "The total number of errors encountered parsing [RFC3339](\(urls.rfc_3339)) timestamps."
+			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

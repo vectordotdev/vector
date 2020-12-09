@@ -86,11 +86,7 @@ where
     ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
         let _enter = self.span.enter();
 
-        if !request.headers().contains_key("User-Agent") {
-            request
-                .headers_mut()
-                .insert("User-Agent", self.user_agent.clone());
-        }
+        default_request_headers(&mut request, &self.user_agent);
 
         emit!(http_client::AboutToSendHTTPRequest { request: &request });
 
@@ -130,6 +126,22 @@ where
         .instrument(self.span.clone());
 
         Box::pin(fut)
+    }
+}
+
+fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
+    if !request.headers().contains_key("User-Agent") {
+        request
+            .headers_mut()
+            .insert("User-Agent", user_agent.clone());
+    }
+
+    if !request.headers().contains_key("Accept-Encoding") {
+        // hardcoding until we support compressed responses:
+        // https://github.com/timberio/vector/issues/5440
+        request
+            .headers_mut()
+            .insert("Accept-Encoding", HeaderValue::from_static("identity"));
     }
 }
 
@@ -211,5 +223,41 @@ impl Auth {
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http::HeaderMap;
+
+    #[test]
+    fn test_default_request_headers_defaults() {
+        let user_agent = HeaderValue::from_static("vector");
+        let mut request = Request::post("http://example.com").body(()).unwrap();
+        default_request_headers(&mut request, &user_agent);
+        assert_eq!(
+            request.headers().get("Accept-Encoding"),
+            Some(&HeaderValue::from_static("identity")),
+        );
+        assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
+    }
+
+    #[test]
+    fn test_default_request_headers_does_not_overwrite() {
+        let mut request = Request::post("http://example.com")
+            .header("Accept-Encoding", "gzip")
+            .header("User-Agent", "foo")
+            .body(())
+            .unwrap();
+        default_request_headers(&mut request, &HeaderValue::from_static("vector"));
+        assert_eq!(
+            request.headers().get("Accept-Encoding"),
+            Some(&HeaderValue::from_static("gzip")),
+        );
+        assert_eq!(
+            request.headers().get("User-Agent"),
+            Some(&HeaderValue::from_static("foo"))
+        );
     }
 }
