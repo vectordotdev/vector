@@ -5,6 +5,7 @@ use crate::{
     config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
 use std::cmp::max;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use futures::{
@@ -149,7 +150,7 @@ impl Application {
                     .expect("Couldn't set schema");
 
                 let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff)
+                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
 
