@@ -118,6 +118,7 @@ mod tests {
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"
+            encoding = "json"
         "#,
         )
         .unwrap();

@@ -121,6 +121,7 @@ mod tests {
             token = "atoken"
             batch.max_events = 1
             endpoint = "https://localhost:9200/"
+            encoding = "json"
             "#,
         )
         .unwrap();
@@ -131,6 +132,7 @@ mod tests {
             token = "atoken"
             batch.max_events = 1
             host = "https://localhost:9200/"
+            encoding = "json"
             "#,
         )
         .unwrap();
@@ -144,6 +146,7 @@ mod tests {
             r#"
             token = "atoken"
             batch.max_events = 1
+            encoding = "json"
             "#,
         )
         .unwrap();

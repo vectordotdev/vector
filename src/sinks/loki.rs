@@ -319,6 +319,7 @@ mod tests {
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
+            encoding = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"
