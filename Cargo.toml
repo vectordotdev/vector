@@ -42,7 +42,8 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/prometheus-parser",
   "lib/vector-api-client",
-  "lib/remap-lang"
+  "lib/remap-lang",
+  "lib/remap-cli",
 ]
 
 [dependencies]
