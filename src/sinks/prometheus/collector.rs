@@ -262,22 +262,7 @@ impl StringCollector {
     }
 
     pub(super) fn encode_header(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        let r#type = match value {
-            MetricValue::Counter { .. } => "counter",
-            MetricValue::Gauge { .. } => "gauge",
-            MetricValue::Distribution {
-                statistic: StatisticKind::Histogram,
-                ..
-            } => "histogram",
-            MetricValue::Distribution {
-                statistic: StatisticKind::Summary,
-                ..
-            } => "summary",
-            MetricValue::Set { .. } => "gauge",
-            MetricValue::AggregatedHistogram { .. } => "histogram",
-            MetricValue::AggregatedSummary { .. } => "summary",
-        };
-
+        let r#type = value.prometheus_metric_type().as_str();
         writeln!(&mut self.result, "# HELP {} {}", fullname, name).ok();
         writeln!(&mut self.result, "# TYPE {} {}", fullname, r#type).ok();
     }
@@ -329,23 +314,8 @@ impl MetricCollector for TimeSeries {
     }
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        use proto::metric_metadata::MetricType;
         if !self.metadata.contains_key(name) {
-            let r#type = match value {
-                MetricValue::Counter { .. } => MetricType::Counter,
-                MetricValue::Gauge { .. } => MetricType::Gauge,
-                MetricValue::Set { .. } => MetricType::Gauge,
-                MetricValue::Distribution {
-                    statistic: StatisticKind::Histogram,
-                    ..
-                } => MetricType::Histogram,
-                MetricValue::Distribution {
-                    statistic: StatisticKind::Summary,
-                    ..
-                } => MetricType::Summary,
-                MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
-                MetricValue::AggregatedSummary { .. } => MetricType::Summary,
-            };
+            let r#type = value.prometheus_metric_type();
             let metadata = proto::MetricMetadata {
                 r#type: r#type as i32,
                 metric_family_name: fullname.into(),
@@ -388,6 +358,26 @@ impl MetricCollector for TimeSeries {
         proto::WriteRequest {
             timeseries,
             metadata,
+        }
+    }
+}
+
+impl MetricValue {
+    fn prometheus_metric_type(&self) -> proto::MetricType {
+        use proto::MetricType;
+        match self {
+            MetricValue::Counter { .. } => MetricType::Counter,
+            MetricValue::Gauge { .. } | MetricValue::Set { .. } => MetricType::Gauge,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Histogram,
+                ..
+            } => MetricType::Histogram,
+            MetricValue::Distribution {
+                statistic: StatisticKind::Summary,
+                ..
+            } => MetricType::Summary,
+            MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
+            MetricValue::AggregatedSummary { .. } => MetricType::Summary,
         }
     }
 }
