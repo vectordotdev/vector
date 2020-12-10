@@ -15,7 +15,6 @@ use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
-    uri::{Authority, PathAndQuery, Scheme},
     Method, Request, StatusCode, Uri,
 };
 use hyper::Body;
@@ -130,9 +129,11 @@ impl SinkConfig for HttpSinkConfig {
             None => future::ok(()).boxed(),
         };
 
-        let mut config = self.clone();
-        config.auth = Auth::merge_auth_config(&config.auth, &config.uri.auth)?;
-        config.uri.uri = build_uri(&config.uri.uri);
+        let config = HttpSinkConfig {
+            auth: Auth::merge_auth_config(&self.auth, &self.uri.auth)?,
+            uri: self.uri.with_default_parts(),
+            ..self.clone()
+        };
         validate_headers(&config.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
@@ -263,8 +264,8 @@ impl HttpSink for HttpSinkConfig {
 
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = Auth::merge_auth_config(&auth, &uri.auth)?;
-    let uri = build_uri(&uri.uri);
-    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
+    let uri = uri.with_default_parts();
+    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -296,20 +297,6 @@ fn validate_headers(
         }
     }
     Ok(())
-}
-
-fn build_uri(base: &Uri) -> Uri {
-    let mut parts = base.clone().into_parts();
-    if parts.scheme.is_none() {
-        parts.scheme = Some(Scheme::HTTP);
-    }
-    if parts.authority.is_none() {
-        parts.authority = Some(Authority::from_static("127.0.0.1"));
-    }
-    if parts.path_and_query.is_none() {
-        parts.path_and_query = Some(PathAndQuery::from_static(""));
-    }
-    Uri::from_parts(parts).unwrap()
 }
 
 #[cfg(test)]

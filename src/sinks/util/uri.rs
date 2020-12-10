@@ -1,5 +1,5 @@
 use crate::http::Auth;
-use http::uri::{Authority, Uri};
+use http::uri::{Authority, PathAndQuery, Scheme, Uri};
 use percent_encoding::percent_decode_str;
 use serde::{
     de::{Error, Visitor},
@@ -16,6 +16,31 @@ pub struct UriSerde {
     pub uri: Uri,
     #[must_use]
     pub auth: Option<Auth>,
+}
+
+impl UriSerde {
+    /// `Uri` supports incomplete URIs such as "/test", "example.com", etc.
+    /// This function fills in empty scheme with HTTP,
+    /// and empty authority with "127.0.0.1".
+    pub fn with_default_parts(&self) -> Self {
+        let mut parts = self.uri.clone().into_parts();
+        if parts.scheme.is_none() {
+            parts.scheme = Some(Scheme::HTTP);
+        }
+        if parts.authority.is_none() {
+            parts.authority = Some(Authority::from_static("127.0.0.1"));
+        }
+        if parts.path_and_query.is_none() {
+            // just an empty `path_and_query`,
+            // but `from_parts` will fail without this.
+            parts.path_and_query = Some(PathAndQuery::from_static(""));
+        }
+        let uri = Uri::from_parts(parts).expect("invalid parts");
+        Self {
+            uri,
+            auth: self.auth.clone(),
+        }
+    }
 }
 
 impl Serialize for UriSerde {
