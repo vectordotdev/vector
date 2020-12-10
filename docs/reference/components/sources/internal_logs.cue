@@ -96,14 +96,14 @@ components: sources: internal_logs: {
 							description: "The path to the internal module where the span occurred"
 							required:    true
 							type: string: {
-								examples: ["internal_logs"]
+								examples: ["vector::internal_events::heartbeat"]
 							}
 						}
 						target: {
 							description: "Describes the part of the system where the span or event that this metadata describes occurred."
 							required:    true
 							type: string: {
-								examples: ["target"]
+								examples: ["vector"]
 							}
 						}
 					}
