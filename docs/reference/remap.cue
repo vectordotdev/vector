@@ -65,7 +65,7 @@ remap: {
 		}
 	}
 
-	// TRL types
+	// TRL type system
 	types: [TypeName=string]: {
 		#Use: "parameter" | "return"
 
@@ -122,11 +122,14 @@ remap: {
 	}
 
 	// TRL syntax
+	#Operators: [_category=string]: [_op=string]: string
+
 	syntax: [RuleName=string]: {
 		name:        RuleName
 		href:        string // Ensures that we don't end up with clashing anchors
 		description: string
 		examples: [string, ...string]
+		operators?: #Operators
 	}
 
 	syntax: {
@@ -158,10 +161,17 @@ remap: {
 		}
 
 		"Functions": {
+			href: "functions"
+
 			description: """
-				In TRL, functions act just like they do in standard programming languages. They can take
-				inputs (or not) and either return values or make an [assertion](#assert) (if the
-				assertion fails, the script stops executing and Vector logs an error).
+				In TRL, functions act just like they do in standard programming languages. They can
+				take inputs (or no input) and either return values or make an assertion using the
+				[`assert`](#assert) function. If an assertion fails, the script stops executing and
+				Vector logs an error.
+
+				TRL types that can serve as inputs to functions are listed in [Parameter
+				types](#parameter-types); types that functions can output are listed in [Return
+				types](#return-types).
 				"""
 
 			examples: [
@@ -169,6 +179,40 @@ remap: {
 				"assert(.status_code == 500)",
 				#"ip_subnet(.address, "255.255.255.0")"#,
 			]
+		}
+
+		"Operators": {
+			href: "operators"
+
+			description: """
+				TRL offers a standard set of operators that should be familiar from many other
+				programming languages.
+				"""
+
+			operators: {
+				"Boolean": {
+					"&&": "And"
+					"||": "Or"
+					"!":  "Not"
+				}
+				"Equality": {
+					"==": "Equals"
+					"!=": "Not equals"
+				}
+				"Comparison": {
+					">":  "Greater than"
+					"<":  "Less than"
+					">=": "Greater than or equal to"
+					"<=": "Less than or equal to"
+				}
+				"Arithmetic": {
+					"+": "Plus"
+					"-": "Minus"
+					"/": "Divide by"
+					"*": "Multiply by"
+					"%": "Modulo"
+				}
+			}
 		}
 	}
 }
