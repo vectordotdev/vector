@@ -58,11 +58,35 @@ fn coalesced() {
     crate::test_util::trace_init();
     let input = "plain.(option_one | option_two)";
     let lookup = LookupBuf::from_str(input).unwrap();
-    assert_eq!(lookup[0], SegmentBuf::from(String::from("plain")));
-    assert_eq!(lookup[1], SegmentBuf::from(vec![
-        SegmentBuf::from("option_one".to_string()),
-        SegmentBuf::from("option_two".to_string())
-    ]));
+    assert_eq!(lookup[0], SegmentBuf::from("plain".to_string()));
+    assert_eq!(
+        lookup[1],
+        SegmentBuf::from(vec![
+            vec![SegmentBuf::from("option_one".to_string())],
+            vec![SegmentBuf::from("option_two".to_string())],
+        ])
+    );
+}
+
+#[test]
+fn coalesced_nesting() {
+    crate::test_util::trace_init();
+    let input = "plain.(option_one.inner | option_two.other_inner)";
+    let lookup = LookupBuf::from_str(input).unwrap();
+    assert_eq!(lookup[0], SegmentBuf::from("plain".to_string()));
+    assert_eq!(
+        lookup[1],
+        SegmentBuf::from(vec![
+            vec![
+                SegmentBuf::from("option_one".to_string()),
+                SegmentBuf::from("inner".to_string())
+            ],
+            vec![
+                SegmentBuf::from("option_two".to_string()),
+                SegmentBuf::from("other_inner".to_string())
+            ],
+        ])
+    );
 }
 
 #[test]

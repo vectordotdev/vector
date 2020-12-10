@@ -1,6 +1,6 @@
 use crate::event::lookup::SegmentBuf;
-use remap::parser::ParserRule;
 use pest::iterators::Pair;
+use remap::parser::ParserRule;
 use std::fmt::{Display, Formatter};
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
@@ -12,10 +12,16 @@ pub enum Segment<'a> {
     Field {
         name: &'a str,
         // This is a very lazy optimization to avoid having to scan for escapes.
-        requires_quoting: bool
+        requires_quoting: bool,
     },
     Index(usize),
-    Coalesce(Vec<Self>),
+    // Coalesces hold multiple segment sets.
+    Coalesce(
+        Vec<
+            // Each of these can be it's own independent lookup.
+            Vec<Self>,
+        >,
+    ),
 }
 
 impl<'a> Segment<'a> {
@@ -38,7 +44,7 @@ impl<'a> Segment<'a> {
         matches!(self, Segment::Index(_))
     }
 
-    pub const fn coalesce(v: Vec<Self>) -> Segment<'a> {
+    pub const fn coalesce(v: Vec<Vec<Self>>) -> Segment<'a> {
         Segment::Coalesce(v)
     }
 
@@ -56,46 +62,12 @@ impl<'a> Segment<'a> {
             match inner_segment.as_rule() {
                 ParserRule::lookup_segment => {
                     segments.append(&mut Segment::from_lookup_segment(inner_segment)?)
-                },
+                }
                 _ => {
                     return Err(format!(
                         "Got invalid lookup rule. Got: {:?}. Want: {:?}",
                         inner_segment.as_rule(),
                         [ParserRule::lookup]
-                    )
-                        .into())
-                }
-            }
-        }
-        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
-        Ok(segments)
-    }
-
-    #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup_segment(segment: Pair<'a, ParserRule>) -> crate::Result<Vec<Segment<'a>>> {
-        let rule = segment.as_rule();
-        let full_segment = segment.as_str();
-        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
-        let mut segments = Vec::default();
-        for inner_segment in segment.into_inner() {
-            match inner_segment.as_rule() {
-                ParserRule::lookup_field => {
-                    segments.push(Segment::from_lookup_field(inner_segment)?)
-                },
-                ParserRule::lookup_field_quoted => {
-                    segments.push(Segment::from_lookup_field_quoted(inner_segment)?)
-                },
-                ParserRule::lookup_array => {
-                    segments.push(Segment::from_lookup_array(inner_segment)?)
-                },
-                ParserRule::lookup_coalesce => {
-                    segments.push(Segment::from_lookup_coalesce(inner_segment)?)
-                },
-                _ => {
-                    return Err(format!(
-                        "Got invalid lookup rule. Got: {:?}. Want: {:?}",
-                        inner_segment.as_rule(),
-                        [ParserRule::lookup_array, ParserRule::lookup_field_quoted, ParserRule::lookup_field, ParserRule::lookup_coalesce],
                     )
                     .into())
                 }
@@ -106,28 +78,69 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup_coalesce(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
+    pub(crate) fn from_lookup_segment(
+        segment: Pair<'a, ParserRule>,
+    ) -> crate::Result<Vec<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
-                ParserRule::lookup_segment => {
-                    segments.extend(Segment::from_lookup_segment(inner_segment)?)
-                },
+                ParserRule::lookup_field => {
+                    segments.push(Segment::from_lookup_field(inner_segment)?)
+                }
+                ParserRule::lookup_field_quoted => {
+                    segments.push(Segment::from_lookup_field_quoted(inner_segment)?)
+                }
+                ParserRule::lookup_array => {
+                    segments.push(Segment::from_lookup_array(inner_segment)?)
+                }
+                ParserRule::lookup_coalesce => {
+                    segments.push(Segment::from_lookup_coalesce(inner_segment)?)
+                }
                 _ => {
                     return Err(format!(
                         "Got invalid lookup rule. Got: {:?}. Want: {:?}",
                         inner_segment.as_rule(),
-                        [ParserRule::lookup_segment],
+                        [
+                            ParserRule::lookup_array,
+                            ParserRule::lookup_field_quoted,
+                            ParserRule::lookup_field,
+                            ParserRule::lookup_coalesce
+                        ],
                     )
-                        .into())
+                    .into())
                 }
             }
         }
         tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
-        Ok(Segment::Coalesce(segments))
+        Ok(segments)
+    }
+
+    #[tracing::instrument(level = "trace", skip(segment))]
+    pub(crate) fn from_lookup_coalesce(
+        segment: Pair<'a, ParserRule>,
+    ) -> crate::Result<Segment<'a>> {
+        let rule = segment.as_rule();
+        let full_segment = segment.as_str();
+        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
+        let mut sub_segments = Vec::default();
+        for inner_segment in segment.into_inner() {
+            match inner_segment.as_rule() {
+                ParserRule::lookup => sub_segments.push(Segment::from_lookup(inner_segment)?),
+                _ => {
+                    return Err(format!(
+                        "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                        inner_segment.as_rule(),
+                        [ParserRule::lookup],
+                    )
+                    .into())
+                }
+            }
+        }
+        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
+        Ok(Segment::Coalesce(sub_segments))
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
@@ -139,7 +152,7 @@ impl<'a> Segment<'a> {
             ParserRule::lookup_field => {
                 tracing::trace!(segment = %segment_str, ?rule, action = %"push");
                 Segment::field(segment_str, false)
-            },
+            }
             _ => Err(format!(
                 "Got invalid lookup rule. Got: {:?}. Want: {:?}",
                 rule,
@@ -151,7 +164,9 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup_field_quoted(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
+    pub(crate) fn from_lookup_field_quoted(
+        segment: Pair<'a, ParserRule>,
+    ) -> crate::Result<Segment<'a>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -163,22 +178,24 @@ impl<'a> Segment<'a> {
                     let segment_str = inner_segment.as_str();
                     tracing::trace!(segment = %segment_str, ?rule, action = %"push");
                     retval = Some(Segment::field(segment_str, true));
-                },
+                }
                 ParserRule::LOOKUP_QUOTE => continue,
                 _ => {
                     return Err(format!(
                         "Got invalid lookup rule. Got: {:?}. Want: {:?}",
                         inner_segment.as_rule(),
-                        [ParserRule::lookup_field_quoted_content, ParserRule::LOOKUP_QUOTE],
+                        [
+                            ParserRule::lookup_field_quoted_content,
+                            ParserRule::LOOKUP_QUOTE
+                        ],
                     )
-                        .into())
+                    .into())
                 }
             }
         }
         tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
         retval.ok_or("Expected inner lookup segment, did not get one.".into())
     }
-
 
     #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_lookup_array(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
@@ -192,7 +209,7 @@ impl<'a> Segment<'a> {
                     debug_assert!(retval.is_none());
                     tracing::trace!(segment = %inner_segment, ?rule, action = %"push");
                     retval = Some(Segment::from_lookup_array_index(inner_segment)?);
-                },
+                }
                 ParserRule::LOOKUP_OPEN_BRACKET | ParserRule::LOOKUP_CLOSE_BRACKET => continue,
                 _ => {
                     return Err(format!(
@@ -200,7 +217,7 @@ impl<'a> Segment<'a> {
                         inner_segment.as_rule(),
                         [ParserRule::lookup_array_index]
                     )
-                        .into())
+                    .into())
                 }
             }
         }
@@ -209,7 +226,9 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup_array_index(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
+    pub(crate) fn from_lookup_array_index(
+        segment: Pair<'a, ParserRule>,
+    ) -> crate::Result<Segment<'a>> {
         let rule = segment.as_rule();
         let segment_str = segment.as_str();
         tracing::trace!(segment = %segment_str, ?rule, action = %"enter");
@@ -229,13 +248,19 @@ impl<'a> Segment<'a> {
         Ok(retval)
     }
 
-
     #[instrument]
     pub(crate) fn as_segment_buf(&self) -> SegmentBuf {
         match self {
-            Segment::Field { name, requires_quoting } => SegmentBuf::field(name.to_string(), *requires_quoting),
+            Segment::Field {
+                name,
+                requires_quoting,
+            } => SegmentBuf::field(name.to_string(), *requires_quoting),
             Segment::Index(i) => SegmentBuf::index(*i),
-            Segment::Coalesce(v) => SegmentBuf::coalesce(v.iter().map(|v| v.as_segment_buf()).collect()),
+            Segment::Coalesce(v) => SegmentBuf::coalesce(
+                v.iter()
+                    .map(|inner| inner.iter().map(|v| v.as_segment_buf()).collect::<Vec<_>>())
+                    .collect(),
+            ),
         }
     }
 }
@@ -244,9 +269,26 @@ impl<'a> Display for Segment<'a> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Segment::Index(i) => write!(formatter, "{}", i),
-            Segment::Field { name, requires_quoting: false } => write!(formatter, "{}", name),
-            Segment::Field { name, requires_quoting: true } => write!(formatter, "\"{}\"", name),
-            Segment::Coalesce(v) => write!(formatter, "{}", v.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" | ")),
+            Segment::Field {
+                name,
+                requires_quoting: false,
+            } => write!(formatter, "{}", name),
+            Segment::Field {
+                name,
+                requires_quoting: true,
+            } => write!(formatter, "\"{}\"", name),
+            Segment::Coalesce(v) => write!(
+                formatter,
+                "{}",
+                v.iter()
+                    .map(|inner| inner
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join("."))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ),
         }
     }
 }
@@ -258,7 +300,10 @@ impl<'a> From<&'a str> for Segment<'a> {
             let len = name.len();
             name = &name[1..len - 1];
         }
-        Self::Field { name, requires_quoting }
+        Self::Field {
+            name,
+            requires_quoting,
+        }
     }
 }
 
@@ -268,8 +313,8 @@ impl<'a> From<usize> for Segment<'a> {
     }
 }
 
-impl<'a> From<Vec<Segment<'a>>> for Segment<'a> {
-    fn from(value: Vec<Segment<'a>>) -> Self {
+impl<'a> From<Vec<Vec<Segment<'a>>>> for Segment<'a> {
+    fn from(value: Vec<Vec<Segment<'a>>>) -> Self {
         Self::coalesce(value)
     }
 }
@@ -277,9 +322,16 @@ impl<'a> From<Vec<Segment<'a>>> for Segment<'a> {
 impl<'a> From<&'a SegmentBuf> for Segment<'a> {
     fn from(v: &'a SegmentBuf) -> Self {
         match v {
-            SegmentBuf::Field { name, requires_quoting } => Self::field(name, *requires_quoting),
+            SegmentBuf::Field {
+                name,
+                requires_quoting,
+            } => Self::field(name, *requires_quoting),
             SegmentBuf::Index(i) => Self::index(*i),
-            SegmentBuf::Coalesce(v) => Self::coalesce(v.iter().map(Into::into).collect()),
+            SegmentBuf::Coalesce(v) => Self::coalesce(
+                v.iter()
+                    .map(|inner| inner.iter().map(Into::into).collect())
+                    .collect(),
+            ),
         }
     }
 }

@@ -24,7 +24,11 @@ pub fn build_unix_datagram_source<D>(
     mut decoder: D,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(LookupBuf, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
+    build_event: impl Fn(LookupBuf, Option<Bytes>, &str) -> Option<Event>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
 ) -> Source
 where
     D: Decoder<Item = String> + Clone + Send + 'static,

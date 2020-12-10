@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
@@ -211,9 +211,7 @@ mod test {
         let event = parser.transform_one(event).unwrap();
 
         assert_eq!(
-            event
-                .as_log()
-                .get(Lookup::from("field.with.dots")),
+            event.as_log().get(Lookup::from("field.with.dots")),
             Some(&crate::event::Value::from("hello")),
         );
         assert_eq!(
@@ -447,14 +445,8 @@ mod test {
             12.34.into()
         );
         assert_eq!(event.as_log()[Lookup::from_str("int").unwrap()], 56.into());
-        assert_eq!(
-            event.as_log()[Lookup::from("bool true")],
-            true.into()
-        );
-        assert_eq!(
-            event.as_log()[Lookup::from("bool false")],
-            false.into()
-        );
+        assert_eq!(event.as_log()[Lookup::from("bool true")], true.into());
+        assert_eq!(event.as_log()[Lookup::from("bool false")], false.into());
         assert_eq!(
             event.as_log()[Lookup::from_str("array[0]").unwrap()],
             "z".into()
@@ -572,7 +564,13 @@ mod test {
             Some(crate::event::Value::Map(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
-        assert_eq!(event[Lookup::from_str("message.greeting").unwrap()], "hello".into());
-        assert_eq!(event[Lookup::from_str("message.name").unwrap()], "bob".into());
+        assert_eq!(
+            event[Lookup::from_str("message.greeting").unwrap()],
+            "hello".into()
+        );
+        assert_eq!(
+            event[Lookup::from_str("message.name").unwrap()],
+            "bob".into()
+        );
     }
 }

@@ -546,9 +546,13 @@ mod integration_tests {
             let event = events.get_mut(i).unwrap();
 
             if i % 2 == 0 {
-                event.as_mut_log().insert(LookupBuf::from("tenant_id"), "tenant1");
+                event
+                    .as_mut_log()
+                    .insert(LookupBuf::from("tenant_id"), "tenant1");
             } else {
-                event.as_mut_log().insert(LookupBuf::from("tenant_id"), "tenant2");
+                event
+                    .as_mut_log()
+                    .insert(LookupBuf::from("tenant_id"), "tenant2");
             }
         }
 

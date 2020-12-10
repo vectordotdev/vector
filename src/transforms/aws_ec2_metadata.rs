@@ -191,10 +191,7 @@ impl Ec2MetadataTransform {
         if let Some(read_ref) = self.state.read() {
             read_ref.into_iter().for_each(|(k, v)| {
                 if let Some(value) = v.get_one() {
-                    log.insert(
-                        LookupBuf::from(k.clone()),
-                        value.clone(),
-                    );
+                    log.insert(LookupBuf::from(k.clone()), value.clone());
                 }
             });
         }
@@ -587,14 +584,8 @@ mod integration_tests {
             log.get(Lookup::from("instance-type")),
             Some(&"t2.micro".into())
         );
-        assert_eq!(
-            log.get(Lookup::from("region")),
-            Some(&"us-east-1".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("vpc-id")),
-            Some(&"mock-vpc-id".into())
-        );
+        assert_eq!(log.get(Lookup::from("region")), Some(&"us-east-1".into()));
+        assert_eq!(log.get(Lookup::from("vpc-id")), Some(&"mock-vpc-id".into()));
         assert_eq!(
             log.get(Lookup::from_str("subnet-id").unwrap()),
             Some(&"mock-subnet-id".into())

@@ -1,8 +1,8 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
-use crate::{event::Value};
-use remap::parser::ParserRule;
+use crate::event::Value;
 use pest::iterators::Pair;
+use remap::parser::ParserRule;
 use std::{
     convert::TryFrom,
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
@@ -89,7 +89,10 @@ impl Display for LookupBuf {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                SegmentBuf::Field { name: _, requires_quoting: _ } => match maybe_next {
+                SegmentBuf::Field {
+                    name: _,
+                    requires_quoting: _,
+                } => match maybe_next {
                     Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
@@ -131,7 +134,11 @@ impl LookupBuf {
     ) -> crate::Result<IndexMap<LookupBuf, Value>> {
         let mut discoveries = IndexMap::new();
         for (key, value) in values {
-            Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
+            Self::from_toml_table_recursive_step(
+                LookupBuf::try_from(key)?,
+                value,
+                &mut discoveries,
+            )?;
         }
         Ok(discoveries)
     }
@@ -147,7 +154,11 @@ impl LookupBuf {
         match value {
             TomlValue::Table(map) => {
                 for (key, value) in map {
-                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
+                    Self::from_toml_table_recursive_step(
+                        LookupBuf::try_from(key)?,
+                        value,
+                        &mut discoveries,
+                    )?;
                 }
                 Ok(discoveries)
             }
@@ -177,14 +188,22 @@ impl LookupBuf {
             TomlValue::Array(vals) => {
                 for (i, val) in vals.into_iter().enumerate() {
                     let key = format!("{}[{}]", lookup, i);
-                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, val, discoveries)?;
+                    Self::from_toml_table_recursive_step(
+                        LookupBuf::try_from(key)?,
+                        val,
+                        discoveries,
+                    )?;
                 }
                 None
             }
             TomlValue::Table(map) => {
                 for (table_key, value) in map {
                     let key = format!("{}.{}", lookup, table_key);
-                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, discoveries)?;
+                    Self::from_toml_table_recursive_step(
+                        LookupBuf::try_from(key)?,
+                        value,
+                        discoveries,
+                    )?;
                 }
                 None
             }

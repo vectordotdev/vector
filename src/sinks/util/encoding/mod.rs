@@ -60,9 +60,7 @@ pub trait EncodingConfiguration<E> {
                         .filter(|field| {
                             !only_fields
                                 .iter()
-                                .any(|only| {
-                                    field.starts_with(only.clone_lookup())
-                                })
+                                .any(|only| field.starts_with(only.clone_lookup()))
                         })
                         // We must clone here so we don't have a borrow into the logevent when we remove.
                         .map(|l| l.into_buf())

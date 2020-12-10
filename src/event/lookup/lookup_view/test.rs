@@ -53,7 +53,6 @@ fn quoted() {
     assert_eq!(lookup.to_string(), input);
 }
 
-
 #[test]
 fn push() {
     crate::test_util::trace_init();
@@ -108,11 +107,29 @@ fn coalesced() {
     crate::test_util::trace_init();
     let input = "plain.(option_one | option_two)";
     let lookup = Lookup::from_str(input).unwrap();
-    assert_eq!(lookup[0], Segment::from(String::from("plain")));
-    assert_eq!(lookup[1], Segment::from(vec![
-        Segment::from("option_one"),
-        Segment::from("option_two"),
-    ]));
+    assert_eq!(lookup[0], Segment::from("plain"));
+    assert_eq!(
+        lookup[1],
+        Segment::from(vec![
+            vec![Segment::from("option_one")],
+            vec![Segment::from("option_two")],
+        ])
+    );
+}
+
+#[test]
+fn coalesced_nesting() {
+    crate::test_util::trace_init();
+    let input = "plain.(option_one.inner | option_two.other_inner)";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::from("plain"));
+    assert_eq!(
+        lookup[1],
+        Segment::from(vec![
+            vec![Segment::from("option_one"), Segment::from("inner")],
+            vec![Segment::from("option_two"), Segment::from("other_inner")],
+        ])
+    );
 }
 
 #[test]
@@ -221,8 +238,10 @@ fn lookup_to_string_and_serialize() {
                 // **WARNING:**: You **can not** deserialize lookups (that is, views, the buffers
                 // are fine) out of str slices with escapes. It's invalid. You **must** use lookupbufs.
                 if lookup.to_string().contains('\"') {
-                    trace!("Need to filter this test, it contains escape chars and cannot be \
-                            deserialized into a lookup view. Use a LookupBuf.");
+                    trace!(
+                        "Need to filter this test, it contains escape chars and cannot be \
+                            deserialized into a lookup view. Use a LookupBuf."
+                    );
                     return;
                 }
 

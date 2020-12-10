@@ -235,7 +235,11 @@ impl rlua::UserData for LuaEvent {
             let state = ctx.create_table()?;
             {
                 let keys = ctx.create_table_from(
-                    event.inner.as_log().keys(true).map(|k| (k.to_string(), true)),
+                    event
+                        .inner
+                        .as_log()
+                        .keys(true)
+                        .map(|k| (k.to_string(), true)),
                 )?;
                 state.set("event", event)?;
                 state.set("keys", keys)?;

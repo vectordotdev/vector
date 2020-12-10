@@ -340,7 +340,13 @@ pub mod test_util {
     pub(crate) fn assert_fields(value: String, fields: Vec<&str>) {
         let encoded_fields: Vec<&str> = value.split(',').collect();
 
-        assert_eq!(fields.len(), encoded_fields.len(), "{:?}.len() != {:?}.len()", fields, encoded_fields);
+        assert_eq!(
+            fields.len(),
+            encoded_fields.len(),
+            "{:?}.len() != {:?}.len()",
+            fields,
+            encoded_fields
+        );
 
         for field in fields.into_iter() {
             assert!(

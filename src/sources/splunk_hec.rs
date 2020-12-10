@@ -1126,13 +1126,19 @@ mod tests {
             events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
-        assert_eq!(events[0].as_log()[&*super::SPLUNK_SOURCE_LOOKUP], "main".into());
+        assert_eq!(
+            events[0].as_log()[&*super::SPLUNK_SOURCE_LOOKUP],
+            "main".into()
+        );
 
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
-        assert_eq!(events[1].as_log()[&*super::SPLUNK_SOURCE_LOOKUP], "main".into());
+        assert_eq!(
+            events[1].as_log()[&*super::SPLUNK_SOURCE_LOOKUP],
+            "main".into()
+        );
 
         assert_eq!(
             events[2].as_log()[log_schema().message_key()],

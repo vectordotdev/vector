@@ -717,7 +717,10 @@ mod test {
             expected.insert(LookupBuf::from_str("origin.software").unwrap(), "rsyslogd");
             expected.insert(LookupBuf::from_str("origin.swVersion").unwrap(), "8.24.0");
             expected.insert(LookupBuf::from_str("origin.x-pid").unwrap(), "8979");
-            expected.insert(LookupBuf::from_str("origin.x-info").unwrap(), "http://www.rsyslog.com");
+            expected.insert(
+                LookupBuf::from_str("origin.x-info").unwrap(),
+                "http://www.rsyslog.com",
+            );
         }
 
         assert_eq!(
@@ -753,7 +756,10 @@ mod test {
             expected.insert(LookupBuf::from_str("origin.software").unwrap(), "rsyslogd");
             expected.insert(LookupBuf::from_str("origin.swVersion").unwrap(), "8.24.0");
             expected.insert(LookupBuf::from_str("origin.x-pid").unwrap(), "9043");
-            expected.insert(LookupBuf::from_str("origin.x-info").unwrap(), "http://www.rsyslog.com");
+            expected.insert(
+                LookupBuf::from_str("origin.x-info").unwrap(),
+                "http://www.rsyslog.com",
+            );
         }
 
         assert_eq!(

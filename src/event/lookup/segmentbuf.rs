@@ -11,15 +11,24 @@ pub enum SegmentBuf {
     Field {
         name: String,
         // This is a very lazy optimization to avoid having to scan for escapes.
-        requires_quoting: bool
+        requires_quoting: bool,
     },
     Index(usize),
-    Coalesce(Vec<Self>),
+    // Coalesces hold multiple segment sets.
+    Coalesce(
+        Vec<
+            // Each of these can be it's own independent lookup.
+            Vec<Self>,
+        >,
+    ),
 }
 
 impl SegmentBuf {
     pub const fn field(name: String, requires_quoting: bool) -> SegmentBuf {
-        SegmentBuf::Field { name, requires_quoting }
+        SegmentBuf::Field {
+            name,
+            requires_quoting,
+        }
     }
 
     pub fn is_field(&self) -> bool {
@@ -34,7 +43,7 @@ impl SegmentBuf {
         matches!(self, SegmentBuf::Index(_))
     }
 
-    pub const fn coalesce(v: Vec<Self>) -> SegmentBuf {
+    pub const fn coalesce(v: Vec<Vec<Self>>) -> SegmentBuf {
         SegmentBuf::Coalesce(v)
     }
 
@@ -42,13 +51,19 @@ impl SegmentBuf {
         matches!(self, SegmentBuf::Coalesce(_))
     }
 
-
     #[instrument]
     pub(crate) fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
-            SegmentBuf::Field { name, requires_quoting} => Segment::field(name.as_str(), *requires_quoting),
+            SegmentBuf::Field {
+                name,
+                requires_quoting,
+            } => Segment::field(name.as_str(), *requires_quoting),
             SegmentBuf::Index(i) => Segment::index(*i),
-            SegmentBuf::Coalesce(v) => Segment::coalesce(v.iter().map(|v| v.as_segment()).collect()),
+            SegmentBuf::Coalesce(v) => Segment::coalesce(
+                v.iter()
+                    .map(|inner| inner.iter().map(|v| v.as_segment()).collect::<Vec<_>>())
+                    .collect(),
+            ),
         }
     }
 }
@@ -57,9 +72,26 @@ impl Display for SegmentBuf {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             SegmentBuf::Index(i) => write!(formatter, "{}", i),
-            SegmentBuf::Field { name, requires_quoting: false } => write!(formatter, "{}", name),
-            SegmentBuf::Field { name, requires_quoting: true } => write!(formatter, "\"{}\"", name),
-            SegmentBuf::Coalesce(v) => write!(formatter, "{}", v.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" | ")),
+            SegmentBuf::Field {
+                name,
+                requires_quoting: false,
+            } => write!(formatter, "{}", name),
+            SegmentBuf::Field {
+                name,
+                requires_quoting: true,
+            } => write!(formatter, "\"{}\"", name),
+            SegmentBuf::Coalesce(v) => write!(
+                formatter,
+                "{}",
+                v.iter()
+                    .map(|inner| inner
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join("."))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ),
         }
     }
 }
@@ -72,9 +104,11 @@ impl From<String> for SegmentBuf {
             // So we have to take a slice and clone it.
             let len = name.len();
             name = name[1..len - 1].to_string();
-
         }
-        Self::Field { name, requires_quoting }
+        Self::Field {
+            name,
+            requires_quoting,
+        }
     }
 }
 
@@ -84,8 +118,8 @@ impl From<usize> for SegmentBuf {
     }
 }
 
-impl From<Vec<SegmentBuf>> for SegmentBuf {
-    fn from(value: Vec<SegmentBuf>) -> Self {
+impl From<Vec<Vec<SegmentBuf>>> for SegmentBuf {
+    fn from(value: Vec<Vec<SegmentBuf>>) -> Self {
         Self::coalesce(value)
     }
 }

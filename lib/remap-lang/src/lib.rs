@@ -9,10 +9,10 @@ mod type_def;
 
 pub mod expression;
 pub mod function;
+pub mod parser;
 pub mod prelude;
 pub mod state;
 pub mod value;
-pub mod parser;
 
 pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};

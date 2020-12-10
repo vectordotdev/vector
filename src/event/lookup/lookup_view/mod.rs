@@ -9,6 +9,7 @@ use core::fmt;
 use nom::lib::std::vec::IntoIter;
 use pest::iterators::Pair;
 use pest::Parser;
+use remap::parser::{Parser as RemapParser, ParserRule};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
@@ -19,7 +20,6 @@ use std::{
     slice::Iter,
     str,
 };
-use remap::parser::{ParserRule, Parser as RemapParser};
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -70,7 +70,10 @@ impl<'a> Display for Lookup<'a> {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                Segment::Field { name: _, requires_quoting: _ } => match maybe_next {
+                Segment::Field {
+                    name: _,
+                    requires_quoting: _,
+                } => match maybe_next {
                     Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
@@ -317,7 +320,8 @@ impl<'de> Visitor<'de> for LookupVisitor<'de> {
     type Value = Lookup<'de>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("Expected valid Lookup path. If deserializing a string, use a LookupBuf.")
+        formatter
+            .write_str("Expected valid Lookup path. If deserializing a string, use a LookupBuf.")
     }
 
     fn visit_borrowed_str<E>(self, value: &'de str) -> Result<Self::Value, E>
