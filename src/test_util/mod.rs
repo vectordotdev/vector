@@ -520,7 +520,9 @@ pub async fn start_topology(
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+        .await
+        .unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()
@@ -536,14 +538,4 @@ macro_rules! map {
             .into_iter()
             .collect::<::std::collections::BTreeMap<_, _>>()
     };
-}
-
-#[macro_export]
-macro_rules! array {
-    () => (
-        ::std::vec::Vec::new().into()
-    );
-    ($($v:expr),+ $(,)?) => {
-        vec![$($v.into()),+]
-    }
 }

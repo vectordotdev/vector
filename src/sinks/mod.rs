@@ -98,7 +98,7 @@ pub enum HealthcheckError {
 impl VectorSink {
     pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: Stream<Item = Event> + Send + 'static,
+        S: Stream<Item = Event> + Send,
     {
         match self {
             Self::Sink(sink) => input.map(Ok).forward(sink).await,

@@ -368,10 +368,6 @@ fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::PathBuf;
-
-    use tempfile::tempdir;
 
     #[test]
     fn generate_all() {
@@ -407,8 +403,16 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-json_parser",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_configfile() {
+        use std::fs;
+        use tempfile::tempdir;
+
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
         let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
@@ -416,12 +420,8 @@ mod tests {
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
         .expect("Could not read config file");
-        cleanup_configfile(&filepath);
-        assert_eq!(cfg.unwrap(), filecontents)
-    }
-
-    fn cleanup_configfile(filepath: &PathBuf) {
         fs::remove_file(filepath).expect("Could not cleanup config file!");
+        assert_eq!(cfg.unwrap(), filecontents)
     }
 
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]

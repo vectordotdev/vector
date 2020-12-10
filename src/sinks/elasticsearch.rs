@@ -546,7 +546,6 @@ mod tests {
         let config = ElasticSearchConfig {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
-                codec: Encoding::Default,
                 except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },
