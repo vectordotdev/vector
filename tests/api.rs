@@ -476,6 +476,7 @@ mod tests {
 
                     [sources.processed_bytes_total_batch_source]
                       type = "generator"
+                      format = "round_robin"
                       lines = ["Random line", "And another"]
                       batch_interval = 0.1
 
@@ -656,6 +657,7 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
+                  format = "round_robin"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
 
