@@ -14,7 +14,6 @@ use std::str::FromStr;
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,
-    #[must_use]
     pub auth: Option<Auth>,
 }
 
