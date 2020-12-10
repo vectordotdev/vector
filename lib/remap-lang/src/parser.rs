@@ -763,7 +763,10 @@ mod tests {
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected primary, query, or ident"],
+                vec![
+                    " 1:9\n",
+                    "= expected value, variable, path, group or function call, value, variable, path, group, !",
+                ],
             ),
             (
                 ".foo = to_string",
