@@ -95,12 +95,16 @@ components: sources: internal_logs: {
 						module_path: {
 							description: "The path to the internal module where the span occurred"
 							required:    true
-							type:        "string"
+							type: string: {
+								examples: ["internal_logs"]
+							}
 						}
 						target: {
 							description: "Describes the part of the system where the span or event that this metadata describes occurred."
 							required:    true
-							type:        "string"
+							type: string: {
+								examples: ["target"]
+							}
 						}
 					}
 				}
