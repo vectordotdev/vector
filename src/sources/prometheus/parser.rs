@@ -29,7 +29,7 @@ fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String,
 pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     let mut result = Vec::new();
 
-    for group in prometheus_parser::group_metrics(packet)? {
+    for group in prometheus_parser::group_text_metrics(packet)? {
         // just a header without measurements
         if group.metrics.is_empty() {
             continue;

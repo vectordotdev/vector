@@ -220,7 +220,7 @@ impl MetricGroup {
     }
 }
 
-pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
+pub fn group_text_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
     for line in input.lines() {
@@ -253,7 +253,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_group_metrics() {
+    fn test_group_text_metrics() {
         let input = r##"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
@@ -292,7 +292,7 @@ mod test {
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
             "##;
-        group_metrics(input).unwrap();
+        group_text_metrics(input).unwrap();
     }
 
     #[test]
@@ -329,7 +329,7 @@ mod test {
     #[test]
     fn test_errors() {
         let input = r##"name{registry="default" content_type="html"} 1890"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
@@ -339,7 +339,7 @@ mod test {
         ));
 
         let input = r##"# TYPE a counte"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
@@ -349,7 +349,7 @@ mod test {
         ));
 
         let input = r##"# TYPEabcd asdf"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
@@ -359,7 +359,7 @@ mod test {
         ));
 
         let input = r##"name{registry="} 1890"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
@@ -369,7 +369,7 @@ mod test {
         ));
 
         let input = r##"name{registry=} 1890"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
@@ -379,7 +379,7 @@ mod test {
         ));
 
         let input = r##"name abcd"##;
-        let error = group_metrics(input).unwrap_err();
+        let error = group_text_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(matches!(
             error,
