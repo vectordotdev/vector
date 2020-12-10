@@ -60,9 +60,17 @@ impl StdError for Rule {
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         macro_rules! rules_str {
-            ($($rule:tt),+ $(,)?) => (
+            ($($rule:tt$(: $name:literal)?),+ $(,)?) => (
                 match self {
-                    $(Rule::$rule => f.write_str(stringify!($rule))),+
+                    $(Rule::$rule => {
+                        #[allow(unused_variables)]
+                        let string = stringify!($rule);
+                        $(let string = $name;)?
+
+                        let string = string.replace('_', " ");
+
+                        f.write_str(&string)
+                    }),+
                 }
             );
         }
@@ -79,8 +87,8 @@ impl fmt::Display for Rule {
             call,
             char,
             comparison,
-            EOE,
-            EOI,
+            EOE: "",
+            EOI: "",
             equality,
             expression,
             expressions,
@@ -88,21 +96,21 @@ impl fmt::Display for Rule {
             group,
             ident,
             if_condition,
-            if_statement,
+            if_statement: "if-statement",
             integer,
             kv_pair,
             map,
             multiplication,
-            not,
+            not: "query",
             null,
-            operator_addition,
-            operator_boolean_expr,
-            operator_comparison,
-            operator_equality,
-            operator_multiplication,
-            operator_not,
+            operator_addition: "",
+            operator_boolean_expr: "",
+            operator_comparison: "",
+            operator_equality: "",
+            operator_multiplication: "operator",
+            operator_not: "query",
             path,
-            path_coalesce,
+            path_coalesce: "coalesced path",
             path_field,
             path_index,
             path_index_inner,
