@@ -1,0 +1,224 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+      "annotations": {
+          "checksum/config": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "creationTimestamp": "2020-01-01T00:00:00Z",
+      "generateName": "myapp-",
+      "labels": {
+          "app.kubernetes.io/instance": "myapp",
+          "app.kubernetes.io/name": "myapp",
+          "controller-revision-hash": "ffffffffff",
+          "pod-template-generation": "1",
+          "vector.dev/exclude": "true"
+      },
+      "name": "myapp-qwert",
+      "namespace": "myns",
+      "ownerReferences": [
+          {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "DaemonSet",
+              "name": "myapp",
+              "uid": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+      ],
+      "resourceVersion": "35635763",
+      "selfLink": "/api/v1/namespaces/myns/pods/myapp-qwert",
+      "uid": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+  },
+  "spec": {
+      "affinity": {
+          "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                      {
+                          "matchFields": [
+                              {
+                                  "key": "metadata.name",
+                                  "operator": "In",
+                                  "values": [
+                                      "node-1"
+                                  ]
+                              }
+                          ]
+                      }
+                  ]
+              }
+          }
+      },
+      "containers": [
+          {
+              "args": [],
+              "env": [
+                  {
+                      "name": "NODE_NAME",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "spec.nodeName"
+                          }
+                      }
+                  },
+                  {
+                      "name": "POD_NAME",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.name"
+                          }
+                      }
+                  },
+                  {
+                      "name": "POD_NAMESPACE",
+                      "valueFrom": {
+                          "fieldRef": {
+                              "apiVersion": "v1",
+                              "fieldPath": "metadata.namespace"
+                          }
+                      }
+                  },
+                  {
+                      "name": "LOG",
+                      "value": "info"
+                  }
+              ],
+              "image": "busybox:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "myapp",
+              "ports": [
+                  {
+                      "containerPort": 9090,
+                      "name": "metrics",
+                      "protocol": "TCP"
+                  }
+              ],
+              "resources": {},
+              "securityContext": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                  {
+                      "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                      "name": "myapp-token-qwert",
+                      "readOnly": true
+                  }
+              ]
+          }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "enableServiceLinks": true,
+      "nodeName": "node-1",
+      "preemptionPolicy": "PreemptLowerPriority",
+      "priority": 0,
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "serviceAccount": "myapp",
+      "serviceAccountName": "myapp",
+      "terminationGracePeriodSeconds": 60,
+      "tolerations": [
+          {
+              "effect": "NoSchedule",
+              "key": "node-role.kubernetes.io/master"
+          },
+          {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists"
+          },
+          {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists"
+          },
+          {
+              "effect": "NoSchedule",
+              "key": "node.kubernetes.io/disk-pressure",
+              "operator": "Exists"
+          },
+          {
+              "effect": "NoSchedule",
+              "key": "node.kubernetes.io/memory-pressure",
+              "operator": "Exists"
+          },
+          {
+              "effect": "NoSchedule",
+              "key": "node.kubernetes.io/pid-pressure",
+              "operator": "Exists"
+          },
+          {
+              "effect": "NoSchedule",
+              "key": "node.kubernetes.io/unschedulable",
+              "operator": "Exists"
+          }
+      ],
+      "volumes": [
+          {
+              "name": "myapp-token-qwert",
+              "secret": {
+                  "defaultMode": 420,
+                  "secretName": "myapp-token-qwert"
+              }
+          }
+      ]
+  },
+  "status": {
+      "conditions": [
+          {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2020-01-01T00:00:00Z",
+              "status": "True",
+              "type": "Initialized"
+          },
+          {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2020-01-01T00:00:00Z",
+              "status": "True",
+              "type": "Ready"
+          },
+          {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2020-01-01T00:00:00Z",
+              "status": "True",
+              "type": "ContainersReady"
+          },
+          {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2020-01-01T00:00:00Z",
+              "status": "True",
+              "type": "PodScheduled"
+          }
+      ],
+      "containerStatuses": [
+          {
+              "containerID": "docker://ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "image": "busybox:latest",
+              "imageID": "docker-pullable://busybox@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "lastState": {},
+              "name": "myapp",
+              "ready": true,
+              "restartCount": 0,
+              "started": true,
+              "state": {
+                  "running": {
+                      "startedAt": "2020-01-01T00:00:00Z"
+                  }
+              }
+          }
+      ],
+      "hostIP": "10.0.0.1",
+      "phase": "Running",
+      "podIP": "10.1.0.1",
+      "podIPs": [
+          {
+              "ip": "10.1.0.1"
+          }
+      ],
+      "qosClass": "BestEffort",
+      "startTime": "2020-01-01T00:00:00Z"
+  }
+}
