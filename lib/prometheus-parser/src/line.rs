@@ -129,7 +129,7 @@ impl Metric {
     }
 
     /// Float value, and +Inf, -Int, Nan.
-    pub fn parse_value(input: &str) -> IResult<f64> {
+    pub(crate) fn parse_value(input: &str) -> IResult<f64> {
         let input = trim_space(input);
         alt((
             value(f64::INFINITY, tag("+Inf")),
@@ -324,7 +324,7 @@ pub enum Line {
 
 impl Line {
     /// Parse a single line. Return `None` if it is a comment or an empty line.
-    pub fn parse(input: &str) -> Result<Option<Self>, ErrorKind> {
+    pub(crate) fn parse(input: &str) -> Result<Option<Self>, ErrorKind> {
         let input = input.trim();
         if input.is_empty() {
             return Ok(None);
