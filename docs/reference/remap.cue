@@ -142,21 +142,25 @@ remap: {
 			href: "dot-notation"
 
 			description: """
-				In TRL, a dot (`.`) holds state across the script. At the beginning of the script, it
-				represents the event arriving into the transform. Take this JSON event data as an
+				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
+				it represents the event arriving into the transform. Take this JSON event data as an
 				example:
 
 				```json
 				{"status_code":200,"username":"booper1234","message":"Successful transaction"}
 				```
 
-				In this case, the dot has three fields: `.status_code`, `.username`, and `.message`. You
-				can then assign new values to the existing fields (`.message = "something different"`),
-				add new fields (`.new_field = "new value"`), and much more.
+				In this case, the event, represented by the dot, has three fields: `.status_code`,
+				`.username`, and `.message`. You can assign new values to the existing fields
+				(`.message = "something different"`), add new fields (`.new_field = "new value"`),
+				delete fields (`del(.username)`), store those values in variables (`$code =
+				.status_code`), and more.
 
-				The dot can also represent nested values, like `.transaction.id` or `.geo.latitude`.
+				The dot can also represent nested values, for example `.transaction.id` or
+				`.geo.latitude`.
 				"""
 			examples: [
+				".",
 				".status_code",
 				".message",
 				".username",
@@ -189,15 +193,16 @@ remap: {
 			href: "assignment"
 
 			description: """
-				You can assign values to fields using a single equals sign (`=`). If the field already
-				exists, its value is re-assigned; it the field doesn't already exist, it's created and
-				assigned the value.
+				You can assign values to fields using a single equals sign (`=`). If the field
+				already exists, its value is re-assigned; it the field doesn't already exist, it's
+				created and assigned the value.
 				"""
 
 			examples: [
 				".request_id = uuidv4()",
 				".average = .total / .number",
 				".partition_id = .status_code",
+				".is_server_error = .status_code == 500"
 			]
 		}
 
@@ -230,6 +235,8 @@ remap: {
 
 			examples: [
 				"exists(.request_id) && !exists(.username)",
+				".status_code == 200",
+				#".user.plan != "enterprise" && .user.role == "admin""#,
 			]
 
 			operators: {
