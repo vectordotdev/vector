@@ -352,6 +352,7 @@ urls: {
 	udp:                                                      "https://en.wikipedia.org/wiki/User_Datagram_Protocol"
 	uds:                                                      "https://en.wikipedia.org/wiki/Unix_domain_socket"
 	unicode_whitespace:                                       "https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace"
+	utf8: "https://en.wikipedia.org/wiki/UTF-8"
 	uuidv4:                                                   "https://en.wikipedia.org/wiki/Universally_unique_identifier#Version_4_(random)"
 	vector_aggregator_role:                                   "https://vector.dev/docs/setup/deployment/roles/#aggregator"
 	vector_blog:                                              "https://vector.dev/blog/"

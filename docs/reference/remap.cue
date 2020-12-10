@@ -91,7 +91,10 @@ remap: {
 			use: ["parameter", "return"]
 		}
 		"map": {
-			description: "A key-value map where values can be of any TRL type"
+			description: """
+				A key-value map in which keys are strings and values can be of any TRL type,
+				including maps.
+				"""
 			use: ["parameter", "return"]
 		}
 		"integer": {
@@ -111,7 +114,10 @@ remap: {
 			use: ["parameter"]
 		}
 		"string": {
-			description: "A sequence of UTF-8 characters"
+			description: """
+				A sequence of characters. Remap converts strings in scripts to [UTF-8](\(urls.utf8))
+				and replaces any invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
+				"""
 			use: ["parameter", "return"]
 		}
 		"timestamp": {
