@@ -42,7 +42,7 @@ impl SourceConfig for InternalLogsConfig {
 
 async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
     let mut subscriber = crate::trace::subscribe()
-        .ok_or_else(|| error!("Tracing is not initialized"))?
+        .ok_or_else(|| error!("Tracing is not initialized."))?
         .take_until(shutdown);
     let mut out = out
         .sink_map_err(|error| error!(message = "Error sending log.", %error))
