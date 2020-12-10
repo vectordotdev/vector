@@ -28,6 +28,6 @@ ignore = [
     "RUSTSEC-2020-0056",
     # ordered_flat - can be removed when heim next releases their beta branch
     "RUSTSEC-2020-0082",
-    # lucet-runtime-internals - we'll need to upgrade here 
+    # lucet-runtime-internals - we'll need to upgrade here
     "RUSTSEC-2020-0004",
 ]
