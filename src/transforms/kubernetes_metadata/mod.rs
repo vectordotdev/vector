@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use std::{convert::Infallible, future::Future};
 
+mod index;
 mod watch_request_builder;
 
 /// Configuration for the `kubernetes_metadata` transform.
@@ -91,12 +92,24 @@ impl Runtime {
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, watch_request_builder);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
+
+        let flush_debounce_timeout = Duration::from_millis(10);
+
         let (_state_reader, state_writer) = evmap::new();
         let state_writer = k8s::state::evmap::Writer::new(
             state_writer,
             k8s::state::evmap::IdentityIndexer,
-            Some(Duration::from_millis(10)),
+            Some(flush_debounce_timeout),
         );
+
+        let (_index_reader, index_writer) = evmap::new();
+        let index_writer = k8s::state::evmap::Writer::new(
+            index_writer,
+            k8s::state::evmap::IdentityIndexer,
+            Some(flush_debounce_timeout),
+        );
+
+        let state_writer = index::Manager::new(state_writer, index_writer);
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
         let state_writer =
             k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));

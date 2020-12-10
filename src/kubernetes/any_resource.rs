@@ -4,7 +4,7 @@ use super::{hash_value::Identity, resource_version};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use snafu::Snafu;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, sync::Arc};
 
 /// A container for an arbitrary Kubernetes resource, represented as
 /// a JSON object.
@@ -108,6 +108,41 @@ impl Identity for AnyResource {
         };
 
         Some(uid.as_ref())
+    }
+}
+
+/// Shared version of [`AnyResource`], for use with indexers.
+///
+/// Technically, this type is a workaround for the current specialization
+/// limitations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SharedAnyResource(Arc<AnyResource>);
+
+impl Identity for SharedAnyResource {
+    type IdentityType = str;
+
+    fn identity(&self) -> Option<&'_ Self::IdentityType> {
+        self.0.identity()
+    }
+}
+
+impl From<AnyResource> for SharedAnyResource {
+    fn from(data: AnyResource) -> Self {
+        Self::from(Arc::new(data))
+    }
+}
+
+impl From<Arc<AnyResource>> for SharedAnyResource {
+    fn from(data: Arc<AnyResource>) -> Self {
+        Self(data)
+    }
+}
+
+impl SharedAnyResource {
+    /// Consume the [`SharedAnyResource`] and return the underlying
+    /// `Arc<AnyResource>`.
+    pub fn into_inner(self) -> Arc<AnyResource> {
+        self.0
     }
 }
 
