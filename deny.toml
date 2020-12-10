@@ -26,4 +26,8 @@ ignore = [
     # can be removed after next release of time
     # https://github.com/time-rs/time/commit/8b2734351a5cd05a9bd3315f1af76c28b5852fec
     "RUSTSEC-2020-0056",
+    # ordered_flat - can be removed when heim next releases their beta branch
+    "RUSTSEC-2020-0082",
+    # lucet-runtime-internals - we'll need to upgrade here
+    "RUSTSEC-2020-0004",
 ]
