@@ -71,52 +71,51 @@ remap: {
 
 		description: string
 		use: [#Use, ...#Use]
-		examples: [string, ...string]
 	}
 
 	types: {
 		"any": {
-			description: ""
+			description: "A stand-in for any type."
 			use: ["parameter"]
 		}
 		"array": {
-			description: ""
+			description: "A list of items"
 			use: ["parameter", "return"]
 		}
 		"boolean": {
-			description: ""
+			description: "True or false"
 			use: ["parameter", "return"]
 		}
 		"float": {
-			description: ""
+			description: "A floating-point integer"
 			use: ["parameter", "return"]
 		}
 		"map": {
-			description: ""
+			description: "A key-value map where values can be of any TRL type"
 			use: ["parameter", "return"]
 		}
 		"integer": {
-			description: ""
+			description: "A 64-bit integer"
 			use: ["parameter", "return"]
 		}
 		"null": {
-			description: ""
+			description: "No value"
 			use: ["return"]
 		}
 		"path": {
-			description: ""
+			description: "An event field"
 			use: ["parameter"]
 		}
 		"regex": {
-			description: ""
+			description: "A regular expression"
 			use: ["parameter"]
 		}
 		"string": {
-			description: ""
+			description: "A sequence of UTF-8 characters"
 			use: ["parameter", "return"]
 		}
 		"timestamp": {
-			description: ""
+			description: "A string formatted as a timestamp"
 			use: ["parameter", "return"]
 		}
 	}
@@ -222,6 +221,10 @@ remap: {
 				TRL offers a standard set of operators that should be familiar from many other
 				programming languages.
 				"""
+
+			examples: [
+				"exists(.request_id) && !exists(.username)",
+			]
 
 			operators: {
 				"Boolean": {
