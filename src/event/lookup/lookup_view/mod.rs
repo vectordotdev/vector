@@ -15,6 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::{
+    collections::VecDeque,
     convert::TryFrom,
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
     slice::Iter,
@@ -48,7 +49,7 @@ use std::{
 ///   string into a `Lookup`. **Use a `LookupBuf` instead.**
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Lookup<'a> {
-    pub(super) segments: Vec<Segment<'a>>,
+    pub(super) segments: VecDeque<Segment<'a>>,
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for Lookup<'a> {
@@ -96,15 +97,27 @@ impl<'a> Display for Lookup<'a> {
 impl<'a> Lookup<'a> {
     /// Push onto the internal list of segments.
     #[instrument(level = "trace")]
-    pub fn push(&mut self, segment: Segment<'a>) {
+    pub fn push_back(&mut self, segment: Segment<'a>) {
         trace!(length = %self.segments.len(), "Pushing.");
-        self.segments.push(segment)
+        self.segments.push_back(segment)
     }
 
     #[instrument(level = "trace")]
-    pub fn pop(&mut self) -> Option<Segment<'a>> {
+    pub fn pop_back(&mut self) -> Option<Segment<'a>> {
         trace!(length = %self.segments.len(), "Popping.");
-        self.segments.pop()
+        self.segments.pop_back()
+    }
+
+    #[instrument(level = "trace")]
+    pub fn push_front(&mut self, segment: Segment<'a>) {
+        trace!(length = %self.segments.len(), "Pushing.");
+        self.segments.push_front(segment)
+    }
+
+    #[instrument(level = "trace")]
+    pub fn pop_front(&mut self) -> Option<Segment<'a>> {
+        trace!(length = %self.segments.len(), "Popping.");
+        self.segments.pop_front()
     }
 
     #[instrument(level = "trace")]
@@ -113,12 +126,12 @@ impl<'a> Lookup<'a> {
     }
 
     #[instrument(level = "trace")]
-    pub fn iter(&self) -> Iter<'_, Segment<'a>> {
+    pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Segment<'a>> {
         self.segments.iter()
     }
 
     #[instrument(level = "trace")]
-    pub fn into_iter(self) -> IntoIter<Segment<'a>> {
+    pub fn into_iter(self) -> std::collections::vec_deque::IntoIter<Segment<'a>> {
         self.segments.into_iter()
     }
 
@@ -154,13 +167,13 @@ impl<'a> Lookup<'a> {
 
     /// Return a borrow of the Segment set.
     #[instrument(level = "trace")]
-    pub fn as_segments(&self) -> &Vec<Segment<'_>> {
+    pub fn as_segments(&self) -> &VecDeque<Segment<'_>> {
         &self.segments
     }
 
     /// Return the Segment set.
     #[instrument(level = "trace")]
-    pub fn into_segments(self) -> Vec<Segment<'a>> {
+    pub fn into_segments(self) -> VecDeque<Segment<'a>> {
         self.segments
     }
 
@@ -172,13 +185,13 @@ impl<'a> Lookup<'a> {
 
     /// Returns `true` if `needle` is a prefix of the lookup.
     pub fn starts_with<'b>(&self, needle: Lookup<'b>) -> bool {
-        self.segments.starts_with(&needle.segments)
+        needle.iter().zip(&self.segments).all(|(n, s)| n == s )
     }
 }
 
 impl<'a> IntoIterator for Lookup<'a> {
     type Item = Segment<'a>;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::collections::vec_deque::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.segments.into_iter()
@@ -187,8 +200,10 @@ impl<'a> IntoIterator for Lookup<'a> {
 
 impl<'a> From<&'a str> for Lookup<'a> {
     fn from(input: &'a str) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(Segment::from(input));
         Self {
-            segments: vec![Segment::from(input)],
+            segments,
         }
         // We know this must be at least one segment.
     }
@@ -196,8 +211,10 @@ impl<'a> From<&'a str> for Lookup<'a> {
 
 impl<'a> From<usize> for Lookup<'a> {
     fn from(input: usize) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(Segment::from(input));
         Self {
-            segments: vec![Segment::index(input)],
+            segments,
         }
         // We know this must be at least one segment.
     }
@@ -205,17 +222,19 @@ impl<'a> From<usize> for Lookup<'a> {
 
 impl<'a> From<&'a String> for Lookup<'a> {
     fn from(input: &'a String) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(Segment::from(input.as_str()));
         Self {
-            segments: vec![Segment::from(input.as_str())],
+            segments,
         }
         // We know this must be at least one segment.
     }
 }
 
-impl<'a> TryFrom<Vec<Segment<'a>>> for Lookup<'a> {
+impl<'a> TryFrom<VecDeque<Segment<'a>>> for Lookup<'a> {
     type Error = crate::Error;
 
-    fn try_from(segments: Vec<Segment<'a>>) -> Result<Self, Self::Error> {
+    fn try_from(segments: VecDeque<Segment<'a>>) -> Result<Self, Self::Error> {
         let retval = Self { segments };
         retval.is_valid()?;
         Ok(retval)
@@ -234,9 +253,21 @@ impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'i
     }
 }
 
+impl<'collection: 'item, 'item> TryFrom<&'collection VecDeque<SegmentBuf>> for Lookup<'item> {
+    type Error = crate::Error;
+
+    fn try_from(segments: &'collection VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
+        let retval = Self {
+            segments: segments.iter().map(Segment::from).collect(),
+        };
+        retval.is_valid()?;
+        Ok(retval)
+    }
+}
+
 impl<'a> From<&'a LookupBuf> for Lookup<'a> {
     fn from(lookup_buf: &'a LookupBuf) -> Self {
-        Self::try_from(lookup_buf.segments.as_slice()).expect(
+        Self::try_from(&lookup_buf.segments).expect(
             "It is an invariant to have a 0 segment LookupBuf, so it is also an \
                      invariant to have a 0 segment Lookup.",
         )
@@ -247,38 +278,6 @@ impl<'a> Index<usize> for Lookup<'a> {
     type Output = Segment<'a>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl<'a> Index<RangeFull> for Lookup<'a> {
-    type Output = [Segment<'a>];
-
-    fn index(&self, index: RangeFull) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl<'a> Index<RangeToInclusive<usize>> for Lookup<'a> {
-    type Output = [Segment<'a>];
-
-    fn index(&self, index: RangeToInclusive<usize>) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl<'a> Index<RangeTo<usize>> for Lookup<'a> {
-    type Output = [Segment<'a>];
-
-    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl<'a> Index<RangeFrom<usize>> for Lookup<'a> {
-    type Output = [Segment<'a>];
-
-    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         self.segments.index(index)
     }
 }

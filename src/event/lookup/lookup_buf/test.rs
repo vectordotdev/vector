@@ -85,7 +85,7 @@ fn coalesced_nesting() {
                 SegmentBuf::from("option_two".to_string()),
                 SegmentBuf::from("other_inner".to_string())
             ],
-        ])
+        ]),
     );
 }
 
@@ -94,7 +94,7 @@ fn push() {
     crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = LookupBuf::from_str(input).unwrap();
-    lookup.push(SegmentBuf::from(String::from(input)));
+    lookup.push_back(SegmentBuf::from(String::from(input)));
     assert_eq!(lookup[0], SegmentBuf::from(String::from("some_key")));
     assert_eq!(lookup[1], SegmentBuf::from(String::from("some_key")));
 }
@@ -104,7 +104,7 @@ fn pop() {
     crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = LookupBuf::from_str(input).unwrap();
-    let out = lookup.pop();
+    let out = lookup.pop_back();
     assert_eq!(out, Some(SegmentBuf::from(String::from("some_key"))));
 }
 
@@ -134,18 +134,6 @@ fn to_string() {
     let input = SUFFICIENTLY_COMPLEX;
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup.to_string(), input);
-}
-
-#[test]
-fn impl_index_ranges() {
-    crate::test_util::trace_init();
-    let lookup = LookupBuf::from_str(SUFFICIENTLY_COMPLEX).unwrap();
-
-    // This test is primarily to ensure certain interfaces exist and weren't disturbed.
-    assert_eq!(lookup[..], SUFFICIENTLY_DECOMPOSED[..]);
-    assert_eq!(lookup[..4], SUFFICIENTLY_DECOMPOSED[..4]);
-    assert_eq!(lookup[..=4], SUFFICIENTLY_DECOMPOSED[..=4]);
-    assert_eq!(lookup[2..], SUFFICIENTLY_DECOMPOSED[2..]);
 }
 
 #[test]

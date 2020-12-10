@@ -4,22 +4,22 @@ use crate::event::Value;
 use pest::iterators::Pair;
 use remap::parser::ParserRule;
 use std::{
+    collections::VecDeque,
     convert::TryFrom,
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
     slice::Iter,
     str,
+    fmt::{self, Display, Formatter},
+    ops::{Index, IndexMut},
+    str::FromStr,
 };
 use toml::Value as TomlValue;
 
 use super::{segmentbuf::SegmentBuf, Lookup};
 use crate::event::lookup::Segment;
-use core::fmt;
 use indexmap::map::IndexMap;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::ops::{Index, IndexMut};
-use std::str::FromStr;
 
 #[cfg(test)]
 mod test;
@@ -54,7 +54,7 @@ mod test;
 /// For more, investigate `Lookup`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct LookupBuf {
-    pub(super) segments: Vec<SegmentBuf>,
+    pub(super) segments: VecDeque<SegmentBuf>,
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
@@ -72,10 +72,10 @@ impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
     }
 }
 
-impl<'a> TryFrom<Vec<SegmentBuf>> for LookupBuf {
+impl<'a> TryFrom<VecDeque<SegmentBuf>> for LookupBuf {
     type Error = crate::Error;
 
-    fn try_from(segments: Vec<SegmentBuf>) -> Result<Self, Self::Error> {
+    fn try_from(segments: VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
         let retval = LookupBuf { segments };
         retval.is_valid()?;
         Ok(retval)
@@ -112,19 +112,32 @@ impl Display for LookupBuf {
 impl LookupBuf {
     /// Push onto the internal list of segments.
     #[instrument(level = "trace")]
-    pub fn push(&mut self, segment: SegmentBuf) {
+    pub fn push_back(&mut self, segment: SegmentBuf) {
         trace!(length = %self.segments.len(), "Pushing.");
-        self.segments.push(segment);
+        self.segments.push_back(segment);
     }
 
     #[instrument(level = "trace")]
-    pub fn pop(&mut self) -> Option<SegmentBuf> {
+    pub fn pop_back(&mut self) -> Option<SegmentBuf> {
         trace!(length = %self.segments.len(), "Popping.");
-        self.segments.pop()
+        self.segments.pop_back()
     }
 
     #[instrument(level = "trace")]
-    pub fn iter(&self) -> Iter<'_, SegmentBuf> {
+    pub fn push_front(&mut self, segment: SegmentBuf) {
+        trace!(length = %self.segments.len(), "Pushing.");
+        self.segments.push_front(segment)
+    }
+
+    #[instrument(level = "trace")]
+    pub fn pop_front(&mut self) -> Option<SegmentBuf> {
+        trace!(length = %self.segments.len(), "Popping.");
+        self.segments.pop_front()
+    }
+
+
+    #[instrument(level = "trace")]
+    pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, SegmentBuf> {
         self.segments.iter()
     }
 
@@ -233,13 +246,13 @@ impl LookupBuf {
 
     /// Return a borrow of the SegmentBuf set.
     #[instrument(level = "trace")]
-    pub fn as_segments(&self) -> &Vec<SegmentBuf> {
-        self.segments.as_ref()
+    pub fn as_segments(&self) -> &VecDeque<SegmentBuf> {
+        &self.segments
     }
 
     /// Return the SegmentBuf set.
     #[instrument(level = "trace")]
-    pub fn into_segments(self) -> Vec<SegmentBuf> {
+    pub fn into_segments(self) -> VecDeque<SegmentBuf> {
         self.segments
     }
 
@@ -252,7 +265,7 @@ impl LookupBuf {
     /// Returns `true` if `needle` is a prefix of the lookup.
     #[instrument(level = "trace")]
     pub fn starts_with(&self, needle: &LookupBuf) -> bool {
-        self.segments.starts_with(&needle.segments)
+        needle.iter().zip(&self.segments).all(|(n, s)| n == s )
     }
 }
 
@@ -268,7 +281,7 @@ impl FromStr for LookupBuf {
 
 impl IntoIterator for LookupBuf {
     type Item = SegmentBuf;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = std::collections::vec_deque::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.segments.into_iter()
@@ -277,8 +290,10 @@ impl IntoIterator for LookupBuf {
 
 impl From<String> for LookupBuf {
     fn from(input: String) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(SegmentBuf::from(input));
         LookupBuf {
-            segments: vec![SegmentBuf::from(input)],
+            segments,
         }
         // We know this must be at least one segment.
     }
@@ -286,8 +301,10 @@ impl From<String> for LookupBuf {
 
 impl From<usize> for LookupBuf {
     fn from(input: usize) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(SegmentBuf::index(input));
         LookupBuf {
-            segments: vec![SegmentBuf::index(input)],
+            segments,
         }
         // We know this must be at least one segment.
     }
@@ -295,8 +312,10 @@ impl From<usize> for LookupBuf {
 
 impl From<&str> for LookupBuf {
     fn from(input: &str) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(SegmentBuf::from(input.to_owned()));
         LookupBuf {
-            segments: vec![SegmentBuf::from(input.to_owned())],
+            segments,
         }
         // We know this must be at least one segment.
     }
@@ -306,38 +325,6 @@ impl Index<usize> for LookupBuf {
     type Output = SegmentBuf;
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl Index<RangeFull> for LookupBuf {
-    type Output = [SegmentBuf];
-
-    fn index(&self, index: RangeFull) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl Index<RangeToInclusive<usize>> for LookupBuf {
-    type Output = [SegmentBuf];
-
-    fn index(&self, index: RangeToInclusive<usize>) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl Index<RangeTo<usize>> for LookupBuf {
-    type Output = [SegmentBuf];
-
-    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
-        self.segments.index(index)
-    }
-}
-
-impl Index<RangeFrom<usize>> for LookupBuf {
-    type Output = [SegmentBuf];
-
-    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         self.segments.index(index)
     }
 }
@@ -396,7 +383,7 @@ impl<'a> From<Lookup<'a>> for LookupBuf {
             .segments
             .into_iter()
             .map(|f| f.as_segment_buf())
-            .collect::<Vec<_>>();
+            .collect::<VecDeque<_>>();
         let retval: Result<LookupBuf, crate::Error> = LookupBuf::try_from(segments);
         retval.expect(
             "A LookupBuf with 0 length was turned into a Lookup. Since a LookupBuf with 0 \

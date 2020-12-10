@@ -6,7 +6,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
         SourceDescription,
     },
-    event::{Event, LookupBuf, SegmentBuf, Value},
+    event::{Event, Lookup, LookupBuf, SegmentBuf, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -430,7 +430,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         let element_lookup = LookupBuf::from(element.id);
         for (name, value) in element.params.into_iter() {
             let mut key_lookup = element_lookup.clone();
-            key_lookup.push(SegmentBuf::from(name.to_string()));
+            key_lookup.push_back(SegmentBuf::from(name.to_string()));
             log.insert(key_lookup, value.to_string());
         }
     }
@@ -614,7 +614,7 @@ mod test {
             event
                 .as_log()
                 .pairs(true)
-                .find(|(key, _)| (&key[..]).starts_with([Segment::from("empty")].as_ref()))
+                .find(|(key, _)| key.starts_with(Lookup::from("empty")))
                 == None
         }
 

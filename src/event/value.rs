@@ -1,14 +1,13 @@
 use crate::event::Segment;
 use crate::{
-    event::{timestamp_to_string, Lookup},
+    event::{timestamp_to_string, Lookup, LookupBuf},
     Result,
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::{BTreeMap, HashMap};
-use std::convert::{TryFrom, TryInto};
+use std::{collections::{BTreeMap, HashMap}, convert::{TryFrom, TryInto}, fmt::Debug};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
@@ -157,6 +156,89 @@ impl Value {
         }
     }
 
+    /// Insert a value at a given lookup.
+    #[instrument(level = "trace", skip(self))]
+    pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Result<Option<Value>> {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Err("Can only insert into map and array values.".into()),
+            Value::Map(_) => {
+                unimplemented!()
+            },
+            Value::Array(_) => {
+                unimplemented!()
+            },
+        }
+    }
+
+    /// Remove a value that exists at a given lookup.
+    ///
+    /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
+    #[instrument(level = "trace", skip(self))]
+    pub fn remove<'a>(
+        &mut self,
+        lookup: impl Into<Lookup<'a>> + Debug,
+        prune: bool,
+    ) -> Result<Option<Value>> {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Err("Can only remove from map and array values.".into()),
+            Value::Map(_) => {
+                unimplemented!()
+            },
+            Value::Array(_) => {
+                unimplemented!()
+            },
+        }
+    }
+
+
+    /// Get a mutable borrow of the value by lookup.
+    #[instrument(level = "trace", skip(self))]
+    pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&mut Value>> {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Err("Can only insert into map and array values.".into()),
+            Value::Map(_) => {
+                unimplemented!()
+            },
+            Value::Array(_) => {
+                unimplemented!()
+            },
+        }
+    }
+
+    /// Get an immutable borrow of the given value by lookup.
+    #[instrument(level = "trace", skip(self))]
+    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>> {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Err("Can only insert into map and array values.".into()),
+            Value::Map(_) => {
+                unimplemented!()
+            },
+            Value::Array(_) => {
+                unimplemented!()
+            },
+        }
+    }
+
     /// Produce an iterator over all 'nodes' in the graph of this value.
     ///
     /// This includes leaf nodes as well as intermediaries.
@@ -187,7 +269,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::from(k.as_str()));
+                                l.push_back(Segment::from(k.as_str()));
                                 l
                             },
                         );
@@ -212,7 +294,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::index(k));
+                                l.push_back(Segment::index(k));
                                 l
                             },
                         );
@@ -265,7 +347,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::from(k.as_str()));
+                                l.push_back(Segment::from(k.as_str()));
                                 l
                             },
                         );
@@ -290,7 +372,7 @@ impl Value {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
                             |mut l| {
-                                l.push(Segment::index(k));
+                                l.push_back(Segment::index(k));
                                 l
                             },
                         );

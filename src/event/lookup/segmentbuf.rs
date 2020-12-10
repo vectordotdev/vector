@@ -1,5 +1,5 @@
 use crate::event::lookup::Segment;
-use std::fmt::{Display, Formatter};
+use std::{collections::VecDeque, fmt::{Display, Formatter}};
 
 /// `SegmentBuf`s are chunks of a `LookupBuf`.
 ///
@@ -18,7 +18,7 @@ pub enum SegmentBuf {
     Coalesce(
         Vec<
             // Each of these can be it's own independent lookup.
-            Vec<Self>,
+            VecDeque<Self>,
         >,
     ),
 }
@@ -43,7 +43,7 @@ impl SegmentBuf {
         matches!(self, SegmentBuf::Index(_))
     }
 
-    pub const fn coalesce(v: Vec<Vec<Self>>) -> SegmentBuf {
+    pub const fn coalesce(v: Vec<VecDeque<Self>>) -> SegmentBuf {
         SegmentBuf::Coalesce(v)
     }
 
@@ -61,7 +61,7 @@ impl SegmentBuf {
             SegmentBuf::Index(i) => Segment::index(*i),
             SegmentBuf::Coalesce(v) => Segment::coalesce(
                 v.iter()
-                    .map(|inner| inner.iter().map(|v| v.as_segment()).collect::<Vec<_>>())
+                    .map(|inner| inner.iter().map(|v| v.as_segment()).collect::<VecDeque<_>>())
                     .collect(),
             ),
         }
@@ -118,9 +118,18 @@ impl From<usize> for SegmentBuf {
     }
 }
 
+impl From<Vec<VecDeque<SegmentBuf>>> for SegmentBuf {
+    fn from(value: Vec<VecDeque<SegmentBuf>>) -> Self {
+        Self::coalesce(value)
+    }
+}
+
+// While testing, it can be very convienent to use the `vec![]` macro.
+// This would be slow in hot release code, so we don't allow it in non-test code.
+#[cfg(test)]
 impl From<Vec<Vec<SegmentBuf>>> for SegmentBuf {
     fn from(value: Vec<Vec<SegmentBuf>>) -> Self {
-        Self::coalesce(value)
+        Self::coalesce(value.into_iter().map(|v| v.into()).collect())
     }
 }
 

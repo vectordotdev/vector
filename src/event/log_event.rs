@@ -416,7 +416,7 @@ impl LogEvent {
                         retval = map.remove(*name);
                         if map.is_empty() && prune {
                             let mut cloned = lookup.clone();
-                            cloned.pop();
+                            cloned.pop_back();
                             needs_prune = Some(cloned);
                         }
                         break;

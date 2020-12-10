@@ -1,7 +1,7 @@
 use crate::event::lookup::SegmentBuf;
 use pest::iterators::Pair;
 use remap::parser::ParserRule;
-use std::fmt::{Display, Formatter};
+use std::{collections::VecDeque, fmt::{Display, Formatter}};
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
 /// A sequence of Segments can become a lookup.
@@ -19,7 +19,7 @@ pub enum Segment<'a> {
     Coalesce(
         Vec<
             // Each of these can be it's own independent lookup.
-            Vec<Self>,
+            VecDeque<Self>,
         >,
     ),
 }
@@ -44,7 +44,7 @@ impl<'a> Segment<'a> {
         matches!(self, Segment::Index(_))
     }
 
-    pub const fn coalesce(v: Vec<Vec<Self>>) -> Segment<'a> {
+    pub const fn coalesce(v: Vec<VecDeque<Self>>) -> Segment<'a> {
         Segment::Coalesce(v)
     }
 
@@ -53,11 +53,11 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup(segment: Pair<'a, ParserRule>) -> crate::Result<Vec<Segment<'a>>> {
+    pub(crate) fn from_lookup(segment: Pair<'a, ParserRule>) -> crate::Result<VecDeque<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
-        let mut segments = Vec::default();
+        let mut segments = VecDeque::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
                 ParserRule::lookup_segment => {
@@ -80,24 +80,24 @@ impl<'a> Segment<'a> {
     #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_lookup_segment(
         segment: Pair<'a, ParserRule>,
-    ) -> crate::Result<Vec<Segment<'a>>> {
+    ) -> crate::Result<VecDeque<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
-        let mut segments = Vec::default();
+        let mut segments = VecDeque::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
                 ParserRule::lookup_field => {
-                    segments.push(Segment::from_lookup_field(inner_segment)?)
+                    segments.push_back(Segment::from_lookup_field(inner_segment)?)
                 }
                 ParserRule::lookup_field_quoted => {
-                    segments.push(Segment::from_lookup_field_quoted(inner_segment)?)
+                    segments.push_back(Segment::from_lookup_field_quoted(inner_segment)?)
                 }
                 ParserRule::lookup_array => {
-                    segments.push(Segment::from_lookup_array(inner_segment)?)
+                    segments.push_back(Segment::from_lookup_array(inner_segment)?)
                 }
                 ParserRule::lookup_coalesce => {
-                    segments.push(Segment::from_lookup_coalesce(inner_segment)?)
+                    segments.push_back(Segment::from_lookup_coalesce(inner_segment)?)
                 }
                 _ => {
                     return Err(format!(
@@ -258,7 +258,7 @@ impl<'a> Segment<'a> {
             Segment::Index(i) => SegmentBuf::index(*i),
             Segment::Coalesce(v) => SegmentBuf::coalesce(
                 v.iter()
-                    .map(|inner| inner.iter().map(|v| v.as_segment_buf()).collect::<Vec<_>>())
+                    .map(|inner| inner.iter().map(|v| v.as_segment_buf()).collect::<VecDeque<_>>())
                     .collect(),
             ),
         }
@@ -313,9 +313,18 @@ impl<'a> From<usize> for Segment<'a> {
     }
 }
 
+impl<'a> From<Vec<VecDeque<Segment<'a>>>> for Segment<'a> {
+    fn from(value: Vec<VecDeque<Segment<'a>>>) -> Self {
+        Self::coalesce(value)
+    }
+}
+
+// While testing, it can be very convienent to use the `vec![]` macro.
+// This would be slow in hot release code, so we don't allow it in non-test code.
+#[cfg(test)]
 impl<'a> From<Vec<Vec<Segment<'a>>>> for Segment<'a> {
     fn from(value: Vec<Vec<Segment<'a>>>) -> Self {
-        Self::coalesce(value)
+        Self::coalesce(value.into_iter().map(|v| v.into()).collect())
     }
 }
 
