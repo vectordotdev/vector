@@ -68,6 +68,18 @@ macro_rules! test_function {
 }
 
 #[macro_export]
+macro_rules! map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
+}
+
+#[macro_export]
 macro_rules! array {
     () => ({
         let vec: Vec<$crate::Value> = ::std::vec::Vec::new();
