@@ -3,8 +3,8 @@
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
-    character::complete::char,
-    combinator::{map, opt, value},
+    character::complete::{char, digit1},
+    combinator::{map, opt, recognize, value},
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
@@ -34,6 +34,8 @@ pub enum ErrorKind {
     ParseNameError { input: String },
     #[snafu(display("parse float value error, parsing: `{}`", input))]
     ParseFloatError { input: String },
+    #[snafu(display("parse timestamp error, parsing: `{}`", input))]
+    ParseTimestampError { input: String },
 
     // Error that we didn't catch
     #[snafu(display("error kind: {:?}, parsing: `{}`", kind, input))]
@@ -96,6 +98,7 @@ pub struct Metric {
     pub name: String,
     pub labels: BTreeMap<String, String>,
     pub value: f64,
+    pub timestamp: Option<i64>,
 }
 
 impl Metric {
@@ -113,12 +116,14 @@ impl Metric {
         let (input, name) = parse_name(input)?;
         let (input, labels) = Self::parse_labels(input)?;
         let (input, value) = Self::parse_value(input)?;
+        let (input, timestamp) = Self::parse_timestamp(input)?;
         Ok((
             input,
             Metric {
                 name,
                 labels,
                 value,
+                timestamp,
             },
         ))
     }
@@ -138,6 +143,13 @@ impl Metric {
             }
             .into()
         })
+    }
+
+    fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
+        let input = trim_space(input);
+        opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
+            s.parse().unwrap()
+        }))(input)
     }
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
@@ -615,6 +627,13 @@ mod test {
             error,
             ErrorKind::ParseNameError { .. }
         ));
+    }
+
+    #[test]
+    fn test_parse_timestamp() {
+        assert_eq!(Metric::parse_timestamp(""), Ok(("", None)));
+        assert_eq!(Metric::parse_timestamp("123"), Ok(("", Some(123))));
+        assert_eq!(Metric::parse_timestamp(" -23"), Ok(("", Some(-23))));
     }
 
     #[test]

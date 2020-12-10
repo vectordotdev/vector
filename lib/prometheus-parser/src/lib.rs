@@ -35,6 +35,7 @@ pub enum ParserError {
 pub struct SummaryMetric {
     pub labels: BTreeMap<String, String>,
     pub value: SummaryMetricValue,
+    pub timestamp: Option<i64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -48,6 +49,7 @@ pub enum SummaryMetricValue {
 pub struct HistogramMetric {
     pub labels: BTreeMap<String, String>,
     pub value: HistogramMetricValue,
+    pub timestamp: Option<i64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -61,6 +63,7 @@ pub enum HistogramMetricValue {
 pub struct OtherMetric {
     pub labels: BTreeMap<String, String>,
     pub value: f64,
+    pub timestamp: Option<i64>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -116,10 +119,15 @@ impl MetricGroup {
             name,
             labels,
             value,
+            timestamp,
         } = metric;
         MetricGroup {
             name,
-            metrics: GroupKind::Untyped(vec![OtherMetric { labels, value }]),
+            metrics: GroupKind::Untyped(vec![OtherMetric {
+                labels,
+                value,
+                timestamp,
+            }]),
         }
     }
 
@@ -142,6 +150,7 @@ impl MetricGroup {
                 vec.push(OtherMetric {
                     labels: metric.labels,
                     value: metric.value,
+                    timestamp: metric.timestamp,
                 });
             }
             GroupKind::Histogram(ref mut vec) => match suffix {
@@ -157,17 +166,20 @@ impl MetricGroup {
                             bucket,
                             count: try_f64_to_u32(metric.value)?,
                         },
+                        timestamp: metric.timestamp,
                     });
                 }
                 "_sum" => vec.push(HistogramMetric {
                     value: HistogramMetricValue::Sum { sum: metric.value },
                     labels: metric.labels,
+                    timestamp: metric.timestamp,
                 }),
                 "_count" => vec.push(HistogramMetric {
                     value: HistogramMetricValue::Count {
                         count: try_f64_to_u32(metric.value)?,
                     },
                     labels: metric.labels,
+                    timestamp: metric.timestamp,
                 }),
                 _ => return Ok(Some(metric)),
             },
@@ -186,17 +198,20 @@ impl MetricGroup {
                             quantile,
                             value: metric.value,
                         },
+                        timestamp: metric.timestamp,
                     });
                 }
                 "_sum" => vec.push(SummaryMetric {
                     value: SummaryMetricValue::Sum { sum: metric.value },
                     labels: metric.labels,
+                    timestamp: metric.timestamp,
                 }),
                 "_count" => vec.push(SummaryMetric {
                     value: SummaryMetricValue::Count {
                         count: try_f64_to_u32(metric.value)?,
                     },
                     labels: metric.labels,
+                    timestamp: metric.timestamp,
                 }),
                 _ => return Ok(Some(metric)),
             },
