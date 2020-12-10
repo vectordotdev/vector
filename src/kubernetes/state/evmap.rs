@@ -2,38 +2,50 @@
 
 use crate::kubernetes::{
     debounce::Debounce,
-    hash_value::{HashValue, Identity},
+    hash_value::{self, HashValue},
 };
 use async_trait::async_trait;
 use evmap::WriteHandle;
 use futures::future::BoxFuture;
-use std::borrow::ToOwned;
 use std::hash::Hash;
 use std::time::Duration;
+
+/// The type that extracts a key from the value.
+pub trait Indexer<T>: Send {
+    /// The type of the key to extract from the value.
+    type IndexValueType: Eq + Hash + Clone + Send;
+
+    /// Index the value
+    fn index(&self, resource: &T) -> Option<Self::IndexValueType>;
+}
 
 /// A [`WriteHandle`] wrapper that implements [`super::Write`].
 /// For use as a state writer implementation for
 /// [`crate::kubernetes::Reflector`].
-pub struct Writer<T>
+pub struct Writer<T, I>
 where
-    T: Identity + Send,
-    <T as Identity>::IdentityType: ToOwned,
-    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    I: Indexer<T> + Send,
 {
-    inner: WriteHandle<<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>>,
+    inner: WriteHandle<<I as Indexer<T>>::IndexValueType, Value<T>>,
+    indexer: I,
     debounced_flush: Option<Debounce>,
 }
 
-impl<T> Writer<T>
+impl<T, I> Writer<T, I>
 where
-    T: Identity + Send,
-    <T as Identity>::IdentityType: ToOwned,
-    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    I: Indexer<T> + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
     /// [`Self`].
     pub fn new(
-        mut inner: WriteHandle<<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>>,
+        mut inner: WriteHandle<<I as Indexer<T>>::IndexValueType, Value<T>>,
+        indexer: I,
         flush_debounce_timeout: Option<Duration>,
     ) -> Self {
         // Prepare inner.
@@ -45,6 +57,7 @@ where
 
         Self {
             inner,
+            indexer,
             debounced_flush,
         }
     }
@@ -66,30 +79,31 @@ where
 }
 
 #[async_trait]
-impl<T> super::Write for Writer<T>
+impl<T, I> super::Write for Writer<T, I>
 where
-    T: Identity + Send,
-    <T as Identity>::IdentityType: ToOwned,
-    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    I: Indexer<T> + Send,
 {
     type Item = T;
 
     async fn add(&mut self, item: Self::Item) {
-        if let Some((key, value)) = kv(item) {
+        if let Some((key, value)) = kv(&self.indexer, item) {
             self.inner.insert(key, value);
             self.debounced_flush();
         }
     }
 
     async fn update(&mut self, item: Self::Item) {
-        if let Some((key, value)) = kv(item) {
+        if let Some((key, value)) = kv(&self.indexer, item) {
             self.inner.update(key, value);
             self.debounced_flush();
         }
     }
 
     async fn delete(&mut self, item: Self::Item) {
-        if let Some((key, _value)) = kv(item) {
+        if let Some((key, _value)) = kv(&self.indexer, item) {
             self.inner.empty(key);
             self.debounced_flush();
         }
@@ -105,11 +119,12 @@ where
 }
 
 #[async_trait]
-impl<T> super::MaintainedWrite for Writer<T>
+impl<T, I> super::MaintainedWrite for Writer<T, I>
 where
-    T: Identity + Send,
-    <T as Identity>::IdentityType: ToOwned,
-    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    I: Indexer<T> + Send,
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         if let Some(ref mut debounced_flush) = self.debounced_flush {
@@ -130,15 +145,36 @@ where
 /// An alias to the value used at [`evmap`].
 pub type Value<T> = Box<HashValue<T>>;
 
-/// Build a key value pair for using in [`evmap`].
-fn kv<T>(object: T) -> Option<(<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>)>
+/// Build a key/value pair for using in [`evmap`] from an indexer.
+fn kv<T, I>(indexer: &I, resource: T) -> Option<(<I as Indexer<T>>::IndexValueType, Value<T>)>
 where
-    T: Identity,
-    <T as Identity>::IdentityType: ToOwned,
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+    I: Indexer<T> + Send,
 {
-    let value = Box::new(HashValue::new(object));
-    let key = value.identity()?.to_owned();
+    let key = indexer.index(&resource)?;
+    let value = Box::new(HashValue::new(resource));
     Some((key, value))
+}
+
+/// A simple indexer that delegates the indexing to the identity.
+///
+/// That is it will index the resources by whatever their identity is,
+/// which will be the `uid` in the general case.
+pub struct IdentityIndexer;
+
+impl<T> Indexer<T> for IdentityIndexer
+where
+    T: hash_value::Identity + Send,
+    <T as hash_value::Identity>::IdentityType: ToOwned,
+    <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
+{
+    type IndexValueType = <<T as hash_value::Identity>::IdentityType as ToOwned>::Owned;
+
+    fn index(&self, resource: &T) -> Option<Self::IndexValueType> {
+        resource.identity().map(ToOwned::to_owned)
+    }
 }
 
 #[cfg(test)]
@@ -160,7 +196,7 @@ mod tests {
     #[test]
     fn test_kv() {
         let pod = make_pod("uid");
-        let (key, val) = kv(pod.clone()).unwrap();
+        let (key, val) = kv(&IdentityIndexer, pod.clone()).unwrap();
         assert_eq!(key, "uid");
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
@@ -168,7 +204,7 @@ mod tests {
     #[tokio::test]
     async fn test_without_debounce() {
         let (state_reader, state_writer) = evmap::new();
-        let mut state_writer = Writer::new(state_writer, None);
+        let mut state_writer = Writer::new(state_writer, IdentityIndexer, None);
 
         assert_eq!(state_reader.is_empty(), true);
         assert!(state_writer.maintenance_request().is_none());
@@ -188,7 +224,8 @@ mod tests {
 
         let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
-        let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
+        let mut state_writer =
+            Writer::new(state_writer, IdentityIndexer, Some(flush_debounce_timeout));
 
         assert_eq!(state_reader.is_empty(), true);
         assert!(state_writer.maintenance_request().is_none());
