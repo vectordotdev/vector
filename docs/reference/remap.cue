@@ -79,15 +79,15 @@ remap: {
 			use: ["parameter"]
 		}
 		"array": {
-			description: "A list of items"
+			description: "A list of items."
 			use: ["parameter", "return"]
 		}
 		"boolean": {
-			description: "True or false"
+			description: "`true` or `false`."
 			use: ["parameter", "return"]
 		}
 		"float": {
-			description: "A floating-point integer"
+			description: "A 64-bit floating-point number."
 			use: ["parameter", "return"]
 		}
 		"map": {
@@ -98,19 +98,19 @@ remap: {
 			use: ["parameter", "return"]
 		}
 		"integer": {
-			description: "A 64-bit integer"
+			description: "A 64-bit integer."
 			use: ["parameter", "return"]
 		}
 		"null": {
-			description: "No value"
+			description: "No value."
 			use: ["return"]
 		}
 		"path": {
-			description: "An event field"
+			description: "An event field."
 			use: ["parameter"]
 		}
 		"regex": {
-			description: "A regular expression"
+			description: "A regular expression."
 			use: ["parameter"]
 		}
 		"string": {
@@ -121,7 +121,7 @@ remap: {
 			use: ["parameter", "return"]
 		}
 		"timestamp": {
-			description: "A string formatted as a timestamp"
+			description: "A string formatted as a timestamp."
 			use: ["parameter", "return"]
 		}
 	}
