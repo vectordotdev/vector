@@ -76,6 +76,12 @@ components: sources: prometheus_remote_write: {
 		gauge:   output._passthrough_gauge
 	}
 
+	telemetry: metrics: {
+		parse_errors_total:     components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+	}
+
 	how_it_works: {
 		metric_types: {
 			title: "Metric type interpretation"

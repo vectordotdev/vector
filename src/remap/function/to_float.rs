@@ -25,8 +25,8 @@ impl Function for ToFloat {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ToFloatFn { value, default }))
     }
@@ -59,7 +59,9 @@ impl Expression for ToFloatFn {
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to float".into()),
+            Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
+                Err("unable to convert value to float".into())
+            }
         };
 
         super::convert_value_or_default(
@@ -123,7 +125,7 @@ mod tests {
         }
 
         array_fallible {
-            expr: |_| ToFloatFn { value: Literal::from(vec![0]).boxed(), default: None },
+            expr: |_| ToFloatFn { value: Array::from(vec![0]).boxed(), default: None },
             def: TypeDef { fallible: true, kind: Kind::Float },
         }
 
@@ -133,7 +135,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToFloatFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            expr: |_| ToFloatFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Float,
@@ -142,8 +144,8 @@ mod tests {
 
        fallible_value_with_fallible_default {
             expr: |_| ToFloatFn {
-                value: Literal::from(vec![0]).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                value: Array::from(vec![0]).boxed(),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: true,
@@ -153,7 +155,7 @@ mod tests {
 
        fallible_value_with_infallible_default {
             expr: |_| ToFloatFn {
-                value: Literal::from(vec![0]).boxed(),
+                value: Array::from(vec![0]).boxed(),
                 default: Some(Literal::from(1).boxed()),
             },
             def: TypeDef {
@@ -165,7 +167,7 @@ mod tests {
         infallible_value_with_fallible_default {
             expr: |_| ToFloatFn {
                 value: Literal::from(1).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: false,
@@ -187,11 +189,13 @@ mod tests {
 
     #[test]
     fn to_float() {
+        use crate::map;
+
         let cases = vec![
             (
                 map![],
                 Ok(Value::Float(10.0)),
-                ToFloatFn::new(Literal::from(vec![0]).boxed(), Some(10.0.into())),
+                ToFloatFn::new(Array::from(vec![0]).boxed(), Some(10.0.into())),
             ),
             (
                 map!["foo": "20.5"],
@@ -207,7 +211,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

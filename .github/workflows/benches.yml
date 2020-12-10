@@ -25,16 +25,19 @@ jobs:
 
   bench:
     name: Bench - Linux
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64]
+    # Allow benchmarks show regressions until we can refine the thresholds for
+    # regression to reduce false positives.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
         continue-on-error: true
@@ -43,19 +46,26 @@ jobs:
           workflow: benches.yml
           branch: master
           name: criterion
-          path: target/criterion
+          path: target
+      - name: Check if there were master artifacts
+        run: |
+          test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
       - run: unzip target/criterion.zip
         continue-on-error: true
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make bench
+      - name: Run benchmarks
+        run: |
+          mkdir -p target/criterion
+          make bench | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
           name: "criterion"
           path: "./target/criterion.zip"
+      - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:
     name: master-failure

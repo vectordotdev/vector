@@ -24,8 +24,8 @@ impl Function for Assert {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let condition = arguments.required_expr("condition")?;
-        let message = arguments.optional_expr("message")?;
+        let condition = arguments.required("condition")?.boxed();
+        let message = arguments.optional("message").map(Expr::boxed);
 
         Ok(Box::new(AssertFn { condition, message }))
     }
@@ -109,7 +109,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object = Value::Map(object);
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

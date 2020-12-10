@@ -3,6 +3,7 @@ use crate::{
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::tcp::TcpSinkConfig,
+    tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
     Event,
 };
@@ -15,6 +16,7 @@ use snafu::Snafu;
 #[serde(deny_unknown_fields)]
 pub struct VectorSinkConfig {
     pub address: String,
+    pub keepalive: Option<TcpKeepaliveConfig>,
     pub tls: Option<TlsConfig>,
 }
 
@@ -34,6 +36,7 @@ impl GenerateConfig for VectorSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "127.0.0.1:5000".to_string(),
+            keepalive: None,
             tls: None,
         })
         .unwrap()
@@ -47,7 +50,8 @@ impl SinkConfig for VectorSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink_config = TcpSinkConfig::new(self.address.clone(), self.tls.clone());
+        let sink_config =
+            TcpSinkConfig::new(self.address.clone(), self.keepalive, self.tls.clone());
         sink_config.build(cx, encode_event)
     }
 

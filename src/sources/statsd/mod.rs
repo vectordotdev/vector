@@ -3,6 +3,7 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
@@ -39,6 +40,7 @@ pub struct UdpConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TcpConfig {
     address: SocketListenAddr,
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -78,6 +80,7 @@ impl SourceConfig for StatsdConfig {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
                     config.address,
+                    config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
                     shutdown,
@@ -226,6 +229,7 @@ mod test {
         let in_addr = next_addr();
         let config = StatsdConfig::Tcp(TcpConfig {
             address: in_addr.into(),
+            keepalive: None,
             tls: None,
             shutdown_timeout_secs: 30,
         });
