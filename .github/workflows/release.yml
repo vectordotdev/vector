@@ -33,6 +33,10 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb"
 
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
@@ -324,6 +328,10 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -398,6 +406,10 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -460,6 +472,10 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -534,6 +550,19 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
+      - name: Push amd64 musl deb
+        id: push-deb-amd64-musl
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "deb"
+          owner: "timber"
+          repo: "vector"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
         uses: cloudsmith-io/action@master

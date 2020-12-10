@@ -90,4 +90,4 @@ char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
 regex_inner = @{ regex_char* }
 regex_char  =  { !("/" | "\\") ~ ANY | "\\" ~ ANY }
 
-WHITESPACE  = _{ " " | "\t" }
+WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }

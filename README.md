@@ -28,7 +28,7 @@ or [**install Vector**][docs.installation].
 ### Principles
 
 * **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
-* **End-to-end** - Deploys as an agent or aggregator. Vector is a complete platform.
+* **End-to-end** - Deploys as an [agent][docs.roles#agent] or [aggregator][docs.roles#aggregator]. Vector is a complete platform.
 * **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool for all of your data.
 
 ### Use cases
@@ -170,8 +170,8 @@ Vector is an end-to-end, unified, open data platform.
 [docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
 [docs.process-management]: https://vector.dev/docs/administration/process-management/
 [docs.reference.templating]: https://vector.dev/docs/reference/templating/
+[docs.roles#agent]: https://vector.dev/docs/setup/deployment/roles/#agent
 [docs.roles#aggregator]: https://vector.dev/docs/setup/deployment/roles/#aggregator
-[docs.roles#daemon]: https://vector.dev/docs/setup/deployment/roles/#daemon
 [docs.roles#sidecar]: https://vector.dev/docs/setup/deployment/roles/#sidecar
 [docs.roles]: https://vector.dev/docs/setup/deployment/roles/
 [docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/

@@ -189,6 +189,8 @@ mod tests {
 
     #[test]
     fn to_int() {
+        use crate::map;
+
         let cases = vec![
             (
                 map![],
