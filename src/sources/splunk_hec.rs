@@ -772,7 +772,7 @@ mod tests {
         shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
-            util::{encoding::EncodingConfigWithDefault, Compression},
+            util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
@@ -821,15 +821,22 @@ mod tests {
 
     async fn sink(
         address: SocketAddr,
-        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecSinkConfig {
-            endpoint: format!("http://{}", address),
             token: TOKEN.to_owned(),
+            endpoint: format!("http://{}", address),
+            host_key: "host".to_owned(),
+            indexed_fields: vec![],
+            index: None,
+            sourcetype: None,
+            source: None,
             encoding: encoding.into(),
             compression,
-            ..HecSinkConfig::default()
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
         }
         .build(SinkContext::new_test())
         .await
@@ -837,7 +844,7 @@ mod tests {
     }
 
     async fn start(
-        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         compression: Compression,
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
