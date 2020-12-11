@@ -940,14 +940,14 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            Value::Bytes(val) => write!(f, r#""{}""#, String::from_utf8_lossy(val)),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
             Value::Boolean(val) => write!(f, "{}", val),
             Value::Map(map) => {
                 let joined = map
                     .iter()
-                    .map(|(key, val)| format!("{}: {}", key, val))
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{{ {} }}", joined)
@@ -961,8 +961,8 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => write!(f, "{}", val.to_string()),
-            Value::Regex(regex) => write!(f, "{}", regex.to_string()),
-            Value::Null => write!(f, "Null"),
+            Value::Regex(regex) => write!(f, "/{}/", regex.to_string()),
+            Value::Null => write!(f, "null"),
         }
     }
 }
