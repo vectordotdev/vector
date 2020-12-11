@@ -9,7 +9,6 @@ use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
-    objects.reverse();
     let mut index = 0;
 
     let mut rt = Runtime::new(state::Program::default());
