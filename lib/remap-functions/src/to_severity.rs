@@ -70,42 +70,42 @@ mod tests {
 
         emergency {
             args: func_args![level: value!(["emerge"])],
-            want: Ok(value!([0])),
+            want: Ok(value!(0)),
         }
 
         alert {
             args: func_args![level: value!["alert"]],
-            want: Ok(value!([1])),
+            want: Ok(value!(1)),
         }
 
         critical {
             args: func_args![severity: value!["crit"]],
-            want: Ok(value!([2])),
+            want: Ok(value!(2)),
         }
 
         error {
             args: func_args![severity: value!["err"]],
-            want: Ok(value!([3])),
+            want: Ok(value!(3)),
         }
 
         warning {
             args: func_args![severity: value!["warn"]],
-            want: Ok(value!([4])),
+            want: Ok(value!(4)),
         }
 
         notice {
             args: func_args![severity: value!["notice"]],
-            want: Ok(value!([5])),
+            want: Ok(value!(5)),
         }
 
         informational {
             args: func_args![severity: value!["info"]],
-            want: Ok(value!([6])),
+            want: Ok(value!(6)),
         }
 
         debug {
             args: func_args![severity: value!["debug"]],
-            want: Ok(value!([7])),
+            want: Ok(value!(7)),
         }
 
         invalid_level_1 {
