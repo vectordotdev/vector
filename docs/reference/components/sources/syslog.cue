@@ -44,7 +44,9 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: sources.socket.configuration
+	configuration: sources.socket.configuration & {
+		"type": "type": string: enum: syslog: "The type of this component."
+	}
 
 	output: logs: line: {
 		description: "An individual Syslog event"

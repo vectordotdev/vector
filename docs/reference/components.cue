@@ -858,8 +858,9 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum:
+				"type": string: enum: #Enum | *{
 					"\(Name)": "The type of this component."
+				}
 			}
 		}
 
