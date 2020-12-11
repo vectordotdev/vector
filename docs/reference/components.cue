@@ -369,12 +369,12 @@ components: {
 	})
 
 	#MetricInput: {
-		counter:      bool
-		distribution: bool
-		gauge:        bool
-		histogram:    bool
-		summary:      bool
-		set:          bool
+		counter:      *false | bool
+		distribution: *false | bool
+		gauge:        *false | bool
+		histogram:    *false | bool
+		set:          *false | bool
+		summary:      *false | bool
 	}
 
 	#MetricOutput: [Name=string]: close({
