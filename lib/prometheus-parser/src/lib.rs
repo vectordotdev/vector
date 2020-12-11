@@ -31,32 +31,80 @@ pub enum ParserError {
     ValueOutOfRange { value: f64 },
 }
 
-#[derive(Debug, PartialEq)]
-pub struct SummaryMetric {
-    pub labels: BTreeMap<String, String>,
-    pub value: SummaryMetricValue,
-    pub timestamp: Option<i64>,
+trait GroupMetric {
+    fn new_from(metric: Metric) -> Self;
+    fn timestamp(&self) -> Option<i64>;
+    fn labels(&self) -> &BTreeMap<String, String>;
 }
 
 #[derive(Debug, PartialEq)]
-pub enum SummaryMetricValue {
-    Quantile { quantile: f64, value: f64 },
-    Sum { sum: f64 },
-    Count { count: u32 },
+pub struct SummaryQuantile {
+    pub quantile: f64,
+    pub value: f64,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SummaryMetric {
+    pub labels: BTreeMap<String, String>,
+    pub quantiles: Vec<SummaryQuantile>,
+    pub sum: f64,
+    pub count: u32,
+    pub timestamp: Option<i64>,
+}
+
+impl GroupMetric for SummaryMetric {
+    fn new_from(metric: Metric) -> Self {
+        Self {
+            labels: metric.labels,
+            quantiles: vec![],
+            sum: 0.0,
+            count: 0,
+            timestamp: metric.timestamp,
+        }
+    }
+
+    fn timestamp(&self) -> Option<i64> {
+        self.timestamp
+    }
+
+    fn labels(&self) -> &BTreeMap<String, String> {
+        &self.labels
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HistogramBucket {
+    pub bucket: f64,
+    pub count: u32,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct HistogramMetric {
     pub labels: BTreeMap<String, String>,
-    pub value: HistogramMetricValue,
+    pub buckets: Vec<HistogramBucket>,
+    pub sum: f64,
+    pub count: u32,
     pub timestamp: Option<i64>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum HistogramMetricValue {
-    Bucket { bucket: f64, count: u32 },
-    Sum { sum: f64 },
-    Count { count: u32 },
+impl GroupMetric for HistogramMetric {
+    fn new_from(metric: Metric) -> Self {
+        Self {
+            labels: metric.labels,
+            buckets: vec![],
+            sum: 0.0,
+            count: 0,
+            timestamp: metric.timestamp,
+        }
+    }
+
+    fn timestamp(&self) -> Option<i64> {
+        self.timestamp
+    }
+
+    fn labels(&self) -> &BTreeMap<String, String> {
+        &self.labels
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -134,7 +182,7 @@ impl MetricGroup {
     /// Err(_) if there are irrecoverable error.
     /// Ok(Some(metric)) if this metric belongs to another group.
     /// Ok(None) pushed successfully.
-    fn try_push(&mut self, metric: Metric) -> Result<Option<Metric>, ParserError> {
+    fn try_push(&mut self, mut metric: Metric) -> Result<Option<Metric>, ParserError> {
         if !metric.name.starts_with(&self.name) {
             return Ok(Some(metric));
         }
@@ -155,64 +203,50 @@ impl MetricGroup {
             }
             GroupKind::Histogram(ref mut vec) => match suffix {
                 "_bucket" => {
-                    let mut labels = metric.labels;
-                    let bucket = labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
+                    let bucket = metric
+                        .labels
+                        .remove("le")
+                        .ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValue)?;
-                    vec.push(HistogramMetric {
-                        labels,
-                        value: HistogramMetricValue::Bucket {
-                            bucket,
-                            count: try_f64_to_u32(metric.value)?,
-                        },
-                        timestamp: metric.timestamp,
-                    });
+                    let count = try_f64_to_u32(metric.value)?;
+                    matching_group(vec, metric)
+                        .buckets
+                        .push(HistogramBucket { bucket, count });
                 }
-                "_sum" => vec.push(HistogramMetric {
-                    value: HistogramMetricValue::Sum { sum: metric.value },
-                    labels: metric.labels,
-                    timestamp: metric.timestamp,
-                }),
-                "_count" => vec.push(HistogramMetric {
-                    value: HistogramMetricValue::Count {
-                        count: try_f64_to_u32(metric.value)?,
-                    },
-                    labels: metric.labels,
-                    timestamp: metric.timestamp,
-                }),
+                "_sum" => {
+                    let sum = metric.value;
+                    matching_group(vec, metric).sum = sum;
+                }
+                "_count" => {
+                    let count = try_f64_to_u32(metric.value)?;
+                    matching_group(vec, metric).count = count;
+                }
                 _ => return Ok(Some(metric)),
             },
             GroupKind::Summary(ref mut vec) => match suffix {
                 "" => {
-                    let mut labels = metric.labels;
-                    let quantile = labels
+                    let quantile = metric
+                        .labels
                         .remove("quantile")
                         .ok_or(ParserError::ExpectedQuantileTag)?;
+                    let value = metric.value;
                     let (_, quantile) = line::Metric::parse_value(&quantile)
                         .map_err(Into::into)
                         .context(ParseLabelValue)?;
-                    vec.push(SummaryMetric {
-                        labels,
-                        value: SummaryMetricValue::Quantile {
-                            quantile,
-                            value: metric.value,
-                        },
-                        timestamp: metric.timestamp,
-                    });
+                    matching_group(vec, metric)
+                        .quantiles
+                        .push(SummaryQuantile { quantile, value });
                 }
-                "_sum" => vec.push(SummaryMetric {
-                    value: SummaryMetricValue::Sum { sum: metric.value },
-                    labels: metric.labels,
-                    timestamp: metric.timestamp,
-                }),
-                "_count" => vec.push(SummaryMetric {
-                    value: SummaryMetricValue::Count {
-                        count: try_f64_to_u32(metric.value)?,
-                    },
-                    labels: metric.labels,
-                    timestamp: metric.timestamp,
-                }),
+                "_sum" => {
+                    let sum = metric.value;
+                    matching_group(vec, metric).sum = sum;
+                }
+                "_count" => {
+                    let count = try_f64_to_u32(metric.value)?;
+                    matching_group(vec, metric).count = count;
+                }
                 _ => return Ok(Some(metric)),
             },
         }
@@ -220,6 +254,21 @@ impl MetricGroup {
     }
 }
 
+fn matching_group<'a, T: GroupMetric>(values: &'a mut Vec<T>, metric: Metric) -> &'a mut T {
+    // Assumes that the incoming metrics are already collated, which
+    // means that a change in either timestamp or labels represents a
+    // group.
+    let needs_new = values.last().map_or(true, |group| {
+        group.timestamp() != metric.timestamp || group.labels() != &metric.labels
+    });
+    if needs_new {
+        values.push(T::new_from(metric));
+    }
+    values.last_mut().unwrap()
+}
+
+/// Parse the given text input, and group the result into higher-level
+/// metric types based on the declared types in the text.
 pub fn group_text_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
@@ -251,6 +300,25 @@ pub fn group_text_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    macro_rules! match_group {
+        ($group:expr, $name:literal, $kind:ident => $inner:expr) => {{
+            assert_eq!($group.name, $name);
+            match &$group.metrics {
+                GroupKind::$kind(metrics) => ($inner)(metrics),
+                _ => panic!("Invalid metric group type"),
+            }
+        }};
+    }
+
+    macro_rules! labels {
+        () => { BTreeMap::new(); };
+        ( $( $name:ident => $value:literal ),* ) => {{
+            let mut result = BTreeMap::<String, String>::new();
+            $( result.insert(stringify!($name).into(), $value.to_string()); )*
+            result
+        }};
+    }
 
     #[test]
     fn test_group_text_metrics() {
@@ -292,7 +360,78 @@ mod test {
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
             "##;
-        group_text_metrics(input).unwrap();
+        let output = group_text_metrics(input).unwrap();
+        assert_eq!(output.len(), 6);
+        match_group!(output[0], "http_requests_total", Counter => |metrics: &[SimpleMetric]| {
+            assert_eq!(metrics.len(), 2);
+            assert_eq!(metrics[0], SimpleMetric {
+                labels: labels!(method => "post", code => 200),
+                value: 1027.0,
+                timestamp: Some(1395066363000),
+            });
+            assert_eq!(metrics[1], SimpleMetric {
+                labels: labels!(method => "post", code => 400),
+                value: 3.0,
+                timestamp: Some(1395066363000),
+            });
+        });
+        match_group!(output[1], "msdos_file_access_time_seconds", Untyped => |metrics: &[SimpleMetric]| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0], SimpleMetric {
+                labels: labels!(path => "C:\\DIR\\FILE.TXT", error => "Cannot find file:\n\"FILE.TXT\""),
+                value: 1.458255915e9,
+                timestamp: None,
+            });
+        });
+        match_group!(output[2], "metric_without_timestamp_and_labels", Untyped => |metrics: &[SimpleMetric]| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0], SimpleMetric {
+                labels: labels!(),
+                value: 12.47,
+                timestamp: None,
+            });
+        });
+        match_group!(output[3], "something_weird", Untyped => |metrics: &[SimpleMetric]| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0], SimpleMetric {
+                labels: labels!(problem => "division by zero"),
+                value: f64::INFINITY,
+                timestamp: Some(-3982045),
+            });
+        });
+        match_group!(output[4], "http_request_duration_seconds", Histogram => |metrics: &[HistogramMetric]| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0], HistogramMetric {
+                labels: labels!(),
+                buckets: vec![
+                    HistogramBucket { bucket: 0.05, count: 24054 },
+                    HistogramBucket { bucket: 0.1, count: 33444 },
+                    HistogramBucket { bucket: 0.2, count: 100392 },
+                    HistogramBucket { bucket: 0.5, count: 129389 },
+                    HistogramBucket { bucket: 1.0, count: 133988 },
+                    HistogramBucket { bucket: f64::INFINITY, count: 144320 },
+                ],
+                count: 144320,
+                sum: 53423.0,
+                timestamp: None,
+            });
+        });
+        match_group!(output[5], "rpc_duration_seconds", Summary => |metrics: &[SummaryMetric]| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0], SummaryMetric {
+                labels: labels!(),
+                quantiles: vec![
+                    SummaryQuantile { quantile: 0.01, value: 3102.0 },
+                    SummaryQuantile { quantile: 0.05, value: 3272.0 },
+                    SummaryQuantile { quantile: 0.5, value: 4773.0 },
+                    SummaryQuantile { quantile: 0.9, value: 9001.0 },
+                    SummaryQuantile { quantile: 0.99, value: 76656.0 },
+                ],
+                count: 2693,
+                sum: 1.7560473e+07,
+                timestamp: None,
+            });
+        });
     }
 
     #[test]

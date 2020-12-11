@@ -1,22 +1,8 @@
 use crate::event::metric::{Bucket, Metric, MetricKind, MetricValue, Quantile};
-use indexmap::IndexMap;
+use chrono::{DateTime, TimeZone, Utc};
 use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
-
-#[derive(Default)]
-struct AggregatedHistogram {
-    buckets: Vec<Bucket>,
-    count: u32,
-    sum: f64,
-}
-
-#[derive(Default)]
-struct AggregatedSummary {
-    quantiles: Vec<Quantile>,
-    count: u32,
-    sum: f64,
-}
 
 fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
     if tags.is_empty() {
@@ -26,7 +12,14 @@ fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String,
     }
 }
 
-pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
+fn utc_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
+    timestamp.and_then(|timestamp| {
+        Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000)
+            .latest()
+    })
+}
+
+pub(super) fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     let mut result = Vec::new();
 
     for group in prometheus_parser::group_text_metrics(packet)? {
@@ -45,6 +38,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             value: metric.value,
                         },
                     )
+                    .with_timestamp(utc_timestamp(metric.timestamp))
                     .with_tags(has_values_or_none(metric.labels));
 
                     result.push(counter);
@@ -59,86 +53,68 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             value: metric.value,
                         },
                     )
+                    .with_timestamp(utc_timestamp(metric.timestamp))
                     .with_tags(has_values_or_none(metric.labels));
 
                     result.push(gauge);
                 }
             }
             GroupKind::Histogram(vec) => {
-                let mut aggregates = IndexMap::<_, AggregatedHistogram>::new();
-
                 for metric in vec {
-                    let labels = metric.labels;
-                    let aggregate = aggregates.entry(labels).or_default();
-                    match metric.value {
-                        HistogramMetricValue::Count { count } => {
-                            aggregate.count = count;
-                        }
-                        HistogramMetricValue::Sum { sum } => {
-                            aggregate.sum = sum;
-                        }
-                        HistogramMetricValue::Bucket { bucket, count } => {
-                            // last bucket is implicit, because we store its value in 'count'
-                            if bucket != f64::INFINITY {
-                                let upper_limit = bucket;
-                                aggregate.buckets.push(Bucket { upper_limit, count });
-                            }
-                        }
+                    let mut buckets = metric.buckets;
+                    for i in (1..buckets.len()).rev() {
+                        buckets[i].count -= buckets[i - 1].count;
                     }
-                }
-
-                for (tags, mut aggregate) in aggregates {
-                    for i in (1..aggregate.buckets.len()).rev() {
-                        aggregate.buckets[i].count -= aggregate.buckets[i - 1].count;
+                    let drop_last = buckets
+                        .last()
+                        .map_or(false, |bucket| bucket.bucket == f64::INFINITY);
+                    if drop_last {
+                        buckets.pop();
                     }
-                    let hist = Metric::new(
-                        group.name.clone(),
-                        MetricKind::Absolute,
-                        MetricValue::AggregatedHistogram {
-                            buckets: aggregate.buckets,
-                            count: aggregate.count,
-                            sum: aggregate.sum,
-                        },
-                    )
-                    .with_tags(has_values_or_none(tags));
 
-                    result.push(hist);
+                    result.push(
+                        Metric::new(
+                            group.name.clone(),
+                            MetricKind::Absolute,
+                            MetricValue::AggregatedHistogram {
+                                buckets: buckets
+                                    .into_iter()
+                                    .map(|b| Bucket {
+                                        upper_limit: b.bucket,
+                                        count: b.count,
+                                    })
+                                    .collect(),
+                                count: metric.count,
+                                sum: metric.sum,
+                            },
+                        )
+                        .with_timestamp(utc_timestamp(metric.timestamp))
+                        .with_tags(has_values_or_none(metric.labels)),
+                    );
                 }
             }
             GroupKind::Summary(vec) => {
-                let mut aggregates = IndexMap::<_, AggregatedSummary>::new();
-
                 for metric in vec {
-                    let tags = metric.labels;
-                    let aggregate = aggregates.entry(tags).or_default();
-
-                    match metric.value {
-                        SummaryMetricValue::Count { count } => {
-                            aggregate.count = count;
-                        }
-                        SummaryMetricValue::Sum { sum } => {
-                            aggregate.sum = sum;
-                        }
-                        SummaryMetricValue::Quantile { quantile, value } => {
-                            let upper_limit = quantile;
-                            aggregate.quantiles.push(Quantile { upper_limit, value });
-                        }
-                    }
-                }
-
-                for (tags, aggregate) in aggregates {
-                    let summary = Metric::new(
-                        group.name.clone(),
-                        MetricKind::Absolute,
-                        MetricValue::AggregatedSummary {
-                            quantiles: aggregate.quantiles,
-                            count: aggregate.count,
-                            sum: aggregate.sum,
-                        },
-                    )
-                    .with_tags(has_values_or_none(tags));
-
-                    result.push(summary);
+                    result.push(
+                        Metric::new(
+                            group.name.clone(),
+                            MetricKind::Absolute,
+                            MetricValue::AggregatedSummary {
+                                quantiles: metric
+                                    .quantiles
+                                    .into_iter()
+                                    .map(|q| Quantile {
+                                        upper_limit: q.quantile,
+                                        value: q.value,
+                                    })
+                                    .collect(),
+                                count: metric.count,
+                                sum: metric.sum,
+                            },
+                        )
+                        .with_timestamp(utc_timestamp(metric.timestamp))
+                        .with_tags(has_values_or_none(metric.labels)),
+                    );
                 }
             }
         }
@@ -151,6 +127,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
 
@@ -275,6 +252,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1027.0 },
                 )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
                 .with_tags(Some(
                     vec![
                         ("method".into(), "post".into()),
@@ -288,6 +266,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 3.0 },
                 )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
                 .with_tags(Some(
                     vec![
                         ("method".into(), "post".into()),
@@ -505,6 +484,7 @@ mod test {
                     value: std::f64::INFINITY
                 },
             )
+            .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
             .with_tags(Some(
                 vec![("problem".into(), "division by zero".into())]
                     .into_iter()
@@ -529,6 +509,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 1.0 },
                 )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
                 .with_tags(Some(
                     vec![("env".into(), "production".into())]
                         .into_iter()
@@ -539,6 +520,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
                 .with_tags(Some(
                     vec![("env".into(), "testing".into())].into_iter().collect()
                 ))
