@@ -68,7 +68,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                 };
 
                 let value = resolve(objects.get_mut(index), &mut rt, command);
-                println!("{}", value);
+                println!("{}\n", value);
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
