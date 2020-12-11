@@ -9,13 +9,11 @@ impl Function for ToLevel {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "severity",
-                accepts: |v| matches!(v, Value::Integer(_)),
-                required: true,
-            }
-        ]
+        &[Parameter {
+            keyword: "severity",
+            accepts: |v| matches!(v, Value::Integer(_)),
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
@@ -29,7 +27,6 @@ impl Function for ToLevel {
 struct ToLevelFn {
     severity: Box<dyn Expression>,
 }
-
 
 impl Expression for ToLevelFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
@@ -45,7 +42,10 @@ impl Expression for ToLevelFn {
             5 => Ok("notice"),
             6 => Ok("info"),
             7 => Ok("debug"),
-            _ => Err(Error::from(format!("severity level {} not valid", severity))),
+            _ => Err(Error::from(format!(
+                "severity level {} not valid",
+                severity
+            ))),
         };
 
         match level {
