@@ -113,13 +113,6 @@ impl GeneratorConfig {
         let mut n: usize = 0;
 
         loop {
-            // If a count is specified, stop when reached, otherwise go forever
-            if let Some(count) = self.count {
-                if n == count - 1 {
-                    break;
-                }
-            }
-
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
                 break;
             }
@@ -139,6 +132,13 @@ impl GeneratorConfig {
             out = sink;
 
             n += 1;
+
+            // If a count is specified, stop when reached, otherwise go forever
+            if let Some(count) = self.count {
+                if n == count - 1 {
+                    break;
+                }
+            }
         }
 
         Ok(())
