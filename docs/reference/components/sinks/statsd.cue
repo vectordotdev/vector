@@ -45,6 +45,7 @@ components: sinks: statsd: {
 	}
 
 	configuration: sinks.socket.configuration & {
+		"type": "type": string: enum: statsd: "The type of this component."
 		default_namespace: {
 			common: true
 			description: """
