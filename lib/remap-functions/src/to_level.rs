@@ -109,14 +109,19 @@ mod tests {
             want: Ok(value!("debug")),
         }
 
-        invalid_severity_1 {
+        invalid_severity_next_int {
             args: func_args![severity: value![8]],
-            want: Err("severity level 8 not valid"),
+            want: Err("function call error: severity level 8 not valid"),
         }
 
-        invalid_severity_2 {
+        invalid_severity_larger_int {
             args: func_args![severity: value![475]],
-            want: Err("severity level 475 not valid"),
+            want: Err("function call error: severity level 475 not valid"),
+        }
+
+        invalid_severity_negative_int {
+            args: func_args![severity: value![-1]],
+            want: Err("function call error: severity level -1 not valid"),
         }
     ];
 }
