@@ -512,7 +512,7 @@ impl Object for Metric {
             result.push(Path::from_str("timestamp").expect("invalid path"));
         }
         if let Some(tags) = &self.tags {
-            for (name, _) in tags {
+            for name in tags.keys() {
                 result.push(Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
             }
         }

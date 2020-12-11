@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{path, state, object, Expression, Object, Result, TypeDef, Value};
+use crate::{object, path, state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]

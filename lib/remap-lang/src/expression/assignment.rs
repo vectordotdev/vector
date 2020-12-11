@@ -1,8 +1,7 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    object,
-    state, Expr, Expression, Object, Result, TypeDef, Value,
+    object, state, Expr, Expression, Object, Result, TypeDef, Value,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
