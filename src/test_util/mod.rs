@@ -93,19 +93,6 @@ pub fn next_addr_v6() -> SocketAddr {
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
-pub fn trace_init() {
-    #[cfg(unix)]
-    let color = atty::is(atty::Stream::Stdout);
-    // Windows: ANSI colors are not supported by cmd.exe
-    // Color is false for everything except unix.
-    #[cfg(not(unix))]
-    let color = false;
-
-    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
-
-    trace::init(color, false, &levels);
-}
-
 pub async fn send_lines(
     addr: SocketAddr,
     lines: impl IntoIterator<Item = String>,
