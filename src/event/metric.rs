@@ -103,6 +103,23 @@ pub enum MetricValue {
     },
 }
 
+/// Convert the Metric value into a remap value.
+/// Currently remap can only read the type of the value and doesn't consider
+/// any actual metric values.
+impl From<MetricValue> for remap::Value {
+    fn from(value: MetricValue) -> Self {
+        match value {
+            MetricValue::Counter { .. } => "counter",
+            MetricValue::Gauge { .. } => "gauge",
+            MetricValue::Set { .. } => "set",
+            MetricValue::Distribution { .. } => "distribution",
+            MetricValue::AggregatedHistogram { .. } => "aggregated histogram",
+            MetricValue::AggregatedSummary { .. } => "aggregated summary",
+        }
+        .into()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
@@ -404,8 +421,20 @@ impl Display for Metric {
     }
 }
 
-fn valid_metric_paths() -> Vec<&'static str> {
+fn valid_metric_paths_set() -> Vec<&'static str> {
     vec![".name", ".namespace", ".timestamp", ".kind", ".tags"]
+}
+
+/// We can get the `type` of the metric in Remap, but can't set  it.
+fn valid_metric_paths_get() -> Vec<&'static str> {
+    vec![
+        ".name",
+        ".namespace",
+        ".timestamp",
+        ".kind",
+        ".tags",
+        ".type",
+    ]
 }
 
 impl Object for Metric {
@@ -452,7 +481,7 @@ impl Object for Metric {
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(valid_metric_paths()),
+                remap::object::ValidPaths(valid_metric_paths_set()),
             )),
         }
     }
@@ -468,7 +497,6 @@ impl Object for Metric {
                 map.insert("timestamp".to_string(), timestamp.into());
             }
             map.insert("kind".to_string(), self.kind.clone().into());
-
             if let Some(tags) = &self.tags {
                 map.insert(
                     "tags".to_string(),
@@ -478,6 +506,7 @@ impl Object for Metric {
                         .into(),
                 );
             }
+            map.insert("type".to_string(), self.value.clone().into());
 
             return Ok(Some(map.into()));
         }
@@ -494,9 +523,12 @@ impl Object for Metric {
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
+            [Segment::Field(type_)] if type_.as_str() == "type" => {
+                Ok(Some(self.value.clone().into()))
+            }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(valid_metric_paths()),
+                remap::object::ValidPaths(valid_metric_paths_get()),
             )),
         }
     }
@@ -517,6 +549,7 @@ impl Object for Metric {
             }
         }
         result.push(Path::from_str("kind").expect("invalid path"));
+        result.push(Path::from_str("type").expect("invalid path"));
 
         Ok(result)
     }
@@ -541,7 +574,7 @@ impl Object for Metric {
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(valid_metric_paths()),
+                remap::object::ValidPaths(valid_metric_paths_set()),
             )),
         }
     }
@@ -912,7 +945,8 @@ mod test {
                      "namespace": "zoob",
                      "timestamp": Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
                      "tags": map!["tig": "tog"],
-                     "kind": "absolute"
+                     "kind": "absolute",
+                     "type": "counter"
                 ]
                 .into()
             )),
@@ -936,10 +970,12 @@ mod test {
         };
 
         assert_eq!(
-            Ok(["name", "namespace", "timestamp", "tags.tig", "kind"]
-                .iter()
-                .map(|path| Path::from_str(path).expect("invalid path"))
-                .collect()),
+            Ok(
+                ["name", "namespace", "timestamp", "tags.tig", "kind", "type"]
+                    .iter()
+                    .map(|path| Path::from_str(path).expect("invalid path"))
+                    .collect()
+            ),
             metric.paths()
         );
     }
@@ -1007,28 +1043,43 @@ mod test {
             value: MetricValue::Counter { value: 1.23 },
         };
 
-        let validpaths =
+        let validpaths_get = remap::object::ValidPaths(vec![
+            ".name",
+            ".namespace",
+            ".timestamp",
+            ".kind",
+            ".tags",
+            ".type",
+        ]);
+
+        let validpaths_set =
             remap::object::ValidPaths(vec![".name", ".namespace", ".timestamp", ".kind", ".tags"]);
 
         assert_eq!(
-            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
+            Err(RemapError::InvalidPath(
+                ".zork".into(),
+                validpaths_get.clone()
+            )),
             metric.get(&Path::from_str("zork").unwrap())
         );
 
         assert_eq!(
-            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
+            Err(RemapError::InvalidPath(
+                ".zork".into(),
+                validpaths_set.clone()
+            )),
             metric.insert(&Path::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
-            Err(RemapError::InvalidPath(".zork".into(), validpaths.clone())),
+            Err(RemapError::InvalidPath(".zork".into(), validpaths_set)),
             metric.remove(&Path::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
             Err(RemapError::InvalidPath(
                 ".tags.foo.flork".into(),
-                validpaths
+                validpaths_get
             )),
             metric.get(&Path::from_str("tags.foo.flork").unwrap())
         );

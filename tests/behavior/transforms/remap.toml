@@ -1346,6 +1346,7 @@
       .tags.host = "ook"
       .tags.name = .name
       .tags.namespace = .namespace
+      .tags.type = .type
    """
 [[tests]]
   name = "remap_metrics"
@@ -1363,3 +1364,4 @@
       "name.equals" = "example counter"
       "namespace.equals" = "zork"
       "host.equals" = "ook"
+      "type.equals" = "counter"
