@@ -7,7 +7,7 @@ remap: functions: to_severity: {
 			description: "The Syslog level keyword to convert."
 			required:    true
 			type: ["string"]
-		}
+		},
 	]
 
 	return: ["integer"]
