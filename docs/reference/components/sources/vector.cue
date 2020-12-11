@@ -6,8 +6,7 @@ components: sources: vector: {
 	title: "Vector"
 
 	description: """
-		The Vector source receives data from another upstream Vector instance
-		using the Vector sink.
+		Receives data from another upstream Vector instance	using the Vector sink.
 		"""
 
 	classes: {

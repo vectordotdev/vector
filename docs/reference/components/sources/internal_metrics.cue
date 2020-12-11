@@ -4,9 +4,8 @@ components: sources: internal_metrics: {
 	title: "Internal Metrics"
 
 	description: """
-		The internal metrics source exposes Vector's own internal metrics,
-		allowing you to collect, process, and route Vector's internal metrics
-		just like other metrics.
+		Exposes Vector's own internal metrics, allowing you to collect, process,
+		and route Vector's internal metrics just like other metrics.
 		"""
 
 	classes: {

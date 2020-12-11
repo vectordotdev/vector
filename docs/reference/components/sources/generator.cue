@@ -4,8 +4,7 @@ components: sources: generator: {
 	title: "Generator"
 
 	description: """
-		The generator source generates fakes events, useful for testing,
-		benchmarking, and demoing.
+		Generates fakes events, useful for testing, benchmarking, and demoing.
 		"""
 
 	classes: {

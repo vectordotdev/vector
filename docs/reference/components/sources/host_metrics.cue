@@ -4,9 +4,9 @@ components: sources: host_metrics: {
 	title: "Host Metrics"
 
 	description: """
-		The host metrics source examines system data sources on the local system
-		and generates metrics describing utilization of various system resources,
-		such as CPU, memory, disk, and network utilization.
+		Examines system data sources on the local system and generates metrics
+		describing utilization of various system resources, such as CPU, memory,
+		disk, and network utilization.
 		"""
 
 	classes: {
