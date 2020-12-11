@@ -15,7 +15,7 @@ struct TRL {
     #[structopt(name = "PROGRAM")]
     program: Option<String>,
 
-    /// File containing the object to manipulate, leave empty to use stdin
+    /// File containing the object(s) to manipulate, leave empty to use stdin
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
@@ -52,16 +52,21 @@ fn main() {
 }
 
 fn run(opt: TRL) -> Result<String, Error> {
-    let mut object = read_into_object(opt.input_file.as_ref())?;
+    let objects = read_into_objects(opt.input_file.as_ref())?;
     let program = read_program(opt.program.as_deref(), opt.program_file.as_ref())?;
 
-    execute(&mut object, &program).map(|v| {
-        if opt.print_object {
-            object.to_string()
-        } else {
-            v.to_string()
-        }
-    })
+    let mut result = "".to_owned();
+    for mut object in objects {
+        result = execute(&mut object, &program).map(|v| {
+            if opt.print_object {
+                object.to_string()
+            } else {
+                v.to_string()
+            }
+        })?;
+    }
+
+    Ok(result)
 }
 
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
@@ -82,15 +87,18 @@ fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, 
     }
 }
 
-fn read_into_object(input: Option<&PathBuf>) -> Result<Value, Error> {
+fn read_into_objects(input: Option<&PathBuf>) -> Result<Vec<Value>, Error> {
     let input = match input {
         Some(path) => read(File::open(path)?),
         None => read(io::stdin()),
     }?;
 
     match input.as_str() {
-        "" => Ok(Value::Map(BTreeMap::default())),
-        _ => Ok(serde_to_remap(serde_json::from_str(&input)?)),
+        "" => Ok(vec![Value::Map(BTreeMap::default())]),
+        _ => input
+            .lines()
+            .map(|line| Ok(serde_to_remap(serde_json::from_str(&line)?)))
+            .collect::<Result<Vec<Value>, Error>>(),
     }
 }
 
