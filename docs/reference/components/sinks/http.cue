@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: http: {
-	title:       "HTTP"
+	title: "HTTP"
 
 	classes: {
 		commonly_used: true

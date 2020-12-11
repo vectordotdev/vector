@@ -32,9 +32,9 @@ components: sources: aws_s3: components._aws & {
 
 		requirements: [
 			"""
-			The AWS S3 source requires a SQS queue configured to receive S3
-			bucket notifications for the desired S3 buckets.
-			"""
+				The AWS S3 source requires a SQS queue configured to receive S3
+				bucket notifications for the desired S3 buckets.
+				""",
 		]
 		warnings: []
 		notices: []

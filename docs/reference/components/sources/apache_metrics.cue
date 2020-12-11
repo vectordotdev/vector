@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: apache_metrics: {
-	title:       "Apache HTTP Server (HTTPD) Metrics"
+	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
