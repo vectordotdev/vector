@@ -560,24 +560,23 @@ mod tests {
     }
 
     #[test]
-    fn sets_insert_action_when_configured() {
+    fn sets_create_action_when_configured() {
+        use chrono::{Utc, TimeZone};
+        use crate::config::log_schema;
+
         let config = ElasticSearchConfig {
             bulk_action: BulkAction::Create,
             index: Some(String::from("vector")),
-            encoding: EncodingConfigWithDefault {
-                codec: Encoding::Default,
-                except_fields: Some(vec!["timestamp".to_string()]),
-                ..Default::default()
-            },
             endpoint: String::from("https://example.com"),
             ..Default::default()
         };
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
-        let event = Event::from("hello there");
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert(log_schema().timestamp_key(), Utc.ymd(2020, 12, 1).and_hms(1, 2, 3));
         let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
-{"message":"hello there"}
+{"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
     }
