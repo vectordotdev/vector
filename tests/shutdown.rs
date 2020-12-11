@@ -163,6 +163,7 @@ fn configuration_path_recomputed() {
         &source_config(
             r#"
         type = "generator"
+        format = "round_robin"
         batch_interval = 1.0 # optional, no default
         lines = []"#,
         ),
@@ -226,6 +227,7 @@ fn timely_shutdown_generator() {
     test_timely_shutdown(source_vector(
         r#"
     type = "generator"
+    format = "round_robin"
     batch_interval = 1.0 # optional, no default
     lines = []"#,
     ));
