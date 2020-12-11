@@ -46,27 +46,31 @@ enum Error {
 
 fn main() {
     match run(TRL::from_args()) {
-        Ok(out) => println!("{}", out),
+        Ok(_) => {}
         Err(err) => eprintln!("{}", err),
     }
 }
 
-fn run(opt: TRL) -> Result<String, Error> {
+fn run(opt: TRL) -> Result<(), Error> {
     let objects = read_into_objects(opt.input_file.as_ref())?;
     let program = read_program(opt.program.as_deref(), opt.program_file.as_ref())?;
 
-    let mut result = "".to_owned();
     for mut object in objects {
-        result = execute(&mut object, &program).map(|v| {
+        let result = execute(&mut object, &program).map(|v| {
             if opt.print_object {
                 object.to_string()
             } else {
                 v.to_string()
             }
-        })?;
+        });
+
+        match result {
+            Ok(ok) => println!("{}", ok),
+            Err(err) => eprintln!("{}", err),
+        }
     }
 
-    Ok(result)
+    Ok(())
 }
 
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
