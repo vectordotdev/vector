@@ -8,9 +8,29 @@ lazy_static! {
         vec!["alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",];
     static ref HTTP_CODES: Vec<usize> =
         vec![200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,];
-    static ref HTTP_ENDPOINTS: Vec<&'static str> = vec!["/foo", "/bar"];
+    static ref HTTP_ENDPOINTS: Vec<&'static str> = vec![
+        "/wp-admin",
+        "/controller/setup",
+        "/user/booperbot124",
+        "/apps/deploy",
+        "/observability/metrics/production",
+        "/secret-info/open-sesame",
+        "/booper/bopper/mooper/mopper",
+        "/do-not-access/needs-work",
+        "/this/endpoint/prints/money",
+    ];
     static ref HTTP_VERSIONS: Vec<&'static str> = vec!["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
-    static ref ERROR_MESSAGES: Vec<&'static str> = vec!["something went wrong", "oops"];
+    static ref ERROR_MESSAGES: Vec<&'static str> = vec![
+        "There's a breach in the warp core, captain",
+        "Great Scott! We're never gonna reach 88 mph with the flux capacitor in its current state!",
+        "You're not gonna believe what just happened",
+        "#hugops to everyone who has to deal with this",
+        "Take a breath, let it go, walk away",
+        "A bug was encountered but not in Vector, which doesn't have bugs",
+        "We're gonna need a bigger boat",
+        "Maybe we just shouldn't user computers",
+        "Pretty pretty pretty good",
+    ];
     static ref APACHE_COMMON_TIME_FORMAT: &'static str = "%d/%b/%Y:%T %z";
     static ref APACHE_ERROR_TIME_FORMAT: &'static str = "%a %b %d %T %Y";
     static ref SYSLOG_TIME_FORMAT: &'static str = "%+";
