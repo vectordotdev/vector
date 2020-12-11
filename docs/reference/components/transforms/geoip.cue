@@ -81,21 +81,21 @@ components: transforms: geoip: {
 				* [GeoLite2-City.mmdb](\(urls.maxmind_geolite2_city)) (free) — Determine the
 					country, subdivisions, city, and postal code associated with IPv4 and IPv6
 					addresses worldwide.
-				* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) -  Determine the country,
+				* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) — Determine the country,
 					subdivisions, city, and postal code associated with IPv4 and IPv6
 					addresses worldwide.
-				* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) - Determine the Internet
+				* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
 					Service Provider (ISP), organization name, and autonomous system organization
 					and number associated with an IP address.
 
-				The database files should in the [MaxMind DB file
+				The database files should be in the [MaxMind DB file
 				format](\(urls.maxmind_db_file_format)).
 				"""
 		}
 	}
 
 	output: logs: line: {
-		_blurb: """
+		_city_db_blurb: """
 			Available with the [GeoIP2-City](\(urls.maxmind_geoip2_city)) or
 			[GeoLite2-City](\(urls.maxmind_geolite2_city)) database.
 			"""
@@ -147,7 +147,7 @@ components: transforms: geoip: {
 						}
 						city_name: {
 							description: """
-								The city name associated with the IP address. \(_blurb).
+								The city name associated with the IP address. \(_city_db_blurb).
 								"""
 							required:    true
 							type: string: {
@@ -156,7 +156,8 @@ components: transforms: geoip: {
 							groups: ["City"]
 						}
 						continent_code: {
-							description: "The continent code associated with the IP address. \(_blurb)."
+							description: "The continent code associated with the IP address.
+							\(_city_db_blurb)."
 							required:    true
 							type: string: {
 								enum: {
@@ -197,7 +198,7 @@ components: transforms: geoip: {
 							groups: ["ISP"]
 						}
 						latitude: {
-							description: "The latitude associated with the IP address. \(_blurb)."
+							description: "The latitude associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["51.75"]
@@ -205,7 +206,7 @@ components: transforms: geoip: {
 							groups: ["City"]
 						}
 						longitude: {
-							description: "The longitude associated with the IP address. \(_blurb)."
+							description: "The longitude associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["-1.25"]
@@ -227,7 +228,7 @@ components: transforms: geoip: {
 							groups: ["ISP"]
 						}
 						postal_code: {
-							description: "The postal code associated with the IP address. \(_blurb)."
+							description: "The postal code associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["07094", "10010", "OX1"]
@@ -238,7 +239,7 @@ components: transforms: geoip: {
 							description: """
 								The timezone associated with the IP address in [IANA time zone
 								format](\(urls.iana_time_zone_format)). A full list of time zones
-								can be found [here](\(urls.iana_time_zones)) \(_blurb).
+								can be found [here](\(urls.iana_time_zones)) \(_city_db_blurb).
 								"""
 							required:    true
 							type: string: {
