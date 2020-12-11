@@ -18,8 +18,7 @@ use tokio::time::{interval, Duration};
 pub struct GeneratorConfig {
     #[serde(default, alias = "batch_interval")]
     interval: Option<f64>,
-    #[serde(default = "usize::max_value")]
-    count: usize,
+    count: Option<usize>,
     #[serde(flatten)]
     format: OutputFormat,
 }
@@ -97,7 +96,7 @@ impl GeneratorConfig {
     }
 
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: Option<usize>, interval: Option<f64>) -> Self {
         Self {
             count,
             interval,
@@ -111,7 +110,16 @@ impl GeneratorConfig {
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
         let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
 
-        for n in 0..self.count {
+        let mut n: usize = 0;
+
+        loop {
+            // If a count is specified, stop when reached, otherwise go forever
+            if let Some(count) = self.count {
+                if n == count - 1 {
+                    break;
+                }
+            }
+
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
                 break;
             }
@@ -129,6 +137,8 @@ impl GeneratorConfig {
                 .await
                 .map_err(|error| error!(message="Error sending generated lines.", %error))?;
             out = sink;
+
+            n += 1;
         }
 
         Ok(())

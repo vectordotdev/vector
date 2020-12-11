@@ -373,7 +373,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let mut config = config::Config::builder();
     let generator =
-        GeneratorConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+        GeneratorConfig::repeat(vec!["line 1".into()], Some(params.requests), params.interval);
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
