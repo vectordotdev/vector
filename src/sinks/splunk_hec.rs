@@ -504,7 +504,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let mut config = config(Encoding::Text, vec![]).await;
-        config.index = Template::try_from(LookupBuf::from("custom_index")).ok();
+        config.index = Template::try_from("custom_index").ok();
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
@@ -520,7 +520,7 @@ mod integration_tests {
     async fn splunk_index_is_interpolated() {
         let cx = SinkContext::new_test();
 
-        let indexed_fields = vec!["asdf".to_string()];
+        let indexed_fields = vec!["asdf".into()];
         let mut config = config(Encoding::Json, indexed_fields).await;
         config.index = Template::try_from("{{ some_field }}".to_string()).ok();
 
@@ -528,7 +528,9 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("some_field", "rendered value");
+        event
+            .as_mut_log()
+            .insert("some_field".into(), "rendered value");
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;

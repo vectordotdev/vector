@@ -185,7 +185,7 @@ impl<'a> Lookup<'a> {
 
     /// Returns `true` if `needle` is a prefix of the lookup.
     pub fn starts_with<'b>(&self, needle: Lookup<'b>) -> bool {
-        needle.iter().zip(&self.segments).all(|(n, s)| n == s )
+        needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }
 
@@ -202,9 +202,7 @@ impl<'a> From<&'a str> for Lookup<'a> {
     fn from(input: &'a str) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input));
-        Self {
-            segments,
-        }
+        Self { segments }
         // We know this must be at least one segment.
     }
 }
@@ -213,9 +211,7 @@ impl<'a> From<usize> for Lookup<'a> {
     fn from(input: usize) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input));
-        Self {
-            segments,
-        }
+        Self { segments }
         // We know this must be at least one segment.
     }
 }
@@ -224,9 +220,7 @@ impl<'a> From<&'a String> for Lookup<'a> {
     fn from(input: &'a String) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input.as_str()));
-        Self {
-            segments,
-        }
+        Self { segments }
         // We know this must be at least one segment.
     }
 }

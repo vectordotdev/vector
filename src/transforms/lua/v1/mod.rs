@@ -252,7 +252,7 @@ impl rlua::UserData for LuaEvent {
                     let key: Option<String> = next.call((keys, prev))?;
                     match key
                         .clone()
-                        .and_then(|k| event.inner.as_log().get(&LookupBuf::from(k)))
+                        .and_then(|k| event.inner.as_log().get(LookupBuf::from(k)))
                     {
                         Some(value) => {
                             Ok((key, Some(ctx.create_string(&value.clone_into_bytes())?)))

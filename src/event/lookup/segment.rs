@@ -1,7 +1,10 @@
 use crate::event::lookup::SegmentBuf;
 use pest::iterators::Pair;
 use remap::parser::ParserRule;
-use std::{collections::VecDeque, fmt::{Display, Formatter}};
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+};
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
 /// A sequence of Segments can become a lookup.
@@ -53,7 +56,9 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub(crate) fn from_lookup(segment: Pair<'a, ParserRule>) -> crate::Result<VecDeque<Segment<'a>>> {
+    pub(crate) fn from_lookup(
+        segment: Pair<'a, ParserRule>,
+    ) -> crate::Result<VecDeque<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -258,7 +263,12 @@ impl<'a> Segment<'a> {
             Segment::Index(i) => SegmentBuf::index(*i),
             Segment::Coalesce(v) => SegmentBuf::coalesce(
                 v.iter()
-                    .map(|inner| inner.iter().map(|v| v.as_segment_buf()).collect::<VecDeque<_>>())
+                    .map(|inner| {
+                        inner
+                            .iter()
+                            .map(|v| v.as_segment_buf())
+                            .collect::<VecDeque<_>>()
+                    })
                     .collect(),
             ),
         }

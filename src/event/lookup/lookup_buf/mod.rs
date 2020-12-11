@@ -6,11 +6,11 @@ use remap::parser::ParserRule;
 use std::{
     collections::VecDeque,
     convert::TryFrom,
+    fmt::{self, Display, Formatter},
+    ops::{Index, IndexMut},
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
     slice::Iter,
     str,
-    fmt::{self, Display, Formatter},
-    ops::{Index, IndexMut},
     str::FromStr,
 };
 use toml::Value as TomlValue;
@@ -134,7 +134,6 @@ impl LookupBuf {
         trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop_front()
     }
-
 
     #[instrument(level = "trace")]
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, SegmentBuf> {
@@ -265,7 +264,7 @@ impl LookupBuf {
     /// Returns `true` if `needle` is a prefix of the lookup.
     #[instrument(level = "trace")]
     pub fn starts_with(&self, needle: &LookupBuf) -> bool {
-        needle.iter().zip(&self.segments).all(|(n, s)| n == s )
+        needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }
 
@@ -292,9 +291,7 @@ impl From<String> for LookupBuf {
     fn from(input: String) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::from(input));
-        LookupBuf {
-            segments,
-        }
+        LookupBuf { segments }
         // We know this must be at least one segment.
     }
 }
@@ -303,9 +300,7 @@ impl From<usize> for LookupBuf {
     fn from(input: usize) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::index(input));
-        LookupBuf {
-            segments,
-        }
+        LookupBuf { segments }
         // We know this must be at least one segment.
     }
 }
@@ -314,9 +309,7 @@ impl From<&str> for LookupBuf {
     fn from(input: &str) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::from(input.to_owned()));
-        LookupBuf {
-            segments,
-        }
+        LookupBuf { segments }
         // We know this must be at least one segment.
     }
 }

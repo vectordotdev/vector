@@ -1249,8 +1249,8 @@ mod integration_tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "before".into()
+            events[0].as_log().get(log_schema().message_key()),
+            Some(&Value::from("before".to_string())),
         );
 
         id
@@ -1286,9 +1286,9 @@ mod integration_tests {
         assert!(log
             .get(&LookupBuf::from(format!("label.{}", label)))
             .is_some());
-        assert_eq!(events[0].as_log()[&*super::NAME], name.into());
+        assert_eq!(events[0].as_log().get(&*super::NAME), name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log().get(log_schema().source_type_key()),
             "docker".into()
         );
     }
@@ -1309,11 +1309,11 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log().get(log_schema().message_key()),
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[log_schema().message_key()],
+            events[1].as_log().get(log_schema().message_key()),
             message.into()
         );
     }
@@ -1337,7 +1337,7 @@ mod integration_tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log().get(log_schema().message_key()),
             message.into()
         );
     }
@@ -1362,7 +1362,7 @@ mod integration_tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log().get(log_schema().message_key()),
             message.into()
         );
     }
@@ -1391,9 +1391,9 @@ mod integration_tests {
         assert!(log
             .get(Lookup::from_str(&*format!("label.{}", label)).unwrap())
             .is_some());
-        assert_eq!(events[0].as_log()[&*super::NAME], name.into());
+        assert_eq!(events[0].as_log().get(&*super::NAME), name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log().get(log_schema().source_type_key()),
             "docker".into()
         );
     }
@@ -1419,7 +1419,7 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
+            events[0].as_log().get(log_schema().message_key()),
             message.into()
         );
     }

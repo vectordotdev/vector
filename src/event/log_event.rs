@@ -21,7 +21,7 @@ pub struct LogEvent {
 impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
+    pub fn get<'event, 'lookup: 'event>(&'event self, lookup: impl Into<Lookup<'lookup>> + Debug) -> Option<&'event Value> {
         let lookup = lookup.into();
         let lookup_len = lookup.len();
         let mut lookup_iter = lookup.into_iter().enumerate();
@@ -100,86 +100,46 @@ impl LogEvent {
 
     /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
-        let lookup = lookup.into();
-        let lookup_len = lookup.len();
-        let mut lookup_iter = lookup.into_iter().enumerate();
+    pub fn get_mut<'event, 'lookup: 'event>(&'event mut self, lookup: impl Into<Lookup<'lookup>> + Debug) -> Option<&'event mut Value> {
+        let mut working_lookup = lookup.into();
         // The first step should always be a field.
-        let (_zero, first_step) = lookup_iter.next()?;
+        let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        let mut cursor = match first_step {
+        match this_segment {
             Segment::Coalesce(v) => unimplemented!(),
             Segment::Field {
                 name,
                 requires_quoting: _,
             } => {
-                if lookup_len == 1 {
+                if working_lookup.len() == 1 {
                     // Terminus: We **must** insert here or abort.
                     trace!(key = ?name, "Getting from root.");
-                    return self.fields.get_mut(name);
+                    self.fields.get_mut(name)
                 } else {
                     trace!(key = ?name, "Descending into map.");
-                    self.fields.get_mut(name)
+                    match self.fields.get_mut(name) {
+                        Some(v) => v.get_mut(working_lookup).ok().unwrap_or(None),
+                        None => None,
+                    }
                 }
-            }
+            },
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
                     "Lookups into LogEvents should never start with indexes.\
                         Please report your config."
                 );
-                return None;
-            }
-        };
-
-        for (_index, segment) in lookup_iter {
-            // Don't do extra work.
-            if cursor.is_none() {
-                break;
-            }
-            cursor = match (segment, cursor) {
-                (Segment::Coalesce(v), _) => unimplemented!(),
-                // Fields access maps.
-                (
-                    Segment::Field {
-                        name,
-                        requires_quoting: _,
-                    },
-                    Some(Value::Map(map)),
-                ) => {
-                    trace!(key = ?name, "Descending into map.");
-                    map.get_mut(name)
-                }
-                // Indexes access arrays.
-                (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!(key = ?i, "Descending into array.");
-                    array.get_mut(i)
-                }
-                // The rest, it's not good.
-                (Segment::Index(_), _)
-                | (
-                    Segment::Field {
-                        name: _,
-                        requires_quoting: _,
-                    },
-                    _,
-                ) => {
-                    trace!("Unmatched lookup.");
-                    None
-                }
-            }
+                None
+            },
         }
-
-        // By the time we get here we either have the item, or nothing. Either case, we're correct.
-        cursor
     }
 
     /// Determine if the log event contains a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
+    pub fn contains<'event, 'lookup: 'event>(&'event self, lookup: impl Into<Lookup<'lookup>> + Debug) -> bool {
         self.get(lookup).is_some()
     }
 
@@ -630,26 +590,6 @@ impl TryInto<serde_json::Value> for LogEvent {
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         let Self { fields } = self;
         Ok(serde_json::to_value(fields)?)
-    }
-}
-
-impl<'a, T> std::ops::Index<T> for LogEvent
-where
-    T: Into<Lookup<'a>> + Debug,
-{
-    type Output = Value;
-
-    fn index(&self, key: T) -> &Value {
-        self.get(key).expect("Key not found.")
-    }
-}
-
-impl<'a, T> std::ops::IndexMut<T> for LogEvent
-where
-    T: Into<Lookup<'a>> + Debug,
-{
-    fn index_mut(&mut self, key: T) -> &mut Value {
-        self.get_mut(key).expect("Key not found.")
     }
 }
 

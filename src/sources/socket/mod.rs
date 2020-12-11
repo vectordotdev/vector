@@ -172,6 +172,7 @@ mod test {
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
+        event::Value,
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
@@ -759,12 +760,12 @@ mod test {
 
         assert_eq!(1, events.len());
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
+            events[0].as_log().get(log_schema().message_key()),
+            Some(&"test".into()),
         );
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "socket".into()
+            events[0].as_log().get(log_schema().source_type_key()),
+            Some(&"socket".into()),
         );
     }
 
@@ -778,12 +779,12 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
+            events[0].as_log().get(log_schema().message_key()),
+            Some(&Value::from("test".to_string()))
         );
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
-            "test2".into()
+            Some(&Value::from("test2".to_string()))
         );
     }
 
@@ -797,12 +798,12 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
+            events[0].as_log().get(log_schema().message_key()),
+            Value::from("test")
         );
         assert_eq!(
-            events[1].as_log()[log_schema().message_key()],
-            "test2".into()
+            events[1].as_log().get(log_schema().message_key()),
+            Value::from("test2")
         );
     }
 

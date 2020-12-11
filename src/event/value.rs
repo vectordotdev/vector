@@ -7,8 +7,12 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize, Serializer};
-use std::{collections::{BTreeMap, HashMap}, convert::{TryFrom, TryInto}, fmt::Debug};
 use std::iter::FromIterator;
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+};
 use toml::value::Value as TomlValue;
 
 // The ordering of these fields, **particularly timestamps and bytes** is very important as serde's
@@ -158,21 +162,12 @@ impl Value {
 
     /// Insert a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Result<Option<Value>> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => Err("Can only insert into map and array values.".into()),
-            Value::Map(_) => {
-                unimplemented!()
-            },
-            Value::Array(_) => {
-                unimplemented!()
-            },
-        }
+    pub fn insert(
+        &mut self,
+        mut lookup: LookupBuf,
+        value: impl Into<Value> + Debug,
+    ) -> Result<Option<Value>> {
+        unimplemented!()
     }
 
     /// Remove a value that exists at a given lookup.
@@ -181,62 +176,132 @@ impl Value {
     #[instrument(level = "trace", skip(self))]
     pub fn remove<'a>(
         &mut self,
-        lookup: impl Into<Lookup<'a>> + Debug,
+        mut lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Result<Option<Value>> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => Err("Can only remove from map and array values.".into()),
-            Value::Map(_) => {
-                unimplemented!()
-            },
-            Value::Array(_) => {
-                unimplemented!()
-            },
+        unimplemented!()
+    }
+
+    /// Get an immutable borrow of the value by lookup.
+    #[instrument(level = "trace", skip(self))]
+    pub fn get<'a>(
+        &'a self,
+        mut lookup: impl Into<Lookup<'a>> + Debug,
+    ) -> Result<Option<&'a Value>> {
+        let mut working_lookup = lookup.into();
+        let this_segment = working_lookup.pop_front();
+        match (this_segment, self) {
+            // We've met an end and found our value.
+            (None, item) => Ok(Some(item)),
+            // This is just not allowed!
+            (_, Value::Boolean(_))
+            | (_, Value::Bytes(_))
+            | (_, Value::Timestamp(_))
+            | (_, Value::Float(_))
+            | (_, Value::Integer(_))
+            | (_, Value::Null) => unimplemented!(),
+            // Descend into a coalesce
+            (Some(Segment::Coalesce(sub_segments)), value) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let lookup = Lookup::try_from(sub_segment)?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    if value.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => value.get(needle),
+                    None => Ok(None),
+                }
+            }
+            // Descend into a map
+            (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
+                trace!(key = ?name, "Descending into map.");
+                match map.get(*name) {
+                    Some(inner) => inner.get(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            // Descend into an array
+            (Some(Segment::Index(i)), Value::Array(array)) => {
+                trace!(key = ?i, "Descending into array.");
+                match array.get(i) {
+                    Some(inner) => inner.get(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
+            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Array(_)) => Ok(None),
         }
     }
 
-
     /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&mut Value>> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => Err("Can only insert into map and array values.".into()),
-            Value::Map(_) => {
-                unimplemented!()
-            },
-            Value::Array(_) => {
-                unimplemented!()
-            },
+    pub fn get_mut<'a>(
+        &'a mut self,
+        mut lookup: impl Into<Lookup<'a>> + Debug,
+    ) -> Result<Option<&'a mut Value>> {
+        let mut working_lookup = lookup.into();
+        let this_segment = working_lookup.pop_front();
+        match (this_segment, self) {
+            // We've met an end and found our value.
+            (None, item) => Ok(Some(item)),
+            // This is just not allowed!
+            (_, Value::Boolean(_))
+            | (_, Value::Bytes(_))
+            | (_, Value::Timestamp(_))
+            | (_, Value::Float(_))
+            | (_, Value::Integer(_))
+            | (_, Value::Null) => unimplemented!(),
+            // Descend into a coalesce
+            (Some(Segment::Coalesce(sub_segments)), value) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let lookup = Lookup::try_from(sub_segment)?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    if value.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => value.get_mut(needle),
+                    None => Ok(None),
+                }
+            }
+            // Descend into a map
+            (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
+                trace!(key = ?name, "Descending into map.");
+                match map.get_mut(*name) {
+                    Some(inner) => inner.get_mut(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            // Descend into an array
+            (Some(Segment::Index(i)), Value::Array(array)) => {
+                trace!(key = ?i, "Descending into array.");
+                match array.get_mut(i) {
+                    Some(inner) => inner.get_mut(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
+            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Array(_)) => Ok(None),
         }
     }
 
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => Err("Can only insert into map and array values.".into()),
-            Value::Map(_) => {
-                unimplemented!()
-            },
-            Value::Array(_) => {
-                unimplemented!()
-            },
-        }
+    pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
+        self.get(lookup.into()).ok().is_some()
     }
 
     /// Produce an iterator over all 'nodes' in the graph of this value.

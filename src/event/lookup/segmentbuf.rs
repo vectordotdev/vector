@@ -1,5 +1,8 @@
 use crate::event::lookup::Segment;
-use std::{collections::VecDeque, fmt::{Display, Formatter}};
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+};
 
 /// `SegmentBuf`s are chunks of a `LookupBuf`.
 ///
@@ -61,7 +64,12 @@ impl SegmentBuf {
             SegmentBuf::Index(i) => Segment::index(*i),
             SegmentBuf::Coalesce(v) => Segment::coalesce(
                 v.iter()
-                    .map(|inner| inner.iter().map(|v| v.as_segment()).collect::<VecDeque<_>>())
+                    .map(|inner| {
+                        inner
+                            .iter()
+                            .map(|v| v.as_segment())
+                            .collect::<VecDeque<_>>()
+                    })
                     .collect(),
             ),
         }
