@@ -64,6 +64,7 @@ async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.15"
+tracing-core = "0.1.17"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.15"
 tracing-log = "0.1.0"
@@ -113,7 +114,6 @@ num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.18.2", optional = true }
 tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
-bus = { version = "2.2.3", optional = true }
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
@@ -307,6 +307,7 @@ sources = [
   "sources-generator",
   "sources-host_metrics",
   "sources-http",
+  "sources-internal_logs",
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
@@ -331,6 +332,7 @@ sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
+sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
