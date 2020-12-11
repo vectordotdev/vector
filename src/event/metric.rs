@@ -452,8 +452,8 @@ impl Object for Metric {
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(valid_metric_paths())),
-            ),
+                remap::object::ValidPaths(valid_metric_paths()),
+            )),
         }
     }
 
@@ -502,10 +502,23 @@ impl Object for Metric {
     }
 
     fn paths(&self) -> Result<Vec<remap::Path>, RemapError> {
-        Ok(["name", "namespace", "timestamp", "tags"]
-            .iter()
-            .map(|path| Path::from_str(path).expect("invalid path"))
-            .collect())
+        let mut result = Vec::new();
+
+        result.push(Path::from_str("name").expect("invalid path"));
+        if self.namespace.is_some() {
+            result.push(Path::from_str("namespace").expect("invalid path"));
+        }
+        if self.timestamp.is_some() {
+            result.push(Path::from_str("timestamp").expect("invalid path"));
+        }
+        if let Some(tags) = &self.tags {
+            for (name, _) in tags {
+                result.push(Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
+            }
+        }
+        result.push(Path::from_str("kind").expect("invalid path"));
+
+        Ok(result)
     }
 
     fn remove(&mut self, path: &remap::Path, _compact: bool) -> Result<(), RemapError> {
@@ -904,6 +917,30 @@ mod test {
                 .into()
             )),
             metric.get(&Path::from_str(".").unwrap())
+        );
+    }
+
+    #[test]
+    fn object_metric_paths() {
+        let metric = Metric {
+            name: "zub".into(),
+            namespace: Some("zoob".into()),
+            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        assert_eq!(
+            Ok(["name", "namespace", "timestamp", "tags.tig", "kind"]
+                .iter()
+                .map(|path| Path::from_str(path).expect("invalid path"))
+                .collect()),
+            metric.paths()
         );
     }
 
