@@ -299,27 +299,22 @@ mod test {
     fn test_f64_to_u32() {
         let value = -1.0;
         let error = try_f64_to_u32(value).unwrap_err();
-        println!("{}", error);
         assert_eq!(error, ParserError::ValueOutOfRange { value });
 
         let value = u32::MAX as f64 + 1.0;
         let error = try_f64_to_u32(value).unwrap_err();
-        println!("{}", error);
         assert_eq!(error, ParserError::ValueOutOfRange { value });
 
         let value = f64::NAN;
         let error = try_f64_to_u32(value).unwrap_err();
-        println!("{}", error);
         assert!(matches!(error, ParserError::ValueOutOfRange { value } if value.is_nan()));
 
         let value = f64::INFINITY;
         let error = try_f64_to_u32(value).unwrap_err();
-        println!("{}", error);
         assert_eq!(error, ParserError::ValueOutOfRange { value });
 
         let value = f64::NEG_INFINITY;
         let error = try_f64_to_u32(value).unwrap_err();
-        println!("{}", error);
         assert_eq!(error, ParserError::ValueOutOfRange { value });
 
         assert_eq!(try_f64_to_u32(0.0).unwrap(), 0);
@@ -330,7 +325,6 @@ mod test {
     fn test_errors() {
         let input = r##"name{registry="default" content_type="html"} 1890"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {
@@ -340,7 +334,6 @@ mod test {
 
         let input = r##"# TYPE a counte"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {
@@ -350,7 +343,6 @@ mod test {
 
         let input = r##"# TYPEabcd asdf"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {
@@ -360,7 +352,6 @@ mod test {
 
         let input = r##"name{registry="} 1890"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {
@@ -370,7 +361,6 @@ mod test {
 
         let input = r##"name{registry=} 1890"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {
@@ -380,7 +370,6 @@ mod test {
 
         let input = r##"name abcd"##;
         let error = group_text_metrics(input).unwrap_err();
-        println!("{}", error);
         assert!(matches!(
             error,
             ParserError::WithLine {

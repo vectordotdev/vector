@@ -606,7 +606,6 @@ mod test {
 
         let input = wrap(r#"{name="value}"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
         assert!(matches!(
             error,
             ErrorKind::ExpectedChar { expected: '"', .. }
@@ -614,7 +613,6 @@ mod test {
 
         let input = wrap(r#"{ a="b" c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
         assert!(matches!(
             error,
             ErrorKind::ExpectedChar { expected: ',', .. }
@@ -622,7 +620,6 @@ mod test {
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
         assert!(matches!(
             error,
             ErrorKind::ParseNameError { .. }
