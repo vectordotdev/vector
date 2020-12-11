@@ -60,7 +60,7 @@ pub enum HistogramMetricValue {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct OtherMetric {
+pub struct SimpleMetric {
     pub labels: BTreeMap<String, String>,
     pub value: f64,
     pub timestamp: Option<i64>,
@@ -70,9 +70,9 @@ pub struct OtherMetric {
 pub enum GroupKind {
     Summary(Vec<SummaryMetric>),
     Histogram(Vec<HistogramMetric>),
-    Gauge(Vec<OtherMetric>),
-    Counter(Vec<OtherMetric>),
-    Untyped(Vec<OtherMetric>),
+    Gauge(Vec<SimpleMetric>),
+    Counter(Vec<SimpleMetric>),
+    Untyped(Vec<SimpleMetric>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -123,7 +123,7 @@ impl MetricGroup {
         } = metric;
         MetricGroup {
             name,
-            metrics: GroupKind::Untyped(vec![OtherMetric {
+            metrics: GroupKind::Untyped(vec![SimpleMetric {
                 labels,
                 value,
                 timestamp,
@@ -147,7 +147,7 @@ impl MetricGroup {
                 if !suffix.is_empty() {
                     return Ok(Some(metric));
                 }
-                vec.push(OtherMetric {
+                vec.push(SimpleMetric {
                     labels: metric.labels,
                     value: metric.value,
                     timestamp: metric.timestamp,
