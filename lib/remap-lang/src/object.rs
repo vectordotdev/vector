@@ -10,10 +10,9 @@ pub struct ValidPaths(pub Vec<&'static str>);
 
 impl Display for ValidPaths {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.join(","))
+        write!(f, "{}", self.0.join(", "))
     }
 }
-
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {

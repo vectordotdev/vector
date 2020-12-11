@@ -2,10 +2,13 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use remap::{object::Error as RemapError, Object, Path, Segment};
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display, Formatter};
 use std::{
     collections::{BTreeMap, BTreeSet},
     str::FromStr,
+};
+use std::{
+    convert::TryFrom,
+    fmt::{self, Display, Formatter},
 };
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -30,6 +33,31 @@ pub struct Metric {
 pub enum MetricKind {
     Incremental,
     Absolute,
+}
+
+impl TryFrom<remap::Value> for MetricKind {
+    type Error = String;
+
+    fn try_from(value: remap::Value) -> Result<Self, Self::Error> {
+        let value = value.try_bytes().map_err(|e| e.to_string())?;
+        match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
+            "incremental" => Ok(Self::Incremental),
+            "absolute" => Ok(Self::Absolute),
+            value => Err(format!(
+                "invalid metric kind {}, metric kind must be `absolute` or `incremental`",
+                value
+            )),
+        }
+    }
+}
+
+impl From<MetricKind> for remap::Value {
+    fn from(kind: MetricKind) -> Self {
+        match kind {
+            MetricKind::Incremental => "incremental".into(),
+            MetricKind::Absolute => "absolute".into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
@@ -376,6 +404,10 @@ impl Display for Metric {
     }
 }
 
+fn valid_metric_paths() -> Vec<&'static str> {
+    vec![".name", ".namespace", ".timestamp", ".kind", ".tags"]
+}
+
 impl Object for Metric {
     fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), RemapError> {
         if path.is_root() {
@@ -415,40 +447,39 @@ impl Object for Metric {
                 Ok(())
             }
             [Segment::Field(kind)] if kind.as_str() == "kind" => {
-                let value = value
-                    .try_bytes()
-                    .map_err(|e| RemapError::InvalidType(e.to_string()))?;
-                match String::from_utf8_lossy(&value).as_ref() {
-                    "absolute" => {
-                        self.kind = MetricKind::Absolute;
-                        Ok(())
-                    }
-                    "incremental" => {
-                        self.kind = MetricKind::Incremental;
-                        Ok(())
-                    }
-                    _ => Err(RemapError::Other(
-                        "metric kind must be `absolute` or `incremental`".into(),
-                    )),
-                }
+                self.kind = MetricKind::try_from(value).map_err(RemapError::Other)?;
+                Ok(())
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(vec![
-                    ".name",
-                    ".namespace",
-                    ".timestamp",
-                    ".kind",
-                    ".tags",
-                ]),
-            )),
+                remap::object::ValidPaths(valid_metric_paths())),
+            ),
         }
     }
 
     fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, RemapError> {
-        // TODO construct a map of the whole metric.
         if path.is_root() {
-            return Err(RemapError::SetRoot);
+            let mut map = BTreeMap::new();
+            map.insert("name".to_string(), self.name.clone().into());
+            if let Some(ref namespace) = self.namespace {
+                map.insert("namespace".to_string(), namespace.clone().into());
+            }
+            if let Some(timestamp) = self.timestamp {
+                map.insert("timestamp".to_string(), timestamp.into());
+            }
+            map.insert("kind".to_string(), self.kind.clone().into());
+
+            if let Some(tags) = &self.tags {
+                map.insert(
+                    "tags".to_string(),
+                    tags.iter()
+                        .map(|(tag, value)| (tag.clone(), value.clone().into()))
+                        .collect::<BTreeMap<_, _>>()
+                        .into(),
+                );
+            }
+
+            return Ok(Some(map.into()));
         }
 
         match path.segments() {
@@ -459,25 +490,13 @@ impl Object for Metric {
             [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 Ok(self.timestamp.map(Into::into))
             }
-            [Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(
-                match self.kind {
-                    MetricKind::Absolute => "absolute",
-                    MetricKind::Incremental => "incremental",
-                }
-                .into(),
-            )),
+            [Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(vec![
-                    ".name",
-                    ".namespace",
-                    ".timestamp",
-                    ".kind",
-                    ".tags",
-                ]),
+                remap::object::ValidPaths(valid_metric_paths()),
             )),
         }
     }
@@ -509,13 +528,7 @@ impl Object for Metric {
             }
             _ => Err(RemapError::InvalidPath(
                 format!("{}", path),
-                remap::object::ValidPaths(vec![
-                    ".name",
-                    ".namespace",
-                    ".timestamp",
-                    ".kind",
-                    ".tags",
-                ]),
+                remap::object::ValidPaths(valid_metric_paths()),
             )),
         }
     }
@@ -551,6 +564,7 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use remap::{Path, Value};
 
@@ -865,12 +879,45 @@ mod test {
     }
 
     #[test]
+    fn object_metric_all_fields() {
+        let metric = Metric {
+            name: "zub".into(),
+            namespace: Some("zoob".into()),
+            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        assert_eq!(
+            Ok(Some(
+                map!["name": "zub",
+                     "namespace": "zoob",
+                     "timestamp": Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
+                     "tags": map!["tig": "tog"],
+                     "kind": "absolute"
+                ]
+                .into()
+            )),
+            metric.get(&Path::from_str(".").unwrap())
+        );
+    }
+
+    #[test]
     fn object_metric_fields() {
         let mut metric = Metric {
             name: "name".into(),
             namespace: None,
             timestamp: None,
-            tags: None,
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value: 1.23 },
         };
