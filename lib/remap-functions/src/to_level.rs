@@ -38,7 +38,7 @@ impl Expression for ToLevelFn {
             1 => Ok("alert"),
             2 => Ok("crit"),
             3 => Ok("err"),
-            4 => Ok("warn"),
+            4 => Ok("warning"),
             5 => Ok("notice"),
             6 => Ok("info"),
             7 => Ok("debug"),
@@ -91,7 +91,7 @@ mod tests {
 
         warning {
             args: func_args![severity: value![4]],
-            want: Ok(value!(["warn"])),
+            want: Ok(value!(["warning"])),
         }
 
         notice {
