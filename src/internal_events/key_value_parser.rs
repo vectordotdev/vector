@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct KeyValueEventProcessed;
-
-impl InternalEvent for KeyValueEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct KeyValueParseFailed {
     pub key: String,
     pub error: crate::types::Error,

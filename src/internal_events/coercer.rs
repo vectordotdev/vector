@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct CoercerEventProcessed;
-
-impl InternalEvent for CoercerEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct CoercerConversionFailed<'a> {
     pub field: &'a str,
     pub error: crate::types::Error,

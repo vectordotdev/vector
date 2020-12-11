@@ -82,8 +82,6 @@ mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
@@ -199,8 +197,6 @@ pub(crate) use self::regex_parser::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
-#[cfg(feature = "transforms-remove_tags")]
-pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;

@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{self, Event, LogEvent},
-    internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
+    internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
     types::Conversion,
 };
@@ -69,7 +69,6 @@ impl MetricToLog {
 impl FunctionTransform for MetricToLog {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let metric = event.into_metric();
-        emit!(MetricToLogEventProcessed);
 
         let retval = serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
