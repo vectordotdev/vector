@@ -31,6 +31,8 @@ components: sources: statsd: {
 				}
 			}
 
+			keepalive: enabled: true
+
 			tls: enabled: false
 		}
 	}

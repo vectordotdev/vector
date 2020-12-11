@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{RemapEventProcessed, RemapFailedMapping},
+    internal_events::{RemapEventProcessed, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
@@ -74,9 +74,9 @@ impl FunctionTransform for Remap {
         let mut runtime = Runtime::default();
 
         if let Err(error) = runtime.execute(&mut event, &self.program) {
-            emit!(RemapFailedMapping {
-                event_dropped: self.drop_on_err,
+            emit!(RemapMappingError {
                 error: error.to_string(),
+                event_dropped: self.drop_on_err,
             });
 
             if self.drop_on_err {

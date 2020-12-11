@@ -27,6 +27,8 @@ components: sources: socket: {
 				}
 			}
 
+			keepalive: enabled: true
+
 			tls: {
 				enabled:                true
 				can_enable:             true

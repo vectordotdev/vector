@@ -6,7 +6,7 @@ use tokio::process::Command;
 
 /// Initiate a log lookup (`kubectl log`) with the specified `kubectl_command`
 /// for the specified `resource` at the specified `namespace`.
-/// Returns a [`Reader`] that managed the reading process.
+/// Returns a [`Reader`] that manages the reading process.
 pub fn log_lookup(kubectl_command: &str, namespace: &str, resource: &str) -> Result<Reader> {
     let mut command = Command::new(kubectl_command);
 

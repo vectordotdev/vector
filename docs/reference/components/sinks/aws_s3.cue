@@ -32,7 +32,7 @@ components: sinks: aws_s3: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "text"
+					default: null
 					enum: ["ndjson", "text"]
 				}
 			}

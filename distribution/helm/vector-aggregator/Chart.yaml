@@ -1,0 +1,17 @@
+apiVersion: v2
+name: vector-aggregator
+type: application
+icon: https://vector.dev/press/vector-icon.svg
+description: A Helm chart to aggregate data with Vector
+version: "0.0.0" # overwritten via --version on publishing
+appVersion: "0.0.0" # overwritten via --app-version on publishing
+home: https://vector.dev/
+sources:
+  - https://github.com/timberio/vector/
+maintainers:
+  - name: Vector Contributors
+    email: vector@timber.io
+dependencies:
+  - name: vector-shared
+    version: "*"
+    repository: file://../vector-shared
