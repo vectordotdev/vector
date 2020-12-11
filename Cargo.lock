@@ -5066,6 +5066,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "remap-functions"
+version = "0.1.0"
+dependencies = [
+ "remap-lang",
+]
+
+[[package]]
 name = "remap-lang"
 version = "0.1.0"
 dependencies = [
