@@ -1,0 +1,111 @@
+[package]
+name = "remap-functions"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+remap = { package = "remap-lang", path = "../remap-lang" }
+
+[features]
+
+default = [
+    "assert",
+    "ceil",
+    "compact",
+    "contains",
+    "del",
+    "downcase",
+    "ends_with",
+    "exists",
+    "flatten",
+    "floor",
+    "format_number",
+    "format_timestamp",
+    "ip_cidr_contains",
+    "ip_subnet",
+    "ip_to_ipv6",
+    "ipv6_to_ipv4",
+    "log",
+    "match",
+    "md5",
+    "merge",
+    "now",
+    "only_fields",
+    "parse_duration",
+    "parse_grok",
+    "parse_json",
+    "parse_syslog",
+    "parse_timestamp",
+    "parse_url",
+    "redact",
+    "replace",
+    "round",
+    "sha1",
+    "sha2",
+    "sha3",
+    "slice",
+    "split",
+    "starts_with",
+    "strip_ansi_escape_codes",
+    "strip_whitespace",
+    "to_bool",
+    "to_float",
+    "to_int",
+    "to_string",
+    "to_timestamp",
+    "tokenize",
+    "truncate",
+    "upcase",
+    "uuid_v4",
+]
+
+assert = []
+ceil = []
+compact = []
+contains = []
+del = []
+downcase = []
+ends_with = []
+exists = []
+flatten = []
+floor = []
+format_number = []
+format_timestamp = []
+ip_cidr_contains = []
+ip_subnet = []
+ip_to_ipv6 = []
+ipv6_to_ipv4 = []
+log = []
+match = []
+md5 = []
+merge = []
+now = []
+only_fields = []
+parse_duration = []
+parse_grok = []
+parse_json = []
+parse_syslog = []
+parse_timestamp = []
+parse_url = []
+redact = []
+replace = []
+round = []
+sha1 = []
+sha2 = []
+sha3 = []
+slice = []
+split = []
+starts_with = []
+strip_ansi_escape_codes = []
+strip_whitespace = []
+to_bool = []
+to_float = []
+to_int = []
+to_string = []
+to_timestamp = []
+tokenize = []
+truncate = []
+upcase = []
+uuid_v4 = []

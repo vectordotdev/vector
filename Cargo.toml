@@ -45,6 +45,7 @@ members = [
   "lib/vector-api-client",
   "lib/remap-lang",
   "lib/remap-cli",
+  "lib/remap-functions",
 ]
 
 [dependencies]
