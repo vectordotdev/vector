@@ -16,8 +16,8 @@ use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GeneratorConfig {
-    #[serde(default)]
-    batch_interval: Option<f64>,
+    #[serde(default, alias = "batch_interval")]
+    interval: Option<f64>,
     #[serde(default = "usize::max_value")]
     count: usize,
     #[serde(flatten)]
@@ -97,10 +97,10 @@ impl GeneratorConfig {
     }
 
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
         Self {
             count,
-            batch_interval,
+            interval,
             format: OutputFormat::RoundRobin {
                 lines,
                 sequence: false,
@@ -109,8 +109,8 @@ impl GeneratorConfig {
     }
 
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
-        let mut batch_interval = self
-            .batch_interval
+        let mut interval = self
+            .interval
             .map(|i| interval(Duration::from_secs_f64(i)));
 
         for n in 0..self.count {
@@ -118,8 +118,8 @@ impl GeneratorConfig {
                 break;
             }
 
-            if let Some(batch_interval) = &mut batch_interval {
-                batch_interval.next().await;
+            if let Some(interval) = &mut interval {
+                interval.next().await;
             }
 
             let events = self.format.generate_events(n);
@@ -276,13 +276,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn round_robin_obeys_batch_interval() {
+    async fn round_robin_obeys_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"format = "round_robin"
                lines = ["one", "two"]
                count = 3
-               batch_interval = 1.0"#,
+               interval = 1.0"#,
         )
         .await;
 
