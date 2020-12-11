@@ -3,8 +3,7 @@ package metadata
 components: sources: aws_kinesis_firehose: components._aws & {
 	_port: 443
 
-	title:       "AWS Kinesis Firehose"
-	description: "[AWS Kinesis Firehose](\(urls.aws_kinesis_firehose)) is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
+	title: "AWS Kinesis Firehose"
 
 	classes: {
 		commonly_used: false
@@ -18,20 +17,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "AWS Kinesis Firehose"
-					thing:    "a \(name) stream"
-					url:      urls.aws_kinesis_firehose
-					versions: null
-
-					setup: [
-						"""
-						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
-						in your preferred AWS region. Point the endpoint to your
-						Vector instance's address.
-						""",
-					]
-				}
+				service: services.aws_kinesis_firehose
 
 				interface: socket: {
 					api: {
@@ -63,7 +49,14 @@ components: sources: aws_kinesis_firehose: components._aws & {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				AWS Kinesis Firehose can only deliver data over HTTP. You will need
+				to solve TLS termination by fronting Vector with a load balaner or
+				configuring the `tls.*` options.
+				""",
+		]
+
 		warnings: []
 		notices: []
 	}
@@ -161,7 +154,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
 				   [`aws_cloudwatch_logs_subscription_parser`][vector_transform_aws_cloudwatch_logs_subscription_parser]
-				   transform to extract the log events.. Make sure to set
+				   transform to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 

@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: nginx_metrics: {
-	title:       "Nginx Metrics"
-	description: "[Nginx][urls.nginx] is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server."
+	title: "Nginx Metrics"
 
 	classes: {
 		commonly_used: false
@@ -16,12 +15,7 @@ components: sources: nginx_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Nginx Server"
-					thing:    "an \(name)"
-					url:      urls.nginx
-					versions: null
-				}
+				service: services.nginx
 
 				interface: {
 					socket: {

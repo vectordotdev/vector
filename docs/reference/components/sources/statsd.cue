@@ -3,8 +3,7 @@ package metadata
 components: sources: statsd: {
 	_port: 8125
 
-	title:       "StatsD"
-	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
+	title: "StatsD"
 
 	classes: {
 		commonly_used: false
@@ -18,12 +17,7 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "StatsD"
-					thing:    "a \(name) client"
-					url:      urls.statsd
-					versions: null
-				}
+				service: services.statsd
 
 				interface: socket: {
 					api: {
