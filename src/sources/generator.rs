@@ -186,14 +186,6 @@ mod tests {
         rx
     }
 
-    async fn still_generating(rx: mpsc::Receiver<Event>) {
-        assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
-    }
-
-    async fn done_generating(rx: mpsc::Receiver<Event>) {
-        assert_eq!(rx.poll().unwrap(), Ready(None));
-    }
-
     #[test]
     fn config_round_robin_lines_not_empty() {
         let empty_lines: Vec<String> = Vec::new();
@@ -250,9 +242,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            still_generating(rx);
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -278,7 +270,7 @@ mod tests {
                 NotReady => panic!("Generator was not ready"),
             }
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -293,9 +285,9 @@ mod tests {
         .await;
 
         for _ in 0..3 {
-            still_generating(rx);
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -310,9 +302,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            still_generating(rx);
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -324,9 +316,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            still_generating(rx);
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -338,8 +330,8 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            still_generating(rx);
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx);
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 }
