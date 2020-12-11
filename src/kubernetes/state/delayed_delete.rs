@@ -1,7 +1,7 @@
 //! A state wrapper that delays deletes.
 
 use async_trait::async_trait;
-use futures::{future::BoxFuture, FutureExt};
+use futures::future::BoxFuture;
 use std::{collections::VecDeque, time::Duration};
 use tokio::time::{delay_until, Instant};
 
@@ -111,17 +111,7 @@ where
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         let delayed_delete_deadline = self.next_deadline().map(delay_until);
         let downstream = self.inner.maintenance_request();
-
-        match (downstream, delayed_delete_deadline) {
-            (Some(downstream), Some(delayed_delete_deadline)) => {
-                let fut = futures::future::select(downstream, delayed_delete_deadline)
-                    .map(|either| either.factor_first().0);
-                Some(Box::pin(fut))
-            }
-            (None, Some(delayed_delete_deadline)) => Some(Box::pin(delayed_delete_deadline)),
-            (Some(downstream), None) => Some(downstream),
-            (None, None) => None,
-        }
+        super::merge_maintenance_requests(delayed_delete_deadline, downstream)
     }
 
     async fn perform_maintenance(&mut self) {

@@ -1,7 +1,9 @@
 //! Local representation of the Kubernetes API resources state.
 
+use std::future::Future;
+
 use async_trait::async_trait;
-use futures::future::BoxFuture;
+use futures::{future::BoxFuture, FutureExt};
 
 pub mod delayed_delete;
 pub mod evmap;
@@ -64,4 +66,25 @@ pub trait MaintainedWrite: Write {
     /// `perform_maintenance` of the wrapped state when `perform_maintenance` is
     /// called.
     async fn perform_maintenance(&mut self);
+}
+
+/// A helper to aid with implementing [`MaintainedWrite::maintenance_request`]
+/// in wrapping storage layers.
+pub fn merge_maintenance_requests<'total, 'own: 'total, 'downstream: 'total, O>(
+    own: Option<O>,
+    downstream: Option<BoxFuture<'downstream, ()>>,
+) -> Option<BoxFuture<'total, ()>>
+where
+    O: Future<Output = ()> + Send + Unpin + 'own,
+{
+    match (own, downstream) {
+        (Some(own), Some(downstream)) => {
+            let fut =
+                futures::future::select(own, downstream).map(|either| either.factor_first().0);
+            Some(Box::pin(fut))
+        }
+        (None, Some(downstream)) => Some(downstream),
+        (Some(own), None) => Some(Box::pin(own)),
+        (None, None) => None,
+    }
 }
