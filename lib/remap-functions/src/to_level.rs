@@ -71,42 +71,42 @@ mod tests {
 
         emergency {
             args: func_args![severity: value!([0])],
-            want: Ok(value!(["emerg"])),
+            want: Ok(value!("emerge")),
         }
 
         alert {
             args: func_args![severity: value![1]],
-            want: Ok(value!(["alert"])),
+            want: Ok(value!("alert")),
         }
 
         critical {
             args: func_args![severity: value![2]],
-            want: Ok(value!(["crit"])),
+            want: Ok(value!("crit")),
         }
 
         error {
             args: func_args![severity: value![3]],
-            want: Ok(value!(["err"])),
+            want: Ok(value!("err")),
         }
 
         warning {
             args: func_args![severity: value![4]],
-            want: Ok(value!(["warning"])),
+            want: Ok(value!("warning")),
         }
 
         notice {
             args: func_args![severity: value![5]],
-            want: Ok(value!(["notice"])),
+            want: Ok(value!("notice")),
         }
 
         informational {
             args: func_args![severity: value![6]],
-            want: Ok(value!(["info"])),
+            want: Ok(value!("info")),
         }
 
         debug {
             args: func_args![severity: value![7]],
-            want: Ok(value!(["debug"])),
+            want: Ok(value!("debug")),
         }
 
         invalid_severity_1 {
