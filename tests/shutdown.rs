@@ -165,7 +165,7 @@ fn configuration_path_recomputed() {
         type = "generator"
         format = "round_robin"
         interval = 1.0 # optional, no default
-        lines = []"#,
+        lines = ["foo", "bar"]"#,
         ),
     );
 
@@ -229,7 +229,7 @@ fn timely_shutdown_generator() {
     type = "generator"
     format = "round_robin"
     interval = 1.0 # optional, no default
-    lines = []"#,
+    lines = ["foo", "bar"]"#,
     ));
 }
 
