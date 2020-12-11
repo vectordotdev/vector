@@ -190,19 +190,21 @@ pub enum Auth {
     Bearer { token: String },
 }
 
-impl Auth {
-    /// If both is `Some`, return an error. Otherwise, return one of them.
-    pub fn merge_auth_config(
-        auth: &Option<Auth>,
-        auth1: &Option<Auth>,
-    ) -> crate::Result<Option<Auth>> {
-        if auth.is_some() && auth1.is_some() {
+pub trait MaybeAuth: Sized {
+    fn choose_one(&self, other: &Self) -> crate::Result<Self>;
+}
+
+impl MaybeAuth for Option<Auth> {
+    fn choose_one(&self, other: &Self) -> crate::Result<Self> {
+        if self.is_some() && other.is_some() {
             Err("Two authorization credentials was provided.".into())
         } else {
-            Ok(auth.clone().take().or_else(|| auth1.clone()))
+            Ok(self.clone().or_else(|| other.clone()))
         }
     }
+}
 
+impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         self.apply_headers_map(req.headers_mut())
     }

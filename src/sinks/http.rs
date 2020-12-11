@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
@@ -130,7 +130,7 @@ impl SinkConfig for HttpSinkConfig {
         };
 
         let config = HttpSinkConfig {
-            auth: Auth::merge_auth_config(&self.auth, &self.uri.auth)?,
+            auth: self.auth.choose_one(&self.uri.auth)?,
             uri: self.uri.with_default_parts(),
             ..self.clone()
         };
@@ -263,7 +263,7 @@ impl HttpSink for HttpSinkConfig {
 }
 
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
-    let auth = Auth::merge_auth_config(&auth, &uri.auth)?;
+    let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
     let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
 

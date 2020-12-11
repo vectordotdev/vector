@@ -15,7 +15,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -98,7 +98,7 @@ impl SinkConfig for LokiConfig {
         let client = HttpClient::new(tls)?;
 
         let config = LokiConfig {
-            auth: Auth::merge_auth_config(&self.auth, &self.endpoint.auth)?,
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
             ..self.clone()
         };
 

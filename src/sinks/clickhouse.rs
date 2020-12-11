@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
@@ -76,8 +76,10 @@ impl SinkConfig for ClickhouseConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 
-        let mut config = self.clone();
-        config.auth = Auth::merge_auth_config(&config.auth, &self.endpoint.auth)?;
+        let config = ClickhouseConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
 
         let sink = BatchedHttpSink::with_retry_logic(
             config.clone(),

@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
@@ -354,7 +354,7 @@ impl ElasticSearchCommon {
             _ => None,
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
-        let authorization = Auth::merge_auth_config(&authorization, &uri.auth)?;
+        let authorization = authorization.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string();
 
         let region = match &config.aws {
