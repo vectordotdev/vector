@@ -202,7 +202,7 @@ remap: {
 				".request_id = uuidv4()",
 				".average = .total / .number",
 				".partition_id = .status_code",
-				".is_server_error = .status_code == 500"
+				".is_server_error = .status_code == 500",
 			]
 		}
 
