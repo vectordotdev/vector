@@ -40,7 +40,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             Ok(line) => {
                 rl.add_history_entry(line);
 
-                let command = match line.as_ref() {
+                let command = match line {
                     "next" => {
                         // allow adding one new object at a time
                         if index < objects.len() && objects.last() != Some(&Value::Null) {
@@ -95,7 +95,7 @@ fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &st
 
     match runtime.execute(object, &program) {
         Ok(value) => value.to_string(),
-        Err(err) => format!("{}", err.to_string()),
+        Err(err) => err.to_string(),
     }
 }
 
@@ -164,7 +164,7 @@ impl Validator for Repl {
         self.validator.validate(ctx).map(|result| match result {
             ValidationResult::Valid(_) => {
                 // support multi-line input by ending the line with a '\'
-                if ctx.input().chars().last() == Some('\\') {
+                if ctx.input().ends_with('\\') {
                     return ValidationResult::Incomplete;
                 }
 
