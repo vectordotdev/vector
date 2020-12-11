@@ -34,12 +34,7 @@ components: sinks: socket: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "socket receiver"
-					thing:    "a \(name)"
-					url:      urls.socket
-					versions: null
-				}
+				service: services.socket_receiver
 
 				interface: {
 					socket: {

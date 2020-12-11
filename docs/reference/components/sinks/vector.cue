@@ -30,12 +30,7 @@ components: sinks: vector: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Vector source"
-					thing:    "a \(name)"
-					url:      urls.vector_source
-					versions: null
-				}
+				service: services.vector
 
 				interface: {
 					socket: {

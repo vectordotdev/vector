@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: nats: {
-	title:       "NATS"
-	description: "[NATS.io](\(urls.nats)) is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
+	title: "NATS"
 
 	classes: {
 		commonly_used: false
@@ -28,12 +27,7 @@ components: sinks: nats: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				service: {
-					name:     "NATS"
-					thing:    "a \(name) server"
-					url:      urls.nats
-					versions: null
-				}
+				service: services.nats
 
 				interface: {
 					socket: {

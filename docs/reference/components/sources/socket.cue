@@ -17,12 +17,7 @@ components: sources: socket: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "socket client"
-					thing:    "a \(name)"
-					url:      urls.prometheus_client
-					versions: null
-				}
+				service: services.socket_client
 
 				interface: socket: {
 					direction: "incoming"
