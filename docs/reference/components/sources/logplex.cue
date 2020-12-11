@@ -6,8 +6,7 @@ components: sources: logplex: {
 	title: "Heroku Logplex"
 
 	description: """
-		The Logplex source is designed to receive log data from Heroku log
-		drains via Heroku's logplex system.
+		Receives log data from Heroku log drains via Heroku's logplex system.
 		"""
 
 	classes: {

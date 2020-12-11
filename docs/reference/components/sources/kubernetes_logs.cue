@@ -6,9 +6,8 @@ components: sources: kubernetes_logs: {
 	title: "Kubernetes Logs"
 
 	description: """
-		The Kubernetes logs source collects all log data for Kubernetes Nodes,
-		automatically enriching data with Kubernetes metadata via the Kubernetes
-		API.
+		Collects all log data for Kubernetes Nodes, automatically enriching data
+		with Kubernetes metadata via the Kubernetes API.
 		"""
 
 	classes: {

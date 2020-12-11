@@ -3,6 +3,10 @@ package metadata
 components: sinks: vector: {
 	title: "Vector"
 
+	description: """
+		Sends data to another downstream Vector instance via the Vector source.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"

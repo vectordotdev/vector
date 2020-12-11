@@ -2,9 +2,10 @@ package metadata
 
 components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	title: "AWS CloudWatch Logs Subscription Parser"
+
 	description: """
-		The AWS CloudWatch Logs Subscription Parser transform parses AWS
-		CloudWatch Logs events coming from the `aws_kinesis_firehose` source.
+		Parses AWS CloudWatch Logs events coming from the `aws_kinesis_firehose`
+		source.
 		"""
 
 	classes: {
