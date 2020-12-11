@@ -1,7 +1,7 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use crate::config::log_schema;
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 
@@ -81,10 +81,6 @@ impl Event {
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {

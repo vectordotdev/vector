@@ -35,6 +35,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/shared",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
