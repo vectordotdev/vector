@@ -39,7 +39,7 @@ components: transforms: filter: {
 
 	input: {
 		logs:    true
-		metrics: null
+		metrics: true
 	}
 
 	examples: [
