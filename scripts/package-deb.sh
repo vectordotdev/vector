@@ -73,12 +73,22 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 
 cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build --no-strip
 
+# If the TARGET is musl populate the TYPE variable
+if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
+  TYPE="musl"
+else
+  TYPE=""
+fi
+
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//_/-}
-  mv "${file}" target/"${TARGET}"/debian/"${nbase}";
+  if [ "${TYPE}" = 'musl' ]; then
+    nbase=${nbase//amd64.deb/musl-amd64.deb}
+  fi
+    mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 
 #

@@ -18,7 +18,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         UriSerde,
@@ -26,7 +26,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use derivative::Derivative;
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,8 +34,7 @@ use std::collections::HashMap;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    #[serde(default)]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<Template>,
     labels: HashMap<String, Template>,
@@ -57,11 +55,9 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
     Json,
     Text,
 }
@@ -74,6 +70,7 @@ impl GenerateConfig for LokiConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:3100"
+            encoding = "json"
             labels = {}"#,
         )
         .unwrap()
@@ -322,6 +319,7 @@ mod tests {
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
+            encoding = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"

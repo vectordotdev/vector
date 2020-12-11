@@ -23,50 +23,42 @@ impl Object for Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{map, Field::*, Segment::*};
+    use crate::{Field::*, Segment::*};
     use std::str::FromStr;
 
     #[test]
     fn object_get() {
         let cases = vec![
-            (true.into(), vec![], Ok(Some(true.into()))),
+            (value!(true), vec![], Ok(Some(value!(true)))),
             (
-                true.into(),
+                value!(true),
                 vec![Field(Regular("foo".to_string()))],
                 Ok(None),
             ),
-            (map![].into(), vec![], Ok(Some(map![].into()))),
+            (value!({}), vec![], Ok(Some(value!({})))),
+            (value!({foo: "bar"}), vec![], Ok(Some(value!({foo: "bar"})))),
             (
-                map!["foo": "bar"].into(),
-                vec![],
-                Ok(Some(map!["foo": "bar"].into())),
-            ),
-            (
-                map!["foo": "bar"].into(),
+                value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned()))],
-                Ok(Some("bar".into())),
+                Ok(Some(value!("bar"))),
             ),
             (
-                map!["foo": "bar"].into(),
+                value!({foo: "bar"}),
                 vec![Field(Regular("bar".to_owned()))],
                 Ok(None),
             ),
+            (value!([1, 2, 3, 4, 5]), vec![Index(1)], Ok(Some(value!(2)))),
             (
-                vec![1, 2, 3, 4, 5].into(),
-                vec![Index(1)],
-                Ok(Some(2.into())),
-            ),
-            (
-                map!["foo": vec![map!["bar": true]]].into(),
+                value!({foo: [{bar: true}]}),
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(0),
                     Field(Regular("bar".to_owned())),
                 ],
-                Ok(Some(true.into())),
+                Ok(Some(value!(true))),
             ),
             (
-                map!["foo": map!["bar baz": map!["baz": 2]]].into(),
+                value!({foo: {"bar baz": {baz: 2}}}),
                 vec![
                     Field(Regular("foo".to_owned())),
                     Coalesce(vec![
@@ -75,7 +67,7 @@ mod tests {
                     ]),
                     Field(Regular("baz".to_owned())),
                 ],
-                Ok(Some(2.into())),
+                Ok(Some(value!(2))),
             ),
         ];
 

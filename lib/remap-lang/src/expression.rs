@@ -158,7 +158,12 @@ expression_dispatch![
 
 impl<T: Into<Value>> From<T> for Expr {
     fn from(value: T) -> Self {
-        Literal::from(value.into()).into()
+        let value = value.into();
+
+        match value {
+            Value::Array(array) => Array::from(array).into(),
+            _ => Literal::from(value).into(),
+        }
     }
 }
 
