@@ -109,9 +109,7 @@ impl GeneratorConfig {
     }
 
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
-        let mut interval = self
-            .interval
-            .map(|i| interval(Duration::from_secs_f64(i)));
+        let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
 
         for n in 0..self.count {
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
