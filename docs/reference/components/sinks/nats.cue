@@ -58,8 +58,7 @@ components: sinks: nats: {
 	configuration: {
 		url: {
 			description: "The NATS URL to connect to. The url _must_ take the form of `nats://server:port`."
-			groups: ["tcp"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
