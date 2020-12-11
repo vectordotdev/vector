@@ -9,13 +9,11 @@ impl Function for ToSeverity {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "level",
-                accepts: |v| matches!(v, Value::Bytes(_)),
-                required: true,
-            }
-        ]
+        &[Parameter {
+            keyword: "level",
+            accepts: |v| matches!(v, Value::Bytes(_)),
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
@@ -32,9 +30,9 @@ struct ToSeverityFn {
 
 impl Expression for ToSeverityFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let level_bytes = self.severity.execute(state, object)?.try_bytes()?;
+        let level_bytes = self.level.execute(state, object)?.try_bytes()?;
 
-        let level = String::from_utf8_lossy(level_bytes);
+        let level = String::from_utf8_lossy(&level_bytes);
 
         // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
         let severity = match &level[..] {
@@ -46,12 +44,12 @@ impl Expression for ToSeverityFn {
             "notice" => Ok(5),
             "info" => Ok(6),
             "debug" => Ok(7),
-            _ => Err(format!("level {} not valid", level))
-        }
+            _ => Err(format!("level {} not valid", level)),
+        };
 
         match severity {
             Ok(severity) => Ok(Value::from(severity)),
-            Err(e) => Err(e),
+            Err(e) => Err(Error::Call(e)),
         }
     }
 
@@ -115,7 +113,7 @@ mod tests {
             want: Err("level oopsie not valid"),
         }
 
-        invalid_severity_2 {
+        invalid_level_2 {
             args: func_args![severity: value!["aww shucks"]],
             want: Err("level aww schucks not valid"),
         }
