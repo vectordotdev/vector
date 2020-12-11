@@ -44,8 +44,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > Type `help` to learn more.
->      `prev` to load the previous object.
 >      `next` to load the next object, or create a new one.
+>      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
