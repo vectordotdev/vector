@@ -14,4 +14,4 @@ pub use crate::function::{ArgumentList, Parameter};
 pub use crate::generate_param_list;
 
 // test helpers
-pub use crate::{bench_function, func_args, map, test_function, test_type_def};
+pub use crate::{array, bench_function, func_args, test_function, test_type_def};

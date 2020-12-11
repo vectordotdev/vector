@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     internal_events::FileOpen,
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::Template,
@@ -34,11 +34,7 @@ use std::convert::TryFrom;
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -55,7 +51,7 @@ impl GenerateConfig for FileSinkConfig {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
-            encoding: Default::default(),
+            encoding: Encoding::Text.into(),
             compression: Default::default(),
         })
         .unwrap()
@@ -67,12 +63,6 @@ impl GenerateConfig for FileSinkConfig {
 pub enum Encoding {
     Text,
     Ndjson,
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Text
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
@@ -157,7 +147,7 @@ impl SinkConfig for FileSinkConfig {
 pub struct FileSink {
     acker: Acker,
     path: Template,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
@@ -320,7 +310,7 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
         .await
 }
 
-pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: Event) -> Vec<u8> {
+pub fn encode_event(encoding: &EncodingConfig<Encoding>, mut event: Event) -> Vec<u8> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     match encoding.codec() {
@@ -335,7 +325,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
 async fn write_event_to_file(
     file: &mut OutFile,
     event: Event,
-    encoding: &EncodingConfigWithDefault<Encoding>,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Result<(), std::io::Error> {
     let mut buf = encode_event(encoding, event);
     buf.push(b'\n');

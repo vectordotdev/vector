@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -196,7 +196,7 @@ impl HttpSink for ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventReceived {
+        emit!(ElasticSearchEventEncoded {
             byte_size: body.len(),
             index
         });
@@ -546,7 +546,6 @@ mod tests {
         let config = ElasticSearchConfig {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
-                codec: Encoding::Default,
                 except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },

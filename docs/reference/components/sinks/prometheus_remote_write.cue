@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: prometheus_remote_write: {
-	title:       "Prometheus Remote Write"
-	description: "[Prometheus](\(urls.prometheus)) is a monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	title: "Prometheus Remote Write"
 
 	classes: {
 		commonly_used: true
@@ -43,12 +42,7 @@ components: sinks: prometheus_remote_write: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Prometheus"
-					thing:    "a \(name) or compatible server"
-					url:      urls.prometheus
-					versions: null
-				}
+				service: services.prometheus
 
 				interface: {
 					socket: {

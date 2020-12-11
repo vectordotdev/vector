@@ -180,6 +180,8 @@ mod tests {
 
     #[test]
     fn to_string() {
+        use crate::map;
+
         let cases = vec![
             (
                 map![],

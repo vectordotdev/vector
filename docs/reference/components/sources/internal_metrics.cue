@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: internal_metrics: {
-	title:       "Internal Metrics"
-	description: "The internal metrics source exposes metrics emitted by the running Vector instance (as opposed to components in its topology)."
+	title: "Internal Metrics"
+
+	description: """
+		Exposes Vector's own internal metrics, allowing you to collect, process,
+		and route Vector's internal metrics just like other metrics.
+		"""
 
 	classes: {
 		commonly_used: true
@@ -15,12 +19,7 @@ components: sources: internal_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: service: {
-				name:     "Vector instance"
-				thing:    "a \(name)"
-				url:      urls.vector_docs
-				versions: ">= 0.11.0"
-			}
+			from: service:       services.vector
 		}
 		multiline: enabled: false
 	}
@@ -162,13 +161,13 @@ components: sources: internal_metrics: {
 			}
 		}
 		collect_completed_total: {
-			description:       "The total number of MongoDB metrics collections completed."
+			description:       "The total number of metrics collections completed for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
 		collect_duration_nanoseconds: {
-			description:       "The duration spent collecting MongoDB metrics."
+			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -393,7 +392,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		parse_errors_total: {
-			description:       "The total number of errors parsing Prometheus metrics."
+			description:       "The total number of errors parsing metrics for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -418,14 +417,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		request_duration_nanoseconds: {
-			description:       "The request duration for this component (in nanoseconds)."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		request_error_total: {
-			description:       "The total number of MongoDB request errors."
+		request_errors_total: {
+			description:       "The total number of requests errors for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -527,7 +520,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		timestamp_parse_errors_total: {
-			description:       "The total number of errors encountered parsing [RFC3339](\(urls.rfc_3339)) timestamps."
+			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

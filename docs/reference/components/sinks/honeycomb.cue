@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: honeycomb: {
-	title:       "Honeycomb"
-	description: "[Honeycomb](\(urls.honeycomb)) provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
+	title: "Honeycomb"
 
 	classes: {
 		commonly_used: false
@@ -39,12 +38,7 @@ components: sinks: honeycomb: {
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "Honeycomb"
-					thing:    "a \(name) dataset"
-					url:      urls.honeycomb
-					versions: null
-				}
+				service: services.honeycomb
 
 				interface: {
 					socket: {
