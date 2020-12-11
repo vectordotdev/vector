@@ -6,6 +6,9 @@ use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+#[cfg(feature = "repl")]
+mod repl;
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "TRL", about = "Timber Remap Language CLI")]
 struct TRL {
@@ -42,6 +45,10 @@ enum Error {
 
     #[error("json error")]
     Json(#[from] serde_json::Error),
+
+    #[cfg(not(feature = "repl"))]
+    #[error("repl feature disabled, program input required")]
+    ReplFeature,
 }
 
 fn main() {
@@ -55,22 +62,36 @@ fn run(opt: TRL) -> Result<(), Error> {
     let objects = read_into_objects(opt.input_file.as_ref())?;
     let program = read_program(opt.program.as_deref(), opt.program_file.as_ref())?;
 
-    for mut object in objects {
-        let result = execute(&mut object, &program).map(|v| {
-            if opt.print_object {
-                object.to_string()
-            } else {
-                v.to_string()
+    if program.is_empty() {
+        repl(objects)
+    } else {
+        for mut object in objects {
+            let result = execute(&mut object, &program).map(|v| {
+                if opt.print_object {
+                    object.to_string()
+                } else {
+                    v.to_string()
+                }
+            });
+
+            match result {
+                Ok(ok) => println!("{}", ok),
+                Err(err) => eprintln!("{}", err),
             }
-        });
-
-        match result {
-            Ok(ok) => println!("{}", ok),
-            Err(err) => eprintln!("{}", err),
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
+}
+
+#[cfg(feature = "repl")]
+fn repl(objects: Vec<Value>) -> Result<(), Error> {
+    repl::run(objects)
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(object: Vec<Value>) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
