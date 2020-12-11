@@ -28,12 +28,11 @@ lazy_static! {
         "Take a breath, let it go, walk away",
         "A bug was encountered but not in Vector, which doesn't have bugs",
         "We're gonna need a bigger boat",
-        "Maybe we just shouldn't user computers",
+        "Maybe we just shouldn't use computers",
         "Pretty pretty pretty good",
     ];
     static ref APACHE_COMMON_TIME_FORMAT: &'static str = "%d/%b/%Y:%T %z";
     static ref APACHE_ERROR_TIME_FORMAT: &'static str = "%a %b %d %T %Y";
-    static ref SYSLOG_TIME_FORMAT: &'static str = "%+";
 }
 
 pub fn apache_common_log_line() -> String {
