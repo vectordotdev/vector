@@ -1,0 +1,5 @@
+subscription ErrorsTotalSubscription($interval: Int!) {
+    errorsTotal(interval: $interval) {
+        errorsTotal
+    }
+}
