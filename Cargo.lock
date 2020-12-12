@@ -7286,6 +7286,7 @@ dependencies = [
  "rand_distr",
  "rdkafka",
  "regex",
+ "remap-functions",
  "remap-lang",
  "reqwest",
  "rlua",
