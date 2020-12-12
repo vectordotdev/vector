@@ -798,7 +798,7 @@ mod tests {
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap();
 
@@ -861,7 +861,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -898,7 +898,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -921,7 +921,7 @@ mod reload_tests {
         let (mut topology, _crash) =
             start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(old_config.build().unwrap(), false)
+            .reload_config_and_respawn(old_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1103,7 +1103,7 @@ mod reload_tests {
         delay_for(Duration::from_secs(1)).await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config)
             .await
             .unwrap());
 
@@ -1257,7 +1257,7 @@ mod transient_state_tests {
         topology.sources_finished().await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1293,7 +1293,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1337,7 +1337,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }

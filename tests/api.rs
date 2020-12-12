@@ -79,7 +79,7 @@ mod tests {
             .await
             .unwrap();
 
-        let result = vector::topology::start_validated(c, diff, pieces, false).await;
+        let result = vector::topology::start_validated(c, diff, pieces).await;
         let (topology, _graceful_crash) = result.unwrap();
 
         topology
@@ -581,7 +581,7 @@ mod tests {
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
-            topology.reload_config_and_respawn(c, false).await.unwrap();
+            topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());
 
             // Await the join handle
@@ -663,7 +663,7 @@ mod tests {
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
-            topology.reload_config_and_respawn(c, false).await.unwrap();
+            topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());
 
             // Await the join handle
