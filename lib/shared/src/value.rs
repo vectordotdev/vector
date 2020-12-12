@@ -28,10 +28,31 @@ macro_rules! value_impl {
             pub fn [<is_ $func>](&self) -> bool {
                 matches!(self, Value::$variant(_))
             }
+
+            pub fn [<as_ $func>](&self) -> Option<&$ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            pub fn [<as_ $func _mut>](&mut self) -> Option<&mut $ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
             })+
 
             pub fn is_null(&self) -> bool {
                 matches!(self, Value::Null)
+            }
+
+            pub fn as_null(&self) -> Option<()> {
+                match self {
+                    Value::Null => Some(()),
+                    _ => None,
+                }
             }
         }
     };
@@ -294,13 +315,6 @@ impl Value {
 
     pub fn into_bytes_lossy(self) -> Bytes {
         self.as_bytes_lossy()
-    }
-
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
-            _ => None,
-        }
     }
 
     pub fn kind(&self) -> &str {
