@@ -1,7 +1,7 @@
 package metadata
 
 remap: {
-	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex"
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
@@ -74,10 +74,6 @@ remap: {
 	}
 
 	types: {
-		"any": {
-			description: "A stand-in for any type."
-			use: ["parameter"]
-		}
 		"array": {
 			description: "A list of items."
 			use: ["parameter", "return"]
