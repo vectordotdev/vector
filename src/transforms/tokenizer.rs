@@ -1,4 +1,4 @@
-use shared::util::tokenize::parse;
+use shared::tokenize::parse;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
