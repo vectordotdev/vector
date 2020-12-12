@@ -23,7 +23,7 @@ impl Object for Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Field::*, Segment::*};
+    use crate::{map, value, Field::*, Segment::*};
     use std::str::FromStr;
 
     #[test]

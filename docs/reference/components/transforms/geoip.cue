@@ -36,7 +36,11 @@ components: transforms: geoip: {
 
 	configuration: {
 		database: {
-			description: "Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City.mmdb`). Other databases, such as the the country database are not supported.\n"
+			description: """
+				Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
+				database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
+				databases, such as the the country database, are not supported.
+				"""
 			required:    true
 			type: string: {
 				examples: ["/path/to/GeoLite2-City.mmdb"]
@@ -65,24 +69,97 @@ components: transforms: geoip: {
 		metrics: null
 	}
 
+	how_it_works: {
+		supported_databases: {
+			title: "Supported MaxMind databases"
+			body:  """
+				The `geoip` transform currently supports the following [MaxMind](\(urls.maxmind))
+				databases:
+
+				* [GeoLite2-ASN.mmdb](\(urls.maxmind_geolite2_asn)) (free) — Determine the
+					autonomous system number and organization associated with an IP address.
+				* [GeoLite2-City.mmdb](\(urls.maxmind_geolite2_city)) (free) — Determine the
+					country, subdivisions, city, and postal code associated with IPv4 and IPv6
+					addresses worldwide.
+				* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) — Determine the country,
+					subdivisions, city, and postal code associated with IPv4 and IPv6
+					addresses worldwide.
+				* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
+					Service Provider (ISP), organization name, and autonomous system organization
+					and number associated with an IP address.
+
+				The database files should be in the [MaxMind DB file
+				format](\(urls.maxmind_db_file_format)).
+				"""
+		}
+	}
+
 	output: logs: line: {
-		description: "Geo enriched log event"
+		_city_db_blurb: """
+			Available with the [GeoIP2-City](\(urls.maxmind_geoip2_city)) or
+			[GeoLite2-City](\(urls.maxmind_geolite2_city)) database.
+			"""
+
+		description: "Geo-enriched log event"
 		fields: {
 			geoip: {
-				description: "The root field containing all geolocation data as sub-fields."
-				required:    true
+				description: """
+					The root field containing all geolocation data as subfields. Depending on the
+					database used, either the city or the ISP field is populated.
+					"""
+				required: true
 				type: object: {
 					examples: []
 					options: {
+						autonomous_system_number: {
+							description: """
+								The Autonomous System (AS) number associated with the IP address.
+								Zero if unknown. Available with the
+								[GeoIP2-ISP](\(urls.maxmind_geoip2_isp)) or
+								[GeoLite2-ASN](\(urls.maxmind_geolite2_asn)) database.
+								"""
+							required:    false
+							common:      false
+							type: uint: {
+								unit:    null
+								default: null
+								examples: [701, 721]
+							}
+							groups: ["ASN", "ISP"]
+						}
+						autonomous_system_organization: {
+							description: """
+							The organization associated with the registered autonomous system number
+							for the IP address. Available with the
+							[GeoIP2-ISP](\(urls.maxmind_geoip2_isp)) or
+							[GeoLite2-ASN](\(urls.maxmind_geolite2_asn)) database.
+							"""
+							required:    false
+							common:      false
+							type: string: {
+								default: null
+								examples: [
+									"MCI Communications Services, Inc. d/b/a Verizon Business",
+									"DoD Network Information Center",
+								]
+							}
+							groups: ["ASN", "ISP"]
+						}
 						city_name: {
-							description: "The city name associated with the IP address."
+							description: """
+								The city name associated with the IP address. \(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								examples: ["New York", "Brooklyn", "Chicago"]
 							}
+							groups: ["City"]
 						}
 						continent_code: {
-							description: "The continent code associated with the IP address."
+							description: """
+								The continent code associated with the IP address.
+								\(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								enum: {
@@ -95,41 +172,82 @@ components: transforms: geoip: {
 									SA: "South America"
 								}
 							}
+							groups: ["City"]
 						}
 						country_code: {
-							description: "The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address."
+							description: """
+								The [ISO 3166-2 country codes](\(urls.iso3166_2)) associated with
+								the IP address. \(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								examples: ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
 							}
+							groups: ["City"]
+						}
+						isp: {
+							description: """
+								The name of the Internet Service Provider (ISP) associated with the
+								IP address. Available with the
+								[GeoIP2-ISP](\(urls.maxmind_geoip2_isp)) database.
+								"""
+							required:    false
+							common:      false
+							type: string: {
+								default: null
+								examples: ["Verizon Business"]
+							}
+							groups: ["ISP"]
 						}
 						latitude: {
-							description: "The latitude associated with the IP address."
+							description: "The latitude associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["51.75"]
 							}
+							groups: ["City"]
 						}
 						longitude: {
-							description: "The longitude associated with the IP address."
+							description: "The longitude associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["-1.25"]
 							}
+							groups: ["City"]
+						}
+						organization: {
+							description: """
+								The name of the organization associated with the IP address.
+								Available with the [GeoIP2-ISP](\(urls.maxmind_geoip2_isp))
+								database.
+								"""
+							required:    false
+							common:      false
+							type: string: {
+								default: null
+								examples: ["Verizon Business"]
+							}
+							groups: ["ISP"]
 						}
 						postal_code: {
-							description: "The postal code associated with the IP address."
+							description: "The postal code associated with the IP address. \(_city_db_blurb)."
 							required:    true
 							type: string: {
 								examples: ["07094", "10010", "OX1"]
 							}
+							groups: ["City"]
 						}
 						timezone: {
-							description: "The timezone associated with the IP address in [IANA time zone format][urls.iana_time_zone_format]. A full list of time zones can be found [here][urls.iana_time_zones].\n"
+							description: """
+								The timezone associated with the IP address in [IANA time zone
+								format](\(urls.iana_time_zone_format)). A full list of time zones
+								can be found [here](\(urls.iana_time_zones)) \(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								examples: ["America/New_York", "Asia/Atyrau", "Europe/London"]
 							}
+							groups: ["City"]
 						}
 					}
 				}
