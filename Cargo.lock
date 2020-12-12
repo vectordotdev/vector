@@ -769,12 +769,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bytes"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0dcbc35f504eb6fc275a6d20e4ebcda18cf50d40ba6fabff8c711fa16cb3b16"
-
-[[package]]
 name = "bytesize"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5041,7 +5035,7 @@ checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
 name = "remap-cli"
 version = "0.1.0"
 dependencies = [
- "bytes 0.6.0",
+ "bytes 0.5.6",
  "remap-lang",
  "rustyline",
  "serde_json",
@@ -5054,7 +5048,7 @@ name = "remap-functions"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes 0.6.0",
+ "bytes 0.5.6",
  "chrono",
  "cidr-utils",
  "grok",
@@ -5080,7 +5074,7 @@ name = "remap-lang"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "bytes 0.6.0",
+ "bytes 0.5.6",
  "chrono",
  "criterion",
  "dyn-clone",
@@ -5878,7 +5872,7 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "atty",
- "bytes 0.6.0",
+ "bytes 0.5.6",
  "chrono",
  "metrics",
  "metrics-tracing-context",
