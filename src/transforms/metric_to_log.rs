@@ -3,11 +3,11 @@ use crate::{
     event::{self, Event, LogEvent},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
     transforms::{FunctionTransform, Transform},
+    types::Conversion,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use shared::conversion::Conversion;
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]

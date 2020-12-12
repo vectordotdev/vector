@@ -172,7 +172,7 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
 
 #[cfg(test)]
 mod tests {
-    use shared::test_util::trace_init;
+    use crate::test_util::trace_init;
     use metrics::counter;
     use tracing::{span, Level};
 

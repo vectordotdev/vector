@@ -19,7 +19,7 @@ lazy_static::lazy_static! {
 
 #[test]
 fn zero_len_not_allowed() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "";
     let maybe_lookup = Lookup::from_str(input);
     assert!(maybe_lookup.is_err());
@@ -27,7 +27,7 @@ fn zero_len_not_allowed() {
 
 #[test]
 fn we_dont_parse_plain_strings_in_from() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
     let lookup = Lookup::from(input);
     assert_eq!(lookup[0], Segment::field(String::from(input)));
@@ -36,7 +36,7 @@ fn we_dont_parse_plain_strings_in_from() {
 
 #[test]
 fn simple() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "some_key";
     let lookup = Lookup::from_str(input).unwrap();
     assert_eq!(lookup[0], Segment::field(String::from("some_key")));
@@ -45,7 +45,7 @@ fn simple() {
 
 #[test]
 fn push() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
     lookup.push(Segment::field(String::from(input)));
@@ -55,7 +55,7 @@ fn push() {
 
 #[test]
 fn pop() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
     let out = lookup.pop();
@@ -64,7 +64,7 @@ fn pop() {
 
 #[test]
 fn array() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = Lookup::from_str(input).unwrap();
     assert_eq!(lookup[0], Segment::field(String::from("foo")));
@@ -74,7 +74,7 @@ fn array() {
 
 #[test]
 fn via_parse() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = input.parse::<Lookup>().unwrap();
     assert_eq!(lookup[0], Segment::field(String::from("foo")));
@@ -84,7 +84,7 @@ fn via_parse() {
 
 #[test]
 fn to_string() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let input = SUFFICIENTLY_COMPLEX;
     let lookup = Lookup::from_str(input).unwrap();
     assert_eq!(lookup.to_string(), input);
@@ -92,7 +92,7 @@ fn to_string() {
 
 #[test]
 fn impl_index_ranges() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     // This test is primarily to ensure certain interfaces exist and weren't disturbed.
@@ -104,7 +104,7 @@ fn impl_index_ranges() {
 
 #[test]
 fn impl_index_usize() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
@@ -114,7 +114,7 @@ fn impl_index_usize() {
 
 #[test]
 fn impl_index_mut_index_mut() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let mut lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
@@ -125,7 +125,7 @@ fn impl_index_mut_index_mut() {
 
 #[test]
 fn iter() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     let mut iter = lookup.iter();
@@ -139,7 +139,7 @@ fn iter() {
 
 #[test]
 fn into_iter() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
     let mut iter = lookup.into_iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().cloned().enumerate() {
@@ -167,7 +167,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 // then turned into a string again is the same.
 #[test]
 fn lookup_to_string_and_serialize() {
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
     const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
     trace!(?FIXTURE_ROOT, "Opening.");

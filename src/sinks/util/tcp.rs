@@ -252,8 +252,7 @@ impl StreamSink for TcpSink {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::next_addr;
-    use shared::test_util::trace_init;
+    use crate::test_util::{next_addr, trace_init};
     use tokio::net::TcpListener;
 
     #[tokio::test]

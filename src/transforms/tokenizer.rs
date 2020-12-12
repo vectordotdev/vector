@@ -4,8 +4,8 @@ use crate::{
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
+    types::{parse_check_conversion_map, Conversion},
 };
-use shared::conversion::{parse_check_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;

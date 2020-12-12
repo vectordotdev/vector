@@ -16,7 +16,7 @@ impl InternalEvent for KeyValueEventProcessed {
 #[derive(Debug)]
 pub(crate) struct KeyValueParseFailed {
     pub key: String,
-    pub error: shared::conversion::Error,
+    pub error: crate::types::Error,
 }
 
 impl InternalEvent for KeyValueParseFailed {

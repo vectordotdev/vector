@@ -70,7 +70,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
 #[derive(Debug)]
 pub(crate) struct RegexParserConversionFailed<'a> {
     pub name: &'a str,
-    pub error: shared::conversion::Error,
+    pub error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for RegexParserConversionFailed<'a> {

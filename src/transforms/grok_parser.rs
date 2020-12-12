@@ -6,8 +6,8 @@ use crate::{
         GrokParserMissingField,
     },
     transforms::{FunctionTransform, Transform},
+    types::{parse_conversion_map, Conversion},
 };
-use shared::conversion::{parse_conversion_map, Conversion};
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};

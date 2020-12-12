@@ -41,6 +41,8 @@ use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 pub mod stats;
 
+pub use shared::test_util::trace_init;
+
 #[macro_export]
 macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{

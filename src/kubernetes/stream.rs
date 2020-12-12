@@ -74,7 +74,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::test_util::trace_init;
+    use crate::test_util::trace_init;
     use futures::StreamExt;
     use k8s_openapi::{api::core::v1::Pod, WatchResponse};
 

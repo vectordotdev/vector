@@ -6,11 +6,11 @@ use crate::{
         RegexParserMissingField, RegexParserTargetExists,
     },
     transforms::{FunctionTransform, Transform},
+    types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
-use shared::conversion::{parse_check_conversion_map, Conversion};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;

@@ -34,7 +34,7 @@ impl InternalEvent for LogfmtParserMissingField<'_> {
 #[derive(Debug)]
 pub struct LogfmtParserConversionFailed<'a> {
     pub name: &'a str,
-    pub error: shared::conversion::Error,
+    pub error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for LogfmtParserConversionFailed<'a> {
