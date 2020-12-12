@@ -32,7 +32,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
 #[derive(Debug)]
 pub struct SplitConvertFailed<'a> {
     pub field: &'a str,
-    pub error: crate::types::Error,
+    pub error: shared::conversion::Error,
 }
 
 impl<'a> InternalEvent for SplitConvertFailed<'a> {

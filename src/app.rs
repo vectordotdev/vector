@@ -1,9 +1,7 @@
 use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand};
 use crate::signal::SignalTo;
 use crate::topology::RunningTopology;
-use crate::{
-    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
-};
+use crate::{config, generate, heartbeat, list, metrics, signal, topology, unit_test, validate};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -84,7 +82,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        trace::init(color, json, &level);
+        shared::trace::init(color, json, &level);
 
         metrics::init().expect("metrics initialization failed");
 

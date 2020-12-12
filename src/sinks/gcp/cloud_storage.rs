@@ -423,7 +423,7 @@ fn encode_event(
         Encoding::Text => {
             let mut bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.as_bytes_lossy().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
             bytes
@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn gcs_encode_event_apply_rules() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
 
         let message = "hello world".to_string();
         let mut event = Event::from(message);

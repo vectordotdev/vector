@@ -5883,7 +5883,7 @@ dependencies = [
  "serde_json",
  "snafu",
  "toml",
- "tracing 0.1.21",
+ "tracing 0.1.22",
  "tracing-futures 0.2.4",
  "tracing-limit",
  "tracing-log",

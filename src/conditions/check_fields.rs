@@ -56,9 +56,9 @@ impl CheckFieldsPredicate for EqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
-                CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
+                CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes_lossy(),
                 CheckFieldsPredicateArg::VecString(ss) => {
-                    ss.iter().any(|s| s.as_bytes() == v.as_bytes())
+                    ss.iter().any(|s| s.as_bytes() == v.as_bytes_lossy())
                 }
                 CheckFieldsPredicateArg::Integer(i) => match v {
                     Value::Integer(vi) => *i == *vi,
@@ -238,7 +238,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
         match event {
             Event::Log(l) => l
                 .get(&self.target)
-                .map(|f| f.as_bytes())
+                .map(|f| f.as_bytes_lossy())
                 .map_or(false, |b| {
                     //false if any match, else true
                     !self.arg.iter().any(|s| b == s.as_bytes())
