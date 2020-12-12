@@ -3,7 +3,7 @@ package metadata
 components: transforms: concat: {
 	title: "Concat"
 
-	description:	"""
+	description: """
 		Slices log string fields and joins them into a single field.
 		"""
 

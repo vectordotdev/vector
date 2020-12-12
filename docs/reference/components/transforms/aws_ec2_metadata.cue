@@ -3,7 +3,7 @@ package metadata
 components: transforms: aws_ec2_metadata: {
 	title: "AWS EC2 Metadata"
 
-	description:	"""
+	description: """
 		Enriches log events with AWS EC2 environment metadata.
 		"""
 

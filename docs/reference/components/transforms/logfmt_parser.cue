@@ -3,7 +3,7 @@ package metadata
 components: transforms: logfmt_parser: {
 	title: "Logfmt Parser"
 
-	description:	"""
+	description: """
 		Parses a log field's value in the [logfmt](\(urls.logfmt)) format.
 		"""
 

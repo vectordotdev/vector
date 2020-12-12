@@ -3,7 +3,7 @@ package metadata
 components: transforms: merge: {
 	title: "Merge"
 
-	description:	"""
+	description: """
 		Merges partial log events into a single event
 		"""
 
@@ -34,7 +34,7 @@ components: transforms: merge: {
 			[`reduce` transform](\(urls.vector_remap_transform)). The `reduce`
 			transform provides a simple syntax for robust data merging.
 			Let us know what you think!
-			"""
+			""",
 		]
 		notices: []
 	}

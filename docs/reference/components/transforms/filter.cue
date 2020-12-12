@@ -3,7 +3,7 @@ package metadata
 components: transforms: filter: {
 	title: "Filter"
 
-	description:	"""
+	description: """
 		Filters events based on a set of conditions.
 		"""
 
@@ -42,8 +42,15 @@ components: transforms: filter: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	examples: [

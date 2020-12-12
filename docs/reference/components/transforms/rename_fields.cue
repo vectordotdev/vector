@@ -3,7 +3,7 @@ package metadata
 components: transforms: rename_fields: {
 	title: "Rename Fields"
 
-	description:	"""
+	description: """
 		Renames one or more log fields.
 		"""
 
@@ -34,7 +34,7 @@ components: transforms: rename_fields: {
 			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
 			transform provides a simple syntax for robust data transformation.
 			Let us know what you think!
-			"""
+			""",
 		]
 		notices: []
 	}

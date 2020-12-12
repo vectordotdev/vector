@@ -3,7 +3,7 @@ package metadata
 components: transforms: json_parser: {
 	title: "JSON Parser"
 
-	description:	"""
+	description: """
 		Parses a log field value as [JSON](\(urls.json))
 		"""
 
@@ -36,11 +36,10 @@ components: transforms: json_parser: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform's `parse_json` function](\(urls.vector_remap_transform#parse_json))`
-			The `remap` transform provides a simple syntax for robust data
-			transformation. Let us know what you think!
-			"""
+			This component has been deprecated in favor of the new [`remap` transform's `parse_json`
+			function](\(urls.vector_remap_transform)#parse_json). The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: []
 	}

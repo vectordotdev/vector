@@ -3,7 +3,7 @@ package metadata
 components: transforms: remap: {
 	title: "Remap"
 
-	description:	"""
+	description: """
 		Transforms events using the [Timber Remap Language](\(urls.timber_remap_language_reference)),
 		a fast, safe, expressive data mapping language.
 		"""

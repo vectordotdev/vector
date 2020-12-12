@@ -3,7 +3,7 @@ package metadata
 components: transforms: ansi_stripper: {
 	title: "ANSI Stripper"
 
-	description:	"""
+	description: """
 		Strips [ANSI escape sequences](\(urls.ansi_escape_codes)).
 		"""
 

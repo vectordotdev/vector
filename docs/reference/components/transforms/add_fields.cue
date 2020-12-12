@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: add_fields: {
-	title: "Add Fields"
+	title:       "Add Fields"
 	description: "Adds fields to log events."
 
 	classes: {
@@ -32,7 +32,7 @@ components: transforms: add_fields: {
 			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
 			transform provides a simple syntax for robust data transformation.
 			Let us know what you think!
-			"""
+			""",
 		]
 		notices: []
 	}

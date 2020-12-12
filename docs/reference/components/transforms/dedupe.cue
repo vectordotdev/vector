@@ -3,7 +3,7 @@ package metadata
 components: transforms: dedupe: {
 	title: "Dedupe events"
 
-	description:	"""
+	description: """
 		Deduplicates events to reduce uncessary data volume.
 		"""
 

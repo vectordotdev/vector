@@ -3,7 +3,7 @@ package metadata
 components: transforms: remove_fields: {
 	title: "Remove Fields"
 
-	description:	"""
+	description: """
 		Removes one or more log fields.
 		"""
 
@@ -30,11 +30,10 @@ components: transforms: remove_fields: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform's `del` function](\(urls.vector_remap_transform#del))`
-			The `remap` transform provides a simple syntax for robust data
-			transformation. Let us know what you think!
-			"""
+			This component has been deprecated in favor of the new [`remap` transform's `del`
+			function](\(urls.vector_remap_transform)#del). The `remap` transform provides a simple
+			syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: []
 	}

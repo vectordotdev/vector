@@ -3,7 +3,7 @@ package metadata
 components: transforms: remove_tags: {
 	title: "Remove Tags"
 
-	description:	"""
+	description: """
 		Removes one or more metric tags.
 		"""
 

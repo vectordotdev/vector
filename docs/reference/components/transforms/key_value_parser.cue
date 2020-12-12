@@ -3,7 +3,7 @@ package metadata
 components: transforms: key_value_parser: {
 	title: "Key Value Parser"
 
-	description:	"""
+	description: """
 		Loosely parses a log field's value in key/value format.
 		"""
 

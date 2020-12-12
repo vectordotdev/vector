@@ -3,7 +3,7 @@ package metadata
 components: transforms: grok_parser: {
 	title: "Grok Parser"
 
-	description:	"""
+	description: """
 		Parses a log field value with [Grok](\(urls.grok))
 		"""
 
@@ -36,11 +36,10 @@ components: transforms: grok_parser: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform's `parse_grok` function](\(urls.vector_remap_transform#parse_grok))`
-			The `remap` transform provides a simple syntax for robust data
-			transformation. Let us know what you think!
-			"""
+			This component has been deprecated in favor of the new [`remap` transform's `parse_grok`
+			function](\(urls.vector_remap_transform)#parse_grok)` The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: [
 			"""

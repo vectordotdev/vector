@@ -3,7 +3,7 @@ package metadata
 components: transforms: coercer: {
 	title: "Coercer"
 
-	description:	"""
+	description: """
 		Coerces log fields into typed values.
 		"""
 
