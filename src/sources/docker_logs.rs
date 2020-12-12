@@ -18,15 +18,17 @@ use bollard::{
     errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
-    Docker,
+    Docker, API_DEFAULT_VERSION,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
+use http::uri::{Scheme, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     future::ready,
+    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Duration,
@@ -34,6 +36,9 @@ use std::{
 };
 
 use tokio::sync::mpsc;
+
+// From bollard source.
+const DEFAULT_TIMEOUT: u64 = 120;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
@@ -51,6 +56,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    docker_host: Option<String>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
@@ -64,6 +70,7 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            docker_host: None,
             exclude_containers: None,
             include_containers: None,
             include_labels: None,
@@ -207,7 +214,7 @@ impl DockerLogsSourceCore {
     fn new(config: DockerLogsConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
-        let docker = docker()?;
+        let docker = docker(config.docker_host.clone())?;
 
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
@@ -989,16 +996,48 @@ impl ContainerMetadata {
     }
 }
 
-fn docker() -> Result<Docker, DockerError> {
-    let scheme = env::var("DOCKER_HOST").ok().and_then(|host| {
-        let uri = host.parse::<hyper::Uri>().expect("invalid url");
-        uri.into_parts().scheme
-    });
+// From bollard source, unfortunately they don't export this function.
+fn default_cert_path() -> Result<PathBuf, DockerError> {
+    let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
+    if let Ok(path) = from_env {
+        Ok(PathBuf::from(path))
+    } else {
+        let home = dirs_next::home_dir().ok_or_else(|| NoCertPathError)?;
+        Ok(home.join(".docker"))
+    }
+}
 
-    match scheme.as_ref().map(|s| s.as_str()) {
-        Some("http") => Docker::connect_with_http_defaults(),
-        Some("https") => Docker::connect_with_ssl_defaults(),
-        _ => Docker::connect_with_local_defaults(),
+fn docker(host: Option<String>) -> Result<Docker, DockerError> {
+    let host = host.or_else(|| env::var("DOCKER_HOST").ok());
+
+    match host {
+        None => Docker::connect_with_local_defaults(),
+
+        Some(host) => {
+            let scheme = host
+                .parse::<Uri>()
+                .ok()
+                .and_then(|uri| uri.into_parts().scheme);
+
+            match scheme {
+                Some(Scheme::HTTP) => {
+                    Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                }
+                Some(Scheme::HTTPS) => {
+                    let cert_path = default_cert_path()?;
+                    Docker::connect_with_ssl(
+                        &host,
+                        &cert_path.join("key.pem"),
+                        &cert_path.join("cert.pem"),
+                        &cert_path.join("ca.pem"),
+                        DEFAULT_TIMEOUT,
+                        API_DEFAULT_VERSION,
+                    )
+                }
+                // unix socket on unix, named pipe on windows
+                _ => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION),
+            }
+        }
     }
 }
 
