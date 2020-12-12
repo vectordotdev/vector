@@ -14,9 +14,7 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if not .Values.externalConfigMap }}
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        {{- end }}
+        {{- include "libvector.configTemplateChecksumAnnotation" . | nindent 8 }}
         {{- include "libvector.rollmeAnnotation" . | nindent 8 }}
         {{- include "libvector.metricsPrometheusPodAnnotations" . | nindent 8 }}
         {{- with .Values.podAnnotations }}
