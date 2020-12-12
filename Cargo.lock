@@ -3510,9 +3510,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22957a1b4e095d61efe0a84ffcdae8e04d64f8b7978d54dd99ccef58699dfbb0"
+checksum = "9327c834909faa65a9c1588421b62db6b6a8dca555e1891459c3905b6f1008c7"
 dependencies = [
  "itoa",
  "metrics",
