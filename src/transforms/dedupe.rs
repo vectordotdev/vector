@@ -164,7 +164,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
                 if let Some(value) = event.as_log().get(&field_name) {
-                    entry.push(Some((type_id_for_value(&value), value.as_bytes_lossy())));
+                    entry.push(Some((type_id_for_value(&value), value.as_bytes())));
                 } else {
                     entry.push(None);
                 }
@@ -179,7 +179,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
                     entry.push((
                         field_name,
                         type_id_for_value(&value),
-                        value.as_bytes_lossy(),
+                        value.as_bytes(),
                     ));
                 }
             }

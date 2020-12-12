@@ -423,7 +423,7 @@ fn encode_event(
         Encoding::Text => {
             let mut bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes_lossy().to_vec())
+                .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
             bytes

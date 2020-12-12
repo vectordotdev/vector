@@ -245,7 +245,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 
         Encoding::Text => log
             .get(crate::config::log_schema().message_key())
-            .map(|v| v.as_bytes_lossy().to_vec())
+            .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
 

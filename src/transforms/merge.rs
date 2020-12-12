@@ -200,7 +200,7 @@ mod test {
                 .as_log()
                 .get("message")
                 .unwrap()
-                .as_bytes_lossy()
+                .as_bytes()
                 .as_ref(),
             b"hello world"
         );
@@ -247,7 +247,7 @@ mod test {
                 .as_log()
                 .get("message")
                 .unwrap()
-                .as_bytes_lossy()
+                .as_bytes()
                 .as_ref(),
             b"hello world"
         );
@@ -257,7 +257,7 @@ mod test {
                 .as_log()
                 .get("message")
                 .unwrap()
-                .as_bytes_lossy()
+                .as_bytes()
                 .as_ref(),
             b"lorem ipsum"
         );
