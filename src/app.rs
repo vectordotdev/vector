@@ -149,6 +149,10 @@ impl Application {
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
 
+                if !config.healthchecks.enabled {
+                    info!("Health checks are disabled.");
+                }
+
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
