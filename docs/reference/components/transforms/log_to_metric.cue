@@ -3,6 +3,10 @@ package metadata
 components: transforms: log_to_metric: {
 	title: "Log to Metric"
 
+	description:	"""
+		Derives one or more Vector metric events from a Vector log event.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"

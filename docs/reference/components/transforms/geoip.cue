@@ -3,6 +3,11 @@ package metadata
 components: transforms: geoip: {
 	title: "GeoIP"
 
+	description:	"""
+		Enrich events with geolocation data from the MaxMind GeoIP2-City,
+		GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -39,7 +44,7 @@ components: transforms: geoip: {
 			description: "Path to the MaxMind GeoIP2 or GeoLite2 binary city database file (`GeoLite2-City.mmdb`). Other databases, such as the the country database are not supported.\n"
 			required:    true
 			type: string: {
-				examples: ["/path/to/GeoLite2-City.mmdb"]
+				examples: [["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
 			}
 		}
 		source: {

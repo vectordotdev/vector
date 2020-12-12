@@ -3,6 +3,7 @@ package metadata
 urls: {
 	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
+	ansi_escape_codes: "https://en.wikipedia.org/wiki/ANSI_escape_code"
 	apache:                                                   "https://httpd.apache.org/"
 	apache_extended_status:                                   "https://httpd.apache.org/docs/current/mod/core.html#extendedstatus"
 	apache_install:                                           "https://httpd.apache.org/docs/current/install.html"
@@ -195,7 +196,6 @@ urls: {
 	jemalloc:                                                 "https://github.com/jemalloc/jemalloc"
 	journald:                                                 "https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html"
 	json:                                                     "https://en.wikipedia.org/wiki/JSON"
-	json:                                                     "https://en.wikipedia.org/wiki/JSON"
 	json_types:                                               "https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax"
 	jsonnet:                                                  "https://jsonnet.org/"
 	kafka:                                                    "https://kafka.apache.org/"
@@ -249,6 +249,7 @@ urls: {
 	lz4:                                                      "https://lz4.github.io/lz4/"
 	macos:                                                    "https://en.wikipedia.org/wiki/MacOS"
 	mailing_list:                                             "https://vector.dev/community/"
+	maxmind: "https://www.maxmind.com"
 	maxmind_db_file_format:                                   "https://maxmind.github.io/MaxMind-DB/"
 	maxmind_geoip2_city:                                      "https://www.maxmind.com/en/geoip2-city"
 	maxmind_geoip2_isp:                                       "https://www.maxmind.com/en/geoip2-isp-database"

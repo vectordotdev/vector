@@ -3,6 +3,10 @@ package metadata
 components: transforms: filter: {
 	title: "Filter"
 
+	description:	"""
+		Filters events based on a set of conditions.
+		"""
+
 	classes: {
 		commonly_used: true
 		development:   "stable"
@@ -24,7 +28,7 @@ components: transforms: filter: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [transforms.add_fields.support.warnings[0]]
 		notices: []
 	}
 

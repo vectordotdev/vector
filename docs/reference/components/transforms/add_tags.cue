@@ -2,6 +2,7 @@ package metadata
 
 components: transforms: add_tags: {
 	title: "Add Tags"
+	description: "Adds tags to metric events."
 
 	classes: {
 		commonly_used: false

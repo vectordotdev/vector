@@ -3,6 +3,10 @@ package metadata
 components: transforms: lua: {
 	title: "Lua"
 
+	description:	"""
+		Transform events with a full embedded [Lua](\(urls.lua)) engine.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
