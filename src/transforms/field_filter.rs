@@ -70,7 +70,7 @@ impl FunctionTransform for FieldFilter {
         if event
             .as_log()
             .get(&self.field_name)
-            .map(|f| f.as_bytes())
+            .map(|f| f.as_bytes_lossy())
             .map_or(false, |b| b == self.value.as_bytes())
         {
             output.push(event);

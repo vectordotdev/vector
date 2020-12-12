@@ -146,7 +146,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
+            let span = shared::trace::current_span();
 
             let mut filter: BoxedFilter<()> = warp::post().boxed();
             if !path.is_empty() && path != "/" {
