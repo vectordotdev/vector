@@ -390,7 +390,7 @@ features one has to pass a comma-separated list of component features.
 | `sources-journald`                                   | Enables building of [`journald` source][docs.sources.journald].                                                                            |
 | `sources-kafka`                                      | Enables building of [`kafka` source][docs.sources.kafka]. Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.          |
 | `sources-kubernetes_logs`                            | Enables building of [`kubernetes_logs` source][docs.sources.kubernetes_logs].                                                              |
-| `sources-heroku-logs`                                | Enables building of [`heroku_logs` source][docs.sources.heroku_logs].                                                                              |
+| `sources-heroku_logs`                                | Enables building of [`heroku_logs` source][docs.sources.heroku_logs].                                                                              |
 | `sources-prometheus`                                 | Enables building of [`prometheus` source][docs.sources.prometheus].                                                                        |
 | `sources-socket`                                     | Enables building of [`socket` source][docs.sources.socket].                                                                                |
 | `sources-splunk_hec`                                 | Enables building of [`splunk_hec` source][docs.sources.splunk_hec].                                                                        |

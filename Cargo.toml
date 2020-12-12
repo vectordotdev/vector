@@ -310,7 +310,7 @@ sources = [
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes-logs",
-  "sources-heroku-logs",
+  "sources-heroku_logs",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
   "sources-prometheus",
@@ -334,7 +334,7 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-heroku-logs = ["sources-utils-http"]
+sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]

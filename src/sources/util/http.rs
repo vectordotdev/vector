@@ -20,7 +20,7 @@ use warp::{
     Filter,
 };
 
-#[cfg(any(feature = "sources-http", feature = "sources-heroku-logs"))]
+#[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) fn add_query_parameters(
     mut events: Vec<Event>,
     query_parameters_config: &[String],
