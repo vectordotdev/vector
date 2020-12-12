@@ -119,6 +119,7 @@ tui = { version = "0.13.0", optional = true, default-features = false, features 
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
+remap-functions = { path = "lib/remap-functions" }
 
 # External libs
 derivative = "2.1.1"
