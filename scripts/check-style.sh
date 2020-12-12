@@ -33,6 +33,7 @@ for FILE in $(git ls-files); do
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
+    lib/shared/tests/data*) continue;;
     distribution/kubernetes/*/*.yaml) continue;;
   esac
 

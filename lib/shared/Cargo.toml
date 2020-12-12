@@ -57,12 +57,12 @@ value = [
 
 trace = [
     "metrics",
-    "metrics-tracing-context", 
+    "metrics-tracing-context",
     "tracing",
-    "tracing-futures", 
-    "tracing-limit", 
-    "tracing-log", 
-    "tracing-subscriber", 
+    "tracing-futures",
+    "tracing-limit",
+    "tracing-log",
+    "tracing-subscriber",
     "tracing-tower",
 ]
 
