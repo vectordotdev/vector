@@ -164,6 +164,7 @@ async fn validate_healthchecks(
                     .get(&name)
                     .expect("Sink not present")
                     .healthcheck
+                    .enabled
                 {
                     fmt.success(format!("Health check `{}`", name.as_str()));
                 } else {

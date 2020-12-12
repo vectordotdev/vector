@@ -180,8 +180,10 @@ inventory::collect!(SourceDescription);
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
-    #[serde(default = "healthcheck_default")]
-    pub healthcheck: bool,
+    // We are accepting bool for backward compatibility reasons.
+    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
+    #[serde(default)]
+    pub healthcheck: SinkHealthcheckOptions,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
@@ -192,6 +194,22 @@ impl SinkOuter {
         let mut resources = self.inner.resources();
         resources.append(&mut self.buffer.resources(name));
         resources
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SinkHealthcheckOptions {
+    pub enabled: bool,
+}
+
+impl Default for SinkHealthcheckOptions {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+impl From<bool> for SinkHealthcheckOptions {
+    fn from(enabled: bool) -> Self {
+        Self { enabled }
     }
 }
 
@@ -413,10 +431,6 @@ fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec
         }
     }
     Ok(())
-}
-
-fn healthcheck_default() -> bool {
-    true
 }
 
 #[cfg(all(
