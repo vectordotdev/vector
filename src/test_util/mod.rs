@@ -519,9 +519,7 @@ pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
-    require_healthy
-        .into()
-        .map(|flag| config.healthchecks.require_healthy = flag);
+    config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await

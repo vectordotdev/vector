@@ -137,6 +137,12 @@ pub struct HealthcheckOptions {
 }
 
 impl HealthcheckOptions {
+    pub fn set_require_healthy(&mut self, require_healthy: impl Into<Option<bool>>) {
+        if let Some(require_healthy) = require_healthy.into() {
+            self.require_healthy = require_healthy;
+        }
+    }
+
     fn merge(&mut self, other: Self) {
         self.enabled &= other.enabled;
         self.require_healthy |= other.require_healthy;

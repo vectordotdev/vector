@@ -152,7 +152,7 @@ impl Application {
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
                 }
-                require_healthy.map(|flag| config.healthchecks.require_healthy = flag);
+                config.healthchecks.set_require_healthy(require_healthy);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -228,7 +228,7 @@ impl Application {
                         let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
                         if let Some(mut new_config) = new_config {
-                            opts.require_healthy.map(|flag| new_config.healthchecks.require_healthy = flag);
+                            new_config.healthchecks.set_require_healthy(opts.require_healthy);
                             match topology
                                 .reload_config_and_respawn(new_config)
                                 .await
