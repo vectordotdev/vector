@@ -76,7 +76,11 @@ components: sinks: elasticsearch: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			#"""
+				Elasticsearch's Data streams feature require Vector to be configured with the `create` `bulk_action`. *This is not enabled by default.*
+				"""#,
+		]
 		warnings: []
 		notices: []
 	}
