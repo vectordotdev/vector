@@ -3,6 +3,11 @@ package metadata
 components: transforms: split: {
 	title: "Split"
 
+	description:	"""
+		Split a field's value on a _literal_ separator and zip the tokens into ordered \
+field names\
+"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
