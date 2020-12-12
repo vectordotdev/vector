@@ -373,12 +373,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-option"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0db678acb667b525ac40a324fc5f7d3390e29239b31c7327bb8157f5b4fff593"
-
-[[package]]
 name = "atomic-shim"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -735,18 +729,6 @@ name = "bumpalo"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
-
-[[package]]
-name = "bus"
-version = "2.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1e66e1779f5b1440f1a58220ba3b3ded4427175f0a9fb8d7066521f8b4e8f2b"
-dependencies = [
- "atomic-option",
- "crossbeam-channel",
- "num_cpus",
- "parking_lot_core 0.7.2",
-]
 
 [[package]]
 name = "byte-tools"
@@ -7137,7 +7119,6 @@ dependencies = [
  "bloom",
  "bollard",
  "built",
- "bus",
  "bytes 0.5.6",
  "bytesize",
  "chrono",
@@ -7259,6 +7240,7 @@ dependencies = [
  "tower",
  "tower-test",
  "tracing 0.1.21",
+ "tracing-core 0.1.17",
  "tracing-futures 0.2.4",
  "tracing-limit",
  "tracing-log",

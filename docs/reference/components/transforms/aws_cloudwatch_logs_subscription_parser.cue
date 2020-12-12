@@ -1,8 +1,12 @@
 package metadata
 
 components: transforms: aws_cloudwatch_logs_subscription_parser: {
-	title:       "AWS CloudWatch Logs Subscription Parser"
-	description: "[AWS CloudWatch Logs Subscription events](\(urls.aws_cloudwatch_logs_subscriptions)) allow you to forward [AWS CloudWatch Logs](\(urls.aws_cloudwatch_logs)) to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
+	title: "AWS CloudWatch Logs Subscription Parser"
+
+	description: """
+		Parses AWS CloudWatch Logs events coming from the `aws_kinesis_firehose`
+		source.
+		"""
 
 	classes: {
 		commonly_used: false

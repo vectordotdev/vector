@@ -1,10 +1,7 @@
 package metadata
 
 components: sources: kafka: {
-	_port: 9093
-
-	title:       "Kafka"
-	description: components._kafka.description
+	title: "Kafka"
 
 	features: {
 		collect: {

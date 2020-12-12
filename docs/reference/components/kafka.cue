@@ -1,30 +1,33 @@
 package metadata
 
 components: _kafka: {
-	description: "[Apache Kafka](\(urls.kafka)) is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
-
 	features: {
-		_service: {
-			name:     "Kafka"
-			thing:    "\(name) topics"
-			url:      urls.kafka
-			versions: ">= 0.8"
-		}
-
 		collect: from: {
-			service: _service
-		}
-
-		send: to: {
-			service: _service
+			service: services.kafka
 			interface: {
 				socket: {
 					api: {
-						title: "Influx HTTP API"
-						url:   urls.influxdb_http_api_v2
+						title: "Kafka protocol"
+						url:   urls.kafka_protocol
+					}
+					direction: "incoming"
+					port:      9093
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
+			}
+		}
+
+		send: to: {
+			service: services.kafka
+			interface: {
+				socket: {
+					api: {
+						title: "Kafka protocol"
+						url:   urls.kafka_protocol
 					}
 					direction: "outgoing"
-					protocols: ["http"]
+					protocols: ["tcp"]
 					ssl: "optional"
 				}
 			}
