@@ -13,6 +13,7 @@ metrics-tracing-context = { version = "0.1.0-alpha.3", optional = true }
 nom = { version = "6", optional = true }
 paste = { version = "1", optional = true }
 remap = { package = "remap-lang", path = "../remap-lang", optional = true }
+rlua = { git = "https://github.com/kyren/rlua", rev = "25bd7e6bffef9597466a98bfca80a3056c9e6320", optional = true }
 serde = { version = "1", optional = true, default-features = false }
 serde_json = { version = "1", optional = true }
 snafu = { version = "0.6", optional = true }
@@ -65,4 +66,10 @@ tokenize = [
 test_util = [
     "atty",
     "trace",
+]
+
+lua = [
+    "chrono",
+    "rlua",
+    "value",
 ]
