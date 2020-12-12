@@ -189,9 +189,19 @@ components: sinks: [Name=string]: {
 			if sinks[Name].features.healthcheck.enabled {
 				healthcheck: {
 					common:      true
-					description: "Enables/disables the sink healthcheck upon Vector boot."
+					description: "Health check options for the sink."
 					required:    false
-					type: bool: default: true
+					type: object: {
+						examples: []
+						options:{
+							enabled: {
+								common: true
+								description: "Enables/disables the healthcheck upon Vector boot."
+								required:    false
+								type: bool: default: true
+							}
+						}
+					}					
 				}
 			}
 		}
