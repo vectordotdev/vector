@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-bytes = { version = "0.6", optional = true }
+bytes = { version = "0.5.6", optional = true }
 chrono = { version = "0.4", optional = true }
 metrics = { version = "0.13.0-alpha.8", optional = true }
 metrics-tracing-context = { version = "0.1.0-alpha.3", optional = true }
