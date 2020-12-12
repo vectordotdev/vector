@@ -222,7 +222,7 @@ impl rlua::UserData for LuaEvent {
 
         methods.add_meta_method(rlua::MetaMethod::Index, |ctx, this, key: String| {
             if let Some(value) = this.inner.as_log().get(key) {
-                let string = ctx.create_string(&value.as_bytes())?;
+                let string = ctx.create_string(&value.as_bytes_lossy())?;
                 Ok(Some(string))
             } else {
                 Ok(None)
@@ -243,7 +243,7 @@ impl rlua::UserData for LuaEvent {
                     let next: rlua::Function = ctx.globals().get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
                     match key.clone().and_then(|k| event.inner.as_log().get(k)) {
-                        Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
+                        Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes_lossy())?))),
                         None => Ok((None, None)),
                     }
                 })?;

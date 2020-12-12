@@ -12,3 +12,6 @@ pub mod test_util;
 
 #[cfg(feature = "tokenize")]
 pub mod tokenize;
+
+#[cfg(feature = "lua")]
+pub mod lua;
