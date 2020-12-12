@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: aws_ecs_metrics: {
-	title:       "AWS ECS Metrics"
-	description: "The ECS metrics source collects the docker container stats for tasks running in Amazon ECS or Fargate."
+	title: "AWS ECS Metrics"
+
+	description: """
+		Collects the docker container stats for tasks running in AWS ECS or AWS
+		Fargate.
+		"""
 
 	classes: {
 		commonly_used: false
@@ -16,12 +20,7 @@ components: sources: aws_ecs_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Amazon ECS"
-					thing:    "an \(name) container"
-					url:      urls.aws_ecs
-					versions: null
-				}
+				service: services.aws_ecs
 
 				interface: {
 					socket: {

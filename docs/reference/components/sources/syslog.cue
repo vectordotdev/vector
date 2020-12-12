@@ -3,8 +3,7 @@ package metadata
 components: sources: syslog: {
 	_port: 514
 
-	title:       "Syslog"
-	description: "[Syslog](\(urls.syslog)) stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+	title: "Syslog"
 
 	classes: sources.socket.classes
 
@@ -13,12 +12,7 @@ components: sources: syslog: {
 
 		receive: {
 			from: {
-				service: {
-					name:     "Syslog"
-					thing:    "a \(name) client"
-					url:      urls.syslog
-					versions: null
-				}
+				service: services.syslog
 
 				interface: socket: {
 					api: {
@@ -50,7 +44,9 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: sources.socket.configuration
+	configuration: sources.socket.configuration & {
+		"type": "type": string: enum: syslog: "The type of this component."
+	}
 
 	output: logs: line: {
 		description: "An individual Syslog event"

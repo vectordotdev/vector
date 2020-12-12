@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: loki: {
-	title:       "Loki"
-	description: "[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream."
+	title: "Loki"
 
 	classes: {
 		commonly_used: true
@@ -49,12 +48,7 @@ components: sinks: loki: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Loki"
-					thing:    "a \(name) database"
-					url:      urls.loki
-					versions: null
-				}
+				service: services.loki
 
 				interface: {
 					socket: {

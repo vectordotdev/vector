@@ -101,7 +101,7 @@ pub fn trace_init() {
     #[cfg(not(unix))]
     let color = false;
 
-    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "off".to_string());
+    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
     trace::init(color, false, &levels);
 }
@@ -538,14 +538,4 @@ macro_rules! map {
             .into_iter()
             .collect::<::std::collections::BTreeMap<_, _>>()
     };
-}
-
-#[macro_export]
-macro_rules! array {
-    () => (
-        ::std::vec::Vec::new().into()
-    );
-    ($($v:expr),+ $(,)?) => {
-        vec![$($v.into()),+]
-    }
 }

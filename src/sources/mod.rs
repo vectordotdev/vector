@@ -19,6 +19,8 @@ pub mod generator;
 pub mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
+#[cfg(feature = "sources-internal_logs")]
+pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
 #[cfg(all(unix, feature = "sources-journald"))]
