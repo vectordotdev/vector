@@ -23,7 +23,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
-use http::uri::{Scheme, Uri};
+use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -57,6 +57,7 @@ lazy_static! {
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
     docker_host: Option<String>,
+    tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
@@ -67,10 +68,19 @@ pub struct DockerLogsConfig {
     retry_backoff_secs: u64,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct DockerTlsConfig {
+    ca_file: PathBuf,
+    crt_file: PathBuf,
+    key_file: PathBuf,
+}
+
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
             docker_host: None,
+            tls: None,
             exclude_containers: None,
             include_containers: None,
             include_labels: None,
@@ -1002,7 +1012,7 @@ fn default_cert_path() -> Result<PathBuf, DockerError> {
     if let Ok(path) = from_env {
         Ok(PathBuf::from(path))
     } else {
-        let home = dirs_next::home_dir().ok_or_else(|| NoCertPathError)?;
+        let home = dirs_next::home_dir().ok_or_else(|| DockerError::NoCertPathError)?;
         Ok(home.join(".docker"))
     }
 }
@@ -1019,11 +1029,11 @@ fn docker(host: Option<String>) -> Result<Docker, DockerError> {
                 .ok()
                 .and_then(|uri| uri.into_parts().scheme);
 
-            match scheme {
-                Some(Scheme::HTTP) => {
+            match scheme.as_ref().map(|scheme| scheme.as_str()) {
+                Some("http") => {
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                 }
-                Some(Scheme::HTTPS) => {
+                Some("https") => {
                     let cert_path = default_cert_path()?;
                     Docker::connect_with_ssl(
                         &host,
