@@ -74,7 +74,7 @@ impl Expression for LogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     #[test]
     fn log() {

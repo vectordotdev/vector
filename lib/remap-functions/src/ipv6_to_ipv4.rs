@@ -66,7 +66,7 @@ impl Expression for Ipv6ToIpV4Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     remap::test_type_def![value_string {
         expr: |_| Ipv6ToIpV4Fn {

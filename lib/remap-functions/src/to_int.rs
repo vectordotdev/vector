@@ -89,7 +89,7 @@ impl Expression for ToIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn to_int() {
-        use shared::map;
+        use crate::map;
 
         let cases = vec![
             (

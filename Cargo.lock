@@ -5098,6 +5098,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "regex",
+ "serde",
  "thiserror",
 ]
 

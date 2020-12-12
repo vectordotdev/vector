@@ -189,7 +189,7 @@ impl Expression for FormatNumberFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use value::Kind;
 
     remap::test_type_def![

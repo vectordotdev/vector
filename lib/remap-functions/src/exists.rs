@@ -52,7 +52,7 @@ impl Expression for ExistsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     #[test]
     fn exists() {

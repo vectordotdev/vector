@@ -80,7 +80,7 @@ impl Expression for ToStringFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn to_string() {
-        use shared::map;
+        use crate::map;
 
         let cases = vec![
             (

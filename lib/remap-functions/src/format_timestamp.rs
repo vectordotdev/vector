@@ -86,7 +86,7 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use chrono::TimeZone;
     use value::Kind;
 

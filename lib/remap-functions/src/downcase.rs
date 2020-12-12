@@ -56,7 +56,7 @@ impl Expression for DowncaseFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     #[test]
     fn downcase() {
