@@ -355,7 +355,7 @@ impl ElasticSearchCommon {
         };
         let uri = config.endpoint.parse::<UriSerde>()?;
         let authorization = authorization.choose_one(&uri.auth)?;
-        let base_url = uri.uri.to_string();
+        let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
 
         let region = match &config.aws {
             Some(region) => Region::try_from(region)?,
