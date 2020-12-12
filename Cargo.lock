@@ -7214,7 +7214,7 @@ dependencies = [
  "rusty-fork",
  "schannel",
  "seahash",
- "security-framework 0.4.4",
+ "security-framework 1.0.0",
  "semver 0.11.0",
  "serde",
  "serde_json",
