@@ -251,7 +251,7 @@ components: sinks: elasticsearch: {
 			body: """
 				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
 				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are inserted
-				via the `index` action. In the case of an conflict, such as a document with the
+				via the `index` action. In the case of a conflict, such as a document with the
 				same `id`, Vector will add or _replace_ the document as necessary. If `bulk_action` is
 				configured with `create`, Elasticsearch will _not_ replace an existing document.
 				"""
