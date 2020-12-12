@@ -32,7 +32,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
 #[derive(Debug)]
 pub(crate) struct TokenizerConvertFailed<'a> {
     pub field: &'a str,
-    pub error: shared::conversion::Error,
+    pub error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for TokenizerConvertFailed<'a> {

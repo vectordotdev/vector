@@ -13,7 +13,7 @@ impl InternalEvent for CoercerEventProcessed {
 #[derive(Debug)]
 pub(crate) struct CoercerConversionFailed<'a> {
     pub field: &'a str,
-    pub error: shared::conversion::Error,
+    pub error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for CoercerConversionFailed<'a> {

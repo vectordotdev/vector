@@ -5,6 +5,7 @@ use crate::{
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
+    trace::{current_span, Instrument},
     Pipeline,
 };
 use bytes::Bytes;
@@ -20,7 +21,6 @@ use futures::{
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
-use shared::trace::{current_span, Instrument};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryInto;
 use std::path::PathBuf;

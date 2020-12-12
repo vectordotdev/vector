@@ -210,7 +210,7 @@ fn protobuf() -> Result<()> {
         io::{Read, Write},
     };
 
-    shared::test_util::trace_init();
+    crate::test_util::trace_init();
 
     // Load in fixtures.
     let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;

@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn gcs_encode_event_apply_rules() {
-        shared::test_util::trace_init();
+        crate::test_util::trace_init();
 
         let message = "hello world".to_string();
         let mut event = Event::from(message);

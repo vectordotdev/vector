@@ -256,7 +256,7 @@ impl Iterator for ExponentialBackoff {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::test_util::trace_init;
+    use crate::test_util::trace_init;
     use std::{fmt, time::Duration};
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};

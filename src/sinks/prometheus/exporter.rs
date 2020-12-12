@@ -328,7 +328,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn prometheus_scrapes_metrics() {
-        shared::test_util::trace_init();
+        crate::test_util::trace_init();
 
         let start = Utc::now().timestamp();
         let address = "127.0.0.1:9101";

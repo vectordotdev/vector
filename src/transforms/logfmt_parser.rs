@@ -5,9 +5,9 @@ use crate::{
         LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
     },
     transforms::{FunctionTransform, Transform},
+    types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
-use shared::conversion::{parse_conversion_map, Conversion};
 use std::collections::HashMap;
 use std::str;
 

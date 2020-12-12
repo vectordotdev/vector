@@ -258,7 +258,7 @@ mod test {
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_log_event_to_json_value() {
-        shared::test_util::trace_init();
+        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
         trace!(?FIXTURE_ROOT, "Opening.");
@@ -290,7 +290,7 @@ mod test {
     // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
     #[test]
     fn entry() {
-        shared::test_util::trace_init();
+        crate::test_util::trace_init();
         let fixture =
             open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
         let mut event = LogEvent::try_from(fixture).unwrap();
