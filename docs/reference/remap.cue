@@ -169,19 +169,15 @@ remap: {
 			href: "functions"
 
 			description: """
-				In TRL, functions act just like they do in standard programming languages. They can
-				take inputs (or no input) and either return values or make an
-				[assertion](#assertion) using the [`assert`](#assert) function.
-
-				TRL types that can serve as inputs to functions are listed in [Parameter
-				types](#parameter-types); types that functions can output are listed in [Return
-				types](#return-types).
+				In TRL, functions can take inputs (or no input) and return a value, `null`, or an
+				error.
 				"""
 
 			examples: [
 				"parse_json(.message)",
 				"assert(.status_code == 500)",
 				#"ip_subnet(.address, "255.255.255.0")"#,
+				".request_id = uuidv4()",
 			]
 		}
 
@@ -199,25 +195,6 @@ remap: {
 				".average = .total / .number",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
-			]
-		}
-
-		"Assertion": {
-			href: "assertion"
-
-			description: """
-				In TRL, you can assert that something is true using [`assert`](#assert). If an
-				assertion succeeds, Vector does nothing and continues with the script; if it fails,
-				the script stops executing and an error is logged. `assert` can take any Boolean as
-				input, including functions that return Booleans, like [`exist`](#exist).
-				"""
-
-			examples: [
-				#"assert(.level == "warn")"#,
-				"assert(exists(.user.username))",
-				"assert(10 == 10 && 1.0 == 1.0)",
-				#"assert(ip_cidr_contains(.address, "192.168.0.0/16"))"#,
-				#"assert(contains("Vector rocks", "vector", case_sensitive = false))"#,
 			]
 		}
 
