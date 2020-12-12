@@ -7,6 +7,7 @@ use tracing_limit::Limit;
 use tracing_log::LogTracer;
 use tracing_subscriber::{layer::SubscriberExt, FmtSubscriber};
 
+pub use tracing::{debug, error, info, span, trace, warn, Level};
 pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
