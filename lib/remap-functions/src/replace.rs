@@ -149,7 +149,7 @@ impl Expression for ReplaceFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     remap::test_type_def![
         infallible {

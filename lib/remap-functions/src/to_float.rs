@@ -89,7 +89,7 @@ impl Expression for ToFloatFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn to_float() {
-        use shared::map;
+        use crate::map;
 
         let cases = vec![
             (

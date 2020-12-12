@@ -63,7 +63,7 @@ impl Expression for IpToIpv6Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     remap::test_type_def![value_string {
         expr: |_| IpToIpv6Fn {

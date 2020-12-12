@@ -119,7 +119,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     #[test]
     fn merge() {

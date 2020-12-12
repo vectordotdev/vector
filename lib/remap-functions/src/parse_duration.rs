@@ -129,7 +129,7 @@ impl Expression for ParseDurationFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
 
     remap::test_type_def![
         value_string {

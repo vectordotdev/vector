@@ -1,5 +1,4 @@
 use remap::prelude::*;
-use shared::value as event;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseJson;
@@ -42,9 +41,7 @@ impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value: Value| {
             let bytes = value.unwrap_bytes();
-            let value = serde_json::from_slice::<'_, serde_json::Value>(&bytes)
-                // TODO: implement serde Serialize/Deserialize for `remap::Value`
-                .map(event::Value::from)
+            let value = serde_json::from_slice::<'_, Value>(&bytes)
                 .map_err(|e| format!("unable to parse json: {}", e))?;
 
             Ok(value.into())
@@ -85,7 +82,7 @@ impl Expression for ParseJsonFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::map;
+    use crate::map;
     use value::Kind;
 
     test_function![

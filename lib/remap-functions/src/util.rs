@@ -43,3 +43,15 @@ pub(crate) fn convert_value_or_default(
         .and_then(convert.clone())
         .or_else(|err| default.ok_or(err)?.and_then(|value| convert(value)))
 }
+
+#[macro_export]
+macro_rules! map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
+}

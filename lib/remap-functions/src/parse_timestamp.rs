@@ -128,8 +128,8 @@ impl Expression for ParseTimestampFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map;
     use chrono::{DateTime, Utc};
-    use shared::map;
 
     remap::test_type_def![
         value_fallible_no_default {
