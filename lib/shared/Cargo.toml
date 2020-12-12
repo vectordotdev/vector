@@ -29,9 +29,7 @@ atty = { version = "0.2", optional = true }
 
 [features]
 
-default = [
-    "conversion",
-]
+default = []
 
 conversion = [
     "snafu",
