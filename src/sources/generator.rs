@@ -16,7 +16,7 @@ use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GeneratorConfig {
-    #[serde(default, alias = "batch_interval")]
+    #[serde(alias = "batch_interval")]
     interval: Option<f64>,
     count: Option<usize>,
     #[serde(flatten)]
