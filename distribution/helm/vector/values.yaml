@@ -25,6 +25,11 @@
 #     # Enabling this will cause the `Pod`s to be recreated every time the value
 #     # changes - effectively restarting them on each update.
 #     podRollmeAnnotation: true
+#     # Add an annotation with a checksum of the Helm release values (as
+#     in `values.yaml` content and `--set` flags).
+#     # Enabling this will cause the `Pod`s to be recreated every time values
+#     # change.
+#     podValuesChecksumAnnotation: false
 
 vector-agent:
   # See the possible settings at the `vector-agent` chart.

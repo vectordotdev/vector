@@ -38,6 +38,12 @@ serviceAccount:
 # changes - effectively restarting them on each update.
 podRollmeAnnotation: false
 
+# Add an annotation to the `Pod`s managed by `DaemonSet` with a checksum of
+# the Helm release values (as in `values.yaml` content and `--set` flags).
+# Enabling this will cause the `Pod`s to be recreated every time values
+# change.
+podValuesChecksumAnnotation: true
+
 # Annotations to add to the `Pod`s managed by `DaemonSet`.
 podAnnotations: {}
 

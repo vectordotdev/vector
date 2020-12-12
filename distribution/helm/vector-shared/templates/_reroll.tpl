@@ -23,3 +23,18 @@ rollme: {{ randAlphaNum 5 | quote }}
 checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 {{- end }}
 {{- end }}
+
+{{/*
+Values checksum annotation.
+*/}}
+{{- define "libvector.valuesChecksumAnnotation" -}}
+{{- $global := default (dict) .Values.global }}
+{{- $global := default (dict) $global.vector }}
+{{- $enabled := .Values.podValuesChecksumAnnotation }}
+{{- if hasKey $global "podValuesChecksumAnnotation" }}
+{{- $enabled = $global.podValuesChecksumAnnotation }}
+{{- end }}
+{{- if $enabled }}
+checksum/values: {{ toJson .Values | sha256sum }}
+{{- end }}
+{{- end }}

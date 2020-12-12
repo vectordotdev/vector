@@ -15,6 +15,7 @@ spec:
     metadata:
       annotations:
         {{- include "libvector.configTemplateChecksumAnnotation" . | nindent 8 }}
+        {{- include "libvector.valuesChecksumAnnotation" . | nindent 8 }}
         {{- include "libvector.rollmeAnnotation" . | nindent 8 }}
         {{- include "libvector.metricsPrometheusPodAnnotations" . | nindent 8 }}
         {{- with .Values.podAnnotations }}
