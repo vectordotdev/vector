@@ -58,7 +58,7 @@ mod test {
             merged_event
                 .get("message")
                 .unwrap()
-                .as_bytes_lossy()
+                .as_bytes()
                 .as_ref(),
             b"hello world"
         );
