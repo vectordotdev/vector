@@ -55,9 +55,8 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok(Float(v as f64)),
             Boolean(v) => Ok(Float(if v { 1.0 } else { 0.0 })),
             Null => Ok(0.0.into()),
-            Bytes(_) => Conversion::Float
-                .convert(value.into())
-                .map(Into::into)
+            Bytes(v) => Conversion::Float
+                .convert(v)
                 .map_err(|e| e.to_string().into()),
             Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
                 Err("unable to convert value to float".into())

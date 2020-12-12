@@ -1,4 +1,4 @@
-use crate::value::Value;
+use bytes::Bytes;
 use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
@@ -11,9 +11,9 @@ pub enum ConversionError {
     UnknownConversion { name: String },
 }
 
-/// `Conversion` is a place-holder for a type conversion operation, to
-/// convert from a plain (`Bytes`) `Value` into another type. Every
-/// variant of `Value` is represented here.
+/// `Conversion` is a place-holder for a type conversion operation, to convert
+/// from a plain `Bytes` into another type. The inner type of every `Value`
+/// variant is represented here.
 #[derive(Clone, Debug)]
 pub enum Conversion {
     Bytes,
@@ -110,40 +110,41 @@ pub enum Error {
 }
 
 impl Conversion {
-    /// Use this `Conversion` variant to turn the given `value` into a
-    /// new `Value`. This will fail in unexpected ways if the
-    /// `value` is not currently a `Value::Bytes`.
-    pub fn convert(&self, value: Value) -> Result<Value, Error> {
-        let bytes = value.as_bytes_lossy();
+    /// Use this `Conversion` variant to turn the given `bytes` into a new `T`.
+    pub fn convert<T>(&self, bytes: Bytes) -> Result<T, Error>
+    where
+        T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
+    {
         Ok(match self {
-            Conversion::Bytes => value,
+            Conversion::Bytes => bytes.into(),
             Conversion::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                Value::Integer(s.parse::<i64>().with_context(|| IntParseError { s })?)
+                s.parse::<i64>()
+                    .with_context(|| IntParseError { s })?
+                    .into()
             }
             Conversion::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                Value::Float(s.parse::<f64>().with_context(|| FloatParseError { s })?)
+                s.parse::<f64>()
+                    .with_context(|| FloatParseError { s })?
+                    .into()
             }
-            Conversion::Boolean => Value::Boolean(parse_bool(&String::from_utf8_lossy(&bytes))?),
-
-            Conversion::Timestamp => {
-                Value::Timestamp(parse_timestamp(&String::from_utf8_lossy(&bytes))?)
-            }
+            Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
+            Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&bytes))?.into(),
             Conversion::TimestampFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                Value::Timestamp(datetime_to_utc(
-                    Local
-                        .datetime_from_str(&s, &format)
-                        .with_context(|| TimestampParseError { s })?,
-                ))
+                let dt = Local
+                    .datetime_from_str(&s, &format)
+                    .with_context(|| TimestampParseError { s })?;
+
+                datetime_to_utc(dt).into()
             }
             Conversion::TimestampTZFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                Value::Timestamp(datetime_to_utc(
-                    DateTime::parse_from_str(&s, &format)
-                        .with_context(|| TimestampParseError { s })?,
-                ))
+                let dt = DateTime::parse_from_str(&s, &format)
+                    .with_context(|| TimestampParseError { s })?;
+
+                datetime_to_utc(dt).into()
             }
         })
     }
@@ -252,15 +253,53 @@ mod tests {
     use super::parse_bool;
     #[cfg(unix)]
     use super::parse_timestamp;
+    use super::Bytes;
     #[cfg(unix)]
     use super::{Conversion, Error};
-    #[cfg(unix)]
-    use crate::value::Value;
     #[cfg(unix)]
     use chrono::prelude::*;
 
     #[cfg(unix)]
     const TIMEZONE: &str = "Australia/Brisbane";
+
+    #[derive(PartialEq, Debug, Clone)]
+    enum StubValue {
+        Bytes(Bytes),
+        Timestamp(DateTime<Utc>),
+        Float(f64),
+        Integer(i64),
+        Boolean(bool),
+    }
+
+    impl From<Bytes> for StubValue {
+        fn from(v: Bytes) -> Self {
+            StubValue::Bytes(v)
+        }
+    }
+
+    impl From<DateTime<Utc>> for StubValue {
+        fn from(v: DateTime<Utc>) -> Self {
+            StubValue::Timestamp(v)
+        }
+    }
+
+    impl From<f64> for StubValue {
+        fn from(v: f64) -> Self {
+            StubValue::Float(v)
+        }
+    }
+
+    impl From<i64> for StubValue {
+        fn from(v: i64) -> Self {
+            StubValue::Integer(v)
+        }
+    }
+
+    impl From<bool> for StubValue {
+        fn from(v: bool) -> Self {
+            StubValue::Boolean(v)
+        }
+    }
 
     #[cfg(unix)]
     fn dateref() -> DateTime<Utc> {
@@ -268,7 +307,10 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn convert(fmt: &str, value: &str) -> Result<Value, Error> {
+    fn convert<T>(fmt: &str, value: &'static str) -> Result<T, Error>
+    where
+        T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
+    {
         std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()
             .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
@@ -279,7 +321,7 @@ mod tests {
     #[test]
     fn timestamp_conversion() {
         assert_eq!(
-            convert("timestamp", "02/03/2001:14:05:06"),
+            convert::<StubValue>("timestamp", "02/03/2001:14:05:06"),
             Ok(dateref().into())
         );
     }
@@ -288,7 +330,7 @@ mod tests {
     #[test]
     fn timestamp_param_conversion() {
         assert_eq!(
-            convert("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 14:05:06"),
+            convert::<StubValue>("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 14:05:06"),
             Ok(dateref().into())
         );
     }
