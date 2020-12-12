@@ -130,8 +130,8 @@ for their Github accounts.
 ### Privilege Model
 
 Vector follows the [principle of least privilege][urls.least_privilege] for
-it's personnel access model. Vector maintains tiers user groups with granular
-privileges to ensure users have access to the minimal resources necessary.
+its personnel access model. Vector maintains tiers user groups with tiered
+privileges to ensure users only have access to the minimal resources necessary.
 
 ### Third-Parties
 
@@ -221,7 +221,7 @@ All builds run in an isolated sandbox that is destroyed after each use.
 
 #### Penetration Testing
 
-Vector performs qauterly pen tests on timber.io and vector.dev.
+Vector performs quarterly pen tests on timber.io and vector.dev.
 
 #### Protocols
 
