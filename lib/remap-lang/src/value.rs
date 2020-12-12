@@ -331,7 +331,7 @@ impl Value {
 
         let value = match &self {
             Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (*lhv as i64/ i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (*lhv as i64 / i64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
