@@ -131,8 +131,8 @@ impl GlobalOptions {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct HealthcheckOptions {
-    enabled: bool,
-    require_healthy: bool,
+    pub enabled: bool,
+    pub require_healthy: bool,
 }
 
 impl HealthcheckOptions {

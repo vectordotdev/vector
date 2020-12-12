@@ -517,7 +517,7 @@ impl CountReceiver<Event> {
 
 pub async fn start_topology(
     config: Config,
-    require_healthy: bool,
+    require_healthy: Option<bool>,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())

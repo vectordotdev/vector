@@ -81,7 +81,7 @@ pub struct RootOpts {
 
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
-    pub require_healthy: bool,
+    pub require_healthy: Option<bool>,
 
     /// Number of threads to use for processing (default is number of available cores)
     #[structopt(short, long, env = "VECTOR_THREADS")]

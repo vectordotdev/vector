@@ -57,9 +57,10 @@ pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-    require_healthy: bool,
+    require_healthy: Option<bool>,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
+    let require_healthy = require_healthy.unwrap_or(config.healthchecks.require_healthy);
 
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
@@ -224,7 +225,7 @@ impl RunningTopology {
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
-        require_healthy: bool,
+        require_healthy: Option<bool>,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
@@ -247,6 +248,8 @@ impl RunningTopology {
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
         {
+            let require_healthy =
+                require_healthy.unwrap_or(new_config.healthchecks.require_healthy);
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -263,6 +266,8 @@ impl RunningTopology {
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
         if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+            let require_healthy =
+                require_healthy.unwrap_or(self.config.healthchecks.require_healthy);
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
