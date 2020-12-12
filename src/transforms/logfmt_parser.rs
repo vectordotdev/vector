@@ -79,7 +79,7 @@ impl FunctionTransform for Logfmt {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(Value::from(val)) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             event.as_mut_log().insert(key, value);
                         }
