@@ -3,8 +3,8 @@ use crate::{
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
-    types::{parse_check_conversion_map, Conversion},
 };
+use shared::conversion::{parse_check_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;

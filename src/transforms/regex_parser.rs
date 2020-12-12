@@ -6,11 +6,11 @@ use crate::{
         RegexParserMissingField, RegexParserTargetExists,
     },
     transforms::{FunctionTransform, Transform},
-    types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
+use shared::conversion::{parse_check_conversion_map, Conversion};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
@@ -239,7 +239,7 @@ impl RegexParser {
 impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(&self.field).map(|s| s.as_bytes_lossy());
         emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
