@@ -5883,18 +5883,10 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "atty",
- "bytes 0.5.6",
- "chrono",
  "metrics",
  "metrics-tracing-context",
  "nom 6.0.1",
- "paste",
- "remap-lang",
- "rlua",
- "serde",
- "serde_json",
  "snafu",
- "toml",
  "tracing 0.1.21",
  "tracing-futures 0.2.4",
  "tracing-limit",
