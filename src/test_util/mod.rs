@@ -515,15 +515,12 @@ impl CountReceiver<Event> {
     }
 }
 
-pub async fn start_topology(
-    config: Config,
-    require_healthy: Option<bool>,
-) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
+pub async fn start_topology(config: Config) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    topology::start_validated(config, diff, pieces, require_healthy)
+    topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
 }
