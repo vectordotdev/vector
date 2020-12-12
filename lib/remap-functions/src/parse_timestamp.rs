@@ -1,5 +1,5 @@
-use crate::types::Conversion;
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTimestamp;
@@ -80,7 +80,7 @@ impl Expression for ParseTimestampFn {
             _ => Err("unable to convert value to integer".into()),
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_timestamp,
@@ -128,8 +128,8 @@ impl Expression for ParseTimestampFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::{DateTime, Utc};
+    use shared::map;
 
     remap::test_type_def![
         value_fallible_no_default {

@@ -60,7 +60,7 @@ impl Expression for ToStringFn {
             Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_string,
@@ -80,7 +80,7 @@ impl Expression for ToStringFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn to_string() {
-        use crate::map;
+        use shared::map;
 
         let cases = vec![
             (

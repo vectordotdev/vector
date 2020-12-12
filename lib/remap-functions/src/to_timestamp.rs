@@ -1,6 +1,6 @@
-use crate::types::Conversion;
 use chrono::{TimeZone, Utc};
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
@@ -80,7 +80,7 @@ impl Expression for ToTimestampFn {
             }
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_timestamp,
@@ -105,7 +105,7 @@ impl Expression for ToTimestampFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn to_timestamp() {
-        use crate::map;
+        use shared::map;
 
         let cases = vec![
             (

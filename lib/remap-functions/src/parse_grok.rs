@@ -93,7 +93,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::map;
+    use shared::map;
 
     remap::test_type_def![string {
         expr: |_| ParseGrokFn {

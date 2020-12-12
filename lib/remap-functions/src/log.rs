@@ -1,4 +1,5 @@
 use remap::prelude::*;
+use shared::trace::{debug, error, info, trace, warn};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Log;
@@ -73,7 +74,7 @@ impl Expression for LogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
 
     #[test]
     fn log() {

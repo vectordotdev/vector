@@ -80,7 +80,7 @@ impl Expression for AssertFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
 
     #[test]
     fn assert() {

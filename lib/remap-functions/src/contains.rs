@@ -113,7 +113,7 @@ impl Expression for ContainsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
 
     #[test]
     fn contains() {
