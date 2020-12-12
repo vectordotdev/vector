@@ -179,6 +179,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
     use crate::kubernetes::state::{MaintainedWrite, Write};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -250,6 +252,75 @@ mod tests {
 
         assert_eq!(state_reader.is_empty(), false);
         assert!(state_writer.maintenance_request().is_none());
+
+        drop(state_writer);
+    }
+
+    #[tokio::test]
+    async fn test_operation_semantics_identity_indexer_clashing_add() {
+        let (state_reader, state_writer) = evmap::new();
+        let mut state_writer = Writer::new(state_writer, IdentityIndexer, None);
+
+        state_writer.add(make_pod("uid0")).await;
+        state_writer.add(make_pod("uid0")).await;
+
+        assert_eq!(state_reader.len(), 1);
+
+        assert_eq!(state_reader.get("uid0").unwrap().len(), 1);
+
+        drop(state_writer);
+    }
+
+    #[tokio::test]
+    async fn test_custom_indexer() {
+        struct CustomIndexer;
+
+        // Index the `Pod`s using an arbitrary label.
+        impl Indexer<Pod> for CustomIndexer {
+            type IndexValueType = String;
+            fn index(&self, resource: &Pod) -> Option<Self::IndexValueType> {
+                resource.metadata.name.clone()
+            }
+        }
+
+        fn make_custom_pod(uid: &str, name: &str) -> Pod {
+            Pod {
+                metadata: ObjectMeta {
+                    uid: Some(uid.to_owned()),
+                    name: Some(name.to_owned()),
+                    ..ObjectMeta::default()
+                },
+                ..Pod::default()
+            }
+        }
+
+        let (state_reader, state_writer) = evmap::new();
+        let mut state_writer = Writer::new(state_writer, CustomIndexer, None);
+
+        // Insert `Pod`s with a name collision.
+        state_writer.add(make_custom_pod("uid0", "name0")).await;
+        state_writer.add(make_custom_pod("uid1", "name0")).await;
+
+        // Assert that the keys look as expected.
+        assert_eq!(state_reader.len(), 1); // we only have one key, so len should be 1!
+
+        {
+            let pods = state_reader
+                .get("name0")
+                .expect("name0 has to have a value");
+            assert_eq!(pods.len(), 2); // we've inserted two `Pod`s with colliding index values.
+
+            let mut expected_uids: HashSet<_> = vec!["uid0", "uid1"].into_iter().collect();
+            for pod in pods.iter() {
+                let uid = pod.metadata.uid.expect("all test pods should've had uids");
+                assert!(
+                    expected_uids.remove(uid),
+                    "unexpected or already seed uid: {}",
+                    uid
+                );
+            }
+            assert!(expected_uids.is_empty());
+        }
 
         drop(state_writer);
     }
