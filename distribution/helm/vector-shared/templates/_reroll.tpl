@@ -6,7 +6,10 @@ Rollme annotation.
 {{- define "libvector.rollmeAnnotation" -}}
 {{- $global := default (dict) .Values.global }}
 {{- $global := default (dict) $global.vector }}
-{{- $enabled := default .Values.podRollmeAnnotation $global.podRollmeAnnotation }}
+{{- $enabled := .Values.podRollmeAnnotation }}
+{{- if hasKey $global "podRollmeAnnotation" }}
+{{- $enabled = $global.podRollmeAnnotation }}
+{{- end }}
 {{- if $enabled }}
 rollme: {{ randAlphaNum 5 | quote }}
 {{- end }}
