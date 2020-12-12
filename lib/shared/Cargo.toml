@@ -30,7 +30,14 @@ atty = { version = "0.2", optional = true }
 
 [features]
 
-default = []
+default = [
+    "conversion",
+    "value",
+    "trace",
+    "tokenize",
+    "test_util",
+    "lua",
+]
 
 conversion = [
     "snafu",

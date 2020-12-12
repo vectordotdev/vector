@@ -50,7 +50,7 @@ members = [
 
 [dependencies]
 # Internal libs
-shared = { path = "lib/shared", features = ["value", "test_util", "conversion", "trace", "tokenize"] }
+shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
