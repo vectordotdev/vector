@@ -1,4 +1,4 @@
-#![cfg(all(feature = "shutdown-tests"))]
+#![cfg(feature = "shutdown-tests")]
 
 use assert_cmd::prelude::*;
 use nix::{
@@ -236,7 +236,8 @@ fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
     type = "http"
-    address = "${VECTOR_TEST_ADDRESS}""#,
+    address = "${VECTOR_TEST_ADDRESS}"
+    encoding = "text""#,
     ));
 }
 

@@ -205,6 +205,8 @@ mod tests {
 
     #[test]
     fn to_timestamp() {
+        use crate::map;
+
         let cases = vec![
             (
                 map![],
