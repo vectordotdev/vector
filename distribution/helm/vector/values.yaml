@@ -20,6 +20,11 @@
 #     # Sets common environment variables for use in all `Pod`s.
 #     commonEnvKV:
 #       LOG: info
+#     # Add an annotation with a random value generated at Helm Chart template
+#     # evaluation time to the managed `Pod`s.
+#     # Enabling this will cause the `Pod`s to be recreated every time the value
+#     # changes - effectively restarting them on each update.
+#     podRollmeAnnotation: true
 
 vector-agent:
   # See the possible settings at the `vector-agent` chart.

@@ -32,6 +32,12 @@ serviceAccount:
   # template.
   name: ""
 
+# Add an annotation to the `Pod`s managed by `DaemonSet` with a random value,
+# generated at Helm Chart template evaluation time.
+# Enabling this will cause the `Pod`s to be recreated every time the value
+# changes - effectively restarting them on each update.
+podRollmeAnnotation: false
+
 # Annotations to add to the `Pod`s managed by `DaemonSet`.
 podAnnotations: {}
 
