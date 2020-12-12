@@ -115,7 +115,7 @@ impl Expression for EndsWithFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use value::Kind;
 
     remap::test_type_def![

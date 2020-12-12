@@ -5069,7 +5069,26 @@ dependencies = [
 name = "remap-functions"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bytes 0.6.0",
+ "chrono",
+ "cidr-utils",
+ "grok",
+ "hex",
+ "lazy_static",
+ "md-5 0.9.1",
+ "regex",
  "remap-lang",
+ "rust_decimal",
+ "serde_json",
+ "sha-1 0.9.1",
+ "sha2 0.9.2",
+ "sha3",
+ "shared",
+ "strip-ansi-escapes",
+ "syslog_loose",
+ "url",
+ "uuid 0.8.1",
 ]
 
 [[package]]
@@ -5873,6 +5892,7 @@ dependencies = [
  "chrono",
  "metrics",
  "metrics-tracing-context",
+ "nom 6.0.1",
  "paste",
  "remap-lang",
  "serde",

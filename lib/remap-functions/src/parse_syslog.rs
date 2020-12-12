@@ -120,7 +120,7 @@ impl Expression for ParseSyslogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use chrono::prelude::*;
 
     remap::test_type_def![

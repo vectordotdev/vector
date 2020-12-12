@@ -36,7 +36,7 @@ impl Expression for UuidV4Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use std::convert::TryFrom;
 
     remap::test_type_def![static_def {

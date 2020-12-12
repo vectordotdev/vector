@@ -1,5 +1,5 @@
-use crate::types::Conversion;
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToInt;
@@ -13,12 +13,12 @@ impl Function for ToInt {
         &[
             Parameter {
                 keyword: "value",
-                accepts: super::is_scalar_value,
+                accepts: crate::util::is_scalar_value,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: super::is_scalar_value,
+                accepts: crate::util::is_scalar_value,
                 required: false,
             },
         ]
@@ -64,7 +64,7 @@ impl Expression for ToIntFn {
             }
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_int,
@@ -89,7 +89,7 @@ impl Expression for ToIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use std::collections::BTreeMap;
     use value::Kind;
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn to_int() {
-        use crate::map;
+        use shared::map;
 
         let cases = vec![
             (

@@ -61,7 +61,7 @@ impl Expression for StripAnsiEscapeCodesFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
 
     remap::test_type_def![
         value_string {

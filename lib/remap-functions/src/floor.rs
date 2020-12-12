@@ -1,4 +1,4 @@
-use super::round_to_precision;
+use crate::util::round_to_precision;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -84,7 +84,7 @@ impl Expression for FloorFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::map;
     use value::Kind;
 
     remap::test_type_def![
