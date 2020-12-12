@@ -30,7 +30,6 @@ possible on our security efforts.
    1. [Two-factor Authentication](#two-factor-authentication)
    1. [Privilege Model](#privilege-model)
    1. [Third-Parties](#third-parties)
-   1. [Termination](#termination)
 1. [Development & Code](#development--code)
    1. [Design & Architecture](#design--architecture)
       1. [Rust](#rust)
@@ -139,10 +138,6 @@ privileges to ensure users have access to the minimal resources necessary.
 When used, third-parties must also adhere to this security policy. Access is
 based on the [principle of least privilege][urls.least_privilege] and removed
 when the contract ends.
-
-### Termination
-
-Upon termination,
 
 ## Development & Code
 
