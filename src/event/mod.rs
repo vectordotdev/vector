@@ -13,14 +13,15 @@ pub mod util;
 
 mod log_event;
 mod lookup;
+mod value;
 
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-pub use shared::value::Value;
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
+pub use value::Value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));

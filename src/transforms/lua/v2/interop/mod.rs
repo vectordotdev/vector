@@ -3,5 +3,5 @@
 pub mod event;
 pub mod log;
 pub mod metric;
-
-pub use shared::lua as util;
+pub mod util;
+pub mod value;

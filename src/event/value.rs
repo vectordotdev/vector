@@ -1,15 +1,14 @@
+use crate::{event::timestamp_to_string, Result};
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Utc};
+use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-type Result<T> = std::result::Result<T, Error>;
-
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -19,55 +18,6 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
-}
-
-macro_rules! value_impl {
-    ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
-        impl Value {
-            $(paste::paste! {
-            pub fn [<is_ $func>](&self) -> bool {
-                matches!(self, Value::$variant(_))
-            }
-
-            pub fn [<as_ $func>](&self) -> Option<&$ret> {
-                match self {
-                    Value::$variant(v) => Some(v),
-                    _ => None,
-                }
-            }
-
-            pub fn [<as_ $func _mut>](&mut self) -> Option<&mut $ret> {
-                match self {
-                    Value::$variant(v) => Some(v),
-                    _ => None,
-                }
-            }
-            })+
-
-            pub fn is_null(&self) -> bool {
-                matches!(self, Value::Null)
-            }
-
-            pub fn as_null(&self) -> Option<()> {
-                match self {
-                    Value::Null => Some(()),
-                    _ => None,
-                }
-            }
-        }
-    };
-}
-
-value_impl! {
-    (bytes, Bytes, Bytes),
-    (integer, Integer, i64),
-    (float, Float, f64),
-    (boolean, Boolean, bool),
-    (map, Map, BTreeMap<String, Value>),
-    (array, Array, Vec<Value>),
-    (timestamp, Timestamp, DateTime<Utc>),
-    // manually implemented due to no variant value
-    // (null, Null, ()),
 }
 
 impl Serialize for Value {
@@ -108,9 +58,9 @@ impl From<String> for Value {
 }
 
 impl TryFrom<TomlValue> for Value {
-    type Error = Error;
+    type Error = crate::Error;
 
-    fn try_from(toml: TomlValue) -> Result<Self> {
+    fn try_from(toml: TomlValue) -> crate::Result<Self> {
         Ok(match toml {
             TomlValue::String(s) => Self::from(s),
             TomlValue::Integer(i) => Self::from(i),
@@ -131,6 +81,10 @@ impl TryFrom<TomlValue> for Value {
     }
 }
 
+// We only enable this in testing for convenience, since `"foo"` is a `&str`.
+// In normal operation, it's better to let the caller decide where to clone and when, rather than
+// hiding this from them.
+#[cfg(test)]
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())
@@ -232,7 +186,7 @@ impl From<serde_json::Value> for Value {
 }
 
 impl TryInto<serde_json::Value> for Value {
-    type Error = Error;
+    type Error = crate::Error;
 
     fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
         match self {
@@ -298,7 +252,7 @@ impl Value {
         }
     }
 
-    pub fn as_bytes_lossy(&self) -> Bytes {
+    pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
@@ -313,8 +267,15 @@ impl Value {
         }
     }
 
-    pub fn into_bytes_lossy(self) -> Bytes {
-        self.as_bytes_lossy()
+    pub fn into_bytes(self) -> Bytes {
+        self.as_bytes()
+    }
+
+    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
+        match &self {
+            Value::Timestamp(ts) => Some(ts),
+            _ => None,
+        }
     }
 
     pub fn kind(&self) -> &str {
@@ -329,10 +290,6 @@ impl Value {
             Value::Null => "null",
         }
     }
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 #[cfg(test)]
