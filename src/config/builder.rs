@@ -15,6 +15,7 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
