@@ -1,10 +1,10 @@
 package metadata
 
 components: transforms: key_value_parser: {
-	title: "Key Value Parser"
+	title: "Key-value Parser"
 
 	description: """
-		Loosely parses a log field's value in key/value format.
+		Loosely parses a log field's value in key-value format.
 		"""
 
 	classes: {
@@ -36,14 +36,14 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-					Performance characteristics of the `key_value` transform have not been benchmarked.
-				""",
+			Performance characteristics of the `key_value` transform have not been benchmarked.
+			""",
 		]
 		notices: [
 			"""
-					It is likely that the `key_value` transform will replace the `logfmt` transform in the future since
-					it offers a more flexible super-set of that transform.
-				""",
+			It is likely that the `key_value` transform will replace the `logfmt_parser` transform
+			in the future since it offers a more flexible superset of that transform.
+			""",
 		]
 	}
 

@@ -4,7 +4,7 @@ components: transforms: merge: {
 	title: "Merge"
 
 	description: """
-		Merges partial log events into a single event
+		Merges partial log events into a single event.
 		"""
 
 	classes: {

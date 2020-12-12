@@ -4,7 +4,7 @@ components: transforms: sampler: {
 	title: "Sampler"
 
 	description: """
-		Samples events with a configurable rate.
+		Samples events at a configurable rate.
 		"""
 
 	classes: {

@@ -4,7 +4,7 @@ components: transforms: json_parser: {
 	title: "JSON Parser"
 
 	description: """
-		Parses a log field value as [JSON](\(urls.json))
+		Parses a log field value as [JSON](\(urls.json)).
 		"""
 
 	classes: {

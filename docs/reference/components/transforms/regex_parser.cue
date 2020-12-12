@@ -4,7 +4,7 @@ components: transforms: regex_parser: {
 	title: "Regex Parser"
 
 	description: """
-		Parses a log field's value with a [Regular Expression](\(urls.regex))
+		Parses a log field's value with a [Regular Expression](\(urls.regex)).
 		"""
 
 	classes: {
