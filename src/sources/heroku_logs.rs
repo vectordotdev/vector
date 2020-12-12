@@ -97,6 +97,36 @@ impl SourceConfig for LogplexConfig {
     }
 }
 
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct LogplexCompatConfig(LogplexConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "logplex")]
+impl SourceConfig for LogplexCompatConfig {
+    async fn build(
+        &self,
+        name: &str,
+        options: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        self.0.build(name, options, shutdown, out).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.0.output_type()
+    }
+
+    fn source_type(&self) -> &'static str {
+        self.0.source_type()
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        self.0.resources()
+    }
+}
+
 fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
     // Deal with headers
     let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
