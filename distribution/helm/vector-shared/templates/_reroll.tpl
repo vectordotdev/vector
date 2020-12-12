@@ -38,3 +38,12 @@ Values checksum annotation.
 checksum/values: {{ toJson .Values | sha256sum }}
 {{- end }}
 {{- end }}
+
+{{/*
+All reroll annotations.
+*/}}
+{{- define "libvector.rerollAnnotations" -}}
+{{- include "libvector.configTemplateChecksumAnnotation" . }}
+{{- include "libvector.valuesChecksumAnnotation" . }}
+{{- include "libvector.rollmeAnnotation" . }}
+{{- end }}
