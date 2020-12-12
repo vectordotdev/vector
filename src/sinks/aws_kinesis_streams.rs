@@ -295,7 +295,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.as_bytes_lossy().to_vec())
             .unwrap_or_default(),
     };
 

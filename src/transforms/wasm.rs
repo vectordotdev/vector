@@ -175,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn protobuf_happy() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::happy");
         let _enter = span.enter();
 
@@ -194,7 +194,7 @@ mod tests {
 
     #[tokio::test]
     async fn protobuf_sad() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::sad");
         let _enter = span.enter();
 
@@ -213,7 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn add_fields() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::add_fields");
         let _enter = span.enter();
 
@@ -234,7 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn drop() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::drop");
         let _enter = span.enter();
 
@@ -253,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn panic() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::panic");
         let _enter = span.enter();
 
@@ -272,7 +272,7 @@ mod tests {
 
     #[tokio::test]
     async fn assert_config() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::assert_config");
         let _enter = span.enter();
 

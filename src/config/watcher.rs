@@ -121,7 +121,8 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{temp_file, trace_init};
+    use crate::test_util::temp_file;
+    use shared::test_util::trace_init;
     use std::time::Duration;
     use std::{fs::File, io::Write};
     #[cfg(unix)]

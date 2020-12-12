@@ -1,7 +1,7 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use crate::config::log_schema;
 use bytes::Bytes;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 
@@ -13,15 +13,14 @@ pub mod util;
 
 mod log_event;
 mod lookup;
-mod value;
 
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use shared::value::Value;
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
-pub use value::Value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -597,8 +596,8 @@ mod test {
 
     #[test]
     fn object_get() {
-        use crate::map;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::map;
 
         let cases = vec![
             (map![], vec![], Ok(Some(map![].into()))),
@@ -651,8 +650,8 @@ mod test {
 
     #[test]
     fn object_insert() {
-        use crate::map;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::map;
 
         let cases = vec![
             (
@@ -758,8 +757,8 @@ mod test {
 
     #[test]
     fn object_remove() {
-        use crate::map;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::map;
 
         let cases = vec![
             (
@@ -835,8 +834,8 @@ mod test {
 
     #[test]
     fn object_paths() {
-        use crate::map;
         use remap::{Object, Path};
+        use shared::map;
         use std::str::FromStr;
 
         let cases = vec![

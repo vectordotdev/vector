@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn add_fields_preserves_types() {
-        crate::test_util::trace_init();
+        shared::test_util::trace_init();
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();

@@ -368,7 +368,7 @@ fn encode_event(
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
-        .map(|v| v.as_bytes().to_vec())
+        .map(|v| v.as_bytes_lossy().to_vec())
         .unwrap_or_default();
 
     encoding.apply_rules(&mut event);
@@ -378,7 +378,7 @@ fn encode_event(
         Encoding::Text => event
             .as_log()
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.as_bytes_lossy().to_vec())
             .unwrap_or_default(),
     };
 

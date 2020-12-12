@@ -68,7 +68,6 @@ pub mod tls;
 #[cfg(feature = "api-client")]
 pub mod top;
 pub mod topology;
-pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;

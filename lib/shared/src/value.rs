@@ -110,10 +110,6 @@ impl TryFrom<TomlValue> for Value {
     }
 }
 
-// We only enable this in testing for convenience, since `"foo"` is a `&str`.
-// In normal operation, it's better to let the caller decide where to clone and when, rather than
-// hiding this from them.
-#[cfg(test)]
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())

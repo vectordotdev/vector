@@ -484,10 +484,10 @@ mod tests {
     use crate::{
         buffers::Acker,
         sinks::util::{BatchSettings, EncodedLength, VecBuffer},
-        test_util::trace_init,
     };
     use bytes::Bytes;
     use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
+    use shared::test_util::trace_init;
     use std::{
         convert::Infallible,
         sync::{atomic::Ordering::Relaxed, Arc, Mutex},

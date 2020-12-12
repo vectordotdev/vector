@@ -1,7 +1,7 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
-    trace, Event,
+    Event,
 };
 use flate2::read::GzDecoder;
 use futures::{
@@ -513,16 +513,4 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()
-}
-
-#[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
 }
