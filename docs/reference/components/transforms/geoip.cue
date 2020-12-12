@@ -156,8 +156,10 @@ components: transforms: geoip: {
 							groups: ["City"]
 						}
 						continent_code: {
-							description: "The continent code associated with the IP address.
-							\(_city_db_blurb)."
+							description: """
+								The continent code associated with the IP address.
+								\(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								enum: {
@@ -175,7 +177,7 @@ components: transforms: geoip: {
 						country_code: {
 							description: """
 								The [ISO 3166-2 country codes](\(urls.iso3166_2)) associated with
-								the IP address. \(_blurb).
+								the IP address. \(_city_db_blurb).
 								"""
 							required:    true
 							type: string: {
