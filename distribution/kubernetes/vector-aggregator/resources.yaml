@@ -126,6 +126,7 @@ spec:
       annotations:
         checksum/config: f21e03060de6e60eeda4b7d6cbc3121890b76a4b3618f30fded3a8a4eb226c24
         
+        
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
