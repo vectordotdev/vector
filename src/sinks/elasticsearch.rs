@@ -561,8 +561,8 @@ mod tests {
 
     #[test]
     fn sets_create_action_when_configured() {
-        use chrono::{Utc, TimeZone};
         use crate::config::log_schema;
+        use chrono::{TimeZone, Utc};
 
         let config = ElasticSearchConfig {
             bulk_action: BulkAction::Create,
@@ -573,7 +573,10 @@ mod tests {
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
         let mut event = Event::from("hello there");
-        event.as_mut_log().insert(log_schema().timestamp_key(), Utc.ymd(2020, 12, 1).and_hms(1, 2, 3));
+        event.as_mut_log().insert(
+            log_schema().timestamp_key(),
+            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        );
         let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}

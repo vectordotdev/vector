@@ -246,9 +246,19 @@ components: sinks: elasticsearch: {
 			title: "Conflicts"
 			body: """
 				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
-				[`_bulk` API endpoint][urls.elasticsearch_bulk]. All events are inserted
+				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are inserted
 				via the `index` action. In the case of an conflict, such as a document with the
-				same `id`, Vector will add or _replace_ the document as necessary.
+				same `id`, Vector will add or _replace_ the document as necessary. If `bulk_action` is
+				configured with `create`, Elasticsearch will _not_ replace an existing document.
+				"""
+		}
+
+		data_streams: {
+			title: "Data streams"
+			body: """
+				By default, Vector will use the `index` action with Elasticsearch's Bulk API.
+				To use [Data streams][urls.elasticsearch_data_streams], `bulk_action` must be configured
+				with the `create` option.
 				"""
 		}
 
