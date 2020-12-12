@@ -10,6 +10,7 @@ bytes = { version = "0.6", optional = true }
 chrono = { version = "0.4", optional = true }
 metrics = { version = "0.13.0-alpha.8", optional = true }
 metrics-tracing-context = { version = "0.1.0-alpha.3", optional = true }
+nom = { version = "6", optional = true }
 paste = { version = "1", optional = true }
 remap = { package = "remap-lang", path = "../remap-lang", optional = true }
 serde = { version = "1", optional = true, default-features = false }
@@ -57,6 +58,10 @@ trace = [
     "tracing-log", 
     "tracing-subscriber", 
     "tracing-tower",
+]
+
+tokenize = [
+    "nom",
 ]
 
 test_util = [
