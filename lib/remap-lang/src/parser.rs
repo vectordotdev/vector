@@ -564,7 +564,7 @@ impl<'a> Parser<'a> {
     // The order of `op` operations defines operator precedence.
     operation_fns! {
         multiplication => {
-            op: [Multiply, Divide, Remainder],
+            op: [Multiply, Divide, IntegerDivide, Remainder],
             next: not,
         }
 
