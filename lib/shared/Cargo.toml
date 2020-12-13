@@ -8,16 +8,9 @@ publish = false
 [dependencies]
 bytes = { version = "0.5.6", optional = true }
 chrono = { version = "0.4", optional = true }
-metrics = { version = "0.13.0-alpha.8", optional = true }
-metrics-tracing-context = { version = "0.1.0-alpha.3", optional = true }
 nom = { version = "6", optional = true }
 snafu = { version = "0.6", optional = true }
 tracing = { version = "0.1", optional = true }
-tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"], optional = true }
-tracing-limit = { path = "../tracing-limit", optional = true }
-tracing-log = { version = "0.1.0", optional = true }
-tracing-subscriber = { version = "0.2.15", optional = true }
-tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 atty = { version = "0.2", optional = true }
@@ -26,7 +19,6 @@ atty = { version = "0.2", optional = true }
 
 default = [
     "conversion",
-    "trace",
     "tokenize",
     "test_util",
 ]
@@ -35,17 +27,7 @@ conversion = [
     "bytes",
     "chrono",
     "snafu",
-]
-
-trace = [
-    "metrics",
-    "metrics-tracing-context",
     "tracing",
-    "tracing-futures",
-    "tracing-limit",
-    "tracing-log",
-    "tracing-subscriber",
-    "tracing-tower",
 ]
 
 tokenize = [
@@ -54,5 +36,4 @@ tokenize = [
 
 test_util = [
     "atty",
-    "trace",
 ]

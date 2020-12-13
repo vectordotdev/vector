@@ -1,7 +1,7 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
-    Event,
+    trace, Event,
 };
 use flate2::read::GzDecoder;
 use futures::{
@@ -40,8 +40,6 @@ use tokio::{
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 pub mod stats;
-
-pub use shared::test_util::trace_init;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -93,6 +91,19 @@ pub fn next_addr() -> SocketAddr {
 pub fn next_addr_v6() -> SocketAddr {
     let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+}
+
+pub fn trace_init() {
+    #[cfg(unix)]
+    let color = atty::is(atty::Stream::Stdout);
+    // Windows: ANSI colors are not supported by cmd.exe
+    // Color is false for everything except unix.
+    #[cfg(not(unix))]
+    let color = false;
+
+    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
+
+    trace::init(color, false, &levels);
 }
 
 pub async fn send_lines(
