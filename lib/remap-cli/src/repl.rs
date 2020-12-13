@@ -17,13 +17,35 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 
     println!(
         "
-> Welcome to TRL: Timber Remap Language
+> TTTTTTTTTTTTTTTTTTTTTTTRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
+> T:::::::::::::::::::::TR::::::::::::::::R  L:::::::::L
+> T:::::::::::::::::::::TR::::::RRRRRR:::::R L:::::::::L
+> T:::::TT:::::::TT:::::TRR:::::R     R:::::RLL:::::::LL
+> TTTTTT  T:::::T  TTTTTT  R::::R     R:::::R  L:::::L
+>         T:::::T          R::::R     R:::::R  L:::::L
+>         T:::::T          R::::RRRRRR:::::R   L:::::L
+>         T:::::T          R:::::::::::::RR    L:::::L
+>         T:::::T          R::::RRRRRR:::::R   L:::::L
+>         T:::::T          R::::R     R:::::R  L:::::L
+>         T:::::T          R::::R     R:::::R  L:::::L
+>         T:::::T          R::::R     R:::::R  L:::::L         LLLLLL
+>       TT:::::::TT      RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
+>       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
+>       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
+>       TTTTTTTTTTT      RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
+>
+>                     TIMBER    REMAP    LANGUAGE
+>
+>
+> Welcome!
 >
 > The CLI is running in REPL (Read-eval-print loop) mode.
 >
+> To run the CLI in regular mode, add a program to your command.
+>
 > Type `help` to learn more.
->      `next` to load the next object (if any).
->      `prev` to load the previous object (if any).
+>      `prev` to load the previous object.
+>      `next` to load the next object, or create a new one.
 >      `exit` to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
