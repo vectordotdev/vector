@@ -44,7 +44,7 @@ impl Expression for ParseJsonFn {
             let value = serde_json::from_slice::<'_, Value>(&bytes)
                 .map_err(|e| format!("unable to parse json: {}", e))?;
 
-            Ok(value.into())
+            Ok(value)
         };
 
         crate::util::convert_value_or_default(
