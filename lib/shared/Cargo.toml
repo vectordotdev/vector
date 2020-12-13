@@ -12,15 +12,11 @@ nom = { version = "6", optional = true }
 snafu = { version = "0.6", optional = true }
 tracing = { version = "0.1", optional = true }
 
-[target.'cfg(unix)'.dependencies]
-atty = { version = "0.2", optional = true }
-
 [features]
 
 default = [
     "conversion",
     "tokenize",
-    "test_util",
 ]
 
 conversion = [
@@ -32,8 +28,4 @@ conversion = [
 
 tokenize = [
     "nom",
-]
-
-test_util = [
-    "atty",
 ]
