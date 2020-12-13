@@ -195,3 +195,106 @@ pub use truncate::Truncate;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+
+pub fn all() -> Vec<Box<dyn remap::Function>> {
+    let mut functions: Vec<Box<dyn remap::Function>> = vec![];
+
+    #[cfg(feature = "md5")]
+    functions.push(Box::new(Md5));
+    #[cfg(feature = "sha1")]
+    functions.push(Box::new(Sha1));
+    #[cfg(feature = "assert")]
+    functions.push(Box::new(Assert));
+    #[cfg(feature = "ceil")]
+    functions.push(Box::new(Ceil));
+    #[cfg(feature = "compact")]
+    functions.push(Box::new(Compact));
+    #[cfg(feature = "contains")]
+    functions.push(Box::new(Contains));
+    #[cfg(feature = "del")]
+    functions.push(Box::new(Del));
+    #[cfg(feature = "downcase")]
+    functions.push(Box::new(Downcase));
+    #[cfg(feature = "ends_with")]
+    functions.push(Box::new(EndsWith));
+    #[cfg(feature = "exists")]
+    functions.push(Box::new(Exists));
+    #[cfg(feature = "flatten")]
+    functions.push(Box::new(Flatten));
+    #[cfg(feature = "floor")]
+    functions.push(Box::new(Floor));
+    #[cfg(feature = "format_number")]
+    functions.push(Box::new(FormatNumber));
+    #[cfg(feature = "format_timestamp")]
+    functions.push(Box::new(FormatTimestamp));
+    #[cfg(feature = "ip_cidr_contains")]
+    functions.push(Box::new(IpCidrContains));
+    #[cfg(feature = "ip_subnet")]
+    functions.push(Box::new(IpSubnet));
+    #[cfg(feature = "ip_to_ipv6")]
+    functions.push(Box::new(IpToIpv6));
+    #[cfg(feature = "ipv6_to_ipv4")]
+    functions.push(Box::new(Ipv6ToIpV4));
+    #[cfg(feature = "log")]
+    functions.push(Box::new(Log));
+    #[cfg(feature = "merge")]
+    functions.push(Box::new(Merge));
+    #[cfg(feature = "now")]
+    functions.push(Box::new(Now));
+    #[cfg(feature = "only_fields")]
+    functions.push(Box::new(OnlyFields));
+    #[cfg(feature = "parse_duration")]
+    functions.push(Box::new(ParseDuration));
+    #[cfg(feature = "parse_grok")]
+    functions.push(Box::new(ParseGrok));
+    #[cfg(feature = "parse_json")]
+    functions.push(Box::new(ParseJson));
+    #[cfg(feature = "parse_syslog")]
+    functions.push(Box::new(ParseSyslog));
+    #[cfg(feature = "parse_timestamp")]
+    functions.push(Box::new(ParseTimestamp));
+    #[cfg(feature = "parse_url")]
+    functions.push(Box::new(ParseUrl));
+    #[cfg(feature = "match")]
+    functions.push(Box::new(Match));
+    #[cfg(feature = "redact")]
+    functions.push(Box::new(Redact));
+    #[cfg(feature = "replace")]
+    functions.push(Box::new(Replace));
+    #[cfg(feature = "round")]
+    functions.push(Box::new(Round));
+    #[cfg(feature = "sha2")]
+    functions.push(Box::new(Sha2));
+    #[cfg(feature = "sha3")]
+    functions.push(Box::new(Sha3));
+    #[cfg(feature = "slice")]
+    functions.push(Box::new(Slice));
+    #[cfg(feature = "split")]
+    functions.push(Box::new(Split));
+    #[cfg(feature = "starts_with")]
+    functions.push(Box::new(StartsWith));
+    #[cfg(feature = "strip_ansi_escape_codes")]
+    functions.push(Box::new(StripAnsiEscapeCodes));
+    #[cfg(feature = "strip_whitespace")]
+    functions.push(Box::new(StripWhitespace));
+    #[cfg(feature = "to_bool")]
+    functions.push(Box::new(ToBool));
+    #[cfg(feature = "to_float")]
+    functions.push(Box::new(ToFloat));
+    #[cfg(feature = "to_int")]
+    functions.push(Box::new(ToInt));
+    #[cfg(feature = "to_string")]
+    functions.push(Box::new(ToString));
+    #[cfg(feature = "to_timestamp")]
+    functions.push(Box::new(ToTimestamp));
+    #[cfg(feature = "tokenize")]
+    functions.push(Box::new(Tokenize));
+    #[cfg(feature = "truncate")]
+    functions.push(Box::new(Truncate));
+    #[cfg(feature = "upcase")]
+    functions.push(Box::new(Upcase));
+    #[cfg(feature = "uuid_v4")]
+    functions.push(Box::new(UuidV4));
+
+    functions
+}
