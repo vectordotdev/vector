@@ -955,14 +955,14 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            Value::Bytes(val) => write!(f, r#""{}""#, String::from_utf8_lossy(val)),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
             Value::Boolean(val) => write!(f, "{}", val),
             Value::Map(map) => {
                 let joined = map
                     .iter()
-                    .map(|(key, val)| format!("{}: {}", key, val))
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{{ {} }}", joined)
@@ -976,8 +976,8 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => write!(f, "{}", val.to_string()),
-            Value::Regex(regex) => write!(f, "{}", regex.to_string()),
-            Value::Null => write!(f, "Null"),
+            Value::Regex(regex) => write!(f, "/{}/", regex.to_string()),
+            Value::Null => write!(f, "null"),
         }
     }
 }
@@ -990,7 +990,7 @@ mod tests {
     #[test]
     fn test_display() {
         let string = format!("{}", Value::from("Sausage 🌭"));
-        assert_eq!("Sausage 🌭", string);
+        assert_eq!(r#""Sausage 🌭""#, string);
 
         let int = format!("{}", Value::from(42));
         assert_eq!("42", int);
@@ -1004,7 +1004,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert("field".to_string(), Value::from(1));
         let map = format!("{}", Value::Map(map));
-        assert_eq!("{ field: 1 }", map);
+        assert_eq!(r#"{ "field": 1 }"#, map);
 
         let array = format!("{}", Value::from(vec![1, 2, 3]));
         assert_eq!("[1, 2, 3]", array);
@@ -1012,7 +1012,10 @@ mod tests {
         let timestamp = format!("{}", Value::from(Utc.ymd(2020, 10, 21).and_hms(16, 20, 13)));
         assert_eq!("2020-10-21 16:20:13 UTC", timestamp);
 
+        let regex = format!("{}", Value::from(regex::Regex::new("foo ba+r").unwrap()));
+        assert_eq!("/foo ba+r/", regex);
+
         let null = format!("{}", Value::Null);
-        assert_eq!("Null", null);
+        assert_eq!("null", null);
     }
 }
