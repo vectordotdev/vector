@@ -5081,6 +5081,7 @@ dependencies = [
  "shared",
  "strip-ansi-escapes",
  "syslog_loose",
+ "tracing 0.1.21",
  "url",
  "uuid 0.8.1",
 ]
@@ -5885,16 +5886,9 @@ dependencies = [
  "atty",
  "bytes 0.5.6",
  "chrono",
- "metrics",
- "metrics-tracing-context",
  "nom 6.0.1",
  "snafu",
  "tracing 0.1.21",
- "tracing-futures 0.2.4",
- "tracing-limit",
- "tracing-log",
- "tracing-subscriber",
- "tracing-tower",
 ]
 
 [[package]]
