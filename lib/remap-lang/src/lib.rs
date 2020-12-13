@@ -256,6 +256,11 @@ mod tests {
                 Ok(()),
                 Ok("bar".into()),
             ),
+            (
+                r#"$foo = 1;$nork = $foo + 3;$nork"#,
+                Ok(()),
+                Ok(4.into())
+            )
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
