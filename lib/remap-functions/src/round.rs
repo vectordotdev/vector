@@ -82,6 +82,7 @@ impl Expression for RoundFn {
 }
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
     use crate::map;
