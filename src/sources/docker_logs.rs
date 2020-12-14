@@ -1346,7 +1346,7 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, Some(label), message, &docker).await;
         let events = collect_n(out, 1).await.unwrap();
@@ -1374,7 +1374,7 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(2, name, None, message, &docker).await;
         let events = collect_n(out, 2).await.unwrap();
@@ -1400,7 +1400,7 @@ mod integration_tests {
 
         let out = source_with(&[name1], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id0 = container_log_n(1, name0, None, "11", &docker).await;
         let id1 = container_log_n(1, name1, None, message, &docker).await;
@@ -1425,7 +1425,7 @@ mod integration_tests {
         let included1 = format!("{}_{}", prefix, "include1");
         let excluded0 = format!("{}_{}", prefix, "excluded0");
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let out = source_with_config(DockerLogsConfig {
             include_containers: Some(vec![prefix.to_owned()]),
@@ -1464,7 +1464,7 @@ mod integration_tests {
 
         let out = source_with(&[name0, name1], label);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id0 = container_log_n(1, name0, None, "13", &docker).await;
         let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
@@ -1486,7 +1486,7 @@ mod integration_tests {
         let name = "vector_test_currently_running";
         let label = "vector_test_label_currently_running";
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
         let id = running_container(name, Some(label), message, &docker).await;
         let out = source_with(&[name], None);
 
@@ -1521,7 +1521,7 @@ mod integration_tests {
 
         let out = source_with_config(config);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message, &docker).await;
         let events = collect_n(out, 1).await.unwrap();
@@ -1546,7 +1546,7 @@ mod integration_tests {
 
         let exclude_out = source_with_config(config_ex);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message, &docker).await;
         container_remove(&id, &docker).await;
@@ -1570,7 +1570,7 @@ mod integration_tests {
             ..DockerLogsConfig::default()
         };
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = running_container(name, None, message, &docker).await;
         let exclude_out = source_with_config(config_ex);
@@ -1595,7 +1595,7 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message.as_str(), &docker).await;
         let events = collect_n(out, 1).await.unwrap();
@@ -1634,7 +1634,7 @@ mod integration_tests {
 
         let out = source_with_config(config);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let command = emitted_messages
             .into_iter()
