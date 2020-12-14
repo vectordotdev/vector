@@ -208,8 +208,8 @@ remap: {
 
 				1. One of the built-in-formats listed in the [Timestamp Formats](#timestamp-formats)
 					table below, or
-				2. Any sequence of [time format specifiers](\(urls.chrono_time_formats)) from Rust's
-					`chrono` library.
+				2. Any valid sequence of [time format specifiers](\(urls.chrono_time_formats)) from
+					Rust's `chrono` library.
 
 				### Timestamp Formats
 
@@ -357,6 +357,36 @@ remap: {
 					.has_proper_format = $is_url
 					del(.url)
 					"""#,
+			]
+		}
+
+		"Blocks": {
+			href: "blocks"
+
+			description: """
+				TRL supports organizing expressions into blocks using curly braces. Everything
+				inside of a block is evaluated as a single expression. In this example, the value
+				assigned to the variable `$success` is `true` if the value of the `status_code`
+				field is `201`:
+
+				```
+				$success = {
+					$success_codes = [200, 201, 202, 204]
+					$code = .status_code
+					contains($success_codes, $code)
+				}
+				```
+
+				You can also create single-line blocks by separating the expressions with a
+				semicolon (`;`). This block would be the equivalent of the one above:
+
+				```
+				$success =
+				```
+				"""
+
+			examples: [
+				"$"
 			]
 		}
 
