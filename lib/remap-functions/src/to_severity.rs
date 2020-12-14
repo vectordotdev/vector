@@ -69,53 +69,53 @@ mod tests {
         to_level => ToSeverity;
 
         emergency {
-            args: func_args![level: value!(["emerge"])],
+            args: func_args![level: value!("emerg")],
             want: Ok(value!(0)),
         }
 
         alert {
-            args: func_args![level: value!["alert"]],
+            args: func_args![level: value!("alert")],
             want: Ok(value!(1)),
         }
 
         critical {
-            args: func_args![severity: value!["crit"]],
+            args: func_args![level: value!("crit")],
             want: Ok(value!(2)),
         }
 
         error {
-            args: func_args![severity: value!["err"]],
+            args: func_args![level: value!("err")],
             want: Ok(value!(3)),
         }
 
         warning {
-            args: func_args![severity: value!["warn"]],
+            args: func_args![level: value!("warn")],
             want: Ok(value!(4)),
         }
 
         notice {
-            args: func_args![severity: value!["notice"]],
+            args: func_args![level: value!("notice")],
             want: Ok(value!(5)),
         }
 
         informational {
-            args: func_args![severity: value!["info"]],
+            args: func_args![level: value!("info")],
             want: Ok(value!(6)),
         }
 
         debug {
-            args: func_args![severity: value!["debug"]],
+            args: func_args![level: value!("debug")],
             want: Ok(value!(7)),
         }
 
         invalid_level_1 {
-            args: func_args![severity: value!["oopsie"]],
-            want: Err("level oopsie not valid"),
+            args: func_args![severity: value!("oopsie")],
+            want: Err("function call error: level oopsie not valid"),
         }
 
         invalid_level_2 {
-            args: func_args![severity: value!["aww shucks"]],
-            want: Err("level aww schucks not valid"),
+            args: func_args![severity: value!("aww shucks")],
+            want: Err("function call error:: level aww schucks not valid"),
         }
     ];
 }
