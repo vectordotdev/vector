@@ -70,57 +70,57 @@ mod tests {
         to_level => ToLevel;
 
         emergency {
-            args: func_args![severity: value!([0])],
+            args: func_args![severity: value!(0)],
             want: Ok(value!("emerge")),
         }
 
         alert {
-            args: func_args![severity: value![1]],
+            args: func_args![severity: value!(1)],
             want: Ok(value!("alert")),
         }
 
         critical {
-            args: func_args![severity: value![2]],
+            args: func_args![severity: value!(2)],
             want: Ok(value!("crit")),
         }
 
         error {
-            args: func_args![severity: value![3]],
+            args: func_args![severity: value!(3)],
             want: Ok(value!("err")),
         }
 
         warning {
-            args: func_args![severity: value![4]],
+            args: func_args![severity: value!(4)],
             want: Ok(value!("warning")),
         }
 
         notice {
-            args: func_args![severity: value![5]],
+            args: func_args![severity: value!(5)],
             want: Ok(value!("notice")),
         }
 
         informational {
-            args: func_args![severity: value![6]],
+            args: func_args![severity: value!(6)],
             want: Ok(value!("info")),
         }
 
         debug {
-            args: func_args![severity: value![7]],
+            args: func_args![severity: value!(7)],
             want: Ok(value!("debug")),
         }
 
         invalid_severity_next_int {
-            args: func_args![severity: value![8]],
+            args: func_args![severity: value!(8)],
             want: Err("function call error: severity level 8 not valid"),
         }
 
         invalid_severity_larger_int {
-            args: func_args![severity: value![475]],
+            args: func_args![severity: value!(475)],
             want: Err("function call error: severity level 475 not valid"),
         }
 
         invalid_severity_negative_int {
-            args: func_args![severity: value![-1]],
+            args: func_args![severity: value!(-1)],
             want: Err("function call error: severity level -1 not valid"),
         }
     ];
