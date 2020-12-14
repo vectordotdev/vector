@@ -181,7 +181,9 @@ impl Value {
     ) -> Result<Option<Value>> {
         let mut working_lookup = lookup.into();
         let this_segment = working_lookup.pop_front();
-        match (this_segment, self) {
+        let mut is_empty = false;
+
+        let retval = match (this_segment, &mut *self) {
             // We've met an end without finding a value. (Terminus nodes on arrays/maps detected prior)
             (None, item) => Ok(None),
             // This is just not allowed!
@@ -216,10 +218,14 @@ impl Value {
                     Ok(map.remove(*name))
                 } else {
                     trace!(key = ?name, "Descending into map.");
-                    match map.get_mut(*name) {
+                    let retval = match map.get_mut(*name) {
                         Some(inner) => inner.remove(working_lookup.clone(), prune),
                         None => Ok(None),
+                    };
+                    if map.is_empty() {
+                        is_empty = true
                     }
+                    retval
                 }
             }
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
@@ -237,15 +243,25 @@ impl Value {
                     }
                 } else {
                     trace!(key = ?i, "Descending into array.");
-                    match array.get_mut(i) {
+                    let retval = match array.get_mut(i) {
                         Some(inner) => inner.remove(working_lookup.clone(), prune),
                         None => Ok(None),
+                    };
+                    if array.is_empty() {
+                        is_empty = true
                     }
+                    retval
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+        };
+
+        if prune && is_empty {
+            *self = Value::Null;
         }
+
+        retval
     }
 
     /// Get an immutable borrow of the value by lookup.

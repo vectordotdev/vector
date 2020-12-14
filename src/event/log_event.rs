@@ -299,13 +299,23 @@ impl LogEvent {
                 if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
                     trace!(key = ?name, "Getting from root.");
-                    self.fields.remove(name)
+                    let retval = self.fields.remove(name);
+                    if prune && self.fields.get(name) == Some(&Value::Null) {
+                        self.fields.remove(name);
+                    }
+                    retval
+
                 } else {
                     trace!(key = ?name, "Descending into map.");
-                    match self.fields.get_mut(name) {
+                    let retval = match self.fields.get_mut(name) {
                         Some(v) => v.remove(working_lookup, prune).ok().unwrap_or(None),
                         None => None,
+                    };
+                    if prune && self.fields.get(name) == Some(&Value::Null) {
+                        self.fields.remove(name);
                     }
+                    retval
+
                 }
             },
             // In this case, the user has passed us an invariant.
