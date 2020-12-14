@@ -143,18 +143,33 @@ remap: {
 			description: """
 				A **reg**ular **ex**pression. In TRL, regular expressions are delimited by `/` and
 				use [Rust regex syntax](\(urls.rust_regex_syntax)).
+
+				### Flags
+
+				TRL regexes allow three flags:
+
+				Flag | Description
+				:----|:-----------
+				`g` | Search for *all* matches
+				`i` | Case insensitive
+				`m` | Multi-line mode
+
+				Regex flags can be combined, as in `/pattern/gmi` or `/pattern/gi`.
 				"""
 			use: ["parameter"]
 			examples: [
-				"//",
+				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
 			]
 		}
 		"string": {
 			description: #"""
-				A sequence of characters. Remap converts strings in scripts to [UTF-8](\(urls.utf8))
-				and replaces any invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
+				A sequence of characters. A few things to note about TRL strings:
 
-				Strings can be escaped using `\`, as in `The password is \"opensesame\".`.
+				* Remap converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any
+					invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
+				* Strings can be escaped using `\`, as in `The password is \"opensesame\".`.
+				* Multi-line strings *are* allowed and don't require any special syntax. See the
+					multi-line example below.
 				"""#
 			use: ["parameter", "return"]
 			examples: [
@@ -198,7 +213,7 @@ remap: {
 			use: ["parameter", "return"]
 			examples: [
 				"%a %d %b %T %Y",
-				"The current year is %Y",
+				"%FT%TZ",
 			]
 		}
 	}
