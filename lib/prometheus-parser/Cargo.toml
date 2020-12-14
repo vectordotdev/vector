@@ -9,8 +9,14 @@ license = "MPL-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+indexmap = "1.6.0"
 nom = "6.0.1"
+prost = "0.6.1"
+prost-types = "0.6.1"
 snafu = { version = "0.6" }
+
+[build-dependencies]
+prost-build = "0.6.1"
 
 [dev-dependencies]
 shared = { path = "../shared", features = ["btreemap"] }

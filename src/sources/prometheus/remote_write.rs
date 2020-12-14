@@ -4,7 +4,6 @@ use crate::{
     internal_events::{
         PrometheusNoNameError, PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived,
     },
-    prometheus::{proto, METRIC_NAME_LABEL},
     shutdown::ShutdownSignal,
     sources::{
         self,
@@ -15,6 +14,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
+use prometheus_parser::{proto, METRIC_NAME_LABEL};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{

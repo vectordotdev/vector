@@ -4800,7 +4800,11 @@ dependencies = [
 name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
  "nom 6.0.1",
+ "prost",
+ "prost-build",
+ "prost-types",
  "shared",
  "snafu",
 ]
