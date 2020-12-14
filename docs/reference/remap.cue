@@ -159,6 +159,10 @@ remap: {
 			use: ["parameter"]
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
+				"""
+				$pattern = /(foo|bar)/
+
+				"""
 			]
 		}
 		"string": {
@@ -291,6 +295,27 @@ remap: {
 				".average = .total / .number",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
+			]
+		}
+
+		"Variables": {
+			href: "variables"
+
+			description: """
+				You can assign values to variables in TRL. Variables in TRL are prefixed with a `$`
+				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
+				`$my_var`, `$this_is_my_variable`, etc.
+				"""
+
+			examples: [
+				"$status_code = .code",
+				#"$my_string = "Hello, Clarice""#,
+				"""
+				$url_pattern = /^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/
+				$is_url = match(.url, $url_pattern)
+				.has_proper_format = $is_url
+				del(.url)
+				"""
 			]
 		}
 

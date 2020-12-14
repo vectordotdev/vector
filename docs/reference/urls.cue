@@ -327,6 +327,7 @@ urls: {
 	sematext_monitoring:                                      "https://sematext.com/docs/monitoring/"
 	sematext_registration:                                    "https://apps.sematext.com/ui/registration"
 	semver:                                                   "https://semver.org/"
+	snake_case:                                               "https://en.wikipedia.org/wiki/Snake_case"
 	snappy:                                                   "https://google.github.io/snappy/"
 	socket:                                                   "https://en.wikipedia.org/wiki/Network_socket"
 	splunk:                                                   "https://www.splunk.com"
