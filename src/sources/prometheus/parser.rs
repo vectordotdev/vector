@@ -20,7 +20,7 @@ fn utc_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
 }
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Metric>, ParserError> {
-    reparse_groups(prometheus_parser::group_text_metrics(packet)?)
+    reparse_groups(prometheus_parser::parse_text(packet)?)
 }
 
 fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> {
