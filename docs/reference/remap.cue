@@ -1,7 +1,7 @@
 package metadata
 
 remap: {
-	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex"
+	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "null"
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
@@ -158,12 +158,12 @@ remap: {
 				"""#
 			use: ["parameter", "return"]
 			examples: [
-				#""I am a teapot""#,
+				"\"I am a teapot\"",
 				#"""
-				"I am split
-				across multiple lines"
-				"""#,
-				#"This is not escaped, \"but this is\""#
+					"I am split
+					across multiple lines"
+					"""#,
+				#"This is not escaped, \"but this is\""#,
 			]
 		}
 		"timestamp": {
@@ -197,7 +197,8 @@ remap: {
 				"""
 			use: ["parameter", "return"]
 			examples: [
-				"%a %d %b %T %Y"
+				"%a %d %b %T %Y",
+				"The current year is %Y",
 			]
 		}
 	}

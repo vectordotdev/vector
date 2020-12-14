@@ -8,13 +8,13 @@ remap: functions: to_string: {
 			name:        "value"
 			description: "The value to return a string representation of."
 			required:    true
-			type: _all_types
+			type:        _all_types
 		},
 		{
 			name:        "default"
 			description: "If the value parameter errors, return this parameter instead."
 			required:    false
-			type: _all_types
+			type:        _all_types
 		},
 	]
 	return: ["string"]
