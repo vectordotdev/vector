@@ -277,6 +277,7 @@ urls: {
 	nixos:                                                    "https://nixos.org/"
 	nixpkgs_9682:                                             "https://github.com/NixOS/nixpkgs/issues/9682"
 	openssl:                                                  "https://www.openssl.org/"
+	order_of_ops:                                             "https://en.wikipedia.org/wiki/Order_of_operations"
 	papertrail:                                               "https://www.papertrail.com/"
 	papertrail_syslog:                                        "https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages"
 	perl_windows:                                             "https://www.perl.org/get.html#win32"

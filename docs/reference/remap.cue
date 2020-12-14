@@ -160,9 +160,9 @@ remap: {
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
 				"""
-				$pattern = /(foo|bar)/
+					$pattern = /(foo|bar)/
 
-				"""
+					""",
 			]
 		}
 		"string": {
@@ -310,12 +310,12 @@ remap: {
 			examples: [
 				"$status_code = .code",
 				#"$my_string = "Hello, Clarice""#,
-				"""
-				$url_pattern = /^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/
-				$is_url = match(.url, $url_pattern)
-				.has_proper_format = $is_url
-				del(.url)
-				"""
+				#"""
+					$url_pattern = /^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/
+					$is_url = match(.url, $url_pattern)
+					.has_proper_format = $is_url
+					del(.url)
+					"""#,
 			]
 		}
 
@@ -325,6 +325,9 @@ remap: {
 			description: """
 				TRL offers a standard set of operators that should be familiar from many other
 				programming languages.
+
+				TRL supports the standard [order of operations](\(urls.order_of_ops)). Thus,
+				`(2 * 2) + 8` makes 12, `10 / (2 + 3)` makes 2, and so on.
 				"""
 
 			examples: [
