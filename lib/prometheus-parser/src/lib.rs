@@ -129,18 +129,6 @@ pub struct MetricGroup {
     pub metrics: GroupKind,
 }
 
-impl GroupKind {
-    pub fn is_empty(&self) -> bool {
-        match self {
-            GroupKind::Counter(vec) | GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
-                vec.is_empty()
-            }
-            GroupKind::Histogram(vec) => vec.is_empty(),
-            GroupKind::Summary(vec) => vec.is_empty(),
-        }
-    }
-}
-
 fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
     if 0.0 <= f && f <= u32::MAX as f64 {
         Ok(f as u32)

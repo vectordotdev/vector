@@ -191,7 +191,7 @@ fn prometheus(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            match parser::parse(&body) {
+                            match parser::parse_text(&body) {
                                 Ok(metrics) => {
                                     emit!(PrometheusEventReceived {
                                         byte_size,
