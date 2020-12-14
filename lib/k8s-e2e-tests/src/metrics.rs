@@ -9,7 +9,7 @@ pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn metrics_regex() -> regex::Regex {
     regex::RegexBuilder::new(
-        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>[^ ]+?)( (?P<timestamp>[^ ]+?))?$",
+        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>\S+?)( (?P<timestamp>\S+?))?$",
     )
     .multi_line(true)
     .build()
