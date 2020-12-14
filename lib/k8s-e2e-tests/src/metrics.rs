@@ -57,7 +57,7 @@ pub async fn get_processed_events(url: &str) -> Result<u64, Box<dyn std::error::
 pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     if !extract_vector_started(&metrics) {
-        return Err(format!("vector_started metric was not found:\n{}", metrics).into());
+        return Err(format!("`vector_started`-ish metric was not found:\n{}", metrics).into());
     }
     Ok(())
 }
@@ -80,8 +80,11 @@ pub async fn wait_for_vector_started(
         }
 
         eprintln!(
-            "Waiting for vector_started metrics to be available, next poll in {} sec, deadline at {:?}",
-            next_attempt_delay.as_secs_f64(), deadline,
+            "Waiting for `vector_started`-ish metric to be available, next poll in {} sec, deadline in {} sec",
+            next_attempt_delay.as_secs_f64(),
+            deadline
+                .saturating_duration_since(std::time::Instant::now())
+                .as_secs_f64(),
         );
         tokio::time::delay_for(next_attempt_delay).await;
     }
