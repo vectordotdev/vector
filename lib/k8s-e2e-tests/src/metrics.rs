@@ -9,7 +9,7 @@ pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn metrics_regex() -> regex::Regex {
     regex::RegexBuilder::new(
-        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>.+)$",
+        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>[^ ]+?)( (?P<timestamp>[^ ]+?))?$",
     )
     .multi_line(true)
     .build()
@@ -129,6 +129,16 @@ mod tests {
                 ],
                 1 + 2 + 3 + 4,
             ),
+            // Prefixes and suffixes with timestamps
+            (
+                vec![
+                    r#"processed_events 1 1607985729161"#,
+                    r#"processed_events_total 2 1607985729161"#,
+                    r#"vector_processed_events 3 1607985729161"#,
+                    r#"vector_processed_events_total 4 1607985729161"#,
+                ],
+                1 + 2 + 3 + 4,
+            ),
         ];
 
         for (input, expected_value) in cases {
@@ -152,6 +162,15 @@ mod tests {
                     r#"# HELP vector_started_total vector_started_total"#,
                     r#"# TYPE vector_started_total counter"#,
                     r#"vector_started_total 1"#,
+                ],
+                true,
+            ),
+            // Another real-world example.
+            (
+                vec![
+                    r#"# HELP vector_started_total started_total"#,
+                    r#"# TYPE vector_started_total counter"#,
+                    r#"vector_started_total 1 1607985729161"#,
                 ],
                 true,
             ),
