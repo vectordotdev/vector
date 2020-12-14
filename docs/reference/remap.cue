@@ -284,6 +284,18 @@ remap: {
 			]
 		}
 
+		"Expressions": {
+			href: "expressions"
+
+			description: """
+
+				"""
+
+			examples: [
+				""
+			]
+		}
+
 		"Functions": {
 			href: "functions"
 
@@ -321,14 +333,14 @@ remap: {
 
 			examples: [
 				"""
-				$pattern = /(foo|bar)/g
+					$pattern = /(foo|bar)/g
 
-				if (match("this does contain foo", $pattern)) {
-					.contains_foo = true
-				} else {
-					.does_not_contain_foo = true
-				}
-				""",
+					if (match("this does contain foo", $pattern)) {
+						.contains_foo = true
+					} else {
+						.does_not_contain_foo = true
+					}
+					""",
 			]
 		}
 
@@ -388,23 +400,41 @@ remap: {
 				field is `201`:
 
 				```
-				$success = {
-					$success_codes = [200, 201, 202, 204]
-					$code = .status_code
-					contains($success_codes, $code)
+				$very_important = {
+					$fail_code = .status_code >= 500
+					$paying_customer = .user.plan == "enterprise"
+
+					$fail_code && $paying_custmer
 				}
 				```
 
-				You can also create single-line blocks by separating the expressions with a
-				semicolon (`;`). This block would be the equivalent of the one above:
+				Blocks are particularly useful in conjunction with variables, as in the example
+				above.
+
+				You can also collapse blocks into a single line by separating the expressions with a
+				semicolon (`;`), as in this block:
 
 				```
-				$success =
+				$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }
 				```
 				"""
 
 			examples: [
-				"$"
+				#"$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }"#,
+				"""
+				$very_important = {
+					$fail_code = .status_code >= 500
+					del(.status_code)
+					$paying_customer = .user.plan == "enterprise"
+					del(.user)
+
+					$fail_code && $paying_custmer
+				}
+
+				.if ($very_important) {
+					.important = true
+				}
+				""",
 			]
 		}
 
