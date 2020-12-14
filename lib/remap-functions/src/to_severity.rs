@@ -109,12 +109,12 @@ mod tests {
         }
 
         invalid_level_1 {
-            args: func_args![severity: value!("oopsie")],
+            args: func_args![level: value!("oopsie")],
             want: Err("function call error: level oopsie not valid"),
         }
 
         invalid_level_2 {
-            args: func_args![severity: value!("aww shucks")],
+            args: func_args![level: value!("aww shucks")],
             want: Err("function call error:: level aww schucks not valid"),
         }
     ];
