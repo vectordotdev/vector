@@ -14,7 +14,6 @@ components: sources: prometheus_remote_write: {
 
 	features: {
 		multiline: enabled: false
-		encoding: enabled:  false
 		receive: {
 			from: {
 				service: {

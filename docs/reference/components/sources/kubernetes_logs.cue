@@ -32,7 +32,6 @@ components: sources: kubernetes_logs: {
 			}
 		}
 		multiline: enabled: false
-		encoding: enabled:  false
 	}
 
 	support: {

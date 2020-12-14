@@ -34,6 +34,7 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+mod encoding_transcode;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -146,6 +147,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
+pub use self::encoding_transcode::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",

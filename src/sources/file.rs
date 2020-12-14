@@ -209,10 +209,9 @@ pub fn file_source(
 
     // if file encoding is specified, need to convert the line delimiter (present as utf8)
     // to the specified encoding, so that delimiter-based line splitting can work properly
-    let line_delimiter_as_bytes = if let Some(e) = encoding_charset {
-        Encoder::new(e).encode_from_utf8(&config.line_delimiter)
-    } else {
-        Bytes::from(config.line_delimiter.clone())
+    let line_delimiter_as_bytes = match encoding_charset {
+        Some(e) => Encoder::new(e).encode_from_utf8(&config.line_delimiter),
+        None => Bytes::from(config.line_delimiter.clone()),
     };
 
     let file_server = FileServer {
@@ -260,10 +259,9 @@ pub fn file_source(
             .flatten()
             .map(move |(line, src)| {
                 // transcode each line from the file's encoding charset to utf8
-                if let Some(d) = encoding_decoder.as_mut() {
-                    (d.decode_to_utf8(line), src)
-                } else {
-                    (line, src)
+                match encoding_decoder.as_mut() {
+                    Some(d) => (d.decode_to_utf8(line), src),
+                    None => (line, src),
                 }
             });
 
@@ -1602,10 +1600,10 @@ mod tests {
 
         sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "hello i am a line\r").unwrap();
-        writeln!(&mut file, "and i am too\r").unwrap();
-        writeln!(&mut file, "CRLF is how we end\r").unwrap();
-        writeln!(&mut file, "please treat us well\r").unwrap();
+        write!(&mut file, "hello i am a line\r\n").unwrap();
+        write!(&mut file, "and i am too\r\n").unwrap();
+        write!(&mut file, "CRLF is how we end\r\n").unwrap();
+        write!(&mut file, "please treat us well\r\n").unwrap();
 
         sleep_500_millis().await;
 

@@ -1,3 +1,6 @@
+use crate::internal_events::{
+    DecoderBomRemoval, DecoderMalformedReplacement, EncoderUnmappableReplacement,
+};
 use bytes::{Bytes, BytesMut};
 use encoding_rs::{CoderResult, Encoding};
 
@@ -56,21 +59,15 @@ impl Decoder {
             self.output.extend_from_slice(&self.buffer[..written]);
 
             match result {
-                CoderResult::InputEmpty => {
-                    // we have consumed all of the given input so we are done!
-                    break;
-                }
-                CoderResult::OutputFull => {
-                    continue;
-                }
+                CoderResult::InputEmpty => break, // we have consumed all of the given input so we are done!
+                CoderResult::OutputFull => (), // continue reading from the input in the next loop iteration
             }
         }
 
         if total_had_errors {
-            warn!(
-                message = "Replaced malformed sequences with replacement character while decoding to utf8.",
-                from_encoding = %self.inner.encoding().name()
-            );
+            emit!(DecoderMalformedReplacement {
+                from_encoding: self.inner.encoding().name()
+            });
         }
 
         let output = self.output.split().freeze();
@@ -89,10 +86,9 @@ impl Decoder {
             .get(..BOM_UTF8_LEN)
             .map_or(false, |start| start == BOM_UTF8)
         {
-            trace!(
-                message = "Removing initial BOM bytes from the final output while decoding to utf8.",
-                from_encoding = %self.inner.encoding().name()
-            );
+            emit!(DecoderBomRemoval {
+                from_encoding: self.inner.encoding().name()
+            });
             output.slice(BOM_UTF8_LEN..)
         } else {
             output
@@ -171,21 +167,15 @@ impl Encoder {
             self.output.extend_from_slice(&self.buffer[..written]);
 
             match result {
-                CoderResult::InputEmpty => {
-                    // we have consumed all of the given input so we are done!
-                    break;
-                }
-                CoderResult::OutputFull => {
-                    continue;
-                }
+                CoderResult::InputEmpty => break, // we have consumed all of the given input so we are done!
+                CoderResult::OutputFull => (), // continue reading from the input in the next loop iteration
             }
         }
 
         if total_had_errors {
-            warn!(
-                message = "Replaced unmappable characters with numeric character references while encoding from utf8.",
-                to_encoding = %self.inner.encoding().name()
-            );
+            emit!(EncoderUnmappableReplacement {
+                to_encoding: self.inner.encoding().name()
+            });
         }
 
         self.output.split().freeze()

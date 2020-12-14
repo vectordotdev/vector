@@ -15,7 +15,6 @@ components: sources: vector: {
 
 	features: {
 		multiline: enabled: false
-		encoding: enabled:  false
 		receive: {
 			from: {
 				service: {

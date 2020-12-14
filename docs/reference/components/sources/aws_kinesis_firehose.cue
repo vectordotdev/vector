@@ -16,7 +16,6 @@ components: sources: aws_kinesis_firehose: components._aws & {
 
 	features: {
 		multiline: enabled: false
-		encoding: enabled:  false
 		receive: {
 			from: {
 				service: {

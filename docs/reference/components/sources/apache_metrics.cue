@@ -16,7 +16,6 @@ components: sources: apache_metrics: {
 
 	features: {
 		multiline: enabled: false
-		encoding: enabled:  false
 		collect: {
 			checkpoint: enabled: false
 			from: {

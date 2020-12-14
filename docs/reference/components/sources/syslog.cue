@@ -11,8 +11,6 @@ components: sources: syslog: {
 	features: {
 		multiline: sources.socket.features.multiline
 
-		encoding: enabled: false
-
 		receive: {
 			from: {
 				service: {

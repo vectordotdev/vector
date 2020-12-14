@@ -16,7 +16,6 @@ components: sources: splunk_hec: {
 
 	features: {
 		multiline: enabled: false
-		encoding: enabled:  false
 		receive: {
 			from: {
 				service: {

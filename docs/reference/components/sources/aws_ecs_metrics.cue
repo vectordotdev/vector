@@ -37,7 +37,6 @@ components: sources: aws_ecs_metrics: {
 			}
 		}
 		multiline: enabled: false
-		encoding: enabled:  false
 	}
 
 	support: {
