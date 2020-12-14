@@ -288,11 +288,28 @@ remap: {
 			href: "expressions"
 
 			description: """
+				Expressions in TRL come in four kinds:
 
+				* [Assignments](#assignments)
+				* [Control flow statements](#control-flow)
+				* Boolean expressions
+				* [Blocks](#blocks)
+
+				*All* expressions in TRL resolve to a concrete value. Here's how that works for each
+				of the four kinds of expressions:
+
+				Expression type | Resolves to | Example in | Example out
+				:---------------|:------------|:-----------|:-----------
+				Assignment | The assigned value | `.success = false` | `false`
+				Control flow statements | The value returned by the chosen expression | `if false { "no" } else { "yes" }` | `"yes"`
+				Boolean expressions | The returned Boolean value | `starts_with("Vector", "Vec")` | `true`
+				Blocks | The value returned by the last expression in the block | `{ $important = true; $important }` | `true`
 				"""
 
 			examples: [
-				""
+				#".request_id = uuid_v4()"#,
+				#"if (starts_with("v1", .version)) { .is_v1 = true }"#,
+				#"contains("emergency", .message)"#,
 			]
 		}
 
