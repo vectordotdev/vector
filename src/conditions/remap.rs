@@ -120,8 +120,8 @@ mod test {
             ),
             (
                 log_event![],
-                "",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to null value"),
+                "null",
+                Err("remap error: program error: expected to resolve to an error, or boolean value, but instead resolves to null value"),
                 Ok(()),
             ),
             (
