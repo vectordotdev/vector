@@ -78,6 +78,19 @@ remap: {
 		"array": {
 			description: """
 				A list of items. Items in an array can be of any TRL type, including other arrays.
+
+				Array values can be accessed index (starting with zero):
+
+				```
+				$levels = ["critical", "emergency", "alert"]
+				$levels[0]
+				```
+
+				You can also assign values to arrays via index:
+
+				```
+				$levels[3] = "not_so_terrible"
+				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -243,14 +256,15 @@ remap: {
 
 			description: """
 				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
-				it represents the event arriving into the transform. Take this JSON event data as an
-				example:
+				it represents the object arriving into the transform. That object can be a
+				log or a metric. To give an example, imagine you're writing a TRL script to handle
+				logs that are already in [JSON](\(urls.json)) form.
 
 				```json
 				{"status_code":200,"username":"booper1234","message":"Successful transaction"}
 				```
 
-				In this case, the event, represented by the dot, has three fields: `.status_code`,
+				In this case, the object, represented by the dot, has three fields: `.status_code`,
 				`.username`, and `.message`. You can assign new values to the existing fields
 				(`.message = "something different"`), add new fields (`.new_field = "new value"`),
 				delete fields (`del(.username)`), store those values in variables (`$code =
@@ -285,18 +299,41 @@ remap: {
 			]
 		}
 
+		"Control flow": {
+			href: "control-flow"
+
+			description: """
+				TRL supports control flow operations using `if`, `else if`, and `else`. Here's an
+				example:
+
+				```
+				$pattern = /(foo|bar)/
+
+				if
+				```
+				"""
+		}
+
 		"Assignment": {
 			href: "assignment"
 
 			description: """
-				You can assign values to fields using a single equals sign (`=`). If the field
-				already exists, its value is re-assigned; it the field doesn't already exist, it's
-				created and assigned the value.
+				You can assign values to object fields or [variables](#variables) using a single
+				equals sign (`=`). Some examples:
+
+				* `.is_success = (.code > 200) && (.code <= 299)`
+				* `$pattern = /(foo|bar)/g`
+				* `. = parse_json(.)`
+				* `.request.id = uuidv4()`
+
+				When assigning a value to an object field, if the field doesn't already exist it's
+				created an assigned the value; if the field does already exist, the value is
+				re-assigned.
 				"""
 
 			examples: [
 				".request_id = uuidv4()",
-				".average = .total / .number",
+				"$average = .total / .number",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
 			]
