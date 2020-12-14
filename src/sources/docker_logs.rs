@@ -224,7 +224,7 @@ impl DockerLogsSourceCore {
     fn new(config: DockerLogsConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
-        let docker = docker(config.docker_host.clone())?;
+        let docker = docker(config.docker_host.clone(), config.tls.clone())?;
 
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
@@ -1007,17 +1007,20 @@ impl ContainerMetadata {
 }
 
 // From bollard source, unfortunately they don't export this function.
-fn default_cert_path() -> Result<PathBuf, DockerError> {
+fn default_certs() -> Option<DockerTlsConfig> {
     let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
-    if let Ok(path) = from_env {
-        Ok(PathBuf::from(path))
-    } else {
-        let home = dirs_next::home_dir().ok_or_else(|| DockerError::NoCertPathError)?;
-        Ok(home.join(".docker"))
-    }
+    let base = match from_env {
+        Ok(path) => PathBuf::from(path),
+        Err(_) => dirs_next::home_dir()?.join(".docker"),
+    };
+    Some(DockerTlsConfig {
+        ca_file: base.join("ca.pem"),
+        key_file: base.join("key.pem"),
+        crt_file: base.join("cert.pem"),
+    })
 }
 
-fn docker(host: Option<String>) -> Result<Docker, DockerError> {
+fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, DockerError> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
@@ -1034,12 +1037,14 @@ fn docker(host: Option<String>) -> Result<Docker, DockerError> {
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                 }
                 Some("https") => {
-                    let cert_path = default_cert_path()?;
+                    let tls = tls
+                        .or_else(default_certs)
+                        .ok_or(DockerError::NoCertPathError)?;
                     Docker::connect_with_ssl(
                         &host,
-                        &cert_path.join("key.pem"),
-                        &cert_path.join("cert.pem"),
-                        &cert_path.join("ca.pem"),
+                        &tls.key_file,
+                        &tls.crt_file,
+                        &tls.ca_file,
                         DEFAULT_TIMEOUT,
                         API_DEFAULT_VERSION,
                     )
