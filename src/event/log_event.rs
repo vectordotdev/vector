@@ -22,80 +22,40 @@ impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
-        let lookup = lookup.into();
-        let lookup_len = lookup.len();
-        let mut lookup_iter = lookup.into_iter().enumerate();
+        let mut working_lookup = lookup.into();
         // The first step should always be a field.
-        let (_zero, first_step) = lookup_iter.next()?;
+        let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        let mut cursor = match first_step {
-            Segment::Coalesce(_) => unimplemented!(),
+        match this_segment {
+            Segment::Coalesce(v) => unimplemented!(),
             Segment::Field {
                 name,
                 requires_quoting: _,
             } => {
-                if lookup_len == 1 {
+                if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
                     trace!(key = ?name, "Getting from root.");
-                    return self.fields.get(name);
+                    self.fields.get(name)
                 } else {
                     trace!(key = ?name, "Descending into map.");
-                    self.fields.get(name)
+                    match self.fields.get(name) {
+                        Some(v) => v.get(working_lookup).ok().unwrap_or(None),
+                        None => None,
+                    }
                 }
-            }
+            },
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
                     "Lookups into LogEvents should never start with indexes.\
                         Please report your config."
                 );
-                return None;
-            }
-        };
-
-        for (_index, segment) in lookup_iter {
-            // Don't do extra work.
-            if cursor.is_none() {
-                break;
-            }
-            cursor = match (segment, cursor) {
-                (Segment::Coalesce(_), _) => unimplemented!(),
-                // Fields access maps.
-                (
-                    Segment::Field {
-                        ref name,
-                        requires_quoting: _,
-                    },
-                    Some(Value::Map(map)),
-                ) => {
-                    trace!(key = ?name, "Descending into map.");
-                    map.get(*name)
-                }
-                // Indexes access arrays.
-                (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!(key = ?i, "Descending into array.");
-                    array.get(i)
-                }
-                // The rest, it's not good.
-                (Segment::Index(_), _)
-                | (
-                    Segment::Field {
-                        name: _,
-                        requires_quoting: _,
-                    },
-                    _,
-                ) => {
-                    trace!("Unmatched lookup.");
-                    None
-                }
-            }
+                None
+            },
         }
-
-        // By the time we get here we either have the item, or nothing. Either case, we're correct.
-        cursor
     }
 
     /// Get a mutable borrow of the value by lookup.
@@ -114,7 +74,7 @@ impl LogEvent {
                 name,
                 requires_quoting: _,
             } => {
-                if working_lookup.len() == 1 {
+                if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
                     trace!(key = ?name, "Getting from root.");
                     self.fields.get_mut(name)
@@ -325,104 +285,38 @@ impl LogEvent {
         lookup: impl Into<Lookup<'lookup>> + Debug,
         prune: bool,
     ) -> Option<Value> {
-        let lookup = lookup.into();
-        let lookup_len = lookup.len();
-        let mut lookup_iter = lookup.iter().enumerate();
+        let mut working_lookup = lookup.into();
         // The first step should always be a field.
-        let (_zero, first_step) = lookup_iter.next()?;
-        // This is good, since the first step into a LogEvent will also be a field.
-
+        let this_segment = working_lookup.pop_front().unwrap();
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        let mut cursor = match first_step {
+        match this_segment {
             Segment::Coalesce(v) => unimplemented!(),
             Segment::Field {
                 name,
                 requires_quoting: _,
             } => {
-                if lookup_len == 1 {
-                    trace!(key = ?name, "Removed from root.");
-                    return self.fields.remove(*name);
+                if working_lookup.len() == 0 {
+                    // Terminus: We **must** insert here or abort.
+                    trace!(key = ?name, "Getting from root.");
+                    self.fields.remove(name)
                 } else {
                     trace!(key = ?name, "Descending into map.");
-                    self.fields.get_mut(*name)
+                    match self.fields.get_mut(name) {
+                        Some(v) => v.remove(working_lookup, prune).ok().unwrap_or(None),
+                        None => None,
+                    }
                 }
-            }
+            },
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
                     "Lookups into LogEvents should never start with indexes.\
                         Please report your config."
                 );
-                return None;
-            }
-        };
-
-        let mut retval = None;
-        let mut needs_prune = None;
-        for (index, segment) in lookup_iter {
-            cursor = match (segment, cursor) {
-                (Segment::Coalesce(v), _) => unimplemented!(),
-                // Fields access maps.
-                (
-                    Segment::Field {
-                        name,
-                        requires_quoting: _,
-                    },
-                    Some(Value::Map(map)),
-                ) => {
-                    if index == lookup_len.saturating_sub(1) {
-                        trace!(key = ?name, "Removing field inside map.");
-                        retval = map.remove(*name);
-                        if map.is_empty() && prune {
-                            let mut cloned = lookup.clone();
-                            cloned.pop_back();
-                            needs_prune = Some(cloned);
-                        }
-                        break;
-                    } else {
-                        trace!(key = ?name, "Descending into map.");
-                        map.get_mut(*name)
-                    }
-                }
-                // Indexes access arrays.
-                (Segment::Index(i), Some(Value::Array(array))) => {
-                    if index == lookup_len.saturating_sub(1) {
-                        trace!("Removing index inside array.");
-                        match array.get_mut(*i) {
-                            None => None,
-                            Some(target) => {
-                                let mut removed = Value::Null;
-                                core::mem::swap(target, &mut removed);
-                                retval = Some(removed);
-                                break;
-                            }
-                        }
-                    } else {
-                        trace!(key = ?i, "Descending into array.");
-                        array.get_mut(*i)
-                    }
-                }
-                // The rest, it's not good.
-                (Segment::Index(_), _)
-                | (
-                    Segment::Field {
-                        name: _,
-                        requires_quoting: _,
-                    },
-                    _,
-                ) => {
-                    trace!("Unmatched lookup.");
-                    None
-                }
-            }
+                None
+            },
         }
-
-        if let Some(prune_here) = needs_prune {
-            self.remove(prune_here, true);
-        }
-
-        retval
     }
 
     /// Iterate over the lookups available in this log event.

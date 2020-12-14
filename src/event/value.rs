@@ -164,7 +164,7 @@ impl Value {
     #[instrument(level = "trace", skip(self))]
     pub fn insert(
         &mut self,
-        mut lookup: LookupBuf,
+        lookup: LookupBuf,
         value: impl Into<Value> + Debug,
     ) -> Result<Option<Value>> {
         unimplemented!()
@@ -179,7 +179,73 @@ impl Value {
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Result<Option<Value>> {
-        unimplemented!()
+        let mut working_lookup = lookup.into();
+        let this_segment = working_lookup.pop_front();
+        match (this_segment, self) {
+            // We've met an end without finding a value. (Terminus nodes on arrays/maps detected prior)
+            (None, item) => Ok(None),
+            // This is just not allowed!
+            (_, Value::Boolean(_))
+            | (_, Value::Bytes(_))
+            | (_, Value::Timestamp(_))
+            | (_, Value::Float(_))
+            | (_, Value::Integer(_))
+            | (_, Value::Null) => unimplemented!(),
+            // Descend into a coalesce
+            (Some(Segment::Coalesce(sub_segments)), value) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let lookup = Lookup::try_from(sub_segment)?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    if value.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => value.remove(needle, prune),
+                    None => Ok(None),
+                }
+            }
+            // Descend into a map
+            (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
+                if working_lookup.len() == 0 {
+                    trace!(key = ?name, "Removing from map.");
+                    Ok(map.remove(*name))
+                } else {
+                    trace!(key = ?name, "Descending into map.");
+                    match map.get_mut(*name) {
+                        Some(inner) => inner.remove(working_lookup.clone(), prune),
+                        None => Ok(None),
+                    }
+                }
+            }
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            // Descend into an array
+            (Some(Segment::Index(i)), Value::Array(array)) => {
+                if working_lookup.len() == 0 {
+                    trace!(key = ?i, "Removing from array.");
+                    // We don't **actually** want to remove the index, we just want to swap it with a null.
+                    if let Some(value) = array.get_mut(i) {
+                        let mut holder = Value::Null;
+                        core::mem::swap(value, &mut holder);
+                        Ok(Some(holder))
+                    } else {
+                        Ok(None)
+                    }
+                } else {
+                    trace!(key = ?i, "Descending into array.");
+                    match array.get_mut(i) {
+                        Some(inner) => inner.remove(working_lookup.clone(), prune),
+                        None => Ok(None),
+                    }
+                }
+            }
+            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+        }
     }
 
     /// Get an immutable borrow of the value by lookup.
