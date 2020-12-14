@@ -1,12 +1,12 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -23,7 +23,7 @@ use snafu::ResultExt;
 pub struct ClickhouseConfig {
     // Deprecated name
     #[serde(alias = "host")]
-    pub endpoint: String,
+    pub endpoint: UriSerde,
     pub table: String,
     pub database: Option<String>,
     #[serde(default = "Compression::gzip_default")]
@@ -76,8 +76,13 @@ impl SinkConfig for ClickhouseConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 
+        let config = ClickhouseConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
+
         let sink = BatchedHttpSink::with_retry_logic(
-            self.clone(),
+            config.clone(),
             Buffer::new(batch.size, self.compression),
             ClickhouseRetryLogic::default(),
             request,
@@ -87,7 +92,7 @@ impl SinkConfig for ClickhouseConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
-        let healthcheck = healthcheck(client, self.clone()).boxed();
+        let healthcheck = healthcheck(client, config).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -123,7 +128,8 @@ impl HttpSink for ClickhouseConfig {
             "default"
         };
 
-        let uri = encode_uri(&self.endpoint, database, &self.table).expect("Unable to encode uri");
+        let uri =
+            set_uri_query(&self.endpoint.uri, database, &self.table).expect("Unable to encode uri");
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
@@ -158,7 +164,7 @@ async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Res
     }
 }
 
-fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
+fn set_uri_query(uri: &Uri, database: &str, table: &str) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
@@ -171,13 +177,16 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         )
         .finish();
 
-    let url = if host.ends_with('/') {
-        format!("{}?{}", host, query)
-    } else {
-        format!("{}/?{}", host, query)
-    };
+    let mut uri = uri.to_string();
+    if !uri.ends_with('/') {
+        uri.push('/');
+    }
+    uri.push('?');
+    uri.push_str(query.as_str());
 
-    Ok(url.parse::<Uri>().context(super::UriParseError)?)
+    uri.parse::<Uri>()
+        .context(super::UriParseError)
+        .map_err(Into::into)
 }
 
 #[derive(Debug, Default, Clone)]
@@ -230,16 +239,26 @@ mod tests {
 
     #[test]
     fn encode_valid() {
-        let uri = encode_uri("http://localhost:80", "my_database", "my_table").unwrap();
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_table",
+        )
+        .unwrap();
         assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
-        let uri = encode_uri("http://localhost:80", "my_database", "my_\"table\"").unwrap();
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+        )
+        .unwrap();
         assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
     }
 
     #[test]
     fn encode_invalid() {
-        encode_uri("localhost:80", "my_database", "my_table").unwrap_err();
+        set_uri_query(&"localhost:80".parse().unwrap(), "my_database", "my_table").unwrap_err();
     }
 }
 
@@ -275,7 +294,7 @@ mod integration_tests {
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -320,7 +339,7 @@ mod integration_tests {
         encoding.timestamp_format = Some(TimestampFormat::Unix);
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             encoding,
@@ -441,7 +460,7 @@ timestamp_format = "unix""#,
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            endpoint: host.clone(),
+            endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -494,7 +513,7 @@ timestamp_format = "unix""#,
         let host = String::from("http://localhost:8124");
 
         let config = ClickhouseConfig {
-            endpoint: host,
+            endpoint: host.parse().unwrap(),
             table: gen_table(),
             batch: BatchConfig {
                 max_events: Some(1),

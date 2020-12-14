@@ -1,9 +1,7 @@
 package metadata
 
 components: sources: docker_logs: {
-	title:       "Docker"
-	description: "Test."
-
+	title: "Docker"
 	alias: "docker"
 
 	classes: {
@@ -39,31 +37,8 @@ components: sources: docker_logs: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Docker"
-					thing:    "the \(name) platform"
-					url:      urls.docker
-					versions: ">= 1.24"
+				service: services.docker
 
-					setup: [
-						"""
-							Ensure that [Docker is setup](\(urls.docker_setup)) and running.
-							""",
-						"""
-							Ensure that the Docker Engine is properly exposing logs:
-
-							```bash
-							docker logs $(docker ps | awk '{ print $1 }')
-							```
-
-							If you receive an error it's likely that you do not have
-							the proper Docker logging drivers installed. The Docker
-							Engine requires the [`json-file`](\(urls.docker_logging_driver_json_file)) (default),
-							[`journald`](docker_logging_driver_journald), or [`local`](\(urls.docker_logging_driver_local)) Docker
-							logging drivers to be installed.
-							""",
-					]
-				}
 				interface: socket: {
 					api: {
 						title: "Docker Engine API"

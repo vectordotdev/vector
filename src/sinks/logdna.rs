@@ -17,7 +17,7 @@ use serde_json::json;
 use std::time::SystemTime;
 
 lazy_static::lazy_static! {
-    static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
+    static ref HOST: Uri = Uri::from_static("https://logs.logdna.com");
 }
 
 const PATH: &str = "/logs/ingest";
@@ -236,7 +236,11 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host: Uri = self.endpoint.clone().unwrap_or_else(|| HOST.clone()).into();
+        let host = self
+            .endpoint
+            .clone()
+            .map(|endpoint| endpoint.uri)
+            .unwrap_or_else(|| HOST.clone());
 
         let uri = format!("{}{}?{}", host, PATH, query);
 

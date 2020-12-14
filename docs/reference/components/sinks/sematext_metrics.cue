@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: sematext_metrics: {
-	title:       "Sematext Metrics"
-	description: "[Sematext](\(urls.sematext)) is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	title: "Sematext Metrics"
 
 	classes: {
 		commonly_used: false

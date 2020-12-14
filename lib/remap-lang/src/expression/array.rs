@@ -1,4 +1,7 @@
-use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    expression::Literal, state, value, Error, Expr, Expression, Object, Result, TypeDef, Value,
+};
+use std::convert::TryFrom;
 use std::fmt;
 use std::iter::IntoIterator;
 
@@ -18,6 +21,14 @@ impl Array {
 
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
+    }
+
+    /// Unwrap the array expression into a [`Value::Array`] type.
+    ///
+    /// This method panics if the stored expressions do not resolve to a literal
+    /// value.
+    pub fn unwrap_value(self) -> Value {
+        Value::try_from(self).expect("array includes non-literal expressions")
     }
 }
 
@@ -42,6 +53,37 @@ impl<T: Into<Value>> From<Vec<T>> for Array {
                 .map(Expr::from)
                 .collect::<Vec<_>>(),
         )
+    }
+}
+
+impl TryFrom<Value> for Array {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Array> {
+        match value {
+            Value::Array(array) => Ok(array.into()),
+            v => Err(Error::Value(value::Error::Expected(
+                value::Kind::Array,
+                v.kind(),
+            ))),
+        }
+    }
+}
+
+impl TryFrom<Array> for Value {
+    type Error = Error;
+
+    fn try_from(array: Array) -> Result<Value> {
+        array
+            .into_iter()
+            .map(|expr| match expr {
+                Expr::Array(v) => Value::try_from(v),
+                _ => Literal::try_from(expr)
+                    .map(|v| v.into_value())
+                    .map_err(Into::into),
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(|v| v.into())
     }
 }
 

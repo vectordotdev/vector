@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: mongodb_metrics: {
-	title:       "MongoDB Metrics"
-	description: "[MongoDB][urls.mongodb] is a general purpose, document-based, distributed database built for modern application developers and for the cloud era."
+	title: "MongoDB Metrics"
 
 	classes: {
 		commonly_used: false
@@ -16,12 +15,7 @@ components: sources: mongodb_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "MongoDB Server"
-					thing:    "an \(name)"
-					url:      urls.mongodb
-					versions: null
-				}
+				service: services.mongodb
 
 				interface: {
 					socket: {
@@ -50,7 +44,10 @@ components: sources: mongodb_metrics: {
 		}
 
 		requirements: [
-			"User from endpoint should have enough privileges for running [serverStatus][urls.mongodb_command_server_status] command",
+			"""
+				User from endpoint should have enough privileges for running
+				[serverStatus][urls.mongodb_command_server_status] command.
+				""",
 		]
 
 		warnings: []

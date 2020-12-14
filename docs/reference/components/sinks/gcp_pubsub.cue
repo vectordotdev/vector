@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_pubsub: {
-	title:       "GCP PubSub"
-	description: "[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform."
+	title: "GCP PubSub"
 
 	classes: {
 		commonly_used: true

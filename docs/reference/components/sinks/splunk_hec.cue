@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: splunk_hec: {
-	title:       "Splunk HEC"
-	description: "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
+	title: "Splunk HEC"
 
 	classes: {
 		commonly_used: true
@@ -54,23 +53,7 @@ components: sinks: splunk_hec: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Splunk"
-					thing:    "a \(name) index"
-					url:      urls.splunk
-					versions: null
-
-					setup: [
-						"""
-							Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
-							and create a Splunk HEC endpoint.
-							""",
-						"""
-							Splunk will provide you with a host and token. Copy those
-							values to the `host` and `token` options.
-							""",
-					]
-				}
+				service: services.splunk
 
 				interface: {
 					socket: {
