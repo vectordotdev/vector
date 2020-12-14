@@ -373,12 +373,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-option"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0db678acb667b525ac40a324fc5f7d3390e29239b31c7327bb8157f5b4fff593"
-
-[[package]]
 name = "atomic-shim"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -735,18 +729,6 @@ name = "bumpalo"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
-
-[[package]]
-name = "bus"
-version = "2.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1e66e1779f5b1440f1a58220ba3b3ded4427175f0a9fb8d7066521f8b4e8f2b"
-dependencies = [
- "atomic-option",
- "crossbeam-channel",
- "num_cpus",
- "parking_lot_core 0.7.2",
-]
 
 [[package]]
 name = "byte-tools"
@@ -1899,6 +1881,16 @@ checksum = "ece68d15c92e84fa4f19d3780f1294e5ca82a78a6d515f1efaabcc144688be00"
 dependencies = [
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5072,6 +5064,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "remap-lang",
+ "rustyline",
  "serde_json",
  "structopt",
  "thiserror",
@@ -5480,6 +5473,26 @@ dependencies = [
  "quick-error",
  "tempfile",
  "wait-timeout",
+]
+
+[[package]]
+name = "rustyline"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a5f54deba50e65ee4cf786dbc37e8b3c63bdccccbcf9d3a8a9fd0c1bb7e1984"
+dependencies = [
+ "bitflags",
+ "cfg-if 1.0.0",
+ "fs2",
+ "libc",
+ "log",
+ "memchr",
+ "nix 0.19.1",
+ "scopeguard",
+ "unicode-segmentation",
+ "unicode-width",
+ "utf8parse 0.2.0",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -7094,6 +7107,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8772a4ccbb4e89959023bc5b7cb8623a795caa7092d99f3aa9501b9484d4557d"
 
 [[package]]
+name = "utf8parse"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
 name = "uuid"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7148,7 +7167,6 @@ dependencies = [
  "bloom",
  "bollard",
  "built",
- "bus",
  "bytes 0.5.6",
  "bytesize",
  "chrono",
@@ -7271,6 +7289,7 @@ dependencies = [
  "tower",
  "tower-test",
  "tracing 0.1.21",
+ "tracing-core 0.1.17",
  "tracing-futures 0.2.4",
  "tracing-limit",
  "tracing-log",
@@ -7355,7 +7374,7 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f42f536e22f7fcbb407639765c8fd78707a33109301f834a594758bedd6e8cf"
 dependencies = [
- "utf8parse",
+ "utf8parse 0.1.1",
 ]
 
 [[package]]
