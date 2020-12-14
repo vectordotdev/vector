@@ -1,7 +1,8 @@
 // Root ------------------------------------------------------------------------
 
-program    = _{ SOI ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ EOI }
-expression = _{ assignment | if_statement | boolean_expr | block }
+program     = _{ SOI ~ NEWLINE* ~ expressions ~ NEWLINE* ~ EOI }
+expressions = _{ (expression ~ (EOE+ ~ expression)*)+ ~ EOE? }
+expression  = _{ assignment | if_statement | boolean_expr | block }
 
 // Program Rules ---------------------------------------------------------------
 
@@ -12,7 +13,8 @@ rule_string_inner = _{ SOI ~ string_inner ~ EOI }
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
-if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block)* ~ ("else" ~ block)? }
+if_statement = { "if" ~ if_condition ~ block ~ ("else if" ~ if_condition ~ block)* ~ ("else" ~ block)? }
+if_condition = { boolean_expr | ("(" ~ expressions ~ ")") }
 
 // Primary ---------------------------------------------------------------------
 
@@ -42,7 +44,7 @@ operator_boolean_expr   = { "||" | "&&" }
 operator_equality       = { "!=" | "==" }
 operator_comparison     = { ">=" | ">" | "<=" | "<" }
 operator_addition       = { "-" | "+" }
-operator_multiplication = { "/" | "*" | "%" }
+operator_multiplication = { "//" | "/" | "*" | "%" }
 operator_not            = { "!" }
 
 // Paths -----------------------------------------------------------------------
@@ -82,7 +84,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 target = _{ variable | path }
-block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*) ~ NEWLINE* ~ "}" }
+block  =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }
 char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
@@ -91,3 +93,6 @@ regex_inner = @{ regex_char* }
 regex_char  =  { !("/" | "\\") ~ ANY | "\\" ~ ANY }
 
 WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }
+
+// end of expression
+EOE = _{ NEWLINE | ";" }
