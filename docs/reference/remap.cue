@@ -90,46 +90,115 @@ remap: {
 		"boolean": {
 			description: "`true` or `false`."
 			use: ["parameter", "return"]
+			examples: [
+				"true",
+				"false",
+			]
 		}
 		"float": {
 			description: "A 64-bit floating-point number."
 			use: ["parameter", "return"]
+			examples: [
+				"0.0",
+				"47.5",
+				"-459.67",
+			]
 		}
 		"map": {
 			description: """
 				A key-value map in which keys are strings and values can be of any TRL type,
-				including maps.
+				including nested maps.
 				"""
 			use: ["parameter", "return"]
+			examples: [
+				#"{"code": 200, "error_type": "insufficient_resources"}"#,
+				"""
+					{
+					  "user": {
+					    "id": "tonydanza1337",
+						"pricing_plan": "elite",
+						"boss": true
+					  }
+					}
+					""",
+			]
 		}
 		"integer": {
 			description: "A 64-bit integer."
 			use: ["parameter", "return"]
+			examples: [
+				"0",
+				"1337",
+				"-25",
+			]
 		}
 		"null": {
 			description: "No value."
 			use: ["return"]
-		}
-		"path": {
-			description: "An event field."
-			use: ["parameter"]
+			examples: [
+				"null",
+			]
 		}
 		"regex": {
-			description: "A regular expression."
+			description: """
+				A **reg**ular **ex**pression. In TRL, regular expressions are delimited by `/` and
+				use [Rust regex syntax](\(urls.rust_regex_syntax)).
+				"""
 			use: ["parameter"]
+			examples: [
+				"//",
+			]
 		}
 		"string": {
-			description: """
+			description: #"""
 				A sequence of characters. Remap converts strings in scripts to [UTF-8](\(urls.utf8))
 				and replaces any invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
 
-				Strings can be escaped using the
-				"""
+				Strings can be escaped using `\`, as in `The password is \"opensesame\".`.
+				"""#
 			use: ["parameter", "return"]
+			examples: [
+				#""I am a teapot""#,
+				#"""
+				"I am split
+				across multiple lines"
+				"""#,
+				#"This is not escaped, \"but this is\""#
+			]
 		}
 		"timestamp": {
-			description: "A string formatted as a timestamp."
+			description: """
+				A string formatted as a timestamp. Timestamp specifiers can be either:
+
+				1. One of the built-in-formats listed in the [Timestamp Formats](#timestamp-formats)
+					table below, or
+				2. Any sequence of [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+					`chrono` library.
+
+				### Timestamp Formats
+
+				The examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in
+				Pacific Standard Time.
+
+				Format | Description | Example
+				:------|:------------|:-------
+				`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
+				`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
+				`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+				`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
+				`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+				`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
+				`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
+				`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
+				`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
+				`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
+				`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
+				`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
+				"""
 			use: ["parameter", "return"]
+			examples: [
+				"%a %d %b %T %Y"
+			]
 		}
 	}
 

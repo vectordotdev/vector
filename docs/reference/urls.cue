@@ -313,7 +313,7 @@ urls: {
 	rust_date_time:                                           "https://docs.rs/chrono/0.4.0/chrono/struct.DateTime.html"
 	rust_grok_library:                                        "https://github.com/daschl/grok"
 	rust_k8s_openapi_crate:                                   "https://docs.rs/k8s-openapi/"
-	rust_memory_safety:                                       "https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/"
+	rust_memory_safety:                                       "https://hacks.mozilla.org/2019/01/fearless-security-memory-safety"
 	rust_regex_syntax:                                        "https://docs.rs/regex/1.3.9/regex/#syntax"
 	rust_sec:                                                 "https://rustsec.org/"
 	rust_subprocess:                                          "https://docs.rs/subprocess"
