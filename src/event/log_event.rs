@@ -21,7 +21,7 @@ pub struct LogEvent {
 impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get<'event, 'lookup: 'event>(&'event self, lookup: impl Into<Lookup<'lookup>> + Debug) -> Option<&'event Value> {
+    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
         let lookup = lookup.into();
         let lookup_len = lookup.len();
         let mut lookup_iter = lookup.into_iter().enumerate();
@@ -100,7 +100,7 @@ impl LogEvent {
 
     /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get_mut<'event, 'lookup: 'event>(&'event mut self, lookup: impl Into<Lookup<'lookup>> + Debug) -> Option<&'event mut Value> {
+    pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let mut working_lookup = lookup.into();
         // The first step should always be a field.
         let this_segment = working_lookup.pop_front().unwrap();
@@ -139,7 +139,7 @@ impl LogEvent {
 
     /// Determine if the log event contains a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn contains<'event, 'lookup: 'event>(&'event self, lookup: impl Into<Lookup<'lookup>> + Debug) -> bool {
+    pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
         self.get(lookup).is_some()
     }
 
@@ -320,9 +320,9 @@ impl LogEvent {
     ///
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     #[instrument(level = "trace", skip(self))]
-    pub fn remove<'a>(
+    pub fn remove<'lookup>(
         &mut self,
-        lookup: impl Into<Lookup<'a>> + Debug,
+        lookup: impl Into<Lookup<'lookup>> + Debug,
         prune: bool,
     ) -> Option<Value> {
         let lookup = lookup.into();
@@ -622,6 +622,28 @@ impl IntoIterator for LogEvent {
         self.fields.into_iter()
     }
 }
+
+
+impl<T> std::ops::Index<T> for LogEvent
+    where
+        T: Into<Lookup<'static>> + Debug,
+{
+    type Output = Value;
+
+    fn index(&self, key: T) -> &Value {
+        self.get(key).expect("Key not found.")
+    }
+}
+
+impl<T> std::ops::IndexMut<T> for LogEvent
+    where
+        T: Into<Lookup<'static>> + Debug,
+{
+    fn index_mut(&mut self, key: T) -> &mut Value {
+        self.get_mut(key).expect("Key not found.")
+    }
+}
+
 
 #[cfg(test)]
 mod test {

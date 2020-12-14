@@ -760,12 +760,12 @@ mod test {
 
         assert_eq!(1, events.len());
         assert_eq!(
-            events[0].as_log().get(log_schema().message_key()),
-            Some(&"test".into()),
+            events[0].as_log()[log_schema().message_key()],
+            Value::from("test"),
         );
         assert_eq!(
-            events[0].as_log().get(log_schema().source_type_key()),
-            Some(&"socket".into()),
+            events[0].as_log()[log_schema().source_type_key()],
+            Value::from("socket"),
         );
     }
 
@@ -779,12 +779,12 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log().get(log_schema().message_key()),
-            Some(&Value::from("test".to_string()))
+            events[0].as_log()[log_schema().message_key()],
+            Value::from("test".to_string()),
         );
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
-            Some(&Value::from("test2".to_string()))
+            Value::from("test2".to_string()),
         );
     }
 
@@ -798,12 +798,12 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log().get(log_schema().message_key()),
-            Value::from("test")
+            events[0].as_log()[log_schema().message_key()],
+            Value::from("test"),
         );
         assert_eq!(
-            events[1].as_log().get(log_schema().message_key()),
-            Value::from("test2")
+            events[1].as_log()[log_schema().message_key()],
+            Value::from("test2"),
         );
     }
 

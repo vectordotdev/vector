@@ -176,7 +176,7 @@ impl Value {
     #[instrument(level = "trace", skip(self))]
     pub fn remove<'a>(
         &mut self,
-        mut lookup: impl Into<Lookup<'a>> + Debug,
+        lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Result<Option<Value>> {
         unimplemented!()
@@ -185,9 +185,9 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(
-        &'a self,
-        mut lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> Result<Option<&'a Value>> {
+        &self,
+        lookup: impl Into<Lookup<'a>> + Debug,
+    ) -> Result<Option<&Value>> {
         let mut working_lookup = lookup.into();
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
@@ -236,16 +236,16 @@ impl Value {
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
-            (Some(Segment::Index(_)), Value::Array(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
         }
     }
 
     /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(
-        &'a mut self,
-        mut lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> Result<Option<&'a mut Value>> {
+        &mut self,
+        lookup: impl Into<Lookup<'a>> + Debug,
+    ) -> Result<Option<&mut Value>> {
         let mut working_lookup = lookup.into();
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {

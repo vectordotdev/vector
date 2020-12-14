@@ -1,7 +1,7 @@
 use crate::transforms::TaskTransform;
 use crate::{
     config::DataType,
-    event::{Event, LookupBuf, Value},
+    event::{Event, LookupBuf, Lookup, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     transforms::Transform,
 };
@@ -252,7 +252,7 @@ impl rlua::UserData for LuaEvent {
                     let key: Option<String> = next.call((keys, prev))?;
                     match key
                         .clone()
-                        .and_then(|k| event.inner.as_log().get(LookupBuf::from(k)))
+                        .and_then(|k| event.inner.as_log().get(Lookup::from(&k)))
                     {
                         Some(value) => {
                             Ok((key, Some(ctx.create_string(&value.clone_into_bytes())?)))
