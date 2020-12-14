@@ -155,14 +155,18 @@ remap: {
 				`m` | Multi-line mode
 
 				Regex flags can be combined, as in `/pattern/gmi` or `/pattern/gi`.
+
+				To learn more about regular expressions in Rust—and by extension in TRL—we strongly
+				recommend the in-browser [Rustexp expression editor and
+				tester](\(urls.regex_tester)).
 				"""
 			use: ["parameter"]
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
-				"""
+				#"""
 					$pattern = /(foo|bar)/
-
-					""",
+					$is_foo_or_bar = match("does contain foo", $pattern)
+					"""#,
 			]
 		}
 		"string": {
@@ -327,7 +331,8 @@ remap: {
 				programming languages.
 
 				TRL supports the standard [order of operations](\(urls.order_of_ops)). Thus,
-				`(2 * 2) + 8` makes 12, `10 / (2 + 3)` makes 2, and so on.
+				`(2 * 2) + 8` makes `12`, `10 / (2 + 3)` makes `2`, `true && (false || true)` makes
+				`true`, and so on.
 				"""
 
 			examples: [
