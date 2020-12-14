@@ -71,12 +71,21 @@ remap: {
 
 		description: string
 		use: [#Use, ...#Use]
+		examples: [string, ...string]
 	}
 
 	types: {
 		"array": {
-			description: "A list of items."
+			description: """
+				A list of items. Items in an array can be of any TRL type, including other arrays.
+				"""
 			use: ["parameter", "return"]
+			examples: [
+				"[200, 201, 202, 204]",
+				#"["error", "warn", "emerg"]"#,
+				"[[1, 2, 3], [4, 5, 6]]",
+				#"[true, 10, {"foo": "bar"}, [10], 47.5]"#,
+			]
 		}
 		"boolean": {
 			description: "`true` or `false`."
@@ -113,6 +122,8 @@ remap: {
 			description: """
 				A sequence of characters. Remap converts strings in scripts to [UTF-8](\(urls.utf8))
 				and replaces any invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
+
+				Strings can be escaped using the
 				"""
 			use: ["parameter", "return"]
 		}
