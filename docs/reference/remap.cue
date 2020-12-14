@@ -248,6 +248,7 @@ remap: {
 		description: string
 		examples: [string, ...string]
 		operators?: #Operators
+		warnings?: [string, ...string]
 	}
 
 	syntax: {
@@ -287,15 +288,15 @@ remap: {
 			href: "functions"
 
 			description: """
-				In TRL, functions can take inputs (or no input) and return a value, `null`, or an
-				error.
+				In TRL, functions can take inputs (or no input) and return either a value or, for
+				some functions, an error.
 				"""
 
 			examples: [
 				"parse_json(.message)",
 				"assert(.status_code == 500)",
 				#"ip_subnet(.address, "255.255.255.0")"#,
-				".request_id = uuidv4()",
+				".request_id = uuid_v4()",
 			]
 		}
 
@@ -303,15 +304,32 @@ remap: {
 			href: "control-flow"
 
 			description: """
-				TRL supports control flow operations using `if`, `else if`, and `else`. Here's an
-				example:
+				TRL supports control flow operations using `if`, `else if`, and `else`. These can
+				be called on any expression that returns a Boolean. Here's a generic example of the
+				syntax:
 
 				```
-				$pattern = /(foo|bar)/
-
-				if
+				if (condition) {
+					...
+				} else if (other_condition) {
+					...
+				} else {
+					...
+				}
 				```
 				"""
+
+			examples: [
+				"""
+				$pattern = /(foo|bar)/g
+
+				if (match("this does contain foo", $pattern)) {
+					.contains_foo = true
+				} else {
+					.does_not_contain_foo = true
+				}
+				""",
+			]
 		}
 
 		"Assignment": {
@@ -324,7 +342,7 @@ remap: {
 				* `.is_success = (.code > 200) && (.code <= 299)`
 				* `$pattern = /(foo|bar)/g`
 				* `. = parse_json(.)`
-				* `.request.id = uuidv4()`
+				* `.request.id = uuid_v4()`
 
 				When assigning a value to an object field, if the field doesn't already exist it's
 				created an assigned the value; if the field does already exist, the value is
@@ -332,7 +350,7 @@ remap: {
 				"""
 
 			examples: [
-				".request_id = uuidv4()",
+				".request_id = uuid_v4()",
 				"$average = .total / .number",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
