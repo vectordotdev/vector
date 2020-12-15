@@ -39,6 +39,7 @@ remap: {
 				multiple:    bool | *false
 				default?:    bool | string | int
 				type: [#RemapParameterTypes, ...#RemapParameterTypes]
+				enum?: [_description=string]: string
 			}
 			#RemapExample: {
 				title: string
