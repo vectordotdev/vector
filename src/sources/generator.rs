@@ -112,11 +112,7 @@ impl GeneratorConfig {
 
         let mut n: usize = 0;
 
-        loop {
-            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-                break;
-            }
-
+        while matches!(futures::poll!(&mut shutdown), Poll::Pending) {
             if let Some(interval) = &mut interval {
                 interval.next().await;
             }
@@ -131,9 +127,9 @@ impl GeneratorConfig {
                 .map_err(|error| error!(message="Error sending generated lines.", %error))?;
             out = sink;
 
+            // If a count is specified, stop when reached, otherwise go forever
             n += 1;
 
-            // If a count is specified, stop when reached, otherwise go forever
             if let Some(count) = self.count {
                 if n == count - 1 {
                     break;
