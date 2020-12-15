@@ -51,7 +51,7 @@ impl Expression for IncludesFn {
         Ok(Value::from(included))
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
             kind: value::Kind::Boolean,
             ..Default::default()
