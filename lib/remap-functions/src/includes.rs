@@ -39,11 +39,21 @@ struct IncludesFn {
 
 impl Expression for IncludesFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        Ok(Value::from(true))
+        let list = self.list.execute(state, object)?.try_array()?;
+        let item = self.item.execute(state, object)?;
+
+        let included: bool = if list.is_empty() {
+            false
+        } else {
+            list.iter().any(|i| i == &item)
+        };
+
+        Ok(Value::from(included))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
         TypeDef {
+            kind: value::Kind::Boolean,
             ..Default::default()
         }
     }
@@ -56,9 +66,59 @@ mod tests {
     test_function![
         includes => Includes;
 
+        empty_not_included {
+            args: func_args![list: value!([]), item: value!("foo")],
+            want: Ok(value!(false)),
+        }
+
         string_included {
             args: func_args![list: value!(["foo", "bar"]), item: value!("foo")],
             want: Ok(value!(true)),
+        }
+
+        string_not_included {
+            args: func_args![list: value!(["foo", "bar"]), item: value!("baz")],
+            want: Ok(value!(false)),
+        }
+
+        bool_included {
+            args: func_args![list: value!([true, false]), item: value!(true)],
+            want: Ok(value!(true)),
+        }
+
+        bool_not_included {
+            args: func_args![list: value!([true, true]), item: value!(false)],
+            want: Ok(value!(false)),
+        }
+
+        integer_included {
+            args: func_args![list: value!([1, 2, 3, 4, 5]), item: value!(5)],
+            want: Ok(value!(true)),
+        }
+
+        integer_not_included {
+            args: func_args![list: value!([1, 2, 3, 4, 6]), item: value!(5)],
+            want: Ok(value!(false)),
+        }
+
+        mixed_included_string {
+            args: func_args![list: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
+            want: Ok(value!(true)),
+        }
+
+        mixed_not_included_string {
+            args: func_args![list: value!(["bar", 1, true, [1,2,3]]), item: value!("foo")],
+            want: Ok(value!(false)),
+        }
+
+        mixed_included_bool {
+            args: func_args![list: value!(["foo", 1, true, [1,2,3]]), item: value!(true)],
+            want: Ok(value!(true)),
+        }
+
+        mixed_not_included_bool {
+            args: func_args![list: value!(["foo", 1, true, [1,2,3]]), item: value!(false)],
+            want: Ok(value!(false)),
         }
     ];
 }
