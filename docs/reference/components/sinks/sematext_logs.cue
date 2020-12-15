@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: sematext_logs: {
-	title:       "Sematext Logs"
-	description: "[Sematext](\(urls.sematext)) is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	title: "Sematext Logs"
 
 	classes: {
 		commonly_used: false

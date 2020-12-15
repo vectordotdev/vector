@@ -46,11 +46,13 @@ impl SinkConfig for PapertrailConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
+            .uri
             .host()
             .map(str::to_string)
             .ok_or_else(|| "A host is required for endpoint".to_string())?;
         let port = self
             .endpoint
+            .uri
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 

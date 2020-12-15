@@ -4,7 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::util::{
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
 use futures::{FutureExt, SinkExt};
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 lazy_static::lazy_static! {
-    static ref HOST: UriSerde = Uri::from_static("https://api.honeycomb.io/1/batch").into();
+    static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

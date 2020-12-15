@@ -547,7 +547,8 @@ mod test {
 
     #[test]
     fn object_get() {
-        use remap::{map, Field::*, Object, Path, Segment::*};
+        use crate::map;
+        use remap::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (map![], vec![], Ok(Some(map![].into()))),
@@ -600,7 +601,8 @@ mod test {
 
     #[test]
     fn object_insert() {
-        use remap::{map, Field::*, Object, Path, Segment::*};
+        use crate::map;
+        use remap::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (
@@ -706,7 +708,8 @@ mod test {
 
     #[test]
     fn object_remove() {
-        use remap::{map, Field::*, Object, Path, Segment::*};
+        use crate::map;
+        use remap::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (
@@ -782,7 +785,8 @@ mod test {
 
     #[test]
     fn object_paths() {
-        use remap::{map, Object, Path};
+        use crate::map;
+        use remap::{Object, Path};
         use std::str::FromStr;
 
         let cases = vec![

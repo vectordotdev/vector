@@ -1,9 +1,7 @@
 package metadata
 
 components: sources: docker_logs: {
-	title:       "Docker"
-	description: "Test."
-
+	title: "Docker"
 	alias: "docker"
 
 	classes: {
@@ -39,31 +37,8 @@ components: sources: docker_logs: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Docker"
-					thing:    "the \(name) platform"
-					url:      urls.docker
-					versions: ">= 1.24"
+				service: services.docker
 
-					setup: [
-						"""
-							Ensure that [Docker is setup](\(urls.docker_setup)) and running.
-							""",
-						"""
-							Ensure that the Docker Engine is properly exposing logs:
-
-							```bash
-							docker logs $(docker ps | awk '{ print $1 }')
-							```
-
-							If you receive an error it's likely that you do not have
-							the proper Docker logging drivers installed. The Docker
-							Engine requires the [`json-file`](\(urls.docker_logging_driver_json_file)) (default),
-							[`journald`](docker_logging_driver_journald), or [`local`](\(urls.docker_logging_driver_local)) Docker
-							logging drivers to be installed.
-							""",
-					]
-				}
 				interface: socket: {
 					api: {
 						title: "Docker Engine API"
@@ -118,18 +93,36 @@ components: sources: docker_logs: {
 			required: false
 			type: bool: default: true
 		}
-		include_containers: {
-			common: true
+		exclude_containers: {
+			common: false
 			description: """
-				A list of container IDs _or_ names to match against. Prefix
-				matches are supported, meaning you can supply just the first
-				few characters of the container ID or name. If not provided,
-				all containers will be included.
+				A list of container IDs _or_ names to match against for
+				containers you don't want to collect logs from. Prefix matches
+				are supported, so you can supply just the first few characters
+				of the ID or name of containers you want to exclude. This can be
+				used in conjunction with
+				[`include_containers`](#include_containers).
 				"""
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["serene_", "serene_leakey", "ad08cc418cf9"]
+				items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
+			}
+		}
+		include_containers: {
+			common: true
+			description: """
+				A list of container IDs _or_ names to match against for
+				containers you want to collect logs from. Prefix matches are
+				supported, so you can supply just the first few characters of
+				the ID or name of containers you want to include. This can be
+				used in conjunction with
+				[`exclude_containers`](#exclude_containers).
+				"""
+			required: false
+			type: array: {
+				default: null
+				items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
 			}
 		}
 		include_labels: {

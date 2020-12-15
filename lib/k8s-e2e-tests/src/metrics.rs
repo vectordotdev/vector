@@ -9,7 +9,7 @@ pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn metrics_regex() -> regex::Regex {
     regex::RegexBuilder::new(
-        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>.+)$",
+        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>\S+?)( (?P<timestamp>\S+?))?$",
     )
     .multi_line(true)
     .build()
@@ -57,7 +57,7 @@ pub async fn get_processed_events(url: &str) -> Result<u64, Box<dyn std::error::
 pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     if !extract_vector_started(&metrics) {
-        return Err(format!("vector_started metric was not found:\n{}", metrics).into());
+        return Err(format!("`vector_started`-ish metric was not found:\n{}", metrics).into());
     }
     Ok(())
 }
@@ -80,8 +80,11 @@ pub async fn wait_for_vector_started(
         }
 
         eprintln!(
-            "Waiting for vector_started metrics to be available, next poll in {} sec, deadline at {:?}",
-            next_attempt_delay.as_secs_f64(), deadline,
+            "Waiting for `vector_started`-ish metric to be available, next poll in {} sec, deadline in {} sec",
+            next_attempt_delay.as_secs_f64(),
+            deadline
+                .saturating_duration_since(std::time::Instant::now())
+                .as_secs_f64(),
         );
         tokio::time::delay_for(next_attempt_delay).await;
     }
@@ -126,6 +129,16 @@ mod tests {
                 ],
                 1 + 2 + 3 + 4,
             ),
+            // Prefixes and suffixes with timestamps
+            (
+                vec![
+                    r#"processed_events 1 1607985729161"#,
+                    r#"processed_events_total 2 1607985729161"#,
+                    r#"vector_processed_events 3 1607985729161"#,
+                    r#"vector_processed_events_total 4 1607985729161"#,
+                ],
+                1 + 2 + 3 + 4,
+            ),
         ];
 
         for (input, expected_value) in cases {
@@ -149,6 +162,15 @@ mod tests {
                     r#"# HELP vector_started_total vector_started_total"#,
                     r#"# TYPE vector_started_total counter"#,
                     r#"vector_started_total 1"#,
+                ],
+                true,
+            ),
+            // Another real-world example.
+            (
+                vec![
+                    r#"# HELP vector_started_total started_total"#,
+                    r#"# TYPE vector_started_total counter"#,
+                    r#"vector_started_total 1 1607985729161"#,
                 ],
                 true,
             ),

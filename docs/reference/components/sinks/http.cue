@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: http: {
-	title:       "HTTP"
-	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
+	title: "HTTP"
 
 	classes: {
 		commonly_used: true
