@@ -5,17 +5,13 @@ remap: {
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
-	#InNOut: {
-		in:  string
-		out: string
-	}
-
 	{
 		description: """
 			The Timber Remap Language (TRL) is a single-purpose, [Rust](\(urls.rust))-native data
-			mapping language that enables you to easily map and reshape data without sacrificing
-			performance or safety. It occupies a comfortable middle ground between stringing
-			together fundamental [transforms](\(urls.vector_transforms)) and using a full-blown
+			transformation language that enables you to easily map and reshape observability event
+			data (logs and metrics) without sacrificing performance or safety. TRL occupies a
+			comfortable middle ground between stringing together fundamental
+			[transforms](\(urls.vector_transforms)) and using a full-blown
 			runtime like [Lua](\(urls.lua)). Guiding principles behind TRL include:
 
 			1. **Performance** - Beyond extremely fast execution, TRL is designed to prevent
@@ -57,7 +53,6 @@ remap: {
 			category:    "coerce" | "numeric" | "object" | "parse" | "text" | "hash" | "event" | "networking"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
-			in_n_out?: [#InNOut, #InNOut]
 			name: Name
 		}
 	}
@@ -85,11 +80,11 @@ remap: {
 			description: """
 				A list of items. Items in an array can be of any TRL type, including other arrays.
 
-				Array values can be accessed index (starting with zero):
+				You can access array values by index (starting with zero):
 
 				```
 				$levels = ["critical", "emergency", "alert"]
-				$levels[0]
+				$levels[0] == "critical"
 				```
 
 				You can also assign values to arrays via index:
@@ -115,7 +110,9 @@ remap: {
 			]
 		}
 		"float": {
-			description: "A 64-bit floating-point number."
+			description: """
+				A 64-bit floating-point number. Both positive and negative floats are supported.
+				"""
 			use: ["parameter", "return"]
 			examples: [
 				"0.0",
@@ -126,7 +123,7 @@ remap: {
 		"map": {
 			description: """
 				A key-value map in which keys are strings and values can be of any TRL type,
-				including nested maps.
+				including other maps.
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -143,7 +140,7 @@ remap: {
 			]
 		}
 		"integer": {
-			description: "A 64-bit integer."
+			description: "A 64-bit integer. Both positive and negative integers are supported."
 			use: ["parameter", "return"]
 			examples: [
 				"0",
@@ -249,6 +246,11 @@ remap: {
 	#Operators: [_category=string]: [_op=string]: string
 
 	syntax: [RuleName=string]: {
+		#InNOut: {
+			in:  string
+			out: string
+		}
+
 		name:        RuleName
 		href:        string // Ensures that we don't end up with clashing anchors
 		description: string
@@ -264,9 +266,9 @@ remap: {
 
 			description: """
 				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
-				it represents the object arriving into the transform. That object can be a
-				log or a metric. To give an example, imagine you're writing a TRL script to handle
-				logs that are already in [JSON](\(urls.json)) form. Here's an example input:
+				it represents the object arriving into the transform; that object can be a log or a
+				metric. To give an example, imagine you're writing a TRL script to handle logs that
+				in [JSON](\(urls.json)) format. Here's an example JSON log event:
 
 				```json
 				{"status_code":200,"username":"booper1234","message":"Successful transaction"}
@@ -280,17 +282,25 @@ remap: {
 
 				### Nested values
 
-				The dot syntax can also represent nested values, for example `.transaction.id` or
-				`.geo.latitude`. You can assign nested values
+				The dot syntax can represent nested fields, for example `.transaction.id` or
+				`.geo.latitude`. If you assign values to nested fields whose parent fields don't
+				exist, the parent fields are created. Take this expression as an example:
+
+				```
+				.user.info.hobbies = ["cooking", "Pogs"]
+				```
+
+				If the `user` field doesn't exist, it is created; if `.user` exists but `.user.info`
+				doesn't, `.user.info` is created; and so on.
 
 				### Path coalescing
 
-				Path *coalescing* in TRL enables you to set multiple values at once. This
-				expression, for example would set `user.first_name` and `user.last_name` to the same
-				value:
+				Path *coalescing* in TRL enables you to express "or" logic inside of paths. This
+				expression sets `user.first_name` to `"Feldman"` *if* that field exists; if not, the
+				`user.last_name` field is set to `"Feldman"` instead.
 
 				```
-				user.(first_name | last_name) = "Nyambi"
+				.user.(first_name | last_name) = "Feldman"
 				```
 
 				### Quoted paths
@@ -308,6 +318,17 @@ remap: {
 
 				Values inside TRL arrays can be accessed via index (beginning with 0). For the array
 				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
+
+				You can also assign values to arrays by index:
+
+				```
+				$stooges = ["Larry", "Moe"]
+				$stooges[2] = "Curly"
+				```
+
+				You can even assign values to arbitrary indices in arrays; any indices that need to
+				be created are back-filled as `null. For example, if the `hobbies` field doesn't
+				exist, the setting `.hobbies[2] = "Pogs"` yields `[null, null, "Pogs"]`.
 				"""
 			examples: [
 				".",
@@ -351,8 +372,8 @@ remap: {
 			href: "functions"
 
 			description: """
-				In TRL, functions can take inputs (or no input) and return either a value or, for
-				some functions, an error.
+				In TRL, functions can take inputs (or no input) and return either a value or, in the
+				case of some functions, an error.
 				"""
 
 			examples: [
@@ -431,10 +452,10 @@ remap: {
 
 			examples: [
 				"$status_code = .code",
-				#"$my_string = "Hello, Clarice""#,
+				#"$is_critical = .log_level == "critical""#,
+				#"$creepy_greeting = "Hello, Clarice""#,
 				#"""
-					$url_pattern = /^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/
-					$is_url = match(.url, $url_pattern)
+					$is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
 					.has_proper_format = $is_url
 					del(.url)
 					"""#,
