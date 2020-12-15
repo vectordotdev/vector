@@ -144,63 +144,33 @@ pub enum GroupKind {
     Untyped(Vec<SimpleMetric>),
 }
 
-#[derive(Debug, PartialEq)]
-pub struct MetricGroup {
-    pub name: String,
-    pub metrics: GroupKind,
-}
-
-fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
-    if 0.0 <= f && f <= u32::MAX as f64 {
-        Ok(f as u32)
-    } else {
-        Err(ParserError::ValueOutOfRange { value: f })
-    }
-}
-
-impl MetricGroup {
-    fn new(name: String, kind: MetricKind) -> Self {
-        let metrics = match kind {
-            MetricKind::Histogram => GroupKind::Histogram(Vec::new()),
-            MetricKind::Summary => GroupKind::Summary(Vec::new()),
-            MetricKind::Counter => GroupKind::Counter(Vec::new()),
-            MetricKind::Gauge => GroupKind::Gauge(Vec::new()),
-            MetricKind::Untyped => GroupKind::Untyped(Vec::new()),
-        };
-        MetricGroup { name, metrics }
-    }
-
-    // For cases where a metric group was not defined with `# TYPE ...`.
-    fn new_untyped(metric: Metric) -> Self {
-        let Metric {
-            name,
-            labels,
-            value,
-            timestamp,
-        } = metric;
-        MetricGroup {
-            name,
-            metrics: GroupKind::Untyped(vec![SimpleMetric {
-                labels,
-                value,
-                timestamp,
-            }]),
+impl GroupKind {
+    fn new(kind: MetricKind) -> Self {
+        match kind {
+            MetricKind::Histogram => Self::Histogram(Vec::new()),
+            MetricKind::Summary => Self::Summary(Vec::new()),
+            MetricKind::Counter => Self::Counter(Vec::new()),
+            MetricKind::Gauge => Self::Gauge(Vec::new()),
+            MetricKind::Untyped => Self::Untyped(Vec::new()),
         }
+    }
+
+    fn new_untyped(metric: SimpleMetric) -> Self {
+        Self::Untyped(vec![metric])
     }
 
     /// Err(_) if there are irrecoverable error.
     /// Ok(Some(metric)) if this metric belongs to another group.
     /// Ok(None) pushed successfully.
-    fn try_push(&mut self, mut metric: Metric) -> Result<Option<Metric>, ParserError> {
-        if !metric.name.starts_with(&self.name) {
-            return Ok(Some(metric));
-        }
-        let suffix = &metric.name[self.name.len()..];
+    fn try_push(
+        &mut self,
+        prefix_len: usize,
+        mut metric: Metric,
+    ) -> Result<Option<Metric>, ParserError> {
+        let suffix = &metric.name[prefix_len..];
 
-        match self.metrics {
-            GroupKind::Counter(ref mut vec)
-            | GroupKind::Gauge(ref mut vec)
-            | GroupKind::Untyped(ref mut vec) => {
+        match self {
+            Self::Counter(ref mut vec) | Self::Gauge(ref mut vec) | Self::Untyped(ref mut vec) => {
                 if !suffix.is_empty() {
                     return Ok(Some(metric));
                 }
@@ -210,7 +180,7 @@ impl MetricGroup {
                     timestamp: metric.timestamp,
                 });
             }
-            GroupKind::Histogram(ref mut vec) => match suffix {
+            Self::Histogram(ref mut vec) => match suffix {
                 "_bucket" => {
                     let bucket = metric
                         .labels
@@ -234,7 +204,7 @@ impl MetricGroup {
                 }
                 _ => return Ok(Some(metric)),
             },
-            GroupKind::Summary(ref mut vec) => match suffix {
+            Self::Summary(ref mut vec) => match suffix {
                 "" => {
                     let quantile = metric
                         .labels
@@ -260,6 +230,55 @@ impl MetricGroup {
             },
         }
         Ok(None)
+    }
+}
+
+#[derive(Debug)]
+pub struct MetricGroup {
+    pub name: String,
+    pub metrics: GroupKind,
+}
+
+fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
+    if 0.0 <= f && f <= u32::MAX as f64 {
+        Ok(f as u32)
+    } else {
+        Err(ParserError::ValueOutOfRange { value: f })
+    }
+}
+
+impl MetricGroup {
+    fn new(name: String, kind: MetricKind) -> Self {
+        let metrics = GroupKind::new(kind);
+        MetricGroup { name, metrics }
+    }
+
+    // For cases where a metric group was not defined with `# TYPE ...`.
+    fn new_untyped(metric: Metric) -> Self {
+        let Metric {
+            name,
+            labels,
+            value,
+            timestamp,
+        } = metric;
+        MetricGroup {
+            name,
+            metrics: GroupKind::new_untyped(SimpleMetric {
+                labels,
+                value,
+                timestamp,
+            }),
+        }
+    }
+
+    /// Err(_) if there are irrecoverable error.
+    /// Ok(Some(metric)) if this metric belongs to another group.
+    /// Ok(None) pushed successfully.
+    fn try_push(&mut self, metric: Metric) -> Result<Option<Metric>, ParserError> {
+        if !metric.name.starts_with(&self.name) {
+            return Ok(Some(metric));
+        }
+        self.metrics.try_push(self.name.len(), metric)
     }
 }
 
