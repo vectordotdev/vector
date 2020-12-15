@@ -101,6 +101,26 @@ mod tests {
             want: Ok(value!(false)),
         }
 
+        float_included {
+            args: func_args![list: value!([0.5, 12.1, 13.075), item: value!(13.075)],
+            want: Ok(value!(true)),
+        }
+
+        float_not_included {
+            args: func_args![list: value!([0.5, 12.1, 13.075), item: value!(471.0)],
+            want: Ok(value!(false)),
+        }
+
+        array_included {
+            args: func_args![list: value!([[1,2,3], [4,5,6]]), item: value!([1,2,3])],
+            want: Ok(value!(true)),
+        }
+
+        array_not_included {
+            args: func_args![list: value!([[1,2,3], [4,5,6]]), item: value!([1,2,4])],
+            want: Ok(value!(false)),
+        }
+
         mixed_included_string {
             args: func_args![list: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
             want: Ok(value!(true)),
