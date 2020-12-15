@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use snafu::ResultExt;
 use std::collections::BTreeMap;
 
@@ -52,111 +53,69 @@ pub enum ParserError {
     ValueOutOfRange { value: f64 },
 }
 
-trait GroupMetric {
-    fn new_from(metric: Metric) -> Self;
-    fn timestamp(&self) -> Option<i64>;
-    fn labels(&self) -> &BTreeMap<String, String>;
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct GroupKey {
+    pub timestamp: Option<i64>,
+    pub labels: BTreeMap<String, String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct SummaryQuantile {
     pub quantile: f64,
     pub value: f64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct SummaryMetric {
-    pub labels: BTreeMap<String, String>,
     pub quantiles: Vec<SummaryQuantile>,
     pub sum: f64,
     pub count: u32,
-    pub timestamp: Option<i64>,
 }
 
-impl GroupMetric for SummaryMetric {
-    fn new_from(metric: Metric) -> Self {
-        Self {
-            labels: metric.labels,
-            quantiles: vec![],
-            sum: 0.0,
-            count: 0,
-            timestamp: metric.timestamp,
-        }
-    }
-
-    fn timestamp(&self) -> Option<i64> {
-        self.timestamp
-    }
-
-    fn labels(&self) -> &BTreeMap<String, String> {
-        &self.labels
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct HistogramBucket {
     pub bucket: f64,
     pub count: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct HistogramMetric {
-    pub labels: BTreeMap<String, String>,
     pub buckets: Vec<HistogramBucket>,
     pub sum: f64,
     pub count: u32,
-    pub timestamp: Option<i64>,
 }
 
-impl GroupMetric for HistogramMetric {
-    fn new_from(metric: Metric) -> Self {
-        Self {
-            labels: metric.labels,
-            buckets: vec![],
-            sum: 0.0,
-            count: 0,
-            timestamp: metric.timestamp,
-        }
-    }
-
-    fn timestamp(&self) -> Option<i64> {
-        self.timestamp
-    }
-
-    fn labels(&self) -> &BTreeMap<String, String> {
-        &self.labels
-    }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct SimpleMetric {
-    pub labels: BTreeMap<String, String>,
     pub value: f64,
-    pub timestamp: Option<i64>,
 }
 
-#[derive(Debug, PartialEq)]
+type MetricMap<T> = IndexMap<GroupKey, T>;
+
+#[derive(Debug)]
 pub enum GroupKind {
-    Summary(Vec<SummaryMetric>),
-    Histogram(Vec<HistogramMetric>),
-    Gauge(Vec<SimpleMetric>),
-    Counter(Vec<SimpleMetric>),
-    Untyped(Vec<SimpleMetric>),
+    Summary(MetricMap<SummaryMetric>),
+    Histogram(MetricMap<HistogramMetric>),
+    Gauge(MetricMap<SimpleMetric>),
+    Counter(MetricMap<SimpleMetric>),
+    Untyped(MetricMap<SimpleMetric>),
 }
 
 impl GroupKind {
     fn new(kind: MetricKind) -> Self {
         match kind {
-            MetricKind::Histogram => Self::Histogram(Vec::new()),
-            MetricKind::Summary => Self::Summary(Vec::new()),
-            MetricKind::Counter => Self::Counter(Vec::new()),
-            MetricKind::Gauge => Self::Gauge(Vec::new()),
-            MetricKind::Untyped => Self::Untyped(Vec::new()),
+            MetricKind::Histogram => Self::Histogram(IndexMap::default()),
+            MetricKind::Summary => Self::Summary(IndexMap::default()),
+            MetricKind::Counter => Self::Counter(IndexMap::default()),
+            MetricKind::Gauge => Self::Gauge(IndexMap::default()),
+            MetricKind::Untyped => Self::Untyped(IndexMap::default()),
         }
     }
 
-    fn new_untyped(metric: SimpleMetric) -> Self {
-        Self::Untyped(vec![metric])
+    fn new_untyped(key: GroupKey, value: f64) -> Self {
+        let mut metrics = IndexMap::default();
+        metrics.insert(key, SimpleMetric { value });
+        Self::Untyped(metrics)
     }
 
     /// Err(_) if there are irrecoverable error.
@@ -165,48 +124,60 @@ impl GroupKind {
     fn try_push(
         &mut self,
         prefix_len: usize,
-        mut metric: Metric,
+        metric: Metric,
     ) -> Result<Option<Metric>, ParserError> {
         let suffix = &metric.name[prefix_len..];
+        let mut key = GroupKey {
+            timestamp: metric.timestamp,
+            labels: metric.labels,
+        };
+        let value = metric.value;
 
         match self {
-            Self::Counter(ref mut vec) | Self::Gauge(ref mut vec) | Self::Untyped(ref mut vec) => {
+            Self::Counter(ref mut metrics)
+            | Self::Gauge(ref mut metrics)
+            | Self::Untyped(ref mut metrics) => {
                 if !suffix.is_empty() {
-                    return Ok(Some(metric));
+                    return Ok(Some(Metric {
+                        name: metric.name,
+                        timestamp: key.timestamp,
+                        labels: key.labels,
+                        value,
+                    }));
                 }
-                vec.push(SimpleMetric {
-                    labels: metric.labels,
-                    value: metric.value,
-                    timestamp: metric.timestamp,
-                });
+                metrics.insert(key, SimpleMetric { value });
             }
-            Self::Histogram(ref mut vec) => match suffix {
+            Self::Histogram(ref mut metrics) => match suffix {
                 "_bucket" => {
-                    let bucket = metric
-                        .labels
-                        .remove("le")
-                        .ok_or(ParserError::ExpectedLeTag)?;
+                    let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValue)?;
                     let count = try_f64_to_u32(metric.value)?;
-                    matching_group(vec, metric)
+                    matching_group(metrics, key)
                         .buckets
                         .push(HistogramBucket { bucket, count });
                 }
                 "_sum" => {
                     let sum = metric.value;
-                    matching_group(vec, metric).sum = sum;
+                    matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
                     let count = try_f64_to_u32(metric.value)?;
-                    matching_group(vec, metric).count = count;
+                    matching_group(metrics, key).count = count;
                 }
-                _ => return Ok(Some(metric)),
+                _ => {
+                    return Ok(Some(Metric {
+                        name: metric.name,
+                        timestamp: key.timestamp,
+                        labels: key.labels,
+                        value,
+                    }))
+                }
             },
-            Self::Summary(ref mut vec) => match suffix {
+            Self::Summary(ref mut metrics) => match suffix {
                 "" => {
-                    let quantile = metric
+                    let quantile = key
                         .labels
                         .remove("quantile")
                         .ok_or(ParserError::ExpectedQuantileTag)?;
@@ -214,19 +185,26 @@ impl GroupKind {
                     let (_, quantile) = line::Metric::parse_value(&quantile)
                         .map_err(Into::into)
                         .context(ParseLabelValue)?;
-                    matching_group(vec, metric)
+                    matching_group(metrics, key)
                         .quantiles
                         .push(SummaryQuantile { quantile, value });
                 }
                 "_sum" => {
                     let sum = metric.value;
-                    matching_group(vec, metric).sum = sum;
+                    matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
                     let count = try_f64_to_u32(metric.value)?;
-                    matching_group(vec, metric).count = count;
+                    matching_group(metrics, key).count = count;
                 }
-                _ => return Ok(Some(metric)),
+                _ => {
+                    return Ok(Some(Metric {
+                        name: metric.name,
+                        timestamp: key.timestamp,
+                        labels: key.labels,
+                        value,
+                    }))
+                }
             },
         }
         Ok(None)
@@ -261,13 +239,10 @@ impl MetricGroup {
             value,
             timestamp,
         } = metric;
+        let key = GroupKey { timestamp, labels };
         MetricGroup {
             name,
-            metrics: GroupKind::new_untyped(SimpleMetric {
-                labels,
-                value,
-                timestamp,
-            }),
+            metrics: GroupKind::new_untyped(key, value),
         }
     }
 
@@ -282,17 +257,14 @@ impl MetricGroup {
     }
 }
 
-fn matching_group<'a, T: GroupMetric>(values: &'a mut Vec<T>, metric: Metric) -> &'a mut T {
+fn matching_group<'a, T: Default>(values: &'a mut MetricMap<T>, group: GroupKey) -> &'a mut T {
     // Assumes that the incoming metrics are already collated, which
     // means that a change in either timestamp or labels represents a
     // group.
-    let needs_new = values.last().map_or(true, |group| {
-        group.timestamp() != metric.timestamp || group.labels() != &metric.labels
-    });
-    if needs_new {
-        values.push(T::new_from(metric));
+    if values.last().map_or(true, |(key, _)| group != *key) {
+        values.insert(group, T::default());
     }
-    values.last_mut().unwrap()
+    values.last_mut().unwrap().1
 }
 
 /// Parse the given text input, and group the result into higher-level
@@ -348,6 +320,18 @@ mod test {
         }};
     }
 
+    macro_rules! simple_metric {
+        ( $timestamp:expr, $labels:expr, $value:expr ) => {
+            (
+                &GroupKey {
+                    timestamp: $timestamp,
+                    labels: $labels,
+                },
+                &SimpleMetric { value: $value },
+            )
+        };
+    }
+
     #[test]
     fn test_parse_text() {
         let input = r##"
@@ -390,75 +374,79 @@ mod test {
             "##;
         let output = parse_text(input).unwrap();
         assert_eq!(output.len(), 6);
-        match_group!(output[0], "http_requests_total", Counter => |metrics: &[SimpleMetric]| {
+        match_group!(output[0], "http_requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 2);
-            assert_eq!(metrics[0], SimpleMetric {
-                labels: labels!(method => "post", code => 200),
-                value: 1027.0,
-                timestamp: Some(1395066363000),
-            });
-            assert_eq!(metrics[1], SimpleMetric {
-                labels: labels!(method => "post", code => 400),
-                value: 3.0,
-                timestamp: Some(1395066363000),
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
+                Some(1395066363000),
+                labels!(method => "post", code => 200),
+                1027.0
+            ));
+            assert_eq!(metrics.get_index(1).unwrap(), simple_metric!(
+                Some(1395066363000),
+                labels!(method => "post", code => 400),
+                3.0
+            ));
         });
-        match_group!(output[1], "msdos_file_access_time_seconds", Untyped => |metrics: &[SimpleMetric]| {
+        match_group!(output[1], "msdos_file_access_time_seconds", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics[0], SimpleMetric {
-                labels: labels!(path => "C:\\DIR\\FILE.TXT", error => "Cannot find file:\n\"FILE.TXT\""),
-                value: 1.458255915e9,
-                timestamp: None,
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
+                None,
+                labels!(path => "C:\\DIR\\FILE.TXT", error => "Cannot find file:\n\"FILE.TXT\""),
+                1.458255915e9
+            ));
         });
-        match_group!(output[2], "metric_without_timestamp_and_labels", Untyped => |metrics: &[SimpleMetric]| {
+        match_group!(output[2], "metric_without_timestamp_and_labels", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics[0], SimpleMetric {
-                labels: labels!(),
-                value: 12.47,
-                timestamp: None,
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(None, labels!(), 12.47));
         });
-        match_group!(output[3], "something_weird", Untyped => |metrics: &[SimpleMetric]| {
+        match_group!(output[3], "something_weird", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics[0], SimpleMetric {
-                labels: labels!(problem => "division by zero"),
-                value: f64::INFINITY,
-                timestamp: Some(-3982045),
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
+                Some(-3982045),
+                labels!(problem => "division by zero"),
+                f64::INFINITY
+            ));
         });
-        match_group!(output[4], "http_request_duration_seconds", Histogram => |metrics: &[HistogramMetric]| {
+        match_group!(output[4], "http_request_duration_seconds", Histogram => |metrics: &MetricMap<HistogramMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics[0], HistogramMetric {
-                labels: labels!(),
-                buckets: vec![
-                    HistogramBucket { bucket: 0.05, count: 24054 },
-                    HistogramBucket { bucket: 0.1, count: 33444 },
-                    HistogramBucket { bucket: 0.2, count: 100392 },
-                    HistogramBucket { bucket: 0.5, count: 129389 },
-                    HistogramBucket { bucket: 1.0, count: 133988 },
-                    HistogramBucket { bucket: f64::INFINITY, count: 144320 },
-                ],
-                count: 144320,
-                sum: 53423.0,
-                timestamp: None,
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), (
+                &GroupKey {
+                    timestamp: None,
+                    labels: labels!(),
+                },
+                &HistogramMetric {
+                    buckets: vec![
+                        HistogramBucket { bucket: 0.05, count: 24054 },
+                        HistogramBucket { bucket: 0.1, count: 33444 },
+                        HistogramBucket { bucket: 0.2, count: 100392 },
+                        HistogramBucket { bucket: 0.5, count: 129389 },
+                        HistogramBucket { bucket: 1.0, count: 133988 },
+                        HistogramBucket { bucket: f64::INFINITY, count: 144320 },
+                    ],
+                    count: 144320,
+                    sum: 53423.0,
+                },
+            ));
         });
-        match_group!(output[5], "rpc_duration_seconds", Summary => |metrics: &[SummaryMetric]| {
+        match_group!(output[5], "rpc_duration_seconds", Summary => |metrics: &MetricMap<SummaryMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics[0], SummaryMetric {
-                labels: labels!(),
-                quantiles: vec![
-                    SummaryQuantile { quantile: 0.01, value: 3102.0 },
-                    SummaryQuantile { quantile: 0.05, value: 3272.0 },
-                    SummaryQuantile { quantile: 0.5, value: 4773.0 },
-                    SummaryQuantile { quantile: 0.9, value: 9001.0 },
-                    SummaryQuantile { quantile: 0.99, value: 76656.0 },
-                ],
-                count: 2693,
-                sum: 1.7560473e+07,
-                timestamp: None,
-            });
+            assert_eq!(metrics.get_index(0).unwrap(), (
+                &GroupKey {
+                    timestamp: None,
+                    labels: labels!(),
+                },
+                &SummaryMetric {
+                    quantiles: vec![
+                        SummaryQuantile { quantile: 0.01, value: 3102.0 },
+                        SummaryQuantile { quantile: 0.05, value: 3272.0 },
+                        SummaryQuantile { quantile: 0.5, value: 4773.0 },
+                        SummaryQuantile { quantile: 0.9, value: 9001.0 },
+                        SummaryQuantile { quantile: 0.99, value: 76656.0 },
+                    ],
+                    count: 2693,
+                    sum: 1.7560473e+07,
+                },
+            ));
         });
     }
 

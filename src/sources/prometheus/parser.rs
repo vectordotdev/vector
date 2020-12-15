@@ -28,8 +28,8 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
 
     for group in groups {
         match group.metrics {
-            GroupKind::Counter(vec) => {
-                for metric in vec {
+            GroupKind::Counter(metrics) => {
+                for (key, metric) in metrics {
                     let counter = Metric::new(
                         group.name.clone(),
                         MetricKind::Absolute,
@@ -37,14 +37,14 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                             value: metric.value,
                         },
                     )
-                    .with_timestamp(utc_timestamp(metric.timestamp))
-                    .with_tags(has_values_or_none(metric.labels));
+                    .with_timestamp(utc_timestamp(key.timestamp))
+                    .with_tags(has_values_or_none(key.labels));
 
                     result.push(counter);
                 }
             }
-            GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
-                for metric in vec {
+            GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
+                for (key, metric) in metrics {
                     let gauge = Metric::new(
                         group.name.clone(),
                         MetricKind::Absolute,
@@ -52,14 +52,14 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                             value: metric.value,
                         },
                     )
-                    .with_timestamp(utc_timestamp(metric.timestamp))
-                    .with_tags(has_values_or_none(metric.labels));
+                    .with_timestamp(utc_timestamp(key.timestamp))
+                    .with_tags(has_values_or_none(key.labels));
 
                     result.push(gauge);
                 }
             }
-            GroupKind::Histogram(vec) => {
-                for metric in vec {
+            GroupKind::Histogram(metrics) => {
+                for (key, metric) in metrics {
                     let mut buckets = metric.buckets;
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count -= buckets[i - 1].count;
@@ -87,13 +87,13 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                                 sum: metric.sum,
                             },
                         )
-                        .with_timestamp(utc_timestamp(metric.timestamp))
-                        .with_tags(has_values_or_none(metric.labels)),
+                        .with_timestamp(utc_timestamp(key.timestamp))
+                        .with_tags(has_values_or_none(key.labels)),
                     );
                 }
             }
-            GroupKind::Summary(vec) => {
-                for metric in vec {
+            GroupKind::Summary(metrics) => {
+                for (key, metric) in metrics {
                     result.push(
                         Metric::new(
                             group.name.clone(),
@@ -111,8 +111,8 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                                 sum: metric.sum,
                             },
                         )
-                        .with_timestamp(utc_timestamp(metric.timestamp))
-                        .with_tags(has_values_or_none(metric.labels)),
+                        .with_timestamp(utc_timestamp(key.timestamp))
+                        .with_tags(has_values_or_none(key.labels)),
                     );
                 }
             }
