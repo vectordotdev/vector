@@ -47,9 +47,6 @@ remap: functions: redact: {
 			title: "Redact credit card number"
 			input: {
 				credit_card: "9876123454320123"
-				filters: ["pattern"]
-				redactor: "full"
-				patterns: ["[0-9]{16}"]
 			}
 			source: """
 				.credit_card = redact(.credit_card, filters = ["pattern"], redactor = "full", patterns = ["[0-9]{16}"])
