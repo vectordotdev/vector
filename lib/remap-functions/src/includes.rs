@@ -102,12 +102,12 @@ mod tests {
         }
 
         float_included {
-            args: func_args![list: value!([0.5, 12.1, 13.075), item: value!(13.075)],
+            args: func_args![list: value!([0.5, 12.1, 13.075]), item: value!(13.075)],
             want: Ok(value!(true)),
         }
 
         float_not_included {
-            args: func_args![list: value!([0.5, 12.1, 13.075), item: value!(471.0)],
+            args: func_args![list: value!([0.5, 12.1, 13.075]), item: value!(471.0)],
             want: Ok(value!(false)),
         }
 
