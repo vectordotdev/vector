@@ -106,174 +106,54 @@ impl LogEvent {
     /// Insert a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
-        let mut seen_segments = vec![];
-        let lookup_len = lookup.len();
-        let mut lookup_iter = lookup.into_iter().enumerate();
-        let value = value.into();
+        let mut working_lookup = lookup;
         // The first step should always be a field.
-        let (_zero, first_step) = lookup_iter.next()?;
-        seen_segments.push(first_step.clone());
+        let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        let mut cursor = match first_step {
+        match this_segment {
             SegmentBuf::Coalesce(v) => unimplemented!(),
             SegmentBuf::Field {
                 name,
                 requires_quoting: _,
             } => {
-                if lookup_len == 1 {
-                    // Terminus: We **must** insert here or abort.
-                    trace!(key = ?name, value = ?value, "Inserted into root.");
-                    return self.fields.insert(name, value);
-                } else {
-                    trace!(key = ?name, "Descending into map.");
-                    self.fields.entry(name.clone()).or_insert_with(|| {
-                        trace!(key = ?name, "Entry not found, inserting a null to build up.");
-                        Value::Null
+                let next_value = match working_lookup.get(0) {
+                    Some(SegmentBuf::Index(next_len)) => Value::Array(Vec::with_capacity(*next_len)),
+                    Some(SegmentBuf::Field { .. }) => Value::Map(Default::default()),
+                    Some(SegmentBuf::Coalesce(set)) => {
+                        let mut cursor_set = set;
+                        loop {
+                            match cursor_set.get(0).and_then(|v| v.get(0)) {
+                                None => return None,
+                                Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
+                                Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
+                            }
+                        }
+                    }
+                    None => {
+                        trace!(key = ?name, "Getting from root.");
+                        return self.fields.insert(name, value.into())
+                    }
+                };
+                self.fields.entry(name)
+                    .or_insert_with(|| {
+                        trace!("Inserting at leaf.");
+                        next_value
                     })
-                }
-            }
+                    .insert(working_lookup, value).ok().unwrap_or(None)
+            },
             // In this case, the user has passed us an invariant.
             SegmentBuf::Index(_) => {
                 error!(
                     "Lookups into LogEvents should never start with indexes.\
                         Please report your config."
                 );
-                return None;
-            }
-        };
-
-        let retval = None;
-
-        for (lookup_index, segment) in lookup_iter {
-            cursor = match (segment.clone(), cursor) {
-                (SegmentBuf::Coalesce(v), _) => unimplemented!(),
-                // Fields access maps.
-                (
-                    SegmentBuf::Field {
-                        ref name,
-                        requires_quoting: _,
-                    },
-                    &mut Value::Map(ref mut map),
-                ) => {
-                    if lookup_index == lookup_len.saturating_sub(1) {
-                        // Terminus: We **must** insert here or abort.
-                        trace!(key = ?name, "Creating field inside map.");
-                        return map.insert(name.clone(), value);
-                    } else {
-                        trace!(key = ?name, "Descending into map.");
-                        map.entry(name.clone()).or_insert_with(|| {
-                            trace!(key = ?name, "Entry not found, inserting null to build up.");
-                            Value::Null
-                        })
-                    }
-                }
-                // Indexes access arrays.
-                (SegmentBuf::Index(i), &mut Value::Array(ref mut array)) => {
-                    if lookup_index == lookup_len.saturating_sub(1) {
-                        // Terminus: We **must** insert here or abort.
-                        trace!(key = ?i, "Terminus array index segment, inserting into index unconditionally.");
-                        return match array.get_mut(i) {
-                            None => {
-                                trace!(key = ?i, ?value, "Resizing array with Null values up to index, then pushing value.");
-                                while array.len() < i {
-                                    trace!("Pushing Null to meet required size.");
-                                    array.push(Value::Null);
-                                }
-                                array.push(value);
-                                None
-                            }
-                            Some(target) => {
-                                trace!(key = ?i, ?value, "Swapping existing value at index for inserted value, returning it.");
-                                let mut swapped_with_target = value;
-                                core::mem::swap(target, &mut swapped_with_target);
-                                Some(swapped_with_target)
-                            }
-                        };
-                    } else {
-                        trace!(key = ?i, "Descending into array.");
-                        let len = array.len();
-                        if i > len {
-                            array.get_mut(i).expect(&*format!(
-                                "Array of length {} is expected to have value at index {}",
-                                len, i
-                            ))
-                        } else {
-                            trace!(key = ?i, "Descendent array was not long enough, resizing and pushing a null to build up.");
-                            // We already know the array is too small!
-                            while array.len() < i {
-                                trace!("Pushing Null to meet required size.");
-                                array.push(Value::Null);
-                            }
-                            array.push(Value::Null); // This wil get built up for the rest of the insert.
-                            array.index_mut(i)
-                        }
-                    }
-                }
-                (
-                    SegmentBuf::Field {
-                        name,
-                        requires_quoting: _,
-                    },
-                    cursor_ref,
-                ) if cursor_ref == &mut Value::Null => {
-                    trace!(key = ?name, lookup_index, lookup_len, "Did not discover map to descend into, but found a `null`. Since a map is expected. Creating one.");
-                    let mut map = BTreeMap::default();
-                    if lookup_index == lookup_len.saturating_sub(1) {
-                        trace!(lookup_index, key = ?name, value = ?value, "Terminus field segment, inserting unconditionally.");
-                        map.insert(name.clone(), value);
-                        *cursor_ref = Value::Map(map);
-                        return None;
-                    } else {
-                        trace!(lookup_index, key = ?name, "Non-terminus field segment, scaffolding a null for later filling.");
-                        map.insert(name.clone(), Value::Null);
-                        *cursor_ref = Value::Map(map);
-                        cursor_ref
-                            .as_map_mut()
-                            .get_mut(&name)
-                            .expect("Failed to regain a ref to a map just created.")
-                    }
-                }
-                (SegmentBuf::Index(i), cursor_ref) if cursor_ref == &mut Value::Null => {
-                    trace!(key = ?i, lookup_index, lookup_len, "Did not discover array to descend into, but found a `null`. Since an array is expected. Creating one.");
-                    let mut newly_created_array = Vec::with_capacity(i.saturating_add(1));
-                    if lookup_index == lookup_len.saturating_sub(1) {
-                        trace!(lookup_index, lookup_len, key = ?i, value = ?value, "Terminus array segment, inserting unconditionally.");
-                        while newly_created_array.len() < i {
-                            trace!("Pushing Null to meet required size.");
-                            newly_created_array.push(Value::Null);
-                        }
-                        newly_created_array.push(value);
-                        *cursor_ref = Value::Array(newly_created_array);
-                        return None;
-                    } else {
-                        trace!(
-                            lookup_index,
-                            lookup_len,
-                            "Non-terminus array segment, scaffolding a null for later filling."
-                        );
-                        while newly_created_array.len() < i {
-                            trace!("Pushing Null to meet required size.");
-                            newly_created_array.push(Value::Null);
-                        }
-                        newly_created_array.push(Value::Null);
-                        *cursor_ref = Value::Array(newly_created_array);
-                        cursor_ref.as_array_mut().index_mut(i)
-                    }
-                }
-
-                // This is an error path but we can't fail. So return none and spit an error.
-                (segment, inner_cursor) => {
-                    debug!(?segment, ?inner_cursor, key = ?segment, "Bailing on insert. There is an existing value which is not an array or map being inserted into.");
-                    return None;
-                }
-            };
-            seen_segments.push(segment.clone())
+                None
+            },
         }
-
-        retval
     }
 
     /// Remove a value that exists at a given lookup.

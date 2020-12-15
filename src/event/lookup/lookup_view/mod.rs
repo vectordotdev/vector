@@ -95,28 +95,30 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
+    /// Get from the internal list of segments.
+    #[instrument(level = "trace")]
+    pub fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
+        self.segments.get(index)
+    }
+
     /// Push onto the internal list of segments.
     #[instrument(level = "trace")]
     pub fn push_back(&mut self, segment: Segment<'a>) {
-        trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push_back(segment)
     }
 
     #[instrument(level = "trace")]
     pub fn pop_back(&mut self) -> Option<Segment<'a>> {
-        trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop_back()
     }
 
     #[instrument(level = "trace")]
     pub fn push_front(&mut self, segment: Segment<'a>) {
-        trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push_front(segment)
     }
 
     #[instrument(level = "trace")]
     pub fn pop_front(&mut self) -> Option<Segment<'a>> {
-        trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop_front()
     }
 

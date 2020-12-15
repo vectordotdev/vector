@@ -96,7 +96,7 @@ WHITESPACE  = _{ " " | "\t" }
 // Used by `src/event/lookup.rs`.
 // Changing this will have far reaching impacts on Vector's core event API.
 lookup         = ${ (lookup_segment) ~ (LOOKUP_PERIOD ~ (lookup_segment))* }
-lookup_segment = ${ ((lookup_field | lookup_field_quoted) ~ lookup_array*) | lookup_coalesce }
+lookup_segment = ${ ((lookup_field | lookup_field_quoted | lookup_array) ~ lookup_array*) | lookup_coalesce }
 lookup_coalesce = !{ "(" ~ lookup ~ ("|" ~ lookup)+ ~ ")" }
 lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"")+ }
 lookup_field_quoted = @{ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }

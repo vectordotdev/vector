@@ -1,6 +1,6 @@
 use crate::event::Segment;
 use crate::{
-    event::{timestamp_to_string, Lookup, LookupBuf},
+    event::{timestamp_to_string, Lookup, LookupBuf, SegmentBuf},
     Result,
 };
 use bytes::Bytes;
@@ -167,7 +167,120 @@ impl Value {
         lookup: LookupBuf,
         value: impl Into<Value> + Debug,
     ) -> Result<Option<Value>> {
-        unimplemented!()
+        let mut working_lookup = lookup;
+        let this_segment = working_lookup.pop_front();
+        match (this_segment, self) {
+            // We've met an end and found our value.
+            (None, item) => {
+                let mut value = value.into();
+                core::mem::swap(&mut value, item);
+                Ok(Some(value))
+            },
+            // This is just not allowed!
+            (_, Value::Boolean(_))
+            | (_, Value::Bytes(_))
+            | (_, Value::Timestamp(_))
+            | (_, Value::Float(_))
+            | (_, Value::Integer(_))
+            | (_, Value::Null) => Err("Cannot insert value nested inside a primitive field.".into()),
+            // Descend into a coalesce
+            (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let lookup = LookupBuf::try_from(sub_segment)?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    trace!(?lookup, "Checking coalesce option.");
+                    if !sub_value.contains(&lookup) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => {
+                        trace!(?needle, "Inserting value at coalesce option.");
+                        sub_value.insert(needle, value)
+                    },
+                    None => Ok(None),
+                }
+            }
+            // Descend into a map
+            (Some(SegmentBuf::Field { ref name, .. }), Value::Map(map)) => {
+                trace!(key = ?name, "Descending into map.");
+                let next_value = match working_lookup.get(0) {
+                    Some(SegmentBuf::Index(next_len)) => Value::Array(Vec::with_capacity(*next_len)),
+                    Some(SegmentBuf::Field { .. }) => Value::Map(Default::default()),
+                    Some(SegmentBuf::Coalesce(set)) => {
+                        let mut cursor_set = set;
+                        loop {
+                            match cursor_set.get(0).and_then(|v| v.get(0)) {
+                                None => return Err("Met 0 length coalesce sub segment.".into()),
+                                Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
+                                Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
+                            }
+                        }
+                    }
+                    None => {
+                        trace!(key = ?name, "Inserting at leaf.");
+                        return Ok(map.insert(name.clone(), value.into()))
+                    }
+                };
+                map.entry(name.clone())
+                    .or_insert_with(|| {
+                        trace!(key = ?name, "Pushing required next value onto map.");
+                        next_value
+                    })
+                    .insert(working_lookup, value)
+            }
+            (Some(SegmentBuf::Index(_)), Value::Map(_)) => Ok(None),
+            // Descend into an array
+            (Some(SegmentBuf::Index(i)), Value::Array(array)) => {
+                trace!(key = ?i, "Descending into array.");
+                match array.get_mut(i) {
+                    Some(inner) => inner.insert(working_lookup, value),
+                    None => {
+                        trace!(key = ?i, "Resizing array to fit.");
+                        // Fill the vector to the index.
+                        array.resize(i, Value::Null);
+                        let mut retval = Ok(None);
+                        let next_val = match working_lookup.get(0) {
+                            Some(SegmentBuf::Index(next_len)) => {
+                                let mut inner = Value::Array(Vec::with_capacity(*next_len));
+                                trace!("Next step is an array.");
+                                retval = inner.insert(working_lookup, value);
+                                inner
+                            },
+                            Some(SegmentBuf::Field { .. }) => {
+                                let mut inner = Value::Map(Default::default());
+                                trace!("Next step is a map.");
+                                retval = inner.insert(working_lookup, value);
+                                inner
+                            },
+                            Some(SegmentBuf::Coalesce(set)) => {
+                                let mut cursor_set = set;
+                                trace!("Next step is a coalesce.");
+                                loop {
+                                    match cursor_set.get(0).and_then(|v| v.get(0)) {
+                                        None => return Err("Met 0 length coalesce sub segment.".into()),
+                                        Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
+                                        Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                        Some(SegmentBuf::Coalesce(set)) => cursor_set = set,
+                                    }
+                                }
+                            },
+                            None => value.into(),
+                        };
+                        trace!(?next_val, "Pushing on to array.");
+                        array.push(next_val);
+                        retval
+                    },
+                }
+            }
+            (Some(SegmentBuf::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(SegmentBuf::Index(_)), Value::Array(_)) => Ok(None),
+        }
     }
 
     /// Remove a value that exists at a given lookup.
@@ -192,7 +305,7 @@ impl Value {
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
             | (_, Value::Integer(_))
-            | (_, Value::Null) => unimplemented!(),
+            | (_, Value::Null) => Err("Cannot remove value nested inside a primitive field.".into()),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -909,6 +1022,7 @@ impl Value {
 mod test {
     use super::*;
     use std::{fs, io::Read, path::Path};
+    use crate::log_event;
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {
@@ -920,6 +1034,108 @@ mod test {
         test_file.read_to_end(&mut buf)?;
 
         Ok(buf)
+    }
+
+    mod insert_get_remove {
+        use super::*;
+
+        #[test]
+        fn single_field() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()[key], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn nested_field() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root.doot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()["root"].as_map()["doot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn single_index() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn nested_index() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn field_index() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()["root"].as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn index_field() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn coalesced_index() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "([0] | [1])";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
     }
 
     // This test iterates over the `tests/data/fixtures/value` folder and:
