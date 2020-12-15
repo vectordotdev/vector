@@ -24,23 +24,21 @@ remap: functions: match: {
 		{
 			title: "Successful match"
 			input: {
-				value: "I'm a little teapot"
-				pattern: "/teapot/"
+				phrase: "I'm a little teapot"
 			}
-			source: ".matches = match(.value, .pattern)"
+			source: ".has_teapot = match(.phrase, /teapot/)"
 			output: {
-				matches: true
+				has_teapot: true
 			}
 		},
 		{
 			title: "Unsuccessful match"
 			input: {
-				value: "life is but a dream"
-				pattern: "/teapot/"
+				phrase: "life is but a dream"
 			}
-			source: ".matches = match(.value, .pattern)"
+			source: ".has_teapot = match(.phrase, /teapot/)"
 			output: {
-				matches: false
+				has_teapot: false
 			}
 		}
 	]
