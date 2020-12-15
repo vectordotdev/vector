@@ -161,13 +161,15 @@ impl Value {
     }
 
     /// Insert a value at a given lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn insert(
         &mut self,
         lookup: LookupBuf,
         value: impl Into<Value> + Debug,
     ) -> Result<Option<Value>> {
-        let mut working_lookup = lookup;
+        let mut working_lookup: LookupBuf = lookup.into();
+        let span = trace_span!("insert", lookup = %working_lookup);
+        let _guard = span.enter();
+
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
@@ -286,13 +288,17 @@ impl Value {
     /// Remove a value that exists at a given lookup.
     ///
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, lookup))]
     pub fn remove<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Result<Option<Value>> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("insert", lookup = %working_lookup);
+        let _guard = span.enter();
+
+
         let this_segment = working_lookup.pop_front();
         let mut is_empty = false;
 
@@ -381,12 +387,15 @@ impl Value {
     }
 
     /// Get an immutable borrow of the value by lookup.
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, lookup))]
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
     ) -> Result<Option<&Value>> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("get", lookup = %working_lookup);
+        let _guard = span.enter();
+
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
@@ -447,17 +456,18 @@ impl Value {
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
         }
     }
 
     /// Get a mutable borrow of the value by lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
     ) -> Result<Option<&mut Value>> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("get_mut", lookup = %working_lookup);
+        let _guard = span.enter();
+
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
@@ -509,7 +519,6 @@ impl Value {
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
-            (Some(Segment::Index(_)), Value::Array(_)) => Ok(None),
         }
     }
 
@@ -525,7 +534,7 @@ impl Value {
     ///
     /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
     /// will be prefixed with that lookup.
-    #[instrument(level = "trace")]
+    #[instrument(level = "trace", skip(self, prefix, only_leaves))]
     pub fn lookups<'a>(
         &'a self,
         prefix: Option<Lookup<'a>>,
@@ -598,7 +607,7 @@ impl Value {
     ///
     /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
     /// will be prefixed with that lookup.
-    #[instrument(level = "trace")]
+    #[instrument(level = "trace", skip(self, prefix, only_leaves))]
     pub fn pairs<'a>(
         &'a self,
         prefix: Option<Lookup<'a>>,
@@ -1137,6 +1146,34 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(value.as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn nested_index_field() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn field_with_nested_index_field() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root[0][0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()["root"].as_array()[0].as_array()[0].as_map()["boot"], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));

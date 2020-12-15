@@ -6,7 +6,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
         SourceDescription,
     },
-    event::{Event, Lookup, LookupBuf, SegmentBuf, Value},
+    event::{Event, LookupBuf, SegmentBuf, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
@@ -441,7 +441,7 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::{Event},
+        event::{Event, Lookup},
     };
     use chrono::prelude::*;
 

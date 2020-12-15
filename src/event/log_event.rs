@@ -19,9 +19,11 @@ pub struct LogEvent {
 
 impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("get", lookup = %working_lookup);
+        let _guard = span.enter();
+
         // The first step should always be a field.
         let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
@@ -29,7 +31,27 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
-            Segment::Coalesce(v) => unimplemented!(),
+            Segment::Coalesce(sub_segments) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
+                    if self.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        self.get(needle)
+                    },
+                    None => None,
+                }
+            },
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -58,9 +80,11 @@ impl LogEvent {
     }
 
     /// Get a mutable borrow of the value by lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("get_mut", lookup = %working_lookup);
+        let _guard = span.enter();
+
         // The first step should always be a field.
         let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
@@ -68,7 +92,27 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
-            Segment::Coalesce(v) => unimplemented!(),
+            Segment::Coalesce(sub_segments) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
+                    if self.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        self.get_mut(needle)
+                    },
+                    None => None,
+                }
+            },
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -97,15 +141,20 @@ impl LogEvent {
     }
 
     /// Determine if the log event contains a value at a given lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
-        self.get(lookup).is_some()
+        let working_lookup = lookup.into();
+        let span = trace_span!("contains", lookup = %working_lookup);
+        let _guard = span.enter();
+
+        self.get(working_lookup).is_some()
     }
 
     /// Insert a value at a given lookup.
-    #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
-        let mut working_lookup = lookup;
+        let mut working_lookup: LookupBuf = lookup.into();
+        let span = trace_span!("insert", lookup = %working_lookup);
+        let _guard = span.enter();
+
         // The first step should always be a field.
         let this_segment = working_lookup.pop_front().unwrap();
         // This is good, since the first step into a LogEvent will also be a field.
@@ -113,7 +162,27 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
-            SegmentBuf::Coalesce(v) => unimplemented!(),
+            SegmentBuf::Coalesce(sub_segments) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let mut lookup = LookupBuf::try_from(sub_segment).ok()?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
+                    if !self.contains(&lookup) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        self.insert(needle, value)
+                    },
+                    None => None,
+                }
+            },
             SegmentBuf::Field {
                 name,
                 requires_quoting: _,
@@ -158,19 +227,41 @@ impl LogEvent {
     /// Remove a value that exists at a given lookup.
     ///
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
-    #[instrument(level = "trace", skip(self))]
     pub fn remove<'lookup>(
         &mut self,
         lookup: impl Into<Lookup<'lookup>> + Debug,
         prune: bool,
     ) -> Option<Value> {
         let mut working_lookup = lookup.into();
+        let span = trace_span!("remove", lookup = %working_lookup);
+        let _guard = span.enter();
+
         // The first step should always be a field.
         let this_segment = working_lookup.pop_front().unwrap();
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
-            Segment::Coalesce(v) => unimplemented!(),
+            Segment::Coalesce(sub_segments) => {
+                // Creating a needle with a back out of the loop is very important.
+                let mut needle = None;
+                for sub_segment in sub_segments {
+                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
+                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
+                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
+                    if self.contains(lookup.clone()) {
+                        needle = Some(lookup);
+                        break;
+                    }
+                }
+                match needle {
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        self.remove(needle, prune)
+                    },
+                    None => None,
+                }
+            },
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -212,7 +303,7 @@ impl LogEvent {
     ///
     /// This is notably different than the keys in a map, as this descends into things like arrays
     /// and maps. It also returns those array/map values during iteration.
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn keys<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = Lookup<'a>> + 'a {
         self.fields
             .iter()
@@ -227,7 +318,7 @@ impl LogEvent {
     ///
     /// This is notably different than pairs in a map, as this descends into things like arrays and
     /// maps. It also returns those array/map values during iteration.
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn pairs<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
         self.fields
             .iter()
@@ -743,9 +834,9 @@ mod test {
             for lookup in lookups.clone() {
                 assert!(
                     pairs.contains(&lookup.clone_lookup()),
-                    "Failed while looking for {:?} in {:?}",
+                    "Failed while looking for {} in {}",
                     lookup,
-                    pairs
+                    pairs.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ")
                 );
             }
             Ok(())
