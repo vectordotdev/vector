@@ -2,6 +2,10 @@ use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Returns a reference to a field value specified by the given path.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value get instead."
+)]
 pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Value> {
     let mut path_iter = PathIter::new(path);
 
@@ -15,6 +19,10 @@ pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Va
 }
 
 /// Returns a reference to a field value specified by a path iter.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value get instead."
+)]
 pub fn get_value<I>(mut value: &Value, mut path_iter: I) -> Option<&Value>
 where
     I: Iterator<Item = PathComponent>,

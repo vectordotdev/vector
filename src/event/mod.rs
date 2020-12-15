@@ -13,6 +13,7 @@ pub mod util;
 mod log_event;
 mod lookup;
 mod value;
+mod visitors;
 
 pub use log_event::LogEvent;
 pub use lookup::{Lookup, LookupBuf, Segment, SegmentBuf};

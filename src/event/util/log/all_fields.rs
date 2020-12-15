@@ -7,6 +7,10 @@ use std::{
 
 /// Iterates over all paths in form "a.b[0].c[1]" in alphabetical order
 /// and their corresponding values.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value pairs instead."
+)]
 pub fn all_fields<'a>(
     fields: &'a BTreeMap<String, Value>,
 ) -> impl Iterator<Item = (String, &'a Value)> + Serialize {
@@ -14,12 +18,20 @@ pub fn all_fields<'a>(
 }
 
 #[derive(Clone)]
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value pairs instead."
+)]
 enum LeafIter<'a> {
     Map(btree_map::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
 #[derive(Clone)]
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value pairs instead."
+)]
 enum PathComponent<'a> {
     Key(&'a String),
     Index(usize),
@@ -27,6 +39,10 @@ enum PathComponent<'a> {
 
 /// Performs depth-first traversal of the nested structure.
 #[derive(Clone)]
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value pairs instead."
+)]
 struct FieldsIter<'a> {
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,

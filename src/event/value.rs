@@ -477,13 +477,6 @@ impl Value {
                 trace!(?item, "Found.");
                 Ok(Some(item))
             },
-            // This is just not allowed!
-            (_, Value::Boolean(_))
-            | (_, Value::Bytes(_))
-            | (_, Value::Timestamp(_))
-            | (_, Value::Float(_))
-            | (_, Value::Integer(_))
-            | (_, Value::Null) => unimplemented!(),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -534,11 +527,21 @@ impl Value {
                         Ok(None)
                     },
                 }
-            }
+            },
             (Some(Segment::Field { .. }), Value::Array(_)) => {
                 trace!("Mismatched field trying to access array.");
                 Ok(None)
-            }
+            },
+            // This is just not allowed!
+            (Some(_s), Value::Boolean(_))
+            | (Some(_s), Value::Bytes(_))
+            | (Some(_s), Value::Timestamp(_))
+            | (Some(_s), Value::Float(_))
+            | (Some(_s), Value::Integer(_))
+            | (Some(_s), Value::Null) => {
+                trace!("Mismatched primitive field while trying to use segment.");
+                Ok(None)
+            },
         }
     }
 

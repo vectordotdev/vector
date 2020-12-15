@@ -2,10 +2,18 @@ use super::{PathComponent, PathIter, Value};
 use std::{collections::BTreeMap, iter::Peekable};
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value insert instead."
+)]
 pub fn insert(fields: &mut BTreeMap<String, Value>, path: &str, value: Value) -> Option<Value> {
     map_insert(fields, PathIter::new(path).peekable(), value)
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value insert instead."
+)]
 pub fn insert_path(
     fields: &mut BTreeMap<String, Value>,
     path: Vec<PathComponent>,
@@ -14,6 +22,10 @@ pub fn insert_path(
     map_insert(fields, path.into_iter().peekable(), value)
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value insert instead."
+)]
 fn map_insert<I>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<I>,
@@ -46,6 +58,10 @@ where
     }
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value insert instead."
+)]
 fn array_insert<I>(
     values: &mut Vec<Value>,
     mut path_iter: Peekable<I>,

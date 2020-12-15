@@ -5,6 +5,10 @@ use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value remove instead."
+)]
 pub fn remove(fields: &mut BTreeMap<String, Value>, path: &str, prune: bool) -> Option<Value> {
     remove_map(fields, PathIter::new(path).peekable(), prune).map(|(value, _)| value)
 }
@@ -12,6 +16,10 @@ pub fn remove(fields: &mut BTreeMap<String, Value>, path: &str, prune: bool) -> 
 /// Recursively iterate through the path, and remove the last path
 /// element. This is the top-level function which can remove from any
 /// type of `Value`.
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value remove instead."
+)]
 fn remove_rec(value: &mut Value, path: Peekable<PathIter>, prune: bool) -> Option<(Value, bool)> {
     match value {
         Value::Map(map) => remove_map(map, path, prune),
@@ -20,6 +28,10 @@ fn remove_rec(value: &mut Value, path: Peekable<PathIter>, prune: bool) -> Optio
     }
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value remove instead."
+)]
 fn remove_array(
     array: &mut Vec<Value>,
     mut path: Peekable<PathIter>,
@@ -36,6 +48,10 @@ fn remove_array(
     }
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value remove instead."
+)]
 fn remove_map(
     fields: &mut BTreeMap<String, Value>,
     mut path: Peekable<PathIter>,
@@ -58,6 +74,10 @@ fn remove_map(
     }
 }
 
+#[deprecated(
+    since = "0.12",
+    note = "Please use Event/Value remove instead."
+)]
 fn array_remove(values: &mut Vec<Value>, index: usize) -> Option<Value> {
     match (index + 1).cmp(&values.len()) {
         Ordering::Less => Some(mem::replace(&mut values[index], Value::Null)),
