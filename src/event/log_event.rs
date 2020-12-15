@@ -40,13 +40,15 @@ impl LogEvent {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if self.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
                         self.get(needle)
                     },
                     None => None,
@@ -58,12 +60,15 @@ impl LogEvent {
             } => {
                 if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = ?name, "Getting from root.");
+                    trace!(field = %name, "Getting from root.");
                     self.fields.get(name)
                 } else {
-                    trace!(key = ?name, "Descending into map.");
+                    trace!(field = %name, "Descending into map.");
                     match self.fields.get(name) {
-                        Some(v) => v.get(working_lookup).ok().unwrap_or(None),
+                        Some(v) => v.get(working_lookup).unwrap_or_else(|e| {
+                            trace!(?e);
+                            None
+                        }),
                         None => None,
                     }
                 }
@@ -101,13 +106,15 @@ impl LogEvent {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if self.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
                         self.get_mut(needle)
                     },
                     None => None,
@@ -119,12 +126,15 @@ impl LogEvent {
             } => {
                 if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = ?name, "Getting from root.");
+                    trace!(field = %name, "Getting from root.");
                     self.fields.get_mut(name)
                 } else {
-                    trace!(key = ?name, "Descending into map.");
+                    trace!(field = %name, "Descending into map.");
                     match self.fields.get_mut(name) {
-                        Some(v) => v.get_mut(working_lookup).ok().unwrap_or(None),
+                        Some(v) => v.get_mut(working_lookup).unwrap_or_else(|e| {
+                            trace!(?e);
+                            None
+                        }),
                         None => None,
                     }
                 }
@@ -163,6 +173,7 @@ impl LogEvent {
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
             SegmentBuf::Coalesce(sub_segments) => {
+                trace!("Seeking first match of coalesce.");
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
@@ -171,13 +182,15 @@ impl LogEvent {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if !self.contains(&lookup) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
                         self.insert(needle, value)
                     },
                     None => None,
@@ -188,7 +201,7 @@ impl LogEvent {
                 requires_quoting: _,
             } => {
                 let next_value = match working_lookup.get(0) {
-                    Some(SegmentBuf::Index(next_len)) => Value::Array(Vec::with_capacity(*next_len)),
+                    Some(SegmentBuf::Index(_)) => Value::Array(Vec::with_capacity(0)),
                     Some(SegmentBuf::Field { .. }) => Value::Map(Default::default()),
                     Some(SegmentBuf::Coalesce(set)) => {
                         let mut cursor_set = set;
@@ -202,16 +215,20 @@ impl LogEvent {
                         }
                     }
                     None => {
-                        trace!(key = ?name, "Getting from root.");
+                        trace!(field = %name, "Getting from root.");
                         return self.fields.insert(name, value.into())
                     }
                 };
+                trace!(field = %name, "Seeking into map.");
                 self.fields.entry(name)
                     .or_insert_with(|| {
                         trace!("Inserting at leaf.");
                         next_value
                     })
-                    .insert(working_lookup, value).ok().unwrap_or(None)
+                    .insert(working_lookup, value).unwrap_or_else(|e| {
+                        trace!(?e);
+                        None
+                    })
             },
             // In this case, the user has passed us an invariant.
             SegmentBuf::Index(_) => {
@@ -242,6 +259,7 @@ impl LogEvent {
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
             Segment::Coalesce(sub_segments) => {
+                trace!("Seeking first match of coalesce.");
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
@@ -250,13 +268,15 @@ impl LogEvent {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if self.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
                         self.remove(needle, prune)
                     },
                     None => None,
@@ -268,7 +288,7 @@ impl LogEvent {
             } => {
                 if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = ?name, "Getting from root.");
+                    trace!(field = %name, "Getting from root.");
                     let retval = self.fields.remove(name);
                     if prune && self.fields.get(name) == Some(&Value::Null) {
                         self.fields.remove(name);
@@ -276,9 +296,12 @@ impl LogEvent {
                     retval
 
                 } else {
-                    trace!(key = ?name, "Descending into map.");
+                    trace!(field = %name, "Seeking into map.");
                     let retval = match self.fields.get_mut(name) {
-                        Some(v) => v.remove(working_lookup, prune).ok().unwrap_or(None),
+                        Some(v) => v.remove(working_lookup, prune).unwrap_or_else(|e| {
+                            trace!(?e);
+                            None
+                        }),
                         None => None,
                     };
                     if prune && self.fields.get(name) == Some(&Value::Null) {

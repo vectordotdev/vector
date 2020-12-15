@@ -176,6 +176,7 @@ impl Value {
             (None, item) => {
                 let mut value = value.into();
                 core::mem::swap(&mut value, item);
+                trace!("Inserted");
                 Ok(Some(value))
             },
             // This is just not allowed!
@@ -183,8 +184,7 @@ impl Value {
             | (_, Value::Bytes(_))
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
-            | (_, Value::Integer(_))
-            | (_, Value::Null) => Err("Cannot insert value nested inside a primitive field.".into()),
+            | (_, Value::Integer(_)) => Err("Cannot insert value nested inside a primitive field.".into()),
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -194,23 +194,24 @@ impl Value {
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the insert.
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    trace!(?lookup, "Checking coalesce option.");
                     if !sub_value.contains(&lookup) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Inserting value at coalesce option.");
                         sub_value.insert(needle, value)
                     },
                     None => Ok(None),
                 }
-            }
+            },
             // Descend into a map
             (Some(SegmentBuf::Field { ref name, .. }), Value::Map(map)) => {
-                trace!(key = ?name, "Descending into map.");
+                trace!(field = %name, "Seeking into map.");
                 let next_value = match working_lookup.get(0) {
                     Some(SegmentBuf::Index(next_len)) => Value::Array(Vec::with_capacity(*next_len)),
                     Some(SegmentBuf::Field { .. }) => Value::Map(Default::default()),
@@ -219,14 +220,20 @@ impl Value {
                         loop {
                             match cursor_set.get(0).and_then(|v| v.get(0)) {
                                 None => return Err("Met 0 length coalesce sub segment.".into()),
-                                Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
-                                Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                Some(SegmentBuf::Field { .. }) => break {
+                                    trace!("Preparing inner map.");
+                                    Value::Map(Default::default())
+                                },
+                                Some(SegmentBuf::Index(_)) => break {
+                                    trace!("Preparing inner array.");
+                                    Value::Array(Vec::with_capacity(0))
+                                },
                                 Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
                             }
                         }
                     }
                     None => {
-                        trace!(key = ?name, "Inserting at leaf.");
+                        trace!(field = %name, "Inserted.");
                         return Ok(map.insert(name.clone(), value.into()))
                     }
                 };
@@ -237,51 +244,113 @@ impl Value {
                     })
                     .insert(working_lookup, value)
             }
-            (Some(SegmentBuf::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(SegmentBuf::Index(_)), Value::Map(_)) => {
+                trace!("Mismatched index trying to access map.");
+                Ok(None)
+            },
             // Descend into an array
             (Some(SegmentBuf::Index(i)), Value::Array(array)) => {
-                trace!(key = ?i, "Descending into array.");
                 match array.get_mut(i) {
-                    Some(inner) => inner.insert(working_lookup, value),
+                    Some(inner) => {
+                        trace!(index = ?i, "Seeking into array.");
+                        inner.insert(working_lookup, value)
+                    },
                     None => {
-                        trace!(key = ?i, "Resizing array to fit.");
+                        trace!(lenth = ?i, "Array too small, resizing array to fit.");
                         // Fill the vector to the index.
                         array.resize(i, Value::Null);
                         let mut retval = Ok(None);
                         let next_val = match working_lookup.get(0) {
                             Some(SegmentBuf::Index(next_len)) => {
                                 let mut inner = Value::Array(Vec::with_capacity(*next_len));
-                                trace!("Next step is an array.");
+                                trace!("Preparing inner array.");
                                 retval = inner.insert(working_lookup, value);
                                 inner
                             },
                             Some(SegmentBuf::Field { .. }) => {
                                 let mut inner = Value::Map(Default::default());
-                                trace!("Next step is a map.");
+                                trace!("Preparing inner map.");
                                 retval = inner.insert(working_lookup, value);
                                 inner
                             },
                             Some(SegmentBuf::Coalesce(set)) => {
                                 let mut cursor_set = set;
-                                trace!("Next step is a coalesce.");
                                 loop {
                                     match cursor_set.get(0).and_then(|v| v.get(0)) {
                                         None => return Err("Met 0 length coalesce sub segment.".into()),
-                                        Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
-                                        Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                        Some(SegmentBuf::Field { .. }) => break {
+                                            let mut inner = Value::Map(Default::default());
+                                            trace!("Preparing inner map.");
+                                            retval = inner.insert(working_lookup, value);
+                                            inner
+                                        },
+                                        Some(SegmentBuf::Index(_)) => break {
+                                            let mut inner = Value::Array(Vec::with_capacity(0));
+                                            trace!("Preparing inner array.");
+                                            retval = inner.insert(working_lookup, value);
+                                            inner
+                                        },
                                         Some(SegmentBuf::Coalesce(set)) => cursor_set = set,
                                     }
                                 }
                             },
                             None => value.into(),
                         };
-                        trace!(?next_val, "Pushing on to array.");
+                        trace!(?next_val, "Setting index to value.");
                         array.push(next_val);
                         retval
                     },
                 }
-            }
-            (Some(SegmentBuf::Field { .. }), Value::Array(_)) => Ok(None),
+            },
+            (Some(SegmentBuf::Field { .. }), Value::Array(_)) => {
+                trace!("Mismatched field trying to access array.");
+                Ok(None)
+            },
+            // This situation is surprisingly common due to how nulls full sparse vectors.
+            (Some(segment), val) if val == &mut Value::Null => {
+                let mut retval;
+                let this_val = match segment {
+                    SegmentBuf::Index(_) => {
+                        let mut inner = Value::Array(Vec::with_capacity(0));
+                        trace!("Preparing inner array.");
+                        working_lookup.push_front(segment);
+                        retval = inner.insert(working_lookup, value);
+                        inner
+                    },
+                    SegmentBuf::Field { .. } => {
+                        let mut inner = Value::Map(Default::default());
+                        trace!("Preparing inner map.");
+                        working_lookup.push_front(segment);
+                        retval = inner.insert(working_lookup, value);
+                        inner
+                    },
+                    SegmentBuf::Coalesce(set) => {
+                        let mut cursor_set = &set;
+                        loop {
+                            match cursor_set.get(0).and_then(|v| v.get(0)) {
+                                None => return Err("Met 0 length coalesce sub segment.".into()),
+                                Some(SegmentBuf::Field { .. }) => break {
+                                    let mut inner = Value::Map(Default::default());
+                                    trace!("Preparing inner map.");
+                                    retval = inner.insert(working_lookup, value);
+                                    inner
+                                },
+                                Some(SegmentBuf::Index(_)) => break {
+                                    let mut inner = Value::Array(Vec::with_capacity(0));
+                                    trace!("Preparing inner array.");
+                                    retval = inner.insert(working_lookup, value);
+                                    inner
+                                },
+                                Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
+                            }
+                        }
+                    },
+                };
+                trace!(val = ?this_val, "Setting previously existing null to value.");
+                *val = this_val;
+                retval
+            },
+            (Some(segment), Value::Null) => unreachable!("This is covered by the above case."),
         }
     }
 
@@ -304,7 +373,10 @@ impl Value {
 
         let retval = match (this_segment, &mut *self) {
             // We've met an end without finding a value. (Terminus nodes on arrays/maps detected prior)
-            (None, _item) => Ok(None),
+            (None, _item) => {
+                trace!("Found nothing to remove.");
+                Ok(None)
+            },
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
@@ -322,13 +394,15 @@ impl Value {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if value.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
                     Some(needle) => {
-                        trace!(?needle, "Removing inside coalesce option.");
                         value.remove(needle, prune)
                     },
                     None => Ok(None),
@@ -337,10 +411,10 @@ impl Value {
             // Descend into a map
             (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
                 if working_lookup.len() == 0 {
-                    trace!(key = ?name, "Removing from map.");
+                    trace!(field = ?name, "Removing from map.");
                     Ok(map.remove(*name))
                 } else {
-                    trace!(key = ?name, "Descending into map.");
+                    trace!(field = ?name, "Descending into map.");
                     let retval = match map.get_mut(*name) {
                         Some(inner) => inner.remove(working_lookup.clone(), prune),
                         None => Ok(None),
@@ -355,7 +429,7 @@ impl Value {
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 if working_lookup.len() == 0 {
-                    trace!(key = ?i, "Removing from array.");
+                    trace!(index = ?i, "Removing from array.");
                     // We don't **actually** want to remove the index, we just want to swap it with a null.
                     if let Some(value) = array.get_mut(i) {
                         let mut holder = Value::Null;
@@ -365,7 +439,7 @@ impl Value {
                         Ok(None)
                     }
                 } else {
-                    trace!(key = ?i, "Descending into array.");
+                    trace!(index = ?i, "Descending into array.");
                     let retval = match array.get_mut(i) {
                         Some(inner) => inner.remove(working_lookup.clone(), prune),
                         None => Ok(None),
@@ -400,7 +474,7 @@ impl Value {
         match (this_segment, self) {
             // We've met an end and found our value.
             (None, item) => {
-                trace!(?item, "Got item.");
+                trace!(?item, "Found.");
                 Ok(Some(item))
             },
             // This is just not allowed!
@@ -420,8 +494,11 @@ impl Value {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
                     if value.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
@@ -434,7 +511,7 @@ impl Value {
             }
             // Descend into a map
             (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
-                trace!(key = ?name, "Descending into map.");
+                trace!(field = %name, "Descending into map.");
                 match map.get(*name) {
                     Some(inner) => inner.get(working_lookup.clone()),
                     None => {
@@ -443,10 +520,13 @@ impl Value {
                     },
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_)) => {
+                trace!("Mismatched index trying to access map.");
+                Ok(None)
+            },
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
-                trace!(key = ?i, "Descending into array.");
+                trace!(index = %i, "Descending into array.");
                 match array.get(i) {
                     Some(inner) => inner.get(working_lookup.clone()),
                     None => {
@@ -455,7 +535,10 @@ impl Value {
                     },
                 }
             }
-            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(Segment::Field { .. }), Value::Array(_)) => {
+                trace!("Mismatched field trying to access array.");
+                Ok(None)
+            }
         }
     }
 
@@ -471,7 +554,10 @@ impl Value {
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
-            (None, item) => Ok(Some(item)),
+            (None, item) => {
+                trace!(?item, "Found.");
+                Ok(Some(item))
+            },
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
@@ -489,8 +575,11 @@ impl Value {
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     if value.contains(lookup.clone()) {
+                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
+                    } else {
+                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
@@ -503,22 +592,28 @@ impl Value {
             }
             // Descend into a map
             (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
-                trace!(key = ?name, "Descending into map.");
+                trace!(field = %name, "Seeking into map.");
                 match map.get_mut(*name) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_)) => {
+                trace!("Mismatched index trying to access map.");
+                Ok(None)
+            },
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
-                trace!(key = ?i, "Descending into array.");
+                trace!(index = %i, "Seeking into array.");
                 match array.get_mut(i) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
+            (Some(Segment::Field { .. }), Value::Array(_)) => {
+                trace!("Mismatched field trying to access array.");
+                Ok(None)
+            }
         }
     }
 
