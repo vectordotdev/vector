@@ -5,6 +5,11 @@ remap: {
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
+	#InNOut: {
+		in:  string
+		out: string
+	}
+
 	{
 		description: """
 			The Timber Remap Language (TRL) is a single-purpose, [Rust](\(urls.rust))-native data
@@ -51,7 +56,8 @@ remap: {
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
 			category:    "coerce" | "numeric" | "object" | "parse" | "text" | "hash" | "event" | "networking"
 			description: string
-			examples: [#RemapExample, ...#RemapExample]
+			examples?: [#RemapExample, ...#RemapExample]
+			in_n_out?: [#InNOut, #InNOut]
 			name: Name
 		}
 	}
@@ -71,7 +77,7 @@ remap: {
 
 		description: string
 		use: [#Use, ...#Use]
-		examples: [string, ...string]
+		examples?: [string, ...string]
 	}
 
 	types: {
@@ -246,20 +252,21 @@ remap: {
 		name:        RuleName
 		href:        string // Ensures that we don't end up with clashing anchors
 		description: string
-		examples: [string, ...string]
+		examples?: [string, ...string]
+		in_n_out?: [#InNOut, ...#InNOut]
 		operators?: #Operators
 		warnings?: [string, ...string]
 	}
 
 	syntax: {
-		"Dot notation": {
-			href: "dot-notation"
+		"Paths": {
+			href: "paths"
 
 			description: """
 				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
 				it represents the object arriving into the transform. That object can be a
 				log or a metric. To give an example, imagine you're writing a TRL script to handle
-				logs that are already in [JSON](\(urls.json)) form.
+				logs that are already in [JSON](\(urls.json)) form. Here's an example input:
 
 				```json
 				{"status_code":200,"username":"booper1234","message":"Successful transaction"}
@@ -271,16 +278,43 @@ remap: {
 				delete fields (`del(.username)`), store those values in variables (`$code =
 				.status_code`), and more.
 
-				The dot can also represent nested values, for example `.transaction.id` or
-				`.geo.latitude`.
+				### Nested values
+
+				The dot syntax can also represent nested values, for example `.transaction.id` or
+				`.geo.latitude`. You can assign nested values
+
+				### Path coalescing
+
+				Path *coalescing* in TRL enables you to set multiple values at once. This
+				expression, for example would set `user.first_name` and `user.last_name` to the same
+				value:
+
+				```
+				user.(first_name | last_name) = "Nyambi"
+				```
+
+				### Quoted paths
+
+				In the examples above, all paths have used literals à la `.foo.bar`. But path
+				segments can also be quoted, as in this example:
+
+				```
+				$fav_color = user."favorite color"
+				```
+
+				Quoted paths are useful when keys contain whitespace.
+
+				### Indexing
+
+				Values inside TRL arrays can be accessed via index (beginning with 0). For the array
+				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
 				"""
 			examples: [
 				".",
 				".status_code",
-				".message",
-				".username",
+				#".message.event."time of occurrence""#,
 				".transaction.id",
-				".geo.latitude",
+				".user.hobbies[0].description",
 			]
 		}
 
@@ -296,20 +330,20 @@ remap: {
 				* [Blocks](#blocks)
 
 				*All* expressions in TRL resolve to a concrete value. Here's how that works for each
-				of the four kinds of expressions:
+				of the four kinds:
 
-				Expression type | Resolves to | Example in | Example out
-				:---------------|:------------|:-----------|:-----------
-				Assignment | The assigned value | `.success = false` | `false`
-				Control flow statements | The value returned by the chosen expression | `if false { "no" } else { "yes" }` | `"yes"`
-				Boolean expressions | The returned Boolean value | `starts_with("Vector", "Vec")` | `true`
-				Blocks | The value returned by the last expression in the block | `{ $important = true; $important }` | `true`
+				Expression type | Resolves to
+				:---------------|:-----------
+				Assignment | The assigned value
+				Control flow statements | The value returned by the chosen expression
+				Boolean expressions | The returned Boolean value
+				Blocks | The value returned by the last expression in the block
 				"""
 
-			examples: [
-				#".request_id = uuid_v4()"#,
-				#"if (starts_with("v1", .version)) { .is_v1 = true }"#,
-				#"contains("emergency", .message)"#,
+			in_n_out: [
+				{in: #".request_id = "a1b2c3d4e5f6""#, out:                       "\"a1b2c3d4e5f6\""},
+				{in: #"if (starts_with("v1", "v1.2.5")) { .is_v1 = true }"#, out: "true"},
+				{in: #"contains("emergency", "this is an emergency")"#, out:      "true"},
 			]
 		}
 
@@ -439,19 +473,19 @@ remap: {
 			examples: [
 				#"$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }"#,
 				"""
-				$very_important = {
-					$fail_code = .status_code >= 500
-					del(.status_code)
-					$paying_customer = .user.plan == "enterprise"
-					del(.user)
+					$very_important = {
+						$fail_code = .status_code >= 500
+						del(.status_code)
+						$paying_customer = .user.plan == "enterprise"
+						del(.user)
 
-					$fail_code && $paying_custmer
-				}
+						$fail_code && $paying_custmer
+					}
 
-				.if ($very_important) {
-					.important = true
-				}
-				""",
+					.if ($very_important) {
+						.important = true
+					}
+					""",
 			]
 		}
 
