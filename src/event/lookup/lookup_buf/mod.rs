@@ -8,8 +8,6 @@ use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     ops::{Index, IndexMut},
-    ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
-    slice::Iter,
     str,
     str::FromStr,
 };

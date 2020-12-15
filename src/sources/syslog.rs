@@ -441,7 +441,7 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::{Event, Segment},
+        event::{Event},
     };
     use chrono::prelude::*;
 

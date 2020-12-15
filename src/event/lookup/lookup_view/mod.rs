@@ -6,7 +6,6 @@ mod test;
 use super::{segmentbuf::SegmentBuf, LookupBuf};
 use crate::event::lookup::Segment;
 use core::fmt;
-use nom::lib::std::vec::IntoIter;
 use pest::iterators::Pair;
 use pest::Parser;
 use remap::parser::{Parser as RemapParser, ParserRule};
@@ -17,8 +16,6 @@ use std::ops::{Index, IndexMut};
 use std::{
     collections::VecDeque,
     convert::TryFrom,
-    ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
-    slice::Iter,
     str,
 };
 

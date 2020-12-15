@@ -188,7 +188,8 @@ impl Value {
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
-                    let lookup = LookupBuf::try_from(sub_segment)?;
+                    let mut lookup = LookupBuf::try_from(sub_segment)?;
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the insert.
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     trace!(?lookup, "Checking coalesce option.");
@@ -279,7 +280,6 @@ impl Value {
                 }
             }
             (Some(SegmentBuf::Field { .. }), Value::Array(_)) => Ok(None),
-            (Some(SegmentBuf::Index(_)), Value::Array(_)) => Ok(None),
         }
     }
 
@@ -298,7 +298,7 @@ impl Value {
 
         let retval = match (this_segment, &mut *self) {
             // We've met an end without finding a value. (Terminus nodes on arrays/maps detected prior)
-            (None, item) => Ok(None),
+            (None, _item) => Ok(None),
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
@@ -311,16 +311,20 @@ impl Value {
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
-                    let lookup = Lookup::try_from(sub_segment)?;
+                    let mut lookup = Lookup::try_from(sub_segment)?;
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if value.contains(lookup.clone()) {
                         needle = Some(lookup);
                         break;
                     }
                 }
                 match needle {
-                    Some(needle) => value.remove(needle, prune),
+                    Some(needle) => {
+                        trace!(?needle, "Removing inside coalesce option.");
+                        value.remove(needle, prune)
+                    },
                     None => Ok(None),
                 }
             }
@@ -367,7 +371,6 @@ impl Value {
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
         };
 
         if prune && is_empty {
@@ -387,7 +390,10 @@ impl Value {
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
-            (None, item) => Ok(Some(item)),
+            (None, item) => {
+                trace!(?item, "Got item.");
+                Ok(Some(item))
+            },
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
@@ -400,16 +406,20 @@ impl Value {
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
-                    let lookup = Lookup::try_from(sub_segment)?;
+                    let mut lookup = Lookup::try_from(sub_segment)?;
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
                     if value.contains(lookup.clone()) {
                         needle = Some(lookup);
                         break;
                     }
                 }
                 match needle {
-                    Some(needle) => value.get(needle),
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        value.get(needle)
+                    },
                     None => Ok(None),
                 }
             }
@@ -418,7 +428,10 @@ impl Value {
                 trace!(key = ?name, "Descending into map.");
                 match map.get(*name) {
                     Some(inner) => inner.get(working_lookup.clone()),
-                    None => Ok(None),
+                    None => {
+                        trace!("Found nothing.");
+                        Ok(None)
+                    },
                 }
             }
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
@@ -427,7 +440,10 @@ impl Value {
                 trace!(key = ?i, "Descending into array.");
                 match array.get(i) {
                     Some(inner) => inner.get(working_lookup.clone()),
-                    None => Ok(None),
+                    None => {
+                        trace!("Found nothing.");
+                        Ok(None)
+                    },
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
@@ -458,7 +474,8 @@ impl Value {
                 // Creating a needle with a back out of the loop is very important.
                 let mut needle = None;
                 for sub_segment in sub_segments {
-                    let lookup = Lookup::try_from(sub_segment)?;
+                    let mut lookup = Lookup::try_from(sub_segment)?;
+                    lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
                     // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     if value.contains(lookup.clone()) {
@@ -467,7 +484,10 @@ impl Value {
                     }
                 }
                 match needle {
-                    Some(needle) => value.get_mut(needle),
+                    Some(needle) => {
+                        trace!(?needle, "Getting inside coalesce option.");
+                        value.get_mut(needle)
+                    },
                     None => Ok(None),
                 }
             }
@@ -496,7 +516,7 @@ impl Value {
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
-        self.get(lookup.into()).ok().is_some()
+        self.get(lookup.into()).unwrap_or(None).is_some()
     }
 
     /// Produce an iterator over all 'nodes' in the graph of this value.
@@ -1022,7 +1042,6 @@ impl Value {
 mod test {
     use super::*;
     use std::{fs, io::Read, path::Path};
-    use crate::log_event;
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {
@@ -1135,6 +1154,27 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+        }
+
+        #[test]
+        fn coalesced_index_with_tail() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "([0] | [1]).bloop";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None); // Duplicated on purpose.
+            assert_eq!(value.as_array()[0].as_map()["bloop"], marker);
+            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+
+            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone())); // Duplicated on purpose.
         }
     }
 

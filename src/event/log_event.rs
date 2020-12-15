@@ -4,7 +4,6 @@ use crate::event::{
     Lookup, LookupBuf, Value,
 };
 use serde::{Deserialize, Serialize};
-use std::ops::IndexMut;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -494,10 +493,10 @@ mod test {
         fn coalesced_root() -> crate::Result<()> {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
-            let lookup = LookupBuf::from_str("(snoot | boot)")?;
+            let lookup = LookupBuf::from_str("(snoot | boot).loot")?;
             let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
-            assert_eq!(event.inner()["snoot"], value);
+            assert_eq!(event.inner()["snoot"].as_map()["loot"], value);
             assert_eq!(event.get(&lookup), Some(&value));
             assert_eq!(event.get_mut(&lookup), Some(&mut value));
             assert_eq!(event.remove(&lookup, false), Some(value));
@@ -526,6 +525,32 @@ mod test {
             Ok(())
         }
 
+        #[test]
+        fn coalesced_with_nesting() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup = LookupBuf::from_str("root.(snoot | boot.beep).leep")?;
+            let mut value = Value::Boolean(true);
+
+            // This is deliberately duplicated!!! Because it's a coalesce both fields will be filled.
+            // This is the point of the test!
+            event.insert(lookup.clone(), value.clone());
+            event.insert(lookup.clone(), value.clone());
+
+            assert_eq!(event.inner()["root"].as_map()["snoot"].as_map()["leep"], value);
+            assert_eq!(event.inner()["root"].as_map()["boot"].as_map()["beep"].as_map()["leep"], value);
+
+            // This repeats, because it's the purpose of the test!
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value.clone()));
+            // Now that we removed one, we will get the other.
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value.clone()));
+
+            Ok(())
+        }
         #[test]
         fn map_field() -> crate::Result<()> {
             crate::test_util::trace_init();
