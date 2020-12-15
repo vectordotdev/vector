@@ -1,11 +1,9 @@
-use super::{PathComponent, PathIter, Value};
+use super::{PathComponent, PathIter};
+use crate::event::Value;
 use std::collections::BTreeMap;
 
 /// Checks whether a field specified by a given path is present.
-#[deprecated(
-    since = "0.12",
-    note = "Please use Event/Value contains instead."
-)]
+#[deprecated(since = "0.12.0", note = "Please use Event/Value contains instead.")]
 pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     let mut path_iter = PathIter::new(path);
 
@@ -18,10 +16,7 @@ pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     }
 }
 
-#[deprecated(
-    since = "0.12",
-    note = "Please use Event/Value contains instead."
-)]
+#[deprecated(since = "0.12.0", note = "Please use Event/Value contains instead.")]
 fn value_contains<I>(mut value: &Value, mut path_iter: I) -> bool
 where
     I: Iterator<Item = PathComponent>,

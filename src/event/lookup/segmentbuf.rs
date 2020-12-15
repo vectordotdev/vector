@@ -90,7 +90,7 @@ impl Display for SegmentBuf {
             } => write!(formatter, "\"{}\"", name),
             SegmentBuf::Coalesce(v) => write!(
                 formatter,
-                "{}",
+                "({})",
                 v.iter()
                     .map(|inner| inner
                         .iter()
@@ -106,7 +106,7 @@ impl Display for SegmentBuf {
 
 impl From<String> for SegmentBuf {
     fn from(mut name: String) -> Self {
-        let requires_quoting = name.starts_with("\"");
+        let requires_quoting = name.starts_with('\"');
         if requires_quoting {
             // There is unfortunately not way to make an owned substring of a string.
             // So we have to take a slice and clone it.

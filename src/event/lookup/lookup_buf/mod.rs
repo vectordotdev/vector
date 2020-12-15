@@ -91,16 +91,16 @@ impl Display for LookupBuf {
                     name: _,
                     requires_quoting: _,
                 } => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
                 SegmentBuf::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
                 SegmentBuf::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"({})."#, segment)?,
-                    None | Some(_) => write!(f, "({})", segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
+                    None | Some(_) => write!(f, "{}", segment)?,
                 },
             }
             next = peeker.next();

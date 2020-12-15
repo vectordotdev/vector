@@ -65,7 +65,7 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::GlobalOptions, test_util::collect_ready, event::Lookup};
+    use crate::{config::GlobalOptions, event::Lookup, test_util::collect_ready};
     use tokio::time::{delay_for, Duration};
 
     #[test]
@@ -102,12 +102,14 @@ mod tests {
 
         let log = logs[0].as_log();
         assert_eq!(log[Lookup::from_str("message").unwrap()], ERROR_TEXT.into());
-        assert!(
-            log["timestamp"]
-                .as_timestamp()
-                > &start
+        assert!(log["timestamp"].as_timestamp() > &start);
+        assert_eq!(
+            log[Lookup::from_str("metadata.kind").unwrap()],
+            "event".into()
         );
-        assert_eq!(log[Lookup::from_str("metadata.kind").unwrap()], "event".into());
-        assert_eq!(log[Lookup::from_str("metadata.level").unwrap()], "ERROR".into());
+        assert_eq!(
+            log[Lookup::from_str("metadata.level").unwrap()],
+            "ERROR".into()
+        );
     }
 }

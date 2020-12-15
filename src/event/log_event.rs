@@ -48,12 +48,10 @@ impl LogEvent {
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        self.get(needle)
-                    },
+                    Some(needle) => self.get(needle),
                     None => None,
                 }
-            },
+            }
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -72,7 +70,7 @@ impl LogEvent {
                         None => None,
                     }
                 }
-            },
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -80,7 +78,7 @@ impl LogEvent {
                         Please report your config."
                 );
                 None
-            },
+            }
         }
     }
 
@@ -114,12 +112,10 @@ impl LogEvent {
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        self.get_mut(needle)
-                    },
+                    Some(needle) => self.get_mut(needle),
                     None => None,
                 }
-            },
+            }
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -138,7 +134,7 @@ impl LogEvent {
                         None => None,
                     }
                 }
-            },
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -146,7 +142,7 @@ impl LogEvent {
                         Please report your config."
                 );
                 None
-            },
+            }
         }
     }
 
@@ -161,7 +157,7 @@ impl LogEvent {
 
     /// Insert a value at a given lookup.
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
-        let mut working_lookup: LookupBuf = lookup.into();
+        let mut working_lookup: LookupBuf = lookup;
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
 
@@ -190,12 +186,10 @@ impl LogEvent {
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        self.insert(needle, value)
-                    },
+                    Some(needle) => self.insert(needle, value),
                     None => None,
                 }
-            },
+            }
             SegmentBuf::Field {
                 name,
                 requires_quoting: _,
@@ -208,28 +202,34 @@ impl LogEvent {
                         loop {
                             match cursor_set.get(0).and_then(|v| v.get(0)) {
                                 None => return None,
-                                Some(SegmentBuf::Field { .. }) => break Value::Map(Default::default()),
-                                Some(SegmentBuf::Index(i)) => break Value::Array(Vec::with_capacity(*i)),
+                                Some(SegmentBuf::Field { .. }) => {
+                                    break Value::Map(Default::default())
+                                }
+                                Some(SegmentBuf::Index(i)) => {
+                                    break Value::Array(Vec::with_capacity(*i))
+                                }
                                 Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
                             }
                         }
                     }
                     None => {
                         trace!(field = %name, "Getting from root.");
-                        return self.fields.insert(name, value.into())
+                        return self.fields.insert(name, value.into());
                     }
                 };
                 trace!(field = %name, "Seeking into map.");
-                self.fields.entry(name)
+                self.fields
+                    .entry(name)
                     .or_insert_with(|| {
                         trace!("Inserting at leaf.");
                         next_value
                     })
-                    .insert(working_lookup, value).unwrap_or_else(|e| {
+                    .insert(working_lookup, value)
+                    .unwrap_or_else(|e| {
                         trace!(?e);
                         None
                     })
-            },
+            }
             // In this case, the user has passed us an invariant.
             SegmentBuf::Index(_) => {
                 error!(
@@ -237,7 +237,7 @@ impl LogEvent {
                         Please report your config."
                 );
                 None
-            },
+            }
         }
     }
 
@@ -276,12 +276,10 @@ impl LogEvent {
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        self.remove(needle, prune)
-                    },
+                    Some(needle) => self.remove(needle, prune),
                     None => None,
                 }
-            },
+            }
             Segment::Field {
                 name,
                 requires_quoting: _,
@@ -294,7 +292,6 @@ impl LogEvent {
                         self.fields.remove(name);
                     }
                     retval
-
                 } else {
                     trace!(field = %name, "Seeking into map.");
                     let retval = match self.fields.get_mut(name) {
@@ -308,9 +305,8 @@ impl LogEvent {
                         self.fields.remove(name);
                     }
                     retval
-
                 }
-            },
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -318,7 +314,7 @@ impl LogEvent {
                         Please report your config."
                 );
                 None
-            },
+            }
         }
     }
 
@@ -520,10 +516,9 @@ impl IntoIterator for LogEvent {
     }
 }
 
-
 impl<T> std::ops::Index<T> for LogEvent
-    where
-        T: Into<Lookup<'static>> + Debug,
+where
+    T: Into<Lookup<'static>> + Debug,
 {
     type Output = Value;
 
@@ -533,14 +528,13 @@ impl<T> std::ops::Index<T> for LogEvent
 }
 
 impl<T> std::ops::IndexMut<T> for LogEvent
-    where
-        T: Into<Lookup<'static>> + Debug,
+where
+    T: Into<Lookup<'static>> + Debug,
 {
     fn index_mut(&mut self, key: T) -> &mut Value {
         self.get_mut(key).expect("Key not found.")
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -651,8 +645,14 @@ mod test {
             event.insert(lookup.clone(), value.clone());
             event.insert(lookup.clone(), value.clone());
 
-            assert_eq!(event.inner()["root"].as_map()["snoot"].as_map()["leep"], value);
-            assert_eq!(event.inner()["root"].as_map()["boot"].as_map()["beep"].as_map()["leep"], value);
+            assert_eq!(
+                event.inner()["root"].as_map()["snoot"].as_map()["leep"],
+                value
+            );
+            assert_eq!(
+                event.inner()["root"].as_map()["boot"].as_map()["beep"].as_map()["leep"],
+                value
+            );
 
             // This repeats, because it's the purpose of the test!
             assert_eq!(event.get(&lookup), Some(&value));
@@ -661,7 +661,7 @@ mod test {
             // Now that we removed one, we will get the other.
             assert_eq!(event.get(&lookup), Some(&value));
             assert_eq!(event.get_mut(&lookup), Some(&mut value));
-            assert_eq!(event.remove(&lookup, false), Some(value.clone()));
+            assert_eq!(event.remove(&lookup, false), Some(value));
 
             Ok(())
         }
@@ -859,7 +859,11 @@ mod test {
                     pairs.contains(&lookup.clone_lookup()),
                     "Failed while looking for {} in {}",
                     lookup,
-                    pairs.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ")
+                    pairs
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
                 );
             }
             Ok(())

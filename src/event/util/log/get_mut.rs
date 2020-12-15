@@ -1,11 +1,9 @@
-use super::{PathComponent, PathIter, Value};
+use super::{PathComponent, PathIter};
+use crate::event::Value;
 use std::collections::BTreeMap;
 
 /// Returns a mutable reference to field value specified by the given path.
-#[deprecated(
-    since = "0.12",
-    note = "Please use Event/Value get_mut instead."
-)]
+#[deprecated(since = "0.12.0", note = "Please use Event/Value get_mut instead.")]
 pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Option<&'a mut Value> {
     let mut path_iter = PathIter::new(path);
 
@@ -18,10 +16,7 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Optio
     }
 }
 
-#[deprecated(
-    since = "0.12",
-    note = "Please use Event/Value get_mut instead."
-)]
+#[deprecated(since = "0.12.0", note = "Please use Event/Value get_mut instead.")]
 fn get_mut_value<I>(mut value: &mut Value, mut path_iter: I) -> Option<&mut Value>
 where
     I: Iterator<Item = PathComponent>,

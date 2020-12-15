@@ -1,4 +1,4 @@
-use crate::event::{Event, LogEvent, Value, LookupBuf};
+use crate::event::{Event, LogEvent, LookupBuf, Value};
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use std::{convert::TryInto, fmt::Debug};
@@ -181,11 +181,13 @@ struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(LookupBuf::from(field.name()), value.to_string());
+        self.0
+            .insert(LookupBuf::from(field.name()), value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(LookupBuf::from(field.name()), format!("{:?}", value));
+        self.0
+            .insert(LookupBuf::from(field.name()), format!("{:?}", value));
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {

@@ -13,11 +13,7 @@ use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
-use std::{
-    collections::VecDeque,
-    convert::TryFrom,
-    str,
-};
+use std::{collections::VecDeque, convert::TryFrom, str};
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -72,15 +68,15 @@ impl<'a> Display for Lookup<'a> {
                     name: _,
                     requires_quoting: _,
                 } => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
                 Segment::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
                 Segment::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"({})."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
             }

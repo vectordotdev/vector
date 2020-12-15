@@ -1,7 +1,7 @@
 use crate::transforms::TaskTransform;
 use crate::{
     config::DataType,
-    event::{Event, LookupBuf, Lookup, Value},
+    event::{Event, Lookup, LookupBuf, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     transforms::Transform,
 };

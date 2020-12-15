@@ -167,12 +167,12 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
+        event::Value,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        event::Value,
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };

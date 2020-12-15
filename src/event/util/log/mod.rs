@@ -7,8 +7,6 @@ mod keys;
 mod path_iter;
 mod remove;
 
-pub(self) use super::Value;
-
 pub use all_fields::all_fields;
 pub use contains::contains;
 pub use get::get;
@@ -21,7 +19,7 @@ pub use remove::remove;
 
 #[cfg(test)]
 pub(self) mod test {
-    use super::Value;
+    use crate::event::Value;
     use serde_json::Value as JsonValue;
     use std::collections::BTreeMap;
 

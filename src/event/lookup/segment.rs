@@ -158,11 +158,14 @@ impl<'a> Segment<'a> {
                 tracing::trace!(segment = %segment_str, ?rule, action = %"push");
                 Segment::field(segment_str, false)
             }
-            _ => Err(format!(
-                "Got invalid lookup rule. Got: {:?}. Want: {:?}",
-                rule,
-                ParserRule::lookup_field,
-            ))?,
+            _ => {
+                return Err(format!(
+                    "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                    rule,
+                    ParserRule::lookup_field,
+                )
+                .into())
+            }
         };
         tracing::trace!(segment = %segment_str, ?rule, action = %"exit");
         Ok(retval)
@@ -199,7 +202,7 @@ impl<'a> Segment<'a> {
             }
         }
         tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
-        retval.ok_or("Expected inner lookup segment, did not get one.".into())
+        retval.ok_or_else(|| "Expected inner lookup segment, did not get one.".into())
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
@@ -227,7 +230,7 @@ impl<'a> Segment<'a> {
             }
         }
         tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
-        retval.ok_or("Expected array index, did not get one.".into())
+        retval.ok_or_else(|| "Expected array index, did not get one.".into())
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
@@ -243,11 +246,13 @@ impl<'a> Segment<'a> {
                 tracing::trace!(segment = %index, ?rule, action = %"push");
                 Segment::index(index)
             }
-            _ => Err(format!(
-                "Got invalid lookup rule. Got: {:?}. Want: {:?}",
-                rule,
-                ParserRule::lookup_array_index,
-            ))?,
+            _ => {
+                return Err(format!(
+                    "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                    rule,
+                    ParserRule::lookup_array_index,
+                ).into())
+            }
         };
         tracing::trace!(segment = %segment_str, ?rule, action = %"exit");
         Ok(retval)
@@ -289,7 +294,7 @@ impl<'a> Display for Segment<'a> {
             } => write!(formatter, "\"{}\"", name),
             Segment::Coalesce(v) => write!(
                 formatter,
-                "{}",
+                "({})",
                 v.iter()
                     .map(|inner| inner
                         .iter()
@@ -305,7 +310,7 @@ impl<'a> Display for Segment<'a> {
 
 impl<'a> From<&'a str> for Segment<'a> {
     fn from(mut name: &'a str) -> Self {
-        let requires_quoting = name.starts_with("\"");
+        let requires_quoting = name.starts_with('\"');
         if requires_quoting {
             let len = name.len();
             name = &name[1..len - 1];

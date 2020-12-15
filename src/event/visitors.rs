@@ -1,7 +1,10 @@
-use serde::de::{MapAccess, Visitor, SeqAccess};
-use std::{fmt::{self, Write}, collections::BTreeMap};
-use crate::{event::{LogEvent, Value}};
+use crate::event::{LogEvent, Value};
 use bytes::Bytes;
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use std::{
+    collections::BTreeMap,
+    fmt::{self},
+};
 
 pub struct LogEventVisitor;
 
@@ -13,8 +16,8 @@ impl<'de> Visitor<'de> for LogEventVisitor {
     }
 
     fn visit_map<A>(self, mut data: A) -> Result<Self::Value, A::Error>
-        where
-            A: MapAccess<'de>,
+    where
+        A: MapAccess<'de>,
     {
         let mut map = BTreeMap::default();
 
@@ -76,8 +79,8 @@ impl<'de> Visitor<'de> for ValueVisitor {
     }
 
     fn visit_seq<A>(self, mut data: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
+    where
+        A: SeqAccess<'de>,
     {
         let mut vec = Vec::with_capacity(data.size_hint().unwrap_or(0));
 
@@ -91,8 +94,8 @@ impl<'de> Visitor<'de> for ValueVisitor {
     }
 
     fn visit_map<A>(self, mut data: A) -> Result<Self::Value, A::Error>
-        where
-            A: MapAccess<'de>,
+    where
+        A: MapAccess<'de>,
     {
         let mut map = BTreeMap::default();
 

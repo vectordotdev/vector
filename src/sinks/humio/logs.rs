@@ -280,7 +280,7 @@ mod integration_tests {
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
-            host_key: log_schema().host_key().to_string(),
+            host_key: log_schema().host_key().clone(),
             compression: Compression::None,
             request: TowerRequestConfig::default(),
             batch: BatchConfig {

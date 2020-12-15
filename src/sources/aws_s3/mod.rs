@@ -385,10 +385,22 @@ mod integration_tests {
             let message = expected_lines[i].as_str();
 
             let log = event.as_log();
-            assert_eq!(log.get(Lookup::from("message")), Some(&Value::from(message.to_string())));
-            assert_eq!(log.get(Lookup::from("bucket")), Some(&Value::from(bucket.clone())));
-            assert_eq!(log.get(Lookup::from("object")), Some(&Value::from(key.clone())));
-            assert_eq!(log.get(Lookup::from("region")), Some(&Value::from("us-east-1")));
+            assert_eq!(
+                log.get(Lookup::from("message")),
+                Some(&Value::from(message.to_string()))
+            );
+            assert_eq!(
+                log.get(Lookup::from("bucket")),
+                Some(&Value::from(bucket.clone()))
+            );
+            assert_eq!(
+                log.get(Lookup::from("object")),
+                Some(&Value::from(key.clone()))
+            );
+            assert_eq!(
+                log.get(Lookup::from("region")),
+                Some(&Value::from("us-east-1"))
+            );
         }
     }
 
