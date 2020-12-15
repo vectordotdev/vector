@@ -10,7 +10,7 @@ remap: functions: redact: {
 		},
 		{
 			name:        "filters"
-			description: "A list of filters to apply"
+			description: "A list of filters to apply to the input value."
 			required:    false
 			type: ["array"]
 			enum: {
@@ -30,7 +30,7 @@ remap: functions: redact: {
 			name: "patterns"
 			description: """
 				A list of patterns to apply. Patterns can be strings or regular expressions; if a
-				string is supplied, Vector searches for exact matches when redacting.
+				string is supplied, Vector searches for exact matches to redact.
 				"""
 			required: false
 			type: ["array"]
@@ -39,7 +39,8 @@ remap: functions: redact: {
 	return: ["string"]
 	category: "text"
 	description: """
-		Obscures sensitive data.
+		Obscures sensitive data, such as personal identification numbers or credit card numbers, in
+		Vector event data.
 		"""
 	examples: [
 		{
