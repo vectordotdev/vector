@@ -65,6 +65,33 @@ impl Expression for IncludesFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use value::Kind;
+
+    test_type_def![
+        value_non_empty_array {
+            expr: |_| IncludesFn {
+                value: Array::from(vec!["foo", true, 27]).boxed(),
+                item: Literal::from("foo").boxed(),
+            },
+            def: TypeDef { fallible: false, kind: Kind::Boolean },
+        }
+
+        value_empty_array {
+            expr: |_| IncludesFn {
+                value: Array::from(vec![]).boxed(), // Empty array is a-okay
+                item: Literal::from("foo").boxed(),
+            },
+            def: TypeDef { fallible: false, kind: Kind::Boolean },
+        }
+
+        value_not_an_array {
+            expr: |_| IncludesFn {
+                value: Literal::from("foo").boxed(), // Must be an array, hence fallible
+                item: Literal::from("foo").boxed(),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
+        }
+    ];
 
     test_function![
         includes => Includes;
