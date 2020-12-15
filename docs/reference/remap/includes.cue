@@ -3,15 +3,15 @@ package metadata
 remap: functions: include: {
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The array"
-			required: true
+			required:    true
 			type: ["array"]
 		},
 		{
-			name: "item"
+			name:        "item"
 			description: "The item to check"
-			required: true
+			required:    true
 			type: ["any"]
 		},
 	]
@@ -33,7 +33,7 @@ remap: functions: include: {
 				"""#
 			output: {
 				includes_banana: true
-				includes_mango: false
+				includes_mango:  false
 			}
 		},
 		{
@@ -48,9 +48,9 @@ remap: functions: include: {
 				"""#
 			output: {
 				includes_empty_list: false
-				includes_hello: true
-				includes_false: true
+				includes_hello:      true
+				includes_false:      true
 			}
-		}
+		},
 	]
 }
