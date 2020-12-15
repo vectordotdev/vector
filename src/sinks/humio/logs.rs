@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
 pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) token: String,
     // Deprecated name

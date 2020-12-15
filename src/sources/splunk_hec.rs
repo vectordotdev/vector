@@ -843,7 +843,7 @@ mod tests {
         HecSinkConfig {
             token: TOKEN.to_owned(),
             endpoint: format!("http://{}", address),
-            host_key: "host".to_owned(),
+            host_key: LookupBuf::from("host"),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,

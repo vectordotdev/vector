@@ -308,7 +308,7 @@ impl Value {
             },
             // This situation is surprisingly common due to how nulls full sparse vectors.
             (Some(segment), val) if val == &mut Value::Null => {
-                let mut retval;
+                let retval;
                 let this_val = match segment {
                     SegmentBuf::Index(_) => {
                         let mut inner = Value::Array(Vec::with_capacity(0));
@@ -350,7 +350,7 @@ impl Value {
                 *val = this_val;
                 retval
             },
-            (Some(segment), Value::Null) => unreachable!("This is covered by the above case."),
+            (Some(_), Value::Null) => unreachable!("This is covered by the above case."),
         }
     }
 

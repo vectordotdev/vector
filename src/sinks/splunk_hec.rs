@@ -31,14 +31,12 @@ pub enum BuildError {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-#[derivative(Default)]
 pub struct HecSinkConfig {
     pub token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
     #[serde(default = "default_host_key")]
-    #[derivative(Default(value = "default_host_key()"))]
     pub host_key: LookupBuf,
     #[serde(default)]
     pub indexed_fields: Vec<LookupBuf>,

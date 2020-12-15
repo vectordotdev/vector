@@ -1,4 +1,4 @@
-use crate::event::{Event, LogEvent, Value};
+use crate::event::{Event, LogEvent, Value, LookupBuf};
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use std::{convert::TryInto, fmt::Debug};
@@ -136,6 +136,13 @@ impl<F: Subscriber + 'static> Subscriber for BroadcastSubscriber<F> {
     }
 }
 
+lazy_static::lazy_static! {
+    static ref METADATA_KIND: LookupBuf = LookupBuf::from_str("metadata.kind").unwrap();
+    static ref METADATA_LEVEL: LookupBuf = LookupBuf::from_str("metadata.level").unwrap();
+    static ref METADATA_MODULE_PATH: LookupBuf = LookupBuf::from_str("metadata.module_path").unwrap();
+    static ref METADATA_TARGET: LookupBuf = LookupBuf::from_str("metadata.target").unwrap();
+}
+
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
@@ -143,11 +150,11 @@ impl From<&tracing::Event<'_>> for Event {
         event.record(&mut maker);
 
         let mut log = maker.0;
-        log.insert("timestamp", now);
+        log.insert(crate::config::log_schema().timestamp_key().clone(), now);
 
         let meta = event.metadata();
         log.insert(
-            "metadata.kind",
+            METADATA_KIND.clone(),
             if meta.is_event() {
                 Value::Bytes("event".to_string().into())
             } else if meta.is_span() {
@@ -156,14 +163,14 @@ impl From<&tracing::Event<'_>> for Event {
                 Value::Null
             },
         );
-        log.insert("metadata.level", meta.level().to_string());
+        log.insert(METADATA_LEVEL.clone(), meta.level().to_string());
         log.insert(
-            "metadata.module_path",
+            METADATA_MODULE_PATH.clone(),
             meta.module_path()
                 .map(|mp| Value::Bytes(mp.to_string().into()))
                 .unwrap_or(Value::Null),
         );
-        log.insert("metadata.target", meta.target().to_string());
+        log.insert(METADATA_TARGET.clone(), meta.target().to_string());
 
         log.into()
     }
@@ -174,27 +181,27 @@ struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(field.name(), value.to_string());
+        self.0.insert(LookupBuf::from(field.name()), value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.insert(field.name(), format!("{:?}", value));
+        self.0.insert(LookupBuf::from(field.name()), format!("{:?}", value));
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.0.insert(field.name(), value);
+        self.0.insert(LookupBuf::from(field.name()), value);
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
         let field = field.name();
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.0.insert(field, value),
-            Err(_) => self.0.insert(field, value.to_string()),
+            Ok(value) => self.0.insert(LookupBuf::from(field), value),
+            Err(_) => self.0.insert(LookupBuf::from(field), value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.0.insert(field.name(), value);
+        self.0.insert(LookupBuf::from(field.name()), value);
     }
 }
