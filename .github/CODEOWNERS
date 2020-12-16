@@ -74,6 +74,7 @@
 /docs/reference/remap/ipv6_to_ipv4.cue @FungusHumungus
 /docs/reference/remap/log.cue @FungusHumungus
 /docs/reference/remap/merge.cue @FungusHumungus
+/docs/reference/remap/parse_aws_vpc_flow.cue @fanatid
 /docs/reference/remap/parse_grok.cue @FungusHumungus
 
 /distribution/ @hoverbear @jamtur01
@@ -201,6 +202,7 @@
 /src/remap/function/ipv6_to_ipv4.rs @FungusHumungus
 /src/remap/function/log.rs @FungusHumungus
 /src/remap/function/merge.rs @FungusHumungus
+/src/remap/function/parse_aws_vpc_flow.cue @fanatid
 /src/remap/function/parse_grok.rs @FungusHumungus
 
 /src/wasm/ @hoverbear @JeanMertz
