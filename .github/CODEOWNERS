@@ -63,6 +63,19 @@
 /docs/reference/components/transforms/split.cue @lukesteensen
 /docs/reference/components/transforms/tokenzier.cue @lukesteensen
 
+/docs/reference/remap/ @JeanMertz
+/docs/reference/remap/assert.cue @FungusHumungus
+/docs/reference/remap/compact.cue @FungusHumungus
+/docs/reference/remap/exists.cue @FungusHumungus
+/docs/reference/remap/flatten.cue @FungusHumungus
+/docs/reference/remap/ip_cidr_contains.cue @FungusHumungus
+/docs/reference/remap/ip_subnet.cue @FungusHumungus
+/docs/reference/remap/ip_to_ipv6.cue @FungusHumungus
+/docs/reference/remap/ipv6_to_ipv4.cue @FungusHumungus
+/docs/reference/remap/log.cue @FungusHumungus
+/docs/reference/remap/merge.cue @FungusHumungus
+/docs/reference/remap/parse_grok.cue @FungusHumungus
+
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @vector-kubernetes
 /distribution/helm/ @vector-kubernetes
@@ -176,6 +189,19 @@
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
+
+/src/remap/ @JeanMertz
+/src/remap/function/assert.rs @FungusHumungus
+/src/remap/function/compact.rs @FungusHumungus
+/src/remap/function/exists.rs @FungusHumungus
+/src/remap/function/flatten.rs @FungusHumungus
+/src/remap/function/ip_cidr_contains.rs @FungusHumungus
+/src/remap/function/ip_subnet.rs @FungusHumungus
+/src/remap/function/ip_to_ipv6.rs @FungusHumungus
+/src/remap/function/ipv6_to_ipv4.rs @FungusHumungus
+/src/remap/function/log.rs @FungusHumungus
+/src/remap/function/merge.rs @FungusHumungus
+/src/remap/function/parse_grok.rs @FungusHumungus
 
 /src/wasm/ @hoverbear @JeanMertz
 
