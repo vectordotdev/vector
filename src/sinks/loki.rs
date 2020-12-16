@@ -15,10 +15,10 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         UriSerde,
@@ -26,7 +26,6 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use derivative::Derivative;
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,8 +34,7 @@ use std::collections::HashMap;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    #[serde(default)]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<Template>,
     labels: HashMap<String, Template>,
@@ -57,11 +55,9 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
     Json,
     Text,
 }
@@ -74,6 +70,7 @@ impl GenerateConfig for LokiConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:3100"
+            encoding = "json"
             labels = {}"#,
         )
         .unwrap()
@@ -100,8 +97,13 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
+        let config = LokiConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
+
         let sink = PartitionHttpSink::new(
-            self.clone(),
+            config.clone(),
             PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
@@ -110,7 +112,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let healthcheck = healthcheck(config, client).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -202,7 +204,7 @@ impl HttpSink for LokiConfig {
 
         let body = serde_json::to_vec(&json).unwrap();
 
-        let uri = format!("{}loki/api/v1/push", self.endpoint);
+        let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
@@ -221,7 +223,7 @@ impl HttpSink for LokiConfig {
 }
 
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint);
+    let uri = format!("{}ready", config.endpoint.uri);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
@@ -322,6 +324,7 @@ mod tests {
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
+            encoding = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"

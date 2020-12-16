@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_cloudwatch_logs: components._aws & {
-	title:       "AWS Cloudwatch Logs"
-	description: sinks._aws_cloudwatch.description
+	title: "AWS Cloudwatch Logs"
 
 	classes: {
 		commonly_used: true
@@ -49,7 +48,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			}
 			tls: enabled: false
 			to: {
-				service: services.aws_cloudwatch
+				service: services.aws_cloudwatch_logs
 
 				interface: {
 					socket: {

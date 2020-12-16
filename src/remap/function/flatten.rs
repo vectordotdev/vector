@@ -28,13 +28,6 @@ struct FlattenFn {
     value: Box<dyn Expression>,
 }
 
-impl FlattenFn {
-    #[cfg(test)]
-    pub fn new(value: Box<dyn Expression>) -> Self {
-        FlattenFn { value }
-    }
-}
-
 impl Expression for FlattenFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         match self.value.execute(state, object)? {
@@ -165,163 +158,107 @@ impl<'a> std::iter::Iterator for ArrayFlatten<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::array;
-    use crate::map;
 
-    #[test]
-    fn check_flatten() {
-        let cases = vec![
-            (
-                map!["foo": Value::Array(array![42])],
-                Ok(Value::Array(array![42])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": Value::Array(array![42, Value::Array(array![43, 44]),])],
-                Ok(Value::from(vec![
-                    Value::from(42),
-                    Value::from(43),
-                    Value::from(44),
-                ])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": Value::Array(array![42, Value::Array(array![]), 43])],
-                Ok(Value::Array(array![42, 43])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        Value::Array(
-                            array![
-                                42,
-                                Value::Array(array![43, 44, Value::Array(array![45, 46]),]),
-                            ],
-                        )
-                ],
-                Ok(Value::Array(array![42, 43, 44, 45, 46,])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        Value::Array(
-                            array![Value::Array(array![42, 43]), Value::Array(array![44, 45]),],
-                        )
-                ],
-                Ok(Value::Array(array![42, 43, 44, 45,])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": map!["parent": "child"]],
-                Ok(Value::from(map!["parent": "child"])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        map!["parent": map![ "child1": 1,
-                                                 "child2": 2],
-                                 "key": "val"]
-                ],
-                Ok(Value::from(map!["parent.child1": 1,
-                                    "parent.child2": 2,
-                                    "key": "val"])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        map![ "parent": map![ "child1": 1,
-                                                       "child2": map![ "grandchild1": 1,
-                                                                        "grandchild2": 2]],
-                                       "key": "val"]
-                ],
-                Ok(Value::from(map!["parent.child1": 1,
-                                    "parent.child2.grandchild1": 1,
-                                    "parent.child2.grandchild2": 2,
-                                    "key": "val"])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        map!["parent": map![ "child1": Value::Array(array![1, Value::Array(array![2, 3])]),
-                                                 "child2": map!["grandchild1": 1,
-                                                                "grandchild2": Value::Array(array![1, Value::Array(array![2, 3]), 4])]],
-                                 "key": "val"]
-                ],
-                Ok(Value::from(
-                    map!["parent.child1": Value::Array(array![1, Value::Array(array![2, 3])]),
-                                    "parent.child2.grandchild1": 1,
-                                    "parent.child2.grandchild2": Value::Array(array![1, Value::Array(array![2, 3]), 4]),
-                                    "key": "val"],
-                )),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                // If the root object is an array, child maps are not flattened.
-                map![
-                    "foo":
-                        Value::Array(
-                            array![
-                                map![
-                                    "parent1":
-                                        map!["child1": 1,
-                                             "child2": 2]
-                                ],
-                                Value::Array(array![
-                                    map![
-                                        "parent2":
-                                            map!["child3": 3,
-                                                 "child4": 4]
-                                    ],
-                                    map!["parent3": map!["child5": 5]]
-                                ])
-                            ],
-                        )
-                ],
-                Ok(Value::Array(array![
-                    map![
-                        "parent1":
-                            map!["child1": 1,
-                                             "child2": 2]
-                    ],
-                    map![
-                        "parent2":
-                            map!["child3": 3,
-                                             "child4": 4]
-                    ],
-                    map!["parent3": map!["child5": 5]]
-                ])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![
-                    "foo":
-                        map!["parent1": map![ "child1": map![ "grandchild1": 1 ],
-                                                   "child2": map![ "grandchild2": 2,
-                                                                    "grandchild3": 3 ]],
-                                 "parent2": 4]
-                ],
-                Ok(Value::from(map!["parent1.child1.grandchild1": 1,
-                                    "parent1.child2.grandchild2": 2,
-                                    "parent1.child2.grandchild3": 3,
-                                    "parent2": 4])),
-                FlattenFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+    test_function![
+        flatten => Flatten;
 
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object = Value::Map(object);
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
+        array {
+            args: func_args![value: value!([42])],
+            want: Ok(value!([42])),
         }
-    }
+
+        nested_array {
+            args: func_args![value: value!([42, [43, 44]])],
+            want: Ok(value!([42, 43, 44])),
+        }
+
+        nested_empty_array {
+            args: func_args![value: value!([42, [], 43])],
+            want: Ok(value!([42, 43])),
+        }
+
+        double_nested_array {
+            args: func_args![value: value!([42, [43, 44, [45, 46]]])],
+            want: Ok(value!([42, 43, 44, 45, 46])),
+        }
+
+        two_arrays {
+            args: func_args![value: value!([[42, 43], [44, 45]])],
+            want: Ok(value!([42, 43, 44, 45])),
+        }
+
+        map {
+            args: func_args![value: value!({parent: "child"})],
+            want: Ok(value!({parent: "child"})),
+        }
+
+        nested_map {
+            args: func_args![value: value!({parent: {child1: 1, child2: 2}, key: "val"})],
+            want: Ok(value!({"parent.child1": 1, "parent.child2": 2, key: "val"})),
+        }
+
+        double_nested_map {
+            args: func_args![value: value!({
+                parent: {
+                    child1: 1,
+                    child2: { grandchild1: 1, grandchild2: 2 },
+                },
+                key: "val",
+            })],
+            want: Ok(value!({
+                "parent.child1": 1,
+                "parent.child2.grandchild1": 1,
+                "parent.child2.grandchild2": 2,
+                key: "val",
+            })),
+        }
+
+        map_and_array {
+            args: func_args![value: value!({
+                parent: {
+                    child1: [1, [2, 3]],
+                    child2: {grandchild1: 1, grandchild2: [1, [2, 3], 4]},
+                },
+                key: "val",
+            })],
+            want: Ok(value!({
+                "parent.child1": [1, [2, 3]],
+                "parent.child2.grandchild1": 1,
+                "parent.child2.grandchild2": [1, [2, 3], 4],
+                key: "val",
+            })),
+        }
+
+        // If the root object is an array, child maps are not flattened.
+        root_array {
+            args: func_args![value: value!([
+                { parent1: { child1: 1, child2: 2 } },
+                [
+                    { parent2: { child3: 3, child4: 4 } },
+                    { parent3: { child5: 5 } },
+                ],
+            ])],
+            want: Ok(value!([
+                { parent1: { child1: 1, child2: 2 } },
+                { parent2: { child3: 3, child4: 4 } },
+                { parent3: { child5: 5 } },
+            ])),
+        }
+
+        triple_nested_map {
+            args: func_args![value: value!({
+                parent1: {
+                    child1: { grandchild1: 1 },
+                    child2: { grandchild2: 2, grandchild3: 3 },
+                },
+                parent2: 4,
+            })],
+            want: Ok(value!({
+                "parent1.child1.grandchild1": 1,
+                "parent1.child2.grandchild2": 2,
+                "parent1.child2.grandchild3": 3,
+                parent2: 4,
+            })),
+        }
+    ];
 }

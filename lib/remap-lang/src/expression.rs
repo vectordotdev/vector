@@ -53,7 +53,16 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + fmt::Debug + dyn_clone::DynClone {
+    /// Resolve an expression to a concrete [`Value`].
+    ///
+    /// This method is executed at runtime.
+    ///
+    /// An expression is allowed to fail, which aborts the running program.
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
+
+    /// Resolve an expression to its [`TypeDef`] type definition.
+    ///
+    /// This method is executed at compile-time.
     fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
@@ -149,7 +158,7 @@ expression_dispatch![
     Block,
     Function,
     IfStatement,
-    Literal,
+    Literal, // TODO: literal scalar
     Noop,
     Not,
     Path,
@@ -158,7 +167,12 @@ expression_dispatch![
 
 impl<T: Into<Value>> From<T> for Expr {
     fn from(value: T) -> Self {
-        Literal::from(value.into()).into()
+        let value = value.into();
+
+        match value {
+            Value::Array(array) => Array::from(array).into(),
+            _ => Literal::from(value).into(),
+        }
     }
 }
 

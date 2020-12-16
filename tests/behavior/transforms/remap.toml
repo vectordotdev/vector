@@ -54,6 +54,8 @@
     .result_b = .a * (.b + .c) - .d
     .result_c = .a + .b * .c / .d
     .result_d = (.a + .b) * (.c / .d)
+    .result_e = .e / .c
+    .result_f = .e // .c
   """
 [[tests]]
   name = "remap_arithmetic"
@@ -65,6 +67,7 @@
       b = 7
       c = 12
       d = 6
+      e = 9
   [[tests.outputs]]
     extract_from = "remap_arithmetic"
     [[tests.outputs.conditions]]
@@ -72,6 +75,8 @@
       "result_b.equals" = 51
       "result_c.equals" = 17
       "result_d.equals" = 20
+      "result_e.equals" = 0.75
+      "result_f.equals" = 0
 
 [transforms.remap_boolean_arithmetic]
   inputs = []

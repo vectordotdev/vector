@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-11-26"
+last_modified_on: "2020-12-01"
 $schema: ".schema.json"
 title: "0.11 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes"
@@ -12,6 +12,7 @@ tags: ["type: breaking change"]
 
 0.11 includes some minor breaking changes:
 
+1. [The `prometheus` sink has been renamed to `prometheus_exporter`](#first)
 1. [The metrics emitted by the `internal_metrics` source have changed names.](#second)
 1. [The `statsd` sink now supports all socket types.](#third)
 1. [The `reduce` transform `identifier_fields` was renamed to `group_by`.](#fourth)
@@ -22,6 +23,20 @@ tags: ["type: breaking change"]
 We cover each below to help you upgrade quickly:
 
 ## Upgrade Guide
+
+### The `prometheus` sink has been renamed to `prometheus_exporter`<a name="first"></a>
+
+The `prometheus` sink has been renamed to `prometheus_exporter` since 0.11
+introduced a new `prometheus_remote_write` sink. This renaming distringuishes
+between the two. Upgrading is easy:
+
+```diff title="vector.toml"
+[sinks.prometheus]
+-  type = "prometheus"
++  type = "prometheus_exporter"
+-  namespace = "..."
++  default_namesapce = "..."
+```
 
 ### The metrics emitted by the `internal_metrics` source have changed names<a name="second"></a>
 

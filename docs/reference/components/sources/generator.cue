@@ -3,6 +3,10 @@ package metadata
 components: sources: generator: {
 	title: "Generator"
 
+	description: """
+		Generates fakes events, useful for testing, benchmarking, and demoing.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
