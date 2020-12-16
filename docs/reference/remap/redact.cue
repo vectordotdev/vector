@@ -62,14 +62,14 @@ remap: functions: redact: {
 			input: {
 				email: "ana@booper.com"
 			}
-			source: """
+			source: #"""
 				$email_pattern = /^\S+@\S+$/
 
 				.email = redact(.email, filters = ["pattern"], redactor = "full", patterns = [$email_pattern])
-				"""
+				"""#
 			output: {
 				email: "****"
 			}
-		}
+		},
 	]
 }
