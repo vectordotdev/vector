@@ -75,6 +75,7 @@
 /docs/reference/remap/log.cue @FungusHumungus
 /docs/reference/remap/merge.cue @FungusHumungus
 /docs/reference/remap/parse_grok.cue @FungusHumungus
+/docs/reference/remap/parse_aws_alb_log.cue @fanatid
 
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @vector-kubernetes
@@ -202,6 +203,7 @@
 /src/remap/function/log.rs @FungusHumungus
 /src/remap/function/merge.rs @FungusHumungus
 /src/remap/function/parse_grok.rs @FungusHumungus
+/src/remap/function/parse_aws_alb_log.rs @fanatid
 
 /src/wasm/ @hoverbear @JeanMertz
 
