@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod test;
 
-use super::{segmentbuf::SegmentBuf, LookupBuf};
+use super::{Look, segmentbuf::SegmentBuf, LookupBuf};
 use crate::event::lookup::Segment;
 use core::fmt;
 use pest::iterators::Pair;
@@ -179,7 +179,7 @@ impl<'a> Lookup<'a> {
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    pub fn starts_with<'b>(&self, needle: Lookup<'b>) -> bool {
+    pub fn starts_with<'b>(&self, needle: &Lookup<'b>) -> bool {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }

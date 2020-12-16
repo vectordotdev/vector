@@ -1,4 +1,4 @@
-use crate::event::lookup::SegmentBuf;
+use crate::event::lookup::{SegmentBuf, LookSegment};
 use pest::iterators::Pair;
 use remap::parser::ParserRule;
 use std::{

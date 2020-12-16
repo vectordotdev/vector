@@ -13,7 +13,7 @@ use std::{
 };
 use toml::Value as TomlValue;
 
-use super::{segmentbuf::SegmentBuf, Lookup};
+use super::{Look, segmentbuf::SegmentBuf, Lookup};
 use crate::event::lookup::Segment;
 use indexmap::map::IndexMap;
 use serde::de::{self, Visitor};
@@ -336,7 +336,7 @@ impl Serialize for LookupBuf {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&*self.to_string())
+        serializer.serialize_str(&*ToString::to_string(self))
     }
 }
 
