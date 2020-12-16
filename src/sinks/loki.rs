@@ -15,7 +15,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -97,8 +97,13 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
+        let config = LokiConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
+
         let sink = PartitionHttpSink::new(
-            self.clone(),
+            config.clone(),
             PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
@@ -107,7 +112,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let healthcheck = healthcheck(config, client).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -199,7 +204,7 @@ impl HttpSink for LokiConfig {
 
         let body = serde_json::to_vec(&json).unwrap();
 
-        let uri = format!("{}loki/api/v1/push", self.endpoint);
+        let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
@@ -218,7 +223,7 @@ impl HttpSink for LokiConfig {
 }
 
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint);
+    let uri = format!("{}ready", config.endpoint.uri);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 

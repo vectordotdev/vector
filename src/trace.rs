@@ -124,6 +124,16 @@ impl<F: Subscriber + 'static> Subscriber for BroadcastSubscriber<F> {
     fn register_callsite(&self, meta: &'static Metadata<'static>) -> Interest {
         self.formatter.register_callsite(meta)
     }
+
+    #[inline]
+    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+        self.formatter.max_level_hint()
+    }
+
+    #[inline]
+    unsafe fn downcast_raw(&self, id: std::any::TypeId) -> Option<*const ()> {
+        self.formatter.downcast_raw(id)
+    }
 }
 
 impl From<&tracing::Event<'_>> for Event {
