@@ -27,7 +27,7 @@ lazy_static! {
         Box::new(Tokenize),
         Box::new(Sha2),
         Box::new(Sha3),
-        Box::new(ParseAwsElb),
+        Box::new(ParseAwsAlbLog),
         Box::new(ParseDuration),
         Box::new(FormatNumber),
         Box::new(ParseUrl),

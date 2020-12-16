@@ -10,11 +10,11 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ParseAwsElb;
+pub struct ParseAwsAlbLog;
 
-impl Function for ParseAwsElb {
+impl Function for ParseAwsAlbLog {
     fn identifier(&self) -> &'static str {
-        "parse_aws_elb"
+        "parse_aws_alb_log"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -28,22 +28,22 @@ impl Function for ParseAwsElb {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ParseAwsElbFn::new(value)))
+        Ok(Box::new(ParseAwsAlbLogFn::new(value)))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ParseAwsElbFn {
+struct ParseAwsAlbLogFn {
     value: Box<dyn Expression>,
 }
 
-impl ParseAwsElbFn {
+impl ParseAwsAlbLogFn {
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
 }
 
-impl Expression for ParseAwsElbFn {
+impl Expression for ParseAwsAlbLogFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
 
@@ -195,18 +195,18 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| ParseAwsElbFn { value: Literal::from("foo").boxed() },
+            expr: |_| ParseAwsAlbLogFn { value: Literal::from("foo").boxed() },
             def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
 
         value_optional {
-            expr: |_| ParseAwsElbFn { value: Box::new(Noop) },
+            expr: |_| ParseAwsAlbLogFn { value: Box::new(Noop) },
             def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
     ];
 
     #[test]
-    fn parse_aws_elb() {
+    fn parse_aws_alb_log() {
         let logs = vec![
             r#"http 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
 192.168.131.39:2817 10.0.0.1:80 0.000 0.001 0.000 200 200 34 366
