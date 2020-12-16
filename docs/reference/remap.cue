@@ -7,15 +7,14 @@ remap: {
 
 	{
 		description: """
-			The Timber Remap Language (TRL) is a single-purpose, [Rust](\(urls.rust))-native data
-			transformation language that enables you to easily map and reshape observability event
-			data (logs and metrics) without sacrificing performance or safety. TRL occupies a
-			comfortable middle ground between stringing together fundamental
-			[transforms](\(urls.vector_transforms)) and using a full-blown
-			runtime like [Lua](\(urls.lua)). Guiding principles behind TRL include:
+			The Timber Remap Language (TRL) is a lean, single-purpose data transformation language
+			that enables you to easily map and reshape observability event data (logs and metrics)
+			without sacrificing performance or safety. TRL occupies a cozy middle ground between
+			stitching together fundamental [transforms](\(urls.vector_transforms)) and using a
+			full-blown runtime like [Lua](\(urls.lua)). Guiding principles behind TRL include:
 
-			1. **Performance** - Beyond extremely fast execution, TRL is designed to prevent
-			   Vector operators from writing slow scripts.
+			1. **Performance** - Beyond extremely fast execution, TRL is designed to prevent Vector
+			   operators from writing slow scripts.
 			2. **Safety** - TRL is Rust native and performs compile-time checks at boot time to
 			   ensure safety. In addition, TRL's simplicity and lack of complex \"footguns\" are
 			   ideal for collaboration.
@@ -59,7 +58,7 @@ remap: {
 
 	errors: {
 		ArgumentError: {
-			description: "Raised when the provided input is not a supported type."
+			description: "Raised when the provided input is not a supported type for that function."
 		}
 		ParseError: {
 			description: "Raised when the provided input cannot be parsed."
@@ -92,6 +91,8 @@ remap: {
 				```
 				$levels[3] = "not_so_terrible"
 				```
+
+
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -428,9 +429,8 @@ remap: {
 				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
 
-				When assigning a value to an object field, if the field doesn't already exist it's
-				created an assigned the value; if the field does already exist, the value is
-				re-assigned.
+				If you assign a value to an object field that doesn't already exist, the field is
+				created; if the field does exist, the value is re-assigned.
 				"""
 
 			examples: [
@@ -447,7 +447,12 @@ remap: {
 			description: """
 				You can assign values to variables in TRL. Variables in TRL are prefixed with a `$`
 				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
-				`$my_var`, `$this_is_my_variable`, etc.
+				`$my_var`, `$this_is_my_variable`, etc. Here's an example usage of a variable:
+
+				```
+				$log_level = "critical"
+				.log_level = $log_level
+				```
 				"""
 
 			examples: [
