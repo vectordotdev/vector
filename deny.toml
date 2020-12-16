@@ -71,9 +71,4 @@ ignore = [
     # ordered-float v2.0.0
     # ordered_flat - can be removed when heim next releases their beta branch
     "RUSTSEC-2020-0082",
-
-    # Dangling reference in `access::Map` with Constant
-    # Solution: Upgrade to >=1.1.0 OR >=0.4.8
-    # arc-swap v0.4.7
-    "RUSTSEC-2020-0091",
 ]
