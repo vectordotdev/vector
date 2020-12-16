@@ -18,10 +18,10 @@ pub(crate) struct CoercerConversionFailed<'a> {
 
 impl<'a> InternalEvent for CoercerConversionFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        error!(
             message = "Could not convert types.",
             field = %self.field,
-            error = ?self.error,
+            error = %self.error,
             rate_limit_secs = 30
         );
     }
