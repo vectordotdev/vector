@@ -1,8 +1,6 @@
 package metadata
 
 components: sinks: _humio: {
-	description: "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data. Metrics are converted to log events via the metric_to_log transform."
-
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
@@ -62,12 +60,7 @@ components: sinks: _humio: {
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "Humio"
-					thing:    "a \(name) database"
-					url:      urls.humio
-					versions: null
-				}
+				service: services.humio
 
 				interface: {
 					socket: {
@@ -85,6 +78,15 @@ components: sinks: _humio: {
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "The base URL of the Humio instance."
+			required:    false
+			type: string: {
+				default: "https://cloud.humio.com"
+				examples: ["http://127.0.0.1", "http://example.com"]
+			}
+		}
 		event_type: {
 			common:      false
 			description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"

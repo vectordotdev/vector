@@ -38,8 +38,19 @@ components: transforms: filter: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+	}
+
+	telemetry: metrics: {
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
 
 	examples: [

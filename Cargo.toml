@@ -42,7 +42,8 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/prometheus-parser",
   "lib/vector-api-client",
-  "lib/remap-lang"
+  "lib/remap-lang",
+  "lib/remap-cli",
 ]
 
 [dependencies]
@@ -63,6 +64,7 @@ async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.15"
+tracing-core = "0.1.17"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.15"
 tracing-log = "0.1.0"
@@ -112,7 +114,6 @@ num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.18.2", optional = true }
 tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
-bus = { version = "2.2.3", optional = true }
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
@@ -177,7 +178,7 @@ getset = "0.1.1"
 lru = "0.6.1"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
-cidr-utils = "0.4.2"
+cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
 k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
@@ -194,7 +195,8 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = "0.12.0"
+avro-rs = { version = "0.12.0", optional = true }
+dirs-next = { version = "1", optional = true }
 encoding_rs = { version = "0.8", features = ["serde"] }
 
 # For WASM
@@ -209,7 +211,7 @@ schannel = "0.1"
 windows-service = "0.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "0.4"
+security-framework = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -234,7 +236,7 @@ tower-test = "0.3.0"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
-reqwest = { version = "0.10.6", features = ["json"] }
+reqwest = { version = "0.10.9", features = ["json"] }
 rusty-fork = "0.3.0"
 
 [features]
@@ -307,6 +309,7 @@ sources = [
   "sources-generator",
   "sources-host_metrics",
   "sources-http",
+  "sources-internal_logs",
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
@@ -326,11 +329,12 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
-sources-docker_logs = ["bollard"]
+sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
+sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
@@ -479,7 +483,7 @@ sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
-sinks-pulsar = ["pulsar"]
+sinks-pulsar = ["avro-rs", "pulsar"]
 
 # Identifies that the build is a nightly build
 nightly = []

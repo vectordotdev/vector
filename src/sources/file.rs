@@ -16,11 +16,10 @@ use file_source::{
     FileServer, FingerprintStrategy, Fingerprinter,
 };
 use futures::{
-    compat::{Compat, Future01CompatExt},
     future::TryFutureExt,
     stream::{Stream, StreamExt},
+    SinkExt,
 };
-use futures01::{Future, Sink};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -195,7 +194,7 @@ pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> super::Source {
     let ignore_before = config
         .ignore_older
@@ -287,19 +286,13 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
-        let messages01 = Compat::new(StreamExt::map(
-            messages,
-            move |(msg, file): (Bytes, String)| {
+        let mut messages = messages
+            .map(move |(msg, file): (Bytes, String)| {
                 let _enter = span2.enter();
-                Ok::<_, ()>(create_event(msg, file, &host_key, &hostname, &file_key))
-            },
-        ));
-        tokio::spawn(
-            futures01::Stream::forward(messages01, out.sink_map_err(|e| error!(%e)))
-                .map(|_| ())
-                .compat()
-                .instrument(span),
-        );
+                create_event(msg, file, &host_key, &hostname, &file_key)
+            })
+            .map(Ok);
+        tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");
         spawn_blocking(move || {
@@ -362,7 +355,6 @@ mod tests {
     use super::*;
     use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
     use encoding_rs::UTF_16LE;
-    use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -391,18 +383,16 @@ mod tests {
         }
     }
 
-    async fn wait_with_timeout<F, R, E>(future: F) -> R
+    async fn wait_with_timeout<F, R>(future: F) -> R
     where
-        F: Future<Output = Result<R, E>> + Send + 'static,
+        F: Future<Output = R> + Send + 'static,
         R: Send + 'static,
-        E: std::fmt::Debug + Send + 'static,
     {
-        match timeout(Duration::from_secs(5), future).await {
-            Ok(result) => result.unwrap(),
-            Err(_) => {
+        timeout(Duration::from_secs(5), future)
+            .await
+            .unwrap_or_else(|_| {
                 panic!("Unclosed channel: may indicate file-server could not shutdown gracefully.")
-            }
-        }
+            })
     }
 
     async fn sleep_500_millis() {
@@ -529,7 +519,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -594,7 +584,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -660,7 +650,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -725,7 +715,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
 
         let mut is = [0; 3];
 
@@ -771,10 +761,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future().compat())
-                .await
-                .0
-                .unwrap();
+            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
             assert_eq!(
                 received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -808,10 +795,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future().compat())
-                .await
-                .0
-                .unwrap();
+            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
             assert_eq!(
                 received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -845,10 +829,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future().compat())
-                .await
-                .0
-                .unwrap();
+            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
@@ -890,7 +871,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect().compat()).await;
+            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -911,7 +892,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect().compat()).await;
+            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -937,7 +918,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect().compat()).await;
+            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -974,7 +955,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect().compat()).await;
+            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -999,7 +980,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect().compat()).await;
+            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -1072,7 +1053,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
         let before_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
@@ -1134,8 +1115,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1196,8 +1176,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1271,8 +1250,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1338,8 +1316,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1403,8 +1380,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1465,8 +1441,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1512,8 +1487,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1669,7 +1643,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect().compat()).await;
+        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
         assert_eq!(received.len(), n);
 
         match File::open(&path) {

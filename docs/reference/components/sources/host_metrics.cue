@@ -1,8 +1,13 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:       "Host Metrics"
-	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
+	title: "Host Metrics"
+
+	description: """
+		Examines system data sources on the local system and generates metrics
+		describing utilization of various system resources, such as CPU, memory,
+		disk, and network utilization.
+		"""
 
 	classes: {
 		commonly_used: false
@@ -15,12 +20,7 @@ components: sources: host_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: service: {
-				name:     "host"
-				thing:    "a \(name)"
-				url:      urls.host
-				versions: null
-			}
+			from: service:       services.host
 		}
 		multiline: enabled: false
 	}

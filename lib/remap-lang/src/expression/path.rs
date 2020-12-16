@@ -54,6 +54,10 @@ impl Path {
     pub(crate) fn new(path: path::Path) -> Self {
         Self { path }
     }
+
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
 }
 
 impl Expression for Path {
