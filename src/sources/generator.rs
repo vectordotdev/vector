@@ -46,12 +46,12 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    fn generate_event_results(&self, n: usize) -> Vec<Result<Event, ()>> {
+    fn generate_event(&self, n: usize) -> Event {
         emit!(GeneratorEventProcessed);
 
         let event_from_log_line = |log: String| -> Event { Event::from(log) };
 
-        let event: Event = match self {
+        match self {
             Self::RoundRobin {
                 sequence,
                 ref lines,
@@ -59,9 +59,7 @@ impl OutputFormat {
             Self::ApacheCommon => event_from_log_line(apache_common_log_line()),
             Self::ApacheError => event_from_log_line(apache_error_log_line()),
             Self::Syslog => event_from_log_line(syslog_5424_log_line()),
-        };
-
-        vec![Ok(event)]
+        }
     }
 
     fn round_robin_generate(sequence: &bool, lines: &[String], n: usize) -> Event {
@@ -119,9 +117,9 @@ impl GeneratorConfig {
                 interval.next().await;
             }
 
-            let events: Vec<Result<Event, _>> = self.format.generate_event_results(n);
+            let events: Vec<Event> = vec![self.format.generate_event(n)];
 
-            out.send_all(&mut futures::stream::iter(events))
+            out.send_all(&mut futures::stream::iter(events).map(Ok))
                 .await
                 .map_err(|_: crate::pipeline::ClosedError| {
                     error!(message = "Failed to forward events; downstream is closed.");
