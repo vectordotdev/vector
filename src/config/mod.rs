@@ -1,6 +1,10 @@
 use crate::{
-    buffers::Acker, conditions, event::Metric, shutdown::ShutdownSignal, sinks, sources,
-    transforms, Pipeline,
+    buffers::Acker,
+    conditions,
+    event::Metric,
+    shutdown::ShutdownSignal,
+    sinks::{self, util::UriSerde},
+    sources, transforms, Pipeline,
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
@@ -180,10 +184,12 @@ inventory::collect!(SourceDescription);
 pub struct SinkOuter {
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
-    // We are accepting bool for backward compatibility reasons.
-    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
+    // We are accepting bool and uri for backward compatibility reasons.
+    #[serde(deserialize_with = "crate::serde::bool_or_str_or_struct")]
+    // We are accepting alias for backward compatibility reasons.
+    #[serde(alias = "healthcheck_uri")]
     #[serde(default)]
-    pub healthcheck: SinkHealthcheckOptions,
+    pub healthcheck: HealthcheckOptions,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
@@ -197,19 +203,34 @@ impl SinkOuter {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SinkHealthcheckOptions {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct HealthcheckOptions {
     pub enabled: bool,
+    pub uri: Option<UriSerde>,
 }
 
-impl Default for SinkHealthcheckOptions {
+impl Default for HealthcheckOptions {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            uri: None,
+        }
     }
 }
-impl From<bool> for SinkHealthcheckOptions {
+
+impl From<bool> for HealthcheckOptions {
     fn from(enabled: bool) -> Self {
-        Self { enabled }
+        Self { enabled, uri: None }
+    }
+}
+
+impl From<UriSerde> for HealthcheckOptions {
+    fn from(uri: UriSerde) -> Self {
+        Self {
+            enabled: true,
+            uri: Some(uri),
+        }
     }
 }
 
@@ -234,12 +255,16 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct SinkContext {
     pub(super) acker: Acker,
+    pub(super) healthcheck: HealthcheckOptions,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
-        Self { acker: Acker::Null }
+        Self {
+            acker: Acker::Null,
+            healthcheck: HealthcheckOptions::default(),
+        }
     }
 
     pub fn acker(&self) -> Acker {

@@ -1,3 +1,4 @@
+use crate::sinks::util::UriSerde;
 use indexmap::map::IndexMap;
 use serde::{de, Deserialize, Serialize};
 use std::fmt;
@@ -50,26 +51,27 @@ impl<V: 'static> Fields<V> {
     }
 }
 
-/// Enables deserializing from a value that could be a bool or a struct.
+/// Enables deserializing from a value that could be a bool or uri or a struct.
 /// Example:
 /// healthcheck: bool
+/// healthcheck: "...."
 /// healthcheck.enabled: bool
 /// Both are accepted.
-pub fn bool_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+pub fn bool_or_str_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
-    T: Deserialize<'de> + From<bool>,
+    T: Deserialize<'de> + From<bool> + From<UriSerde>,
     D: de::Deserializer<'de>,
 {
     struct BoolOrStruct<T>(PhantomData<fn() -> T>);
 
     impl<'de, T> de::Visitor<'de> for BoolOrStruct<T>
     where
-        T: Deserialize<'de> + From<bool>,
+        T: Deserialize<'de> + From<bool> + From<UriSerde>,
     {
         type Value = T;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("bool or map")
+            formatter.write_str("bool or str or map")
         }
 
         fn visit_bool<E>(self, value: bool) -> Result<T, E>
@@ -77,6 +79,13 @@ where
             E: de::Error,
         {
             Ok(value.into())
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<T, E>
+        where
+            E: de::Error,
+        {
+            UriSerde::deserialize(de::value::BorrowedStrDeserializer::new(value)).map(Into::into)
         }
 
         fn visit_map<M>(self, map: M) -> Result<T, M::Error>

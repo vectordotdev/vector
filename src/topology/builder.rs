@@ -181,6 +181,7 @@ pub async fn build_pieces(
 
         let cx = SinkContext {
             acker: acker.clone(),
+            healthcheck: sink.healthcheck.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {

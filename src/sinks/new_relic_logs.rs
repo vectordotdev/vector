@@ -147,7 +147,6 @@ impl NewRelicLogsConfig {
         Ok(HttpSinkConfig {
             uri: uri.into(),
             method: Some(HttpMethod::Post),
-            healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
             compression: self.compression,
