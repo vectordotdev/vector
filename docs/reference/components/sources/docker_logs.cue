@@ -14,21 +14,32 @@ components: sources: docker_logs: {
 
 	env_vars: {
 		DOCKER_HOST: {
-			description: "The Docker host to connect to."
+			description: "The Docker host to connect to when `docker_host` configuration is absent."
 			type: string: {
 				default: null
 				examples: ["unix:///var/run/docker.sock"]
 			}
 		}
 
-		DOCKER_VERIFY_TLS: {
-			description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
+		DOCKER_CERT_PATH: {
+			description: """
+				Path to look for TLS certificates when `tls` configuration is absent.
+				Vector will use:
+				- `$DOCKER_CERT_PATH/ca.pem`: CA certificate.
+				- `$DOCKER_CERT_PATH/cert.pem`: TLS certificate.
+				- `$DOCKER_CERT_PATH/key.pem`: TLS key.
+				"""
 			type: string: {
-				default: "true"
-				enum: {
-					"true":  "true"
-					"false": "false"
-				}
+				default: null
+				examples: ["certs/"]
+			}
+		}
+
+		DOCKER_CONFIG: {
+			description: "Path to look for TLS certificates when both `tls` configuration and `DOCKER_CERT_PATH` are absent."
+			type: string: {
+				default: null
+				examples: ["certs/"]
 			}
 		}
 	}
@@ -84,6 +95,58 @@ components: sources: docker_logs: {
 	}
 
 	configuration: {
+		docker_host: {
+			common: true
+			description: """
+				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
+				If absent, Vector will try to use `DOCKER_HOST` enviroment variable.
+				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
+				(`/var/run/docker.sock` on Unix flatforms, `\\\\.\\pipe\\docker_engine` on Windows).
+				"""
+			required: false
+			type: string: {
+				default: null
+				examples: ["http://localhost:2375", "https://localhost:2376", "/var/run/docker.sock", "\\\\.\\pipe\\docker_engine"]
+			}
+		}
+		tls: {
+			common: false
+			description: """
+				TLS options to connect to the Docker deamon. This has no effect unless `docker_host` is an HTTPS URL.
+				If absent, Vector will try to use environment variable `DOCKER_CERT_PATH` and then `DOCKER_CONFIG`.
+				If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
+				"""
+			required: false
+			type: object: {
+				examples: []
+				options: {
+					ca_file: {
+						description: "Path to CA certificate file."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["certs/ca.pem"]
+						}
+					}
+					crt_file: {
+						description: "Path to TLS certificate file."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["certs/cert.pem"]
+						}
+					}
+					key_file: {
+						description: "Path to TLS key file."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["certs/key.pem"]
+						}
+					}
+				}
+			}
+		}
 		auto_partial_merge: {
 			common: false
 			description: """
