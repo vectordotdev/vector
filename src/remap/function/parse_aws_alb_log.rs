@@ -78,7 +78,13 @@ fn parse_log(mut input: &str) -> Result<Value> {
     }
     macro_rules! field_raw {
         ($name:expr, $parser:expr) => {
-            log.insert($name.into(), get_value!($name, $parser).into())
+            log.insert(
+                $name.into(),
+                match get_value!($name, $parser).into() {
+                    Value::Bytes(bytes) if bytes == &"-" => Value::Null,
+                    value => value,
+                },
+            )
         };
     }
     macro_rules! field {

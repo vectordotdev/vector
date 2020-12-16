@@ -30,7 +30,7 @@ remap: functions: parse_aws_alb_log: {
 					"timestamp":                "2018-11-30T22:23:00.186641Z"
 					"elb":                      "app/my-loadbalancer/50dc6c495c0c9188"
 					"client_host":              "192.168.131.39:2817"
-					"target_host":              "-"
+					"target_host":              null
 					"request_processing_time":  0.0
 					"target_processing_time":   0.001
 					"response_processing_time": 0.0
@@ -42,21 +42,21 @@ remap: functions: parse_aws_alb_log: {
 					"request_url":              "http://www.example.com:80/"
 					"request_protocol":         "HTTP/1.1"
 					"user_agent":               "curl/7.46.0"
-					"ssl_cipher":               "-"
-					"ssl_protocol":             "-"
+					"ssl_cipher":               null
+					"ssl_protocol":             null
 					"target_group_arn":         "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067"
 					"trace_id":                 "Root=1-58337364-23a8c76965a2ef7629b185e3"
-					"domain_name":              "-"
-					"chosen_cert_arn":          "-"
+					"domain_name":              null
+					"chosen_cert_arn":          null
 					"matched_rule_priority":    "0"
 					"request_creation_time":    "2018-11-30T22:22:48.364000Z"
 					"actions_executed":         "forward"
-					"redirect_url":             "-"
-					"error_reason":             "-"
+					"redirect_url":             null
+					"error_reason":             null
 					"target_port_list": []
 					"target_status_code_list": []
-					"classification":        "-"
-					"classification_reason": "-"
+					"classification":        null
+					"classification_reason": null
 				}
 			}
 		},
