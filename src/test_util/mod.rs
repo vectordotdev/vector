@@ -8,7 +8,7 @@ use futures::{
     compat::Stream01CompatExt, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
     StreamExt, TryStreamExt,
 };
-use futures01::{sync::mpsc, Stream as Stream01};
+use futures01::Stream as Stream01;
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -33,7 +33,7 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
     runtime,
-    sync::oneshot,
+    sync::{mpsc, oneshot},
     task::JoinHandle,
     time::{delay_for, Duration, Instant},
 };
@@ -225,11 +225,11 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()> {
-    rx.compat().take(n).try_collect().await
+pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
+    rx.take(n).collect().await
 }
 
-pub async fn collect_ready<S>(rx: S) -> Result<Vec<S::Item>, ()>
+pub async fn collect_ready01<S>(rx: S) -> Result<Vec<S::Item>, ()>
 where
     S: Stream01<Item = Event, Error = ()>,
 {
@@ -248,7 +248,7 @@ where
     }
 }
 
-pub async fn collect_ready03<S>(rx: &mut S) -> Result<Vec<S::Item>, ()>
+pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
 where
     S: Stream + Unpin,
 {
@@ -259,7 +259,7 @@ where
     loop {
         match rx.poll_next_unpin(&mut cx) {
             Poll::Ready(Some(item)) => vec.push(item),
-            Poll::Ready(None) | Poll::Pending => return Ok(vec),
+            Poll::Ready(None) | Poll::Pending => return vec,
         }
     }
 }
@@ -497,15 +497,12 @@ impl CountReceiver<String> {
 impl CountReceiver<Event> {
     pub fn receive_events<S>(stream: S) -> CountReceiver<Event>
     where
-        S: Stream01<Item = Event> + Send + 'static,
-        <S as Stream01>::Error: std::fmt::Debug,
+        S: Stream<Item = Event> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
             connected.send(()).unwrap();
             stream
-                .compat()
                 .take_until(tripwire)
-                .map(|x| x.unwrap())
                 .inspect(move |_| {
                     count.fetch_add(1, Ordering::Relaxed);
                 })
@@ -518,7 +515,10 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     config: Config,
     require_healthy: bool,
-) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
+) -> (
+    RunningTopology,
+    futures01::sync::mpsc::UnboundedReceiver<()>,
+) {
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
