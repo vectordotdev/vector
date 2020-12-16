@@ -8,12 +8,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codec::BytesDelimitedCodec;
-use futures::{
-    compat::{Compat01As03Sink, Sink01CompatExt},
-    future,
-    stream::BoxStream,
-    SinkExt, StreamExt,
-};
+use futures::{future, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -145,7 +140,7 @@ impl SourceConfig for JournaldConfig {
                 checkpoint_path,
                 batch_size,
                 remap_priority: self.remap_priority,
-                out: out.sink_compat(),
+                out,
             }
             .run_shutdown(shutdown, start)
             .instrument(info_span!("journald-server")),
@@ -167,7 +162,7 @@ struct JournaldSource {
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
-    out: Compat01As03Sink<Pipeline, Event>,
+    out: Pipeline,
 }
 
 impl JournaldSource {
@@ -574,9 +569,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::compat::Future01CompatExt;
     use futures::Stream;
-    use futures01::Stream as _;
     use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
@@ -671,7 +664,7 @@ mod tests {
             checkpoint_path,
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
-            out: tx.sink_compat(),
+            out: tx,
         }
         .run_shutdown(shutdown, Box::new(FakeJournal::new));
         tokio::spawn(source);
@@ -679,10 +672,7 @@ mod tests {
         delay_for(Duration::from_millis(100)).await;
         drop(trigger);
 
-        timeout(Duration::from_secs(1), rx.collect().compat())
-            .await
-            .expect("Unclosed channel")
-            .unwrap()
+        timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
     }
 
     #[tokio::test]

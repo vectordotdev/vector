@@ -6,8 +6,7 @@ use crate::{
     sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_5424_log_line},
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, stream::StreamExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -46,33 +45,33 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    fn generate_events(&self, n: usize) -> Vec<Event> {
+    fn generate_event_results(&self, n: usize) -> Vec<Result<Event, ()>> {
         emit!(GeneratorEventProcessed);
 
-        let events_from_log_line = |log: String| -> Vec<Event> { vec![Event::from(log)] };
+        let event_from_log_line = |log: String| -> Event { Event::from(log) };
 
-        match self {
+        let event: Event = match self {
             Self::RoundRobin {
                 sequence,
                 ref lines,
             } => Self::round_robin_generate(sequence, lines, n),
-            Self::ApacheCommon => events_from_log_line(apache_common_log_line()),
-            Self::ApacheError => events_from_log_line(apache_error_log_line()),
-            Self::Syslog => events_from_log_line(syslog_5424_log_line()),
-        }
+            Self::ApacheCommon => event_from_log_line(apache_common_log_line()),
+            Self::ApacheError => event_from_log_line(apache_error_log_line()),
+            Self::Syslog => event_from_log_line(syslog_5424_log_line()),
+        };
+
+        vec![Ok(event)]
     }
 
-    fn round_robin_generate(sequence: &bool, lines: &[String], n: usize) -> Vec<Event> {
+    fn round_robin_generate(sequence: &bool, lines: &[String], n: usize) -> Event {
         // unwrap can be called here because lines cannot be empty
         let line: String = lines.choose(&mut rand::thread_rng()).unwrap().into();
 
-        let event = if *sequence {
+        if *sequence {
             Event::from(&format!("{} {}", n, line)[..])
         } else {
             Event::from(&line[..])
-        };
-
-        vec![event]
+        }
     }
 
     // Ensures that the lines list is non-empty if RoundRobin is chosen
@@ -110,31 +109,22 @@ impl GeneratorConfig {
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
         let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
 
-        let mut n: usize = 0;
+        for n in 0..self.count {
+            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
+                break;
+            }
 
-        while matches!(futures::poll!(&mut shutdown), Poll::Pending) {
             if let Some(interval) = &mut interval {
                 interval.next().await;
             }
 
-            let events = self.format.generate_events(n);
+            let events: Vec<Result<Event, _>> = self.format.generate_event_results(n);
 
-            let (sink, _) = out
-                .clone()
-                .send_all(iter_ok(events))
-                .compat()
+            out.send_all(&mut futures::stream::iter(events))
                 .await
-                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
-            out = sink;
-
-            // If a count is specified, stop when reached, otherwise go forever
-            n += 1;
-
-            if let Some(count) = self.count {
-                if n == count - 1 {
-                    break;
-                }
-            }
+                .map_err(|_: crate::pipeline::ClosedError| {
+                    error!(message = "Failed to forward events; downstream is closed.");
+                })?;
         }
 
         Ok(())
@@ -177,8 +167,8 @@ impl SourceConfig for GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
-    use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -235,7 +225,7 @@ mod tests {
             }
         }
 
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -248,9 +238,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -276,7 +266,8 @@ mod tests {
                 NotReady => panic!("Generator was not ready"),
             }
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -291,9 +282,9 @@ mod tests {
         .await;
 
         for _ in 0..3 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -308,9 +299,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -322,9 +313,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -336,8 +327,8 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 }
