@@ -12,17 +12,20 @@ use crate::{
     Pipeline,
 };
 use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
+    compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
     future, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Future as Future01, Stream as Stream01};
+use futures01::{Future as Future01, Stream as Stream01};
 use std::{
     collections::HashMap,
     future::ready,
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::time::{timeout, Duration};
+use tokio::{
+    sync::mpsc,
+    time::{timeout, Duration},
+};
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -75,7 +78,10 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx.forward(output).map(|_| TaskOutput::Source).compat();
+        let pump = rx
+            .map(Ok)
+            .forward(output.sink_compat())
+            .map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source

@@ -207,9 +207,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
-    use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -288,7 +288,7 @@ mod tests {
             send(addr, body, Some(auth), "appname=lumberjack-store").await
         );
 
-        let mut events = collect_n(rx, body.lines().count()).await.unwrap();
+        let mut events = collect_n(rx, body.lines().count()).await;
         let event = events.remove(0);
         let log = event.as_log();
 
