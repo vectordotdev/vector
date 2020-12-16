@@ -11,6 +11,7 @@ mod tests {
     use futures::StreamExt;
     use metrics::counter;
     use std::{
+        collections::HashMap,
         net::SocketAddr,
         time::{Duration, Instant},
     };
@@ -75,7 +76,7 @@ mod tests {
         c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
-        let pieces = vector::topology::build_or_log_errors(&c, &diff)
+        let pieces = vector::topology::build_or_log_errors(&c, &diff, HashMap::new())
             .await
             .unwrap();
 

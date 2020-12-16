@@ -5,6 +5,10 @@ components: sources: vector: {
 
 	title: "Vector"
 
+	description: """
+		Receives data from another upstream Vector instance	using the Vector sink.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
@@ -17,12 +21,7 @@ components: sources: vector: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Vector"
-					thing:    "a \(name) sink"
-					url:      urls.vector_sink
-					versions: null
-				}
+				service: services.vector
 
 				interface: socket: {
 					direction: "incoming"

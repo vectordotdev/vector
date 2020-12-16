@@ -4,12 +4,7 @@ components: sinks: _sematext: {
 	features: {
 		send: {
 			to: {
-				service: {
-					name:     "Sematext"
-					thing:    "a \(name) account"
-					url:      urls.sematext
-					versions: null
-				}
+				service: services.sematext
 
 				interface: {
 					socket: {

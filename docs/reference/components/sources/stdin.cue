@@ -15,13 +15,7 @@ components: sources: stdin: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "STDIN"
-					thing:    "the \(name) stream"
-					url:      urls.stdin
-					versions: null
-				}
-
+				service: services.stdin
 				interface: stdin: {}
 			}
 
