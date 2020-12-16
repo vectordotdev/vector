@@ -213,16 +213,10 @@ mod tests {
         let lines = &["one", "two", "three", "four"];
 
         for _ in 0..5 {
-            let event = rx.poll().unwrap();
-            match event {
-                Ready(Some(event)) => {
-                    let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
-                    assert!(lines.contains(&&*message));
-                }
-                Ready(None) => panic!("Premature end of input"),
-                NotReady => panic!("Generator was not ready"),
-            }
+            let event = rx.try_recv().unwrap();
+            let log = event.as_log();
+            let message = log[&message_key].to_string_lossy();
+            assert!(lines.contains(&&*message));
         }
 
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
@@ -255,16 +249,10 @@ mod tests {
         .await;
 
         for n in 0..5 {
-            let event = rx.poll().unwrap();
-            match event {
-                Ready(Some(event)) => {
-                    let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
-                    assert!(message.starts_with(&n.to_string()));
-                }
-                Ready(None) => panic!("Premature end of input"),
-                NotReady => panic!("Generator was not ready"),
-            }
+            let event = rx.try_recv().unwrap();
+            let log = event.as_log();
+            let message = log[&message_key].to_string_lossy();
+            assert!(message.starts_with(&n.to_string()));
         }
 
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
