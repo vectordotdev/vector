@@ -4453,10 +4453,9 @@ dependencies = [
 [[package]]
 name = "portpicker"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
+source = "git+https://github.com/timberio/portpicker-rs?rev=d15829e906516720881584ff3301a0dd04218fbb#d15829e906516720881584ff3301a0dd04218fbb"
 dependencies = [
- "rand 0.6.5",
+ "rand 0.7.3",
 ]
 
 [[package]]

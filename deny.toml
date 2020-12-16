@@ -26,6 +26,7 @@ ignore = [
     # Unaligned memory access
     # Solution: Upgrade to >=0.4.2
     # rand_core v0.3.1
+    # Require `rand` upgrade in `avro-rs`
     "RUSTSEC-2019-0035",
 
     # Type confusion if __private_get_type_id__ is overriden
