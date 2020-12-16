@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use snafu::ResultExt;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, convert::TryFrom};
 
 mod line;
 
@@ -51,6 +51,11 @@ pub enum ParserError {
 
     #[snafu(display("expected value in range [0, {}], found: {}", u32::MAX, value))]
     ValueOutOfRange { value: f64 },
+
+    #[snafu(display("multiple metric kinds given for metric name `{}`", name))]
+    MultipleMetricKinds { name: String },
+    #[snafu(display("request is missing metric name label"))]
+    RequestNoNameLabel,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -116,6 +121,16 @@ impl GroupKind {
         let mut metrics = IndexMap::default();
         metrics.insert(key, SimpleMetric { value });
         Self::Untyped(metrics)
+    }
+
+    fn matches_kind(&self, kind: MetricKind) -> bool {
+        match self {
+            GroupKind::Counter { .. } => kind == MetricKind::Counter,
+            GroupKind::Gauge { .. } => kind == MetricKind::Gauge,
+            GroupKind::Histogram { .. } => kind == MetricKind::Histogram,
+            GroupKind::Summary { .. } => kind == MetricKind::Summary,
+            GroupKind::Untyped { .. } => true,
+        }
     }
 
     /// Err(_) if there are irrecoverable error.
@@ -257,14 +272,8 @@ impl MetricGroup {
     }
 }
 
-fn matching_group<'a, T: Default>(values: &'a mut MetricMap<T>, group: GroupKey) -> &'a mut T {
-    // Assumes that the incoming metrics are already collated, which
-    // means that a change in either timestamp or labels represents a
-    // group.
-    if values.last().map_or(true, |(key, _)| group != *key) {
-        values.insert(group, T::default());
-    }
-    values.last_mut().unwrap().1
+fn matching_group<T: Default>(values: &mut MetricMap<T>, group: GroupKey) -> &mut T {
+    values.entry(group).or_insert_with(T::default)
 }
 
 /// Parse the given text input, and group the result into higher-level
@@ -297,6 +306,119 @@ pub fn parse_text(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     Ok(groups)
 }
 
+#[derive(Default)]
+struct MetricGroupSet(IndexMap<String, GroupKind>);
+
+impl MetricGroupSet {
+    fn get_group<'a>(&'a mut self, name: &str) -> (usize, &'a String, &'a mut GroupKind) {
+        let len = name.len();
+        let name = if self.0.contains_key(name) {
+            name
+        } else if name.ends_with("_bucket") && self.0.contains_key(&name[..len - 7]) {
+            &name[..len - 7]
+        } else if name.ends_with("_sum") && self.0.contains_key(&name[..len - 4]) {
+            &name[..len - 4]
+        } else if name.ends_with("_count") && self.0.contains_key(&name[..len - 6]) {
+            &name[..len - 6]
+        } else {
+            self.0
+                .insert(name.into(), GroupKind::new(MetricKind::Untyped));
+            name
+        };
+        self.0.get_full_mut(name).unwrap()
+    }
+
+    fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {
+        if let Some(group) = self.0.get(&name) {
+            if !group.matches_kind(kind) {
+                return Err(ParserError::MultipleMetricKinds { name });
+            }
+        } else {
+            self.0.insert(name, GroupKind::new(kind));
+        }
+        Ok(())
+    }
+
+    fn insert_sample(
+        &mut self,
+        name: &str,
+        labels: &BTreeMap<String, String>,
+        sample: proto::Sample,
+    ) -> Result<(), ParserError> {
+        let (_, basename, group) = self.get_group(name);
+        if let Some(metric) = group.try_push(
+            basename.len(),
+            Metric {
+                name: name.into(),
+                labels: labels.clone(),
+                value: sample.value,
+                timestamp: Some(sample.timestamp),
+            },
+        )? {
+            let key = GroupKey {
+                timestamp: metric.timestamp,
+                labels: metric.labels,
+            };
+            let group = GroupKind::new_untyped(key, metric.value);
+            self.0.insert(metric.name, group);
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<MetricGroup> {
+        self.0
+            .into_iter()
+            .map(|(name, metrics)| MetricGroup { name, metrics })
+            .collect()
+    }
+}
+
+/// Parse the given remote_write request, grouping the metrics into
+/// higher-level metric types based on the metadata.
+pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, ParserError> {
+    let mut groups = MetricGroupSet::default();
+
+    for metadata in request.metadata {
+        let name = metadata.metric_family_name;
+        let kind = proto::MetricType::try_from(metadata.r#type)
+            .unwrap_or(proto::MetricType::Unknown)
+            .into();
+        groups.insert_metadata(name, kind)?;
+    }
+
+    for timeseries in request.timeseries {
+        let mut labels: BTreeMap<String, String> = timeseries
+            .labels
+            .into_iter()
+            .map(|label| (label.name, label.value))
+            .collect();
+        let name = match labels.remove(METRIC_NAME_LABEL) {
+            Some(name) => name,
+            None => return Err(ParserError::RequestNoNameLabel),
+        };
+
+        for sample in timeseries.samples {
+            groups.insert_sample(&name, &labels, sample)?;
+        }
+    }
+
+    Ok(groups.finish())
+}
+
+impl From<proto::MetricType> for MetricKind {
+    fn from(kind: proto::MetricType) -> Self {
+        use proto::MetricType::*;
+        match kind {
+            Counter => MetricKind::Counter,
+            Gauge => MetricKind::Gauge,
+            Histogram => MetricKind::Histogram,
+            Gaugehistogram => MetricKind::Histogram,
+            Summary => MetricKind::Summary,
+            _ => MetricKind::Untyped,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -304,15 +426,16 @@ mod test {
     macro_rules! match_group {
         ($group:expr, $name:literal, $kind:ident => $inner:expr) => {{
             assert_eq!($group.name, $name);
+            let inner = $inner;
             match &$group.metrics {
-                GroupKind::$kind(metrics) => ($inner)(metrics),
+                GroupKind::$kind(metrics) => inner(metrics),
                 _ => panic!("Invalid metric group type"),
             }
         }};
     }
 
     macro_rules! labels {
-        () => { BTreeMap::new(); };
+        () => { BTreeMap::new() };
         ( $( $name:ident => $value:literal ),* ) => {{
             let mut result = BTreeMap::<String, String>::new();
             $( result.insert(stringify!($name).into(), $value.to_string()); )*
@@ -376,16 +499,14 @@ mod test {
         assert_eq!(output.len(), 6);
         match_group!(output[0], "http_requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 2);
-            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
-                Some(1395066363000),
-                labels!(method => "post", code => 200),
-                1027.0
-            ));
-            assert_eq!(metrics.get_index(1).unwrap(), simple_metric!(
-                Some(1395066363000),
-                labels!(method => "post", code => 400),
-                3.0
-            ));
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066363000), labels!(method => "post", code => 200), 1027.0)
+            );
+            assert_eq!(
+                metrics.get_index(1).unwrap(),
+                simple_metric!(Some(1395066363000), labels!(method => "post", code => 400), 3.0)
+            );
         });
         match_group!(output[1], "msdos_file_access_time_seconds", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
@@ -401,11 +522,10 @@ mod test {
         });
         match_group!(output[3], "something_weird", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
-                Some(-3982045),
-                labels!(problem => "division by zero"),
-                f64::INFINITY
-            ));
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(-3982045), labels!(problem => "division by zero"), f64::INFINITY)
+            );
         });
         match_group!(output[4], "http_request_duration_seconds", Histogram => |metrics: &MetricMap<HistogramMetric>| {
             assert_eq!(metrics.len(), 1);
@@ -531,5 +651,180 @@ mod test {
                 kind: ErrorKind::ParseFloatError { .. }, ..
             }
         ));
+    }
+
+    macro_rules! write_request {
+        (
+            [ $( $name:literal = $type:ident ),* ],
+            [
+                $( [ $( $label:ident => $value:literal ),* ] => [ $( $sample:literal @ $timestamp:literal ),* ] ),*
+            ]
+        ) => {
+            proto::WriteRequest {
+                metadata: vec![
+                    $( proto::MetricMetadata {
+                        r#type: proto::MetricType::$type as i32,
+                        metric_family_name: $name.into(),
+                        help: String::default(),
+                        unit: String::default(),
+                    }, )*
+                ],
+                timeseries: vec![ $( proto::TimeSeries {
+                    labels: vec![ $( proto::Label {
+                        name: stringify!($label).into(),
+                        value: $value.to_string(),
+                    }, )* ],
+                    samples: vec![
+                        $( proto::Sample { value: $sample as f64, timestamp: $timestamp as i64 }, )*
+                    ],
+                }, )* ],
+            }
+        };
+    }
+
+    #[test]
+    fn parse_request_empty() {
+        let parsed = parse_request(write_request!([], [])).unwrap();
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn parse_request_only_metadata() {
+        let parsed = parse_request(write_request!(["one" = Counter, "two" = Gauge], [])).unwrap();
+        assert_eq!(parsed.len(), 2);
+        match_group!(parsed[0], "one", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert!(metrics.is_empty());
+        });
+        match_group!(parsed[1], "two", Gauge => |metrics: &MetricMap<SimpleMetric>| {
+            assert!(metrics.is_empty());
+        });
+    }
+
+    #[test]
+    fn parse_request_untyped() {
+        let parsed = parse_request(write_request!(
+            [],
+            [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]
+        ))
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367500), labels!(big => "small"), 123.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_gauge() {
+        let parsed = parse_request(write_request!(
+            ["one" = Gauge],
+            [
+                [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
+                [__name__ => "two"] => [ 13 @ 1395066367700 ]
+            ]
+        ))
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        match_group!(parsed[0], "one", Gauge => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 2);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367600), labels!(), 12.0)
+            );
+            assert_eq!(
+                metrics.get_index(1).unwrap(),
+                simple_metric!(Some(1395066367800), labels!(), 14.0)
+            );
+        });
+        match_group!(parsed[1], "two", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367700), labels!(), 13.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_histogram() {
+        let parsed = parse_request(write_request!(
+            ["one" = Histogram],
+            [
+                [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
+                [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
+                [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
+                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                [__name__ => "one_total"] => [24 @ 1395066367700]
+            ]
+        ))
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        match_group!(parsed[0], "one", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(), (
+                    &GroupKey {
+                        timestamp: Some(1395066367700),
+                        labels: labels!(),
+                    },
+                    &HistogramMetric {
+                        buckets: vec![
+                            HistogramBucket { bucket: 1.0, count: 15 },
+                            HistogramBucket { bucket: f64::INFINITY, count: 19 },
+                        ],
+                        count: 19,
+                        sum: 12.0,
+                    })
+            );
+        });
+        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
+        });
+    }
+
+    #[test]
+    fn parse_request_summary() {
+        let parsed = parse_request(write_request!(
+            ["one" = Summary],
+            [
+                [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
+                [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
+                [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
+                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                [__name__ => "one_total"] => [24 @ 1395066367700]
+            ]
+        ))
+        .unwrap();
+
+        assert_eq!(parsed.len(), 2);
+        match_group!(parsed[0], "one", Summary => |metrics: &MetricMap<SummaryMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(), (
+                    &GroupKey {
+                        timestamp: Some(1395066367700),
+                        labels: labels!(),
+                    },
+                    &SummaryMetric {
+                        quantiles: vec![
+                            SummaryQuantile { quantile: 0.5, value: 15.0 },
+                            SummaryQuantile { quantile: 0.9, value: 19.0 },
+                        ],
+                        count: 21,
+                        sum: 12.0,
+                    })
+            );
+        });
+        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
+        });
     }
 }

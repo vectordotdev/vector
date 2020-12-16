@@ -4802,6 +4802,7 @@ version = "0.1.0"
 dependencies = [
  "indexmap",
  "nom 6.0.1",
+ "num_enum",
  "prost",
  "prost-build",
  "prost-types",
