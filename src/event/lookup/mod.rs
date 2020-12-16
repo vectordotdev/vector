@@ -24,16 +24,18 @@ use std::hash::Hash;
 // It is convention to implement these functions on the bare type itself,
 // then have the implementation proxy to this **without modification**.
 //
-// This is so the functions are always available to users.
+// This is so the functions are always available to users, without needing an import.
 trait Look<'a>:
     Debug +
+    Display +
     PartialEq +
     Eq +
     PartialOrd +
     Ord +
     Clone +
     Hash +
-    Sized
+    Sized +
+    ToString
 {
     type Segment: LookSegment<'a>;
 
@@ -49,19 +51,13 @@ trait Look<'a>:
 
     fn len(&self) -> usize;
 
-    fn iter(&self) -> std::collections::vec_deque::Iter<'_, Self::Segment>;
-
-    fn into_iter(self) -> std::collections::vec_deque::IntoIter<Self::Segment>;
-
     fn is_valid(&self) -> crate::Result<()>;
 
     fn from_str(input: &'a str) -> Result<Self, crate::Error>;
 
-    fn to_string(&self) -> String;
-
     fn extend(&mut self, other: Self);
 
-    fn starts_with<'b>(&self, needle: &Self) -> bool;
+    fn starts_with(&self, needle: &Self) -> bool;
 }
 
 
@@ -70,19 +66,16 @@ trait Look<'a>:
 impl<'a> Look<'a> for Lookup<'a> {
     type Segment = Segment<'a>;
 
-    fn get(&mut self, index: usize) -> Option<&Self::Segment> { self.get(index) }
-    fn push_back(&mut self, segment: Self::Segment) { self.push_back(segment) }
-    fn pop_back(&mut self) -> Option<Self::Segment> { self.pop_back() }
-    fn push_front(&mut self, segment: Self::Segment) { self.push_front(segment) }
-    fn pop_front(&mut self) -> Option<Self::Segment> { self.pop_front() }
+    fn get(&mut self, index: usize) -> Option<&Self::Segment> { Lookup::get(self, index) }
+    fn push_back(&mut self, segment: Self::Segment) { Lookup::push_back(self, segment) }
+    fn pop_back(&mut self) -> Option<Self::Segment> { Lookup::pop_back(self) }
+    fn push_front(&mut self, segment: Self::Segment) { Lookup::push_front(self, segment) }
+    fn pop_front(&mut self) -> Option<Self::Segment> { Lookup::pop_front(self) }
     fn len(&self) -> usize { self.len() }
-    fn iter(&self) -> std::collections::vec_deque::Iter<'_, Self::Segment> { self.iter() }
-    fn into_iter(self) -> std::collections::vec_deque::IntoIter<Self::Segment> { IntoIterator::into_iter(self) }
-    fn is_valid(&self) -> crate::Result<()> { self.is_valid() }
-    fn from_str(input: &'a str) -> Result<Self, crate::Error> { Self::from_str(input) }
-    fn to_string(&self) -> String { ToString::to_string(self) }
-    fn extend(&mut self, other: Self) { self.extend(other) }
-    fn starts_with<'b>(&self, needle: &Self) -> bool { self.starts_with(needle) }
+    fn is_valid(&self) -> crate::Result<()> { Lookup::is_valid(self) }
+    fn from_str(input: &'a str) -> Result<Self, crate::Error> { Lookup::from_str(input) }
+    fn extend(&mut self, other: Self) { Lookup::extend(self, other) }
+    fn starts_with(&self, needle: &Self) -> bool { Lookup::starts_with(self, needle) }
 }
 
 
@@ -91,19 +84,16 @@ impl<'a> Look<'a> for Lookup<'a> {
 impl Look<'static> for LookupBuf {
     type Segment = SegmentBuf;
 
-    fn get(&mut self, index: usize) -> Option<&Self::Segment> { self.get(index) }
-    fn push_back(&mut self, segment: Self::Segment) { self.push_back(segment) }
-    fn pop_back(&mut self) -> Option<Self::Segment> { self.pop_back() }
-    fn push_front(&mut self, segment: Self::Segment) { self.push_front(segment) }
-    fn pop_front(&mut self) -> Option<Self::Segment> { self.pop_front() }
+    fn get(&mut self, index: usize) -> Option<&Self::Segment> { LookupBuf::get(self, index) }
+    fn push_back(&mut self, segment: Self::Segment) { LookupBuf::push_back(self, segment) }
+    fn pop_back(&mut self) -> Option<Self::Segment> { LookupBuf::pop_back(self) }
+    fn push_front(&mut self, segment: Self::Segment) { LookupBuf::push_front(self, segment) }
+    fn pop_front(&mut self) -> Option<Self::Segment> { LookupBuf::pop_front(self) }
     fn len(&self) -> usize { self.len() }
-    fn iter(&self) -> std::collections::vec_deque::Iter<'_, Self::Segment> { self.iter() }
-    fn into_iter(self) -> std::collections::vec_deque::IntoIter<Self::Segment> { IntoIterator::into_iter(self) }
-    fn is_valid(&self) -> crate::Result<()> { self.is_valid() }
-    fn from_str(input: &'static str) -> Result<Self, crate::Error> { Self::from_str(input) }
-    fn to_string(&self) -> String { ToString::to_string(self) }
-    fn extend(&mut self, other: Self) { self.extend(other) }
-    fn starts_with<'b>(&self, needle: &Self) -> bool { self.starts_with(needle) }
+    fn is_valid(&self) -> crate::Result<()> { LookupBuf::is_valid(self) }
+    fn from_str(input: &'static str) -> Result<Self, crate::Error> { LookupBuf::from_str(input) }
+    fn extend(&mut self, other: Self) { LookupBuf::extend(self, other) }
+    fn starts_with(&self, needle: &Self) -> bool { LookupBuf::starts_with(self, needle) }
 }
 
 // This trait, while it is not necessarily imported and used, exists
@@ -112,7 +102,7 @@ impl Look<'static> for LookupBuf {
 // It is convention to implement these functions on the bare type itself,
 // then have the implementation proxy to this **without modification**.
 //
-// This is so the functions are always available to users.
+// This is so the functions are always available to users, without needing an import.
 trait LookSegment<'a>:
     Debug +
     PartialEq +
@@ -154,7 +144,7 @@ impl<'a> LookSegment<'a> for SegmentBuf {
 // This is so the functions are always available to users, but we are required to expose the same API.
 impl<'a> LookSegment<'a> for Segment<'a> {
     type Field = &'a str;
-    fn field(name: <Self as LookSegment>::Field, requires_quoting: bool) -> Self { Self::field(name, requires_quoting) }
+    fn field(name: <Self as LookSegment<'a>>::Field, requires_quoting: bool) -> Self { Self::field(name, requires_quoting) }
     fn is_field(&self) -> bool { self.is_field() }
     fn index(v: usize) -> Self { Self::index(v) }
     fn is_index(&self) -> bool { self.is_index() }

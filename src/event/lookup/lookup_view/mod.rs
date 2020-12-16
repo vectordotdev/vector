@@ -88,13 +88,11 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    /// Get from the internal list of segments.
     #[instrument(level = "trace")]
     pub fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
         self.segments.get(index)
     }
 
-    /// Push onto the internal list of segments.
     #[instrument(level = "trace")]
     pub fn push_back(&mut self, segment: Segment<'a>) {
         self.segments.push_back(segment)

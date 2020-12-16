@@ -160,6 +160,36 @@ impl Value {
         }
     }
 
+    /// Return if the node is empty, that is, it is an array or map with no items.
+    #[instrument(level = "trace")]
+    pub fn is_empty(&self) -> bool {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => false,
+            Value::Map(v) => v.is_empty(),
+            Value::Array(v) => v.is_empty(),
+        }
+    }
+
+    /// Return the number of subvalues the value has.
+    #[instrument(level = "trace")]
+    pub fn len(&self) -> usize {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => 0,
+            Value::Map(v) => v.len(),
+            Value::Array(v) => v.len(),
+        }
+    }
+
     /// Insert a value at a given lookup.
     pub fn insert(
         &mut self,
@@ -427,15 +457,35 @@ impl Value {
             (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
                 if working_lookup.len() == 0 {
                     trace!(field = ?name, "Removing from map.");
-                    Ok(map.remove(*name))
+                    let retval = Ok(map.remove(*name));
+                    if map.is_empty() {
+                        trace!(prune, "Map is empty. May need to prune.");
+                        is_empty = true
+                    } else {
+                        trace!(prune, items = map.len(), "Map is not empty, no possible pruning.");
+                    };
+                    retval
                 } else {
                     trace!(field = ?name, "Descending into map.");
+                    let mut inner_is_empty = false;
                     let retval = match map.get_mut(*name) {
-                        Some(inner) => inner.remove(working_lookup.clone(), prune),
+                        Some(inner) => {
+                            let ret = inner.remove(working_lookup.clone(), prune);
+                            if inner.is_empty() {
+                                trace!(prune, "Map is empty. May need to prune.");
+                                inner_is_empty = true
+                            } else {
+                                trace!(prune, items = inner.len(), "Map is not empty, no possible pruning.");
+                            };
+                            ret
+                        },
                         None => Ok(None),
                     };
-                    if map.is_empty() {
-                        is_empty = true
+                    if inner_is_empty && prune {
+                        trace!("Pruning.");
+                        map.remove(*name);
+                    } else {
+                        trace!("Pruning not required.");
                     }
                     retval
                 }
@@ -446,31 +496,45 @@ impl Value {
                 if working_lookup.len() == 0 {
                     trace!(index = ?i, "Removing from array.");
                     // We don't **actually** want to remove the index, we just want to swap it with a null.
-                    if let Some(value) = array.get_mut(i) {
-                        let mut holder = Value::Null;
-                        core::mem::swap(value, &mut holder);
-                        Ok(Some(holder))
+                    let retval = if array.len() > i {
+                        Ok(Some(array.remove(i)))
                     } else {
                         Ok(None)
-                    }
-                } else {
-                    trace!(index = ?i, "Descending into array.");
-                    let retval = match array.get_mut(i) {
-                        Some(inner) => inner.remove(working_lookup.clone(), prune),
-                        None => Ok(None),
                     };
                     if array.is_empty() {
+                        trace!(prune, "Array is empty. May need to prune.");
                         is_empty = true
+                    } else {
+                        trace!(prune, items = array.len(), "Array is not empty, no possible pruning.");
+                    };
+                    retval
+                } else {
+                    trace!(index = ?i, "Descending into array.");
+                    let mut inner_is_empty = false;
+                    let retval = match array.get_mut(i) {
+                        Some(inner) => {
+                            let ret = inner.remove(working_lookup.clone(), prune);
+                            if inner.is_empty() {
+                                trace!(prune, "Inner Array is empty. May need to prune.");
+                                inner_is_empty = true
+                            } else {
+                                trace!(prune, "Inner Array is not empty, no possible pruning.");
+                            };
+                            ret
+                        }
+                        None => Ok(None),
+                    };
+                    if inner_is_empty && prune {
+                        trace!("Pruning.");
+                        array.remove(i);
+                    } else {
+                        trace!("Pruning not required.");
                     }
                     retval
                 }
             }
             (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
         };
-
-        if prune && is_empty {
-            *self = Value::Null;
-        }
 
         retval
     }
@@ -812,6 +876,12 @@ impl Serialize for Value {
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
         Value::Bytes(bytes)
+    }
+}
+
+impl From<u32> for Value {
+    fn from(val: u32) -> Self {
+        Value::Integer(val.into())
     }
 }
 
@@ -1325,6 +1395,62 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker)); // Duplicated on purpose.
+        }
+    }
+
+    mod corner_cases {
+        use super::*;
+
+        #[test]
+        fn remove_prune_map_with_map() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "foo.bar";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+            assert!(!value.contains("foo"));
+        }
+
+        #[test]
+        fn remove_prune_map_with_array() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(BTreeMap::default());
+            let key = "foo[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+            assert!(!value.contains("foo"));
+        }
+
+        #[test]
+        fn remove_prune_array_with_map() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0].bar";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+            assert!(!value.contains(0));
+        }
+
+        #[test]
+        fn remove_prune_array_with_array() {
+            crate::test_util::trace_init();
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+            assert!(!value.contains(0));
         }
     }
 

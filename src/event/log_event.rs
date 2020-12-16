@@ -11,6 +11,59 @@ use std::{
     iter::FromIterator,
 };
 
+/// A map of [`crate::event::Value`].
+///
+/// The inside of an [`Event::Log`](crate::event::Event) variant of [`crate::event::Event`].
+///
+/// This type supports being interacted with like a regular old
+/// [`BTreeMap`](std::collections::BTreeMap), or with special (unowned) [`crate::event::Lookup`] and
+/// (owned) [`crate::event::LookupBuf`] types.
+///
+/// Transparently, as a normal [`BTreeMap`](std::collections::BTreeMap):
+///
+/// ```rust
+/// let mut event = vector::event::LogEvent::default();
+/// event.insert(String::from("foo"), 1);
+/// assert!(event.contains("foo"));
+/// assert_eq!(event.get("foo"), Some(&vector::event::Value::from(1)));
+/// ```
+///
+/// Using remap-style lookups:
+///
+/// ```rust
+/// let mut event = vector::event::LogEvent::default();
+/// let lookup = vector::event::LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
+/// event.insert(lookup.clone(), 1);
+/// assert!(event.contains(&lookup));
+/// assert_eq!(event.get(&lookup), Some(&vector::event::Value::from(1)));
+/// ```
+///
+/// It's possible to access the inner [`BTreeMap`](std::collections::BTreeMap):
+///
+/// ```rust
+/// use vector::event::LogEvent;
+/// let mut event = LogEvent::default();
+/// event.insert(String::from("foo"), 1);
+///
+/// use std::collections::BTreeMap;
+/// let _inner: &BTreeMap<_, _> = event.inner();
+/// let _inner: &mut BTreeMap<_, _> = event.inner_mut();
+/// let inner: BTreeMap<_, _> = event.take();
+///
+/// let event = LogEvent::from(inner);
+/// ```
+///
+/// There exists a `log_event` macro you may also utilize to create this type:
+///
+/// ```rust
+/// use vector::{log_event, event::{LookupBuf, Lookup}};
+/// let event = log_event! {
+///     "foo" => 1,
+///     vector::event::LookupBuf::from_str("bar.baz").unwrap() => 2,
+/// }.into_log();
+/// assert!(event.contains("foo"));
+/// assert!(event.contains(Lookup::from_str("foo").unwrap()));
+/// ```
 #[derive(PartialEq, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LogEvent {
     #[serde(flatten)]
@@ -19,6 +72,18 @@ pub struct LogEvent {
 
 impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf}};
+    /// let plain_key = "foo";
+    /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
+    /// let event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// assert_eq!(event.get(plain_key), Some(&vector::event::Value::from(1)));
+    /// assert_eq!(event.get(&lookup_key), Some(&vector::event::Value::from(2)));
+    /// ```
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
@@ -83,6 +148,18 @@ impl LogEvent {
     }
 
     /// Get a mutable borrow of the value by lookup.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf}};
+    /// let plain_key = "foo";
+    /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
+    /// let mut event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// assert_eq!(event.get_mut(plain_key), Some(&mut vector::event::Value::from(1)));
+    /// assert_eq!(event.get_mut(&lookup_key), Some(&mut vector::event::Value::from(2)));
+    /// ```
     pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
@@ -147,6 +224,18 @@ impl LogEvent {
     }
 
     /// Determine if the log event contains a value at a given lookup.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf}};
+    /// let plain_key = "foo";
+    /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
+    /// let mut event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// assert!(event.contains(plain_key));
+    /// assert!(event.contains(&lookup_key));
+    /// ```
     pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
         let working_lookup = lookup.into();
         let span = trace_span!("contains", lookup = %working_lookup);
@@ -155,9 +244,21 @@ impl LogEvent {
         self.get(working_lookup).is_some()
     }
 
-    /// Insert a value at a given lookup.
-    pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
-        let mut working_lookup: LookupBuf = lookup;
+    /// Insert a value at a given lookup, returning any old value that exists.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf}};
+    /// let plain_key = "foo";
+    /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
+    /// let mut event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// assert_eq!(event.insert(plain_key, i64::MAX), Some(vector::event::Value::from(1)));
+    /// assert_eq!(event.insert(lookup_key.clone(), i64::MAX), Some(vector::event::Value::from(2)));
+    /// ```
+    pub fn insert(&mut self, lookup: impl Into<LookupBuf>, value: impl Into<Value> + Debug) -> Option<Value> {
+        let mut working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
 
@@ -244,6 +345,20 @@ impl LogEvent {
     /// Remove a value that exists at a given lookup.
     ///
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf}};
+    /// let plain_key = "foo";
+    /// let lookup_key = LookupBuf::from_str("bar.baz.slam").unwrap();
+    /// let mut event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// assert_eq!(event.remove(plain_key, true), Some(vector::event::Value::from(1)));
+    /// assert_eq!(event.remove(&lookup_key, true), Some(vector::event::Value::from(2)));
+    /// // Since we pruned, observe how `bar` is also removed because `prune` is set:
+    /// assert!(!event.contains("bar.baz"));
+    /// ```
     pub fn remove<'lookup>(
         &mut self,
         lookup: impl Into<Lookup<'lookup>> + Debug,
@@ -322,6 +437,25 @@ impl LogEvent {
     ///
     /// This is notably different than the keys in a map, as this descends into things like arrays
     /// and maps. It also returns those array/map values during iteration.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf, Lookup}};
+    /// let plain_key = "lick";
+    /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
+    /// let event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// let mut keys = event.keys(false);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick.slam").unwrap()));
+    ///
+    /// let mut keys = event.keys(true);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick.slam").unwrap()));
+    /// ```
     #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn keys<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = Lookup<'a>> + 'a {
         self.fields
@@ -337,6 +471,35 @@ impl LogEvent {
     ///
     /// This is notably different than pairs in a map, as this descends into things like arrays and
     /// maps. It also returns those array/map values during iteration.
+    ///
+    /// ```rust
+    /// use vector::{log_event, event::{LookupBuf, Lookup, Value}};
+    /// let plain_key = "lick";
+    /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
+    /// let event = log_event! {
+    ///     plain_key => 1,
+    ///     lookup_key.clone() => 2,
+    /// }.into_log();
+    /// let mut keys = event.pairs(false);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic").unwrap(), &Value::from({
+    ///     let mut inner_map = std::collections::BTreeMap::default();
+    ///     inner_map.insert(String::from("slam"), Value::from(2));
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("stick"), Value::from(inner_map));
+    ///     map
+    /// }))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick").unwrap(), &Value::from({
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("slam"), Value::from(2));
+    ///     map
+    /// }))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick.slam").unwrap(), &Value::from(2))));
+    ///
+    /// let mut keys = event.pairs(true);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick.slam").unwrap(), &Value::from(2))));
+    /// ```
     #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn pairs<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
         self.fields
@@ -349,6 +512,11 @@ impl LogEvent {
     }
 
     /// Determine if the log event is empty of fields.
+    ///
+    /// ```rust
+    /// let event = vector::event::LogEvent::default();
+    /// assert!(event.is_empty());
+    /// ```
     #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
@@ -414,22 +582,52 @@ impl LogEvent {
     }
 
     /// Returns the entire event as a `Value::Map`.
+    ///
+    /// ```rust
+    /// let event = vector::event::LogEvent::default();
+    /// assert_eq!(event.take(), std::collections::BTreeMap::default());
+    /// ```
     #[instrument(level = "trace", skip(self))]
-    pub fn take(self) -> Value {
-        Value::Map(self.fields)
+    pub fn take(self) -> BTreeMap<String, Value> {
+        self.fields
     }
 
     /// Get a borrow of the contained fields.
+    ///
+    /// ```rust
+    /// let mut event = vector::event::LogEvent::default();
+    /// assert_eq!(event.inner(), &std::collections::BTreeMap::default());
+    /// ```
     #[instrument(level = "trace", skip(self))]
     pub fn inner(&mut self) -> &BTreeMap<String, Value> {
         &self.fields
     }
 
     /// Get a mutable borrow of the contained fields.
+    ///
+    /// ```rust
+    /// let mut event = vector::event::LogEvent::default();
+    /// assert_eq!(event.inner_mut(), &mut std::collections::BTreeMap::default());
+    /// ```
     #[instrument(level = "trace", skip(self))]
     pub fn inner_mut(&mut self) -> &mut BTreeMap<String, Value> {
         &mut self.fields
     }
+}
+
+#[macro_export]
+macro_rules! log_event {
+    ($($key:expr => $value:expr),*  $(,)?) => {
+        #[allow(unused_variables)]
+        {
+            let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
+            let log = event.as_mut_log();
+            $(
+                log.insert($key, $value);
+            )*
+            event
+        }
+    };
 }
 
 impl From<BTreeMap<String, Value>> for LogEvent {
@@ -807,6 +1005,27 @@ mod test {
 
     mod corner_cases {
         use super::*;
+
+        // Prune on deeply nested values is tested in `value.rs`, but we must test root values here.
+        #[test]
+        fn pruning() -> crate::Result<()> {
+            crate::test_util::trace_init();
+
+            let mut event = crate::log_event! {
+                LookupBuf::from("foo.bar.baz") => 1,
+            }.into_log();
+            assert_eq!(event.remove(Lookup::from("foo.bar.baz"), true), Some(Value::from(1)));
+            assert!(!event.contains(Lookup::from("foo.bar")));
+            assert!(!event.contains(Lookup::from("foo")));
+
+            let mut event = crate::log_event! {
+                LookupBuf::from("foo.bar") => 1,
+            }.into_log();
+            assert_eq!(event.remove(Lookup::from("foo.bar"), true), Some(Value::from(1)));
+            assert!(!event.contains(Lookup::from("foo")));
+
+            Ok(())
+        }
 
         // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
         // there are some cases where we want to insert 1 by one. Make sure this can happen.

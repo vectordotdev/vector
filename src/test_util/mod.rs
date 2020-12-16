@@ -51,21 +51,6 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
-#[macro_export]
-macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
-        #[allow(unused_variables)]
-        {
-            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
-            let log = event.as_mut_log();
-            $(
-                log.insert($key, $value);
-            )*
-            event
-        }
-    };
-}
-
 pub fn test_generate_config<T>()
 where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,

@@ -614,7 +614,7 @@ mod test {
             event
                 .as_log()
                 .pairs(true)
-                .find(|(key, _)| key.starts_with(Lookup::from("empty")))
+                .find(|(key, _)| key.starts_with(&Lookup::from("empty")))
                 == None
         }
 
