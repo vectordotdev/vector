@@ -248,7 +248,7 @@ impl<'a> Parser<'a> {
     /// Parse if-statement expressions.
     fn if_statement_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
         // if condition
-        let conditional = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
+        let conditional = self.if_condition_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
         let true_expression = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
 
         // else condition
@@ -264,15 +264,15 @@ impl<'a> Parser<'a> {
         while let Some(pair) = pairs.next() {
             let (conditional, true_expression) = match pairs.peek().map(Pair::as_rule) {
                 Some(R::block) | None => {
-                    let conditional = self.expression_from_pair(pair)?;
+                    let conditional = self.if_condition_from_pair(pair)?;
                     let true_expression = false_expression;
                     false_expression = Expr::from(Noop);
 
                     (conditional, true_expression)
                 }
-                Some(R::boolean_expr) => {
+                Some(R::if_condition) => {
                     let next_pair = pairs.next().ok_or(e(R::if_statement))?;
-                    let conditional = self.expression_from_pair(next_pair)?;
+                    let conditional = self.if_condition_from_pair(next_pair)?;
                     let true_expression = self.expression_from_pair(pair)?;
 
                     (conditional, true_expression)
@@ -292,6 +292,16 @@ impl<'a> Parser<'a> {
             Box::new(true_expression),
             Box::new(false_expression),
         )))
+    }
+
+    fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+        let mut pairs = pair.into_inner();
+
+        if let Some(R::boolean_expr) = pairs.peek().map(|p| p.as_rule()) {
+            return self.expression_from_pair(pairs.next().ok_or(e(R::if_condition))?);
+        }
+
+        self.block_from_pairs(pairs)
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.
@@ -564,7 +574,7 @@ impl<'a> Parser<'a> {
     // The order of `op` operations defines operator precedence.
     operation_fns! {
         multiplication => {
-            op: [Multiply, Divide, Remainder],
+            op: [Multiply, Divide, IntegerDivide, Remainder],
             next: not,
         }
 
@@ -716,7 +726,7 @@ mod tests {
                 r#"foo = "bar""#,
                 vec![
                     " 1:1\n",
-                    "= expected EOI, assignment, if_statement, not, or block",
+                    "= expected assignment, if_statement, not, or block",
                 ],
             ),
             (
@@ -746,7 +756,7 @@ mod tests {
             (
                 "if .foo > .bar { del(.foo) } else { .bar = .baz",
                 // This message isn't great, ideally I'd like "expected closing bracket"
-                vec![" 1:48\n", "= expected operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or path_index"],
+                vec![" 1:48\n", "= expected assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, path_index, or block"],
             ),
             (
                 "only_fields(.foo,)",
