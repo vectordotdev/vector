@@ -26,6 +26,10 @@ pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     reparse_groups(prometheus_parser::parse_text(packet)?)
 }
 
+pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
+    reparse_groups(prometheus_parser::parse_request(request)?)
+}
+
 fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Event>, ParserError> {
     let mut result = Vec::new();
 
