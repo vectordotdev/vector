@@ -34,6 +34,8 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+#[cfg(feature = "transforms-filter")]
+mod filter;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -152,6 +154,8 @@ pub use self::elasticsearch::*;
     feature = "sinks-file",
 ))]
 pub use self::file::*;
+#[cfg(feature = "transforms-filter")]
+pub use self::filter::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
