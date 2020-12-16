@@ -15,18 +15,74 @@ use std::{
 };
 use toml::value::Value as TomlValue;
 
+/// A value inside an [`crate::event::Event`].
+///
+/// # Collection-like API
+///
+/// Map and Array variants of this type can be called with [`insert`](crate::event::Value::insert),
+/// [`get_mut`](crate::event::Value::get_mut) similar to how one would with an
+/// [`Event`](crate::event::Event). Non-array/map values will return errors when called with these
+/// endpoints.
+///
+/// This type supports being interacted with like a regular old
+/// [`String`](std::string::String), or with special (unowned) [`crate::event::Lookup`] and
+/// (owned) [`crate::event::LookupBuf`] types.
+///
+/// Transparently, with plain [`String`](std::string::String)s:
+///
+/// ```rust
+/// let mut value = vector::event::Value::Map(std::collections::BTreeMap::default());
+/// value.insert(String::from("foo"), 1);
+/// assert!(value.contains("foo"));
+/// assert_eq!(value.get("foo").unwrap(), Some(&vector::event::Value::from(1)));
+/// ```
+///
+/// Using remap-style lookups:
+///
+/// ```rust
+/// let mut value = vector::event::LogEvent::default();
+/// let lookup = vector::event::LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
+/// value.insert(lookup.clone(), 1);
+/// assert!(value.contains(&lookup));
+/// assert_eq!(value.get(&lookup), Some(&vector::event::Value::from(1)));
+/// ```
+///
+/// It's possible to access the inner values as variants:
+///
+/// ```rust
+/// let mut value = vector::event::Value::from(1);
+/// assert_eq!(value.as_integer(), &1);
+/// assert_eq!(value.as_integer_mut(), &mut 1);
+/// assert_eq!(value.into_integer(), 1);
+/// ```
 // The ordering of these fields, **particularly timestamps and bytes** is very important as serde's
-// untagged enum parser handes it in order.
+// untagged enum parser handles it in order.
 #[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
 #[serde(untagged)]
 pub enum Value {
+    /// A signed 64-bit integer.
     Integer(i64),
+    /// A 64-bit floating point.
     Float(f64),
+    /// A boolean.
     Boolean(bool),
+    /// A timestamp.
     Timestamp(DateTime<Utc>),
+    /// A slice of bytes, or a not necessarily UTF-8 set of u8s.
+    ///
+    /// To treat this as a string:
+    ///
+    /// ```rust
+    /// let val = vector::event::Value::from(String::from("Foo"));
+    /// assert_eq!(String::from_utf8_lossy(&*val.as_bytes()).to_string(), String::from("Foo"));
+    /// assert_eq!(String::from_utf8(val.into_bytes().to_vec()).unwrap(), String::from("Foo"));
+    /// ```
     Bytes(Bytes),
+    /// A map of fields to other values.
     Map(BTreeMap<String, Value>),
+    /// An dense array of values.
     Array(Vec<Value>),
+    /// A null value.
     Null,
 }
 
@@ -48,6 +104,14 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
+    pub fn into_integer(self) -> i64 {
+        match self {
+            Value::Integer(i) => i,
+            _ => panic!("Tried to call `Value::into_integer` on a non-integer value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
     pub fn as_float(&self) -> &f64 {
         match self {
             Value::Float(ref f) => f,
@@ -60,6 +124,14 @@ impl Value {
         match self {
             Value::Float(ref mut f) => f,
             _ => panic!("Tried to call `Value::as_float` on a non-float value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn into_float(self) -> f64 {
+        match self {
+            Value::Float(f) => f,
+            _ => panic!("Tried to call `Value::into_float` on a non-float value."),
         }
     }
 
@@ -80,6 +152,14 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
+    pub fn into_bool(self) -> bool {
+        match self {
+            Value::Boolean(b) => b,
+            _ => panic!("Tried to call `Value::into_bool` on a non-bool value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
     pub fn as_timestamp(&self) -> &DateTime<Utc> {
         match self {
             Value::Timestamp(ref t) => t,
@@ -92,6 +172,14 @@ impl Value {
         match self {
             Value::Timestamp(ref mut t) => t,
             _ => panic!("Tried to call `Value::as_timestamp` on a non-timestamp value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn into_timestamp(self) -> DateTime<Utc> {
+        match self {
+            Value::Timestamp(t) => t,
+            _ => panic!("Tried to call `Value::into_timestamp` on a non-timestamp value."),
         }
     }
 
@@ -112,6 +200,14 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
+    pub fn into_bytes(self) -> Bytes {
+        match self {
+            Value::Bytes(b) => b,
+            _ => panic!("Tried to call `Value::into_bytes` on a non-bytes value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         match self {
             Value::Map(ref m) => m,
@@ -124,6 +220,14 @@ impl Value {
         match self {
             Value::Map(ref mut m) => m,
             _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn into_map(self) -> BTreeMap<String, Value> {
+        match self {
+            Value::Map(m) => m,
+            _ => panic!("Tried to call `Value::into_map` on a non-map value."),
         }
     }
 
@@ -143,9 +247,39 @@ impl Value {
         }
     }
 
+    #[instrument(level = "trace")]
+    pub fn into_array(self) -> Vec<Value> {
+        match self {
+            Value::Array(v) => v,
+            _ => panic!("Tried to call `Value::into_array` on a non-array value."),
+        }
+    }
+
     /// Return if the node is a leaf (meaning it has no children) or not.
     ///
     /// This is notably useful for things like influxdb logs where we list only leaves.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let val = Value::from(1);
+    /// assert_eq!(val.is_leaf(), true);
+    ///
+    /// let mut val = Value::from(Vec::<Value>::default());
+    /// assert_eq!(val.is_leaf(), true);
+    /// val.insert(0, 1);
+    /// assert_eq!(val.is_leaf(), false);
+    /// val.insert(3, 1);
+    /// assert_eq!(val.is_leaf(), false);
+    ///
+    /// let mut val = Value::from(BTreeMap::default());
+    /// assert_eq!(val.is_leaf(), true);
+    /// val.insert("foo", 1);
+    /// assert_eq!(val.is_leaf(), false);
+    /// val.insert("bar", 2);
+    /// assert_eq!(val.is_leaf(), false);
+    /// ```
     #[instrument(level = "trace")]
     pub fn is_leaf<'a>(&'a self) -> bool {
         match &self {
@@ -155,12 +289,34 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_)
             | Value::Null => true,
-            Value::Map(_) => false,
-            Value::Array(_) => false,
+            Value::Map(_) => self.is_empty(),
+            Value::Array(_) => self.is_empty(),
         }
     }
 
     /// Return if the node is empty, that is, it is an array or map with no items.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let val = Value::from(1);
+    /// assert_eq!(val.is_empty(), false);
+    ///
+    /// let mut val = Value::from(Vec::<Value>::default());
+    /// assert_eq!(val.is_empty(), true);
+    /// val.insert(0, 1);
+    /// assert_eq!(val.is_empty(), false);
+    /// val.insert(3, 1);
+    /// assert_eq!(val.is_empty(), false);
+    ///
+    /// let mut val = Value::from(BTreeMap::default());
+    /// assert_eq!(val.is_empty(), true);
+    /// val.insert("foo", 1);
+    /// assert_eq!(val.is_empty(), false);
+    /// val.insert("bar", 2);
+    /// assert_eq!(val.is_empty(), false);
+    /// ```
     #[instrument(level = "trace")]
     pub fn is_empty(&self) -> bool {
         match &self {
@@ -176,6 +332,28 @@ impl Value {
     }
 
     /// Return the number of subvalues the value has.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let val = Value::from(1);
+    /// assert_eq!(val.len(), 0);
+    ///
+    /// let mut val = Value::from(Vec::<Value>::default());
+    /// assert_eq!(val.len(), 0);
+    /// val.insert(0, 1);
+    /// assert_eq!(val.len(), 1);
+    /// val.insert(3, 1);
+    /// assert_eq!(val.len(), 4);
+    ///
+    /// let mut val = Value::from(BTreeMap::default());
+    /// assert_eq!(val.len(), 0);
+    /// val.insert("foo", 1);
+    /// assert_eq!(val.len(), 1);
+    /// val.insert("bar", 2);
+    /// assert_eq!(val.len(), 2);
+    /// ```
     #[instrument(level = "trace")]
     pub fn len(&self) -> usize {
         match &self {
@@ -191,12 +369,27 @@ impl Value {
     }
 
     /// Insert a value at a given lookup.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut inner_map = Value::from(BTreeMap::default());
+    /// inner_map.insert("baz", 1);
+    ///
+    /// let mut map = Value::from(BTreeMap::default());
+    /// map.insert("bar", inner_map.clone());
+    /// map.insert("star", inner_map.clone());
+    ///
+    /// assert!(map.contains("bar"));
+    /// assert!(map.contains(Lookup::from_str("star.baz").unwrap()));
+    /// ```
     pub fn insert(
         &mut self,
-        lookup: LookupBuf,
+        lookup: impl Into<LookupBuf> + Debug,
         value: impl Into<Value> + Debug,
     ) -> Result<Option<Value>> {
-        let mut working_lookup: LookupBuf = lookup;
+        let mut working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
 
@@ -403,6 +596,24 @@ impl Value {
     /// Remove a value that exists at a given lookup.
     ///
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut inner_map = Value::from(BTreeMap::default());
+    /// inner_map.insert("baz", 1);
+    ///
+    /// let mut map = Value::from(BTreeMap::default());
+    /// map.insert("bar", inner_map.clone());
+    /// map.insert("star", inner_map.clone());
+    ///
+    /// assert_eq!(map.remove("bar", true).unwrap(), Some(Value::from(inner_map)));
+    ///
+    /// let lookup_key = Lookup::from_str("star.baz").unwrap();
+    /// assert_eq!(map.remove(lookup_key, true).unwrap(), Some(Value::from(1)));
+    /// assert!(!map.contains("star"));
+    /// ```
     #[instrument(level = "trace", skip(self, lookup))]
     pub fn remove<'a>(
         &mut self,
@@ -540,6 +751,22 @@ impl Value {
     }
 
     /// Get an immutable borrow of the value by lookup.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut inner_map = Value::from(BTreeMap::default());
+    /// inner_map.insert("baz", 1);
+    ///
+    /// let mut map = Value::from(BTreeMap::default());
+    /// map.insert("bar", inner_map.clone());
+    ///
+    /// assert_eq!(map.get("bar").unwrap(), Some(&Value::from(inner_map)));
+    ///
+    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
+    /// ```
     #[instrument(level = "trace", skip(self, lookup))]
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>> {
         let mut working_lookup = lookup.into();
@@ -622,6 +849,22 @@ impl Value {
     }
 
     /// Get a mutable borrow of the value by lookup.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut inner_map = Value::from(BTreeMap::default());
+    /// inner_map.insert("baz", 1);
+    ///
+    /// let mut map = Value::from(BTreeMap::default());
+    /// map.insert("bar", inner_map.clone());
+    ///
+    /// assert_eq!(map.get_mut("bar").unwrap(), Some(&mut Value::from(inner_map)));
+    ///
+    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
+    /// ```
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -696,7 +939,23 @@ impl Value {
         }
     }
 
-    /// Get an immutable borrow of the given value by lookup.
+    /// Determine if the lookup is contained within the value.
+    ///
+    /// ```rust
+    /// use vector::event::{Lookup, Value};
+    /// use std::collections::BTreeMap;
+    ///
+    /// let mut inner_map = Value::from(BTreeMap::default());
+    /// inner_map.insert("baz", 1);
+    ///
+    /// let mut map = Value::from(BTreeMap::default());
+    /// map.insert("bar", inner_map.clone());
+    ///
+    /// assert!(map.contains("bar"));
+    ///
+    /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
+    /// assert!(map.contains(lookup_key));
+    /// ```
     #[instrument(level = "trace", skip(self))]
     pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
         self.get(lookup.into()).unwrap_or(None).is_some()
@@ -708,6 +967,25 @@ impl Value {
     ///
     /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
     /// will be prefixed with that lookup.
+    ///
+    /// ```rust
+    /// use vector::event::{LookupBuf, Lookup, Value};
+    /// let plain_key = "lick";
+    /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
+    /// let mut value = Value::from(std::collections::BTreeMap::default());
+    /// value.insert(plain_key, 1);
+    /// value.insert(lookup_key, 2);
+    ///
+    /// let mut keys = value.lookups(None, false);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick.slam").unwrap()));
+    ///
+    /// let mut keys = value.lookups(None, true);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick.slam").unwrap()));
+    /// ```
     #[instrument(level = "trace", skip(self, prefix, only_leaves))]
     pub fn lookups<'a>(
         &'a self,
@@ -781,6 +1059,35 @@ impl Value {
     ///
     /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
     /// will be prefixed with that lookup.
+    ///
+    /// ```rust
+    /// use vector::event::{LookupBuf, Lookup, Value};
+    /// let plain_key = "lick";
+    /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
+    /// let mut value = Value::from(std::collections::BTreeMap::default());
+    /// value.insert(plain_key, 1);
+    /// value.insert(lookup_key, 2);
+    ///
+    /// let mut keys = value.pairs(None, false);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic").unwrap(), &Value::from({
+    ///     let mut inner_map = std::collections::BTreeMap::default();
+    ///     inner_map.insert(String::from("slam"), Value::from(2));
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("stick"), Value::from(inner_map));
+    ///     map
+    /// }))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick").unwrap(), &Value::from({
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("slam"), Value::from(2));
+    ///     map
+    /// }))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick.slam").unwrap(), &Value::from(2))));
+    ///
+    /// let mut keys = value.pairs(None, true);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
+    /// assert_eq!(keys.next(), Some((Lookup::from_str("vic.stick.slam").unwrap(), &Value::from(2))));
+    /// ```
     #[instrument(level = "trace", skip(self, prefix, only_leaves))]
     pub fn pairs<'a>(
         &'a self,
