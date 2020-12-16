@@ -2678,9 +2678,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-openssl"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed123fc8c1833f305468df3c3a6a837c34a7ae616567d40a5e3c2bf3cac2e31d"
+checksum = "90705b797966f4774ffbc5e4dbda9e5b95f2a49991a3187f753171cdd7db3c58"
 dependencies = [
  "antidote",
  "bytes 0.5.6",
@@ -2692,6 +2692,7 @@ dependencies = [
  "openssl-sys",
  "tokio",
  "tokio-openssl",
+ "tower-layer",
 ]
 
 [[package]]
