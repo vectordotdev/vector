@@ -3,19 +3,19 @@ package metadata
 remap: functions: match: {
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The value to match."
-			required: true
+			required:    true
 			type: ["string"]
 		},
 		{
-			name: "pattern"
+			name:        "pattern"
 			description: "The regular expression pattern to match against."
-			required: true
+			required:    true
 			type: ["regex"]
-		}
+		},
 	]
-	return: ["bool"]
+	return: ["boolean"]
 	category: "text"
 	description: """
 		Determines whether a string matches the provided pattern.
@@ -40,6 +40,6 @@ remap: functions: match: {
 			output: {
 				has_teapot: false
 			}
-		}
+		},
 	]
 }
