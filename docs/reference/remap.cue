@@ -248,7 +248,7 @@ remap: {
 	syntax: [RuleName=string]: {
 		#InNOut: {
 			in:  string
-			out: string
+			out: #RemapReturnTypes
 		}
 
 		name:        RuleName
@@ -328,7 +328,8 @@ remap: {
 
 				You can even assign values to arbitrary indices in arrays; any indices that need to
 				be created are back-filled as `null. For example, if the `hobbies` field doesn't
-				exist, the setting `.hobbies[2] = "Pogs"` yields `[null, null, "Pogs"]`.
+				exist, the expression `.hobbies[2] = "Pogs"` sets `hobbies` to `[null, null,
+				"Pogs"]`.
 				"""
 			examples: [
 				".",
@@ -343,15 +344,8 @@ remap: {
 			href: "expressions"
 
 			description: """
-				Expressions in TRL come in four kinds:
-
-				* [Assignments](#assignments)
-				* [Control flow statements](#control-flow)
-				* Boolean expressions
-				* [Blocks](#blocks)
-
-				*All* expressions in TRL resolve to a concrete value. Here's how that works for each
-				of the four kinds:
+				*All* expressions in TRL resolve to a value. Expressions come in four kinds, listed
+				below, each of which resolves in a different way:
 
 				Expression type | Resolves to
 				:---------------|:-----------
@@ -362,9 +356,15 @@ remap: {
 				"""
 
 			in_n_out: [
-				{in: #".request_id = "a1b2c3d4e5f6""#, out:                       "\"a1b2c3d4e5f6\""},
-				{in: #"if (starts_with("v1", "v1.2.5")) { .is_v1 = true }"#, out: "true"},
-				{in: #"contains("emergency", "this is an emergency")"#, out:      "true"},
+				{in: #".request_id = "a1b2c3d4e5f6""#, out:                      "string"},
+				{in: #"if (starts_with("v1", .version)) { .version = 1 }"#, out: "integer"},
+				{in: #"contains("emergency", "this is an emergency")"#, out:     "boolean"},
+				{
+					in: """
+						$is_success = { $code = .status_code; del(.status_code); $code == 200 }
+						"""
+					out: "boolean"
+				},
 			]
 		}
 
@@ -514,8 +514,8 @@ remap: {
 			href: "operators"
 
 			description: """
-				TRL offers a standard set of operators that should be familiar from many other
-				programming languages.
+				TRL offers a standard set of operators, listed in the table below, that should be
+				familiar from many other programming languages.
 
 				TRL supports the standard [order of operations](\(urls.order_of_ops)). Thus,
 				`(2 * 2) + 8` makes `12`, `10 / (2 + 3)` makes `2`, `true && (false || true)` makes
