@@ -17,7 +17,7 @@ use tokio::time::{interval, Duration};
 pub struct GeneratorConfig {
     #[serde(alias = "batch_interval")]
     interval: Option<f64>,
-    #[serde(default = "usize::MAX")]
+    #[serde(default = "usize::max_value")]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
