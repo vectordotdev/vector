@@ -195,7 +195,7 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = "0.12.0"
+avro-rs = { version = "0.12.0", optional = true }
 dirs-next = { version = "1", optional = true }
 
 # For WASM
@@ -482,7 +482,7 @@ sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
-sinks-pulsar = ["pulsar"]
+sinks-pulsar = ["avro-rs", "pulsar"]
 
 # Identifies that the build is a nightly build
 nightly = []
