@@ -78,21 +78,20 @@ remap: {
 		"array": {
 			description: """
 				A list of items. Items in an array can be of any TRL type, including other arrays.
+				Values inside TRL arrays can be accessed via index (beginning with 0). For the array
+				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
 
-				You can access array values by index (starting with zero):
-
-				```
-				$levels = ["critical", "emergency", "alert"]
-				$levels[0] == "critical"
-				```
-
-				You can also assign values to arrays via index:
+				You can also assign values to arrays by index:
 
 				```
-				$levels[3] = "not_so_terrible"
+				$stooges = ["Larry", "Moe"]
+				$stooges[2] = "Curly"
 				```
 
-
+				You can even assign values to arbitrary indices in arrays; any indices that need to
+				be created are back-filled as `null`. For example, if the `hobbies` field doesn't
+				exist, the expression `.hobbies[2] = "Pogs"` sets `hobbies` to `[null, null,
+				"Pogs"]`.
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -268,18 +267,18 @@ remap: {
 			description: """
 				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
 				it represents the object arriving into the transform; that object can be a log or a
-				metric. To give an example, imagine you're writing a TRL script to handle logs that
-				in [JSON](\(urls.json)) format. Here's an example JSON log event:
+				metric. To give an example, imagine you're writing a TRL script to handle logs in
+				[JSON](\(urls.json)) format. Here's an example event:
 
 				```json
 				{"status_code":200,"username":"booper1234","message":"Successful transaction"}
 				```
 
-				In this case, the object, represented by the dot, has three fields: `.status_code`,
-				`.username`, and `.message`. You can assign new values to the existing fields
-				(`.message = "something different"`), add new fields (`.new_field = "new value"`),
-				delete fields (`del(.username)`), store those values in variables (`$code =
-				.status_code`), and more.
+				In this case, the event object, represented by the dot, has three fields:
+				`.status_code`, `.username`, and `.message`. You can assign new values to the
+				existing fields (`.message = "something different"`), add new fields (`.new_field =
+				"new value"`), delete fields (`del(.username)`), store those values in variables
+				(`$code = .status_code`), and more.
 
 				### Nested values
 
@@ -310,10 +309,10 @@ remap: {
 				segments can also be quoted, as in this example:
 
 				```
-				$fav_color = user."favorite color"
+				user.preferences."favorite color" = "chartreuse"
 				```
 
-				Quoted paths are useful when keys contain whitespace.
+				Quoted paths are particularly useful when keys need to contain whitespace.
 
 				### Indexing
 
@@ -328,9 +327,22 @@ remap: {
 				```
 
 				You can even assign values to arbitrary indices in arrays; any indices that need to
-				be created are back-filled as `null. For example, if the `hobbies` field doesn't
+				be created are back-filled as `null`. For example, if the `hobbies` field doesn't
 				exist, the expression `.hobbies[2] = "Pogs"` sets `hobbies` to `[null, null,
 				"Pogs"]`.
+
+				### Combined
+
+				All of the path methods above can be combined in any way. Here's an example of a
+				complex path:
+
+				```
+				.transaction.(metadata | info).orders[0] = "a1b2c3d4e5f6"
+				```
+
+				This sets the first element of `.transaction.metadata.orders` to `"a1b2c3d4e5f6"`
+				*if* `.transaction.metadata` exist; if not, it sets `.transaction.info.orders` to
+				that value.
 				"""
 			examples: [
 				".",
@@ -338,6 +350,8 @@ remap: {
 				#".message.event."time of occurrence""#,
 				".transaction.id",
 				".user.hobbies[0].description",
+				".event.(time | timestamp).format",
+				#""#,
 			]
 		}
 
