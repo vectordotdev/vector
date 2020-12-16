@@ -1530,8 +1530,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1584,8 +1583,7 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect()
-            .compat(),
+            .collect::<Vec<_>>(),
         )
         .await;
 
