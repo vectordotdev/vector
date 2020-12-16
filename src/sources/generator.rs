@@ -17,7 +17,8 @@ use tokio::time::{interval, Duration};
 pub struct GeneratorConfig {
     #[serde(alias = "batch_interval")]
     interval: Option<f64>,
-    count: Option<usize>,
+    #[serde(default = "usize::MAX")]
+    count: usize,
     #[serde(flatten)]
     format: OutputFormat,
 }
@@ -95,7 +96,7 @@ impl GeneratorConfig {
     }
 
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: Option<usize>, interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
         Self {
             count,
             interval,

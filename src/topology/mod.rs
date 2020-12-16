@@ -931,8 +931,7 @@ mod reload_tests {
     async fn topology_reuse_old_port_sink() {
         let address = next_addr();
 
-        let source =
-            GeneratorConfig::repeat(vec!["msg".to_string()], None, Some(0.001));
+        let source = GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
         let transform = LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
                 field: "message".to_string(),
@@ -995,7 +994,7 @@ mod reload_tests {
         let mut old_config = Config::builder();
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], None, Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform("trans", &[&"in"], transform.clone());
         old_config.add_sink(
@@ -1041,7 +1040,7 @@ mod reload_tests {
         old_config.global.data_dir = Some(data_dir);
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], None, Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform(
             "trans",
@@ -1131,7 +1130,7 @@ mod source_finished_tests {
     #[tokio::test]
     async fn sources_finished() {
         let mut old_config = Config::builder();
-        let generator = GeneratorConfig::repeat(vec!["text".to_owned()], Some(1), None);
+        let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
         old_config.add_source("in", generator);
         old_config.add_sink(
             "out",

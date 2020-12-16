@@ -372,8 +372,11 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let generator =
-        GeneratorConfig::repeat(vec!["line 1".into()], Some(params.requests), params.interval);
+    let generator = GeneratorConfig::repeat(
+        vec!["line 1".into()],
+        params.requests,
+        params.interval,
+    );
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
