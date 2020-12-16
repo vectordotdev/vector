@@ -86,6 +86,13 @@ components: sinks: splunk_hec: {
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Splunk instance."
+			required:    true
+			type: string: {
+				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
+			}
+		}
 		host_key: {
 			common:      true
 			description: "The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
