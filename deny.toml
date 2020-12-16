@@ -57,16 +57,6 @@ ignore = [
     # futures-intrusive v0.3.1
     "RUSTSEC-2020-0072",
 
-    # `net2` invalidly assumes the memory layout of std::net::SocketAddr
-    # Solution: Upgrade to >=0.2.36
-    # net2 v0.2.34
-    "RUSTSEC-2020-0078",
-
-    # `miow` invalidly assumes the memory layout of std::net::SocketAddr
-    # Solution: Upgrade to >=0.2.2 OR >=0.3.6
-    # miow v0.2.1
-    "RUSTSEC-2020-0080",
-
     # ordered_float:NotNan may contain NaN after panic in assignment operators
     # Solution: Upgrade to >=1.1.1, <2.0.0 OR >=2.0.1
     # ordered-float v2.0.0
