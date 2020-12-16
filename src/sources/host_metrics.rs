@@ -27,6 +27,7 @@ use heim::{
     units::{information::byte, time::second},
     Error,
 };
+
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -688,6 +689,33 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
         (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
     }
     metrics
+}
+
+pub fn init_roots() {
+    #[cfg(target_os = "linux")]
+    {
+        match std::env::var_os("PROCFS_ROOT") {
+            Some(procfs_root) => {
+                info!(
+                    message = "PROCFS_ROOT is set in envvars. Using custom for procfs.",
+                    custom = ?procfs_root
+                );
+                heim::os::linux::set_procfs_root(std::path::PathBuf::from(&procfs_root));
+            }
+            None => info!("PROCFS_ROOT is unset. Using default '/proc' for procfs root."),
+        };
+
+        match std::env::var_os("SYSFS_ROOT") {
+            Some(sysfs_root) => {
+                info!(
+                    message = "SYSFS_ROOT is set in envvars. Using custom for sysfs.",
+                    custom = ?sysfs_root
+                );
+                heim::os::linux::set_sysfs_root(std::path::PathBuf::from(&sysfs_root));
+            }
+            None => info!("SYSFS_ROOT is unset. Using default '/sys' for sysfs root."),
+        }
+    };
 }
 
 impl FilterList {
