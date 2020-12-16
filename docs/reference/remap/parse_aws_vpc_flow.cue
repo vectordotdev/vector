@@ -35,16 +35,16 @@ remap: functions: parse_aws_vpc_flow: {
 					"version":      2
 					"account_id":   123456789010
 					"interface_id": "eni-1235b8ca123456789"
-					"srcaddr":      Null
-					"dstaddr":      Null
-					"srcport":      Null
-					"dstport":      Null
-					"protocol":     Null
-					"packets":      Null
-					"bytes":        Null
+					"srcaddr":      null
+					"dstaddr":      null
+					"srcport":      null
+					"dstport":      null
+					"protocol":     null
+					"packets":      null
+					"bytes":        null
 					"start":        1431280876
 					"end":          1431280934
-					"action":       Null
+					"action":       null
 					"log_status":   "NODATA"
 				}
 			}
@@ -61,7 +61,7 @@ remap: functions: parse_aws_vpc_flow: {
 			output: {
 				log: #"- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"#
 				parsed: {
-					"instance_id":  Null
+					"instance_id":  null
 					"interface_id": "eni-1235b8ca123456789"
 					"srcaddr":      "10.0.1.5"
 					"dstaddr":      "10.0.0.220"
