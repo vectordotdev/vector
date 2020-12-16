@@ -1,4 +1,7 @@
-use crate::event::metric::{Bucket, Metric, MetricKind, MetricValue, Quantile};
+use crate::event::{
+    metric::{Bucket, Metric, MetricKind, MetricValue, Quantile},
+    Event,
+};
 use chrono::{DateTime, TimeZone, Utc};
 use std::collections::BTreeMap;
 
@@ -19,11 +22,11 @@ fn utc_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
     })
 }
 
-pub(super) fn parse_text(packet: &str) -> Result<Vec<Metric>, ParserError> {
+pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     reparse_groups(prometheus_parser::parse_text(packet)?)
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> {
+fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Event>, ParserError> {
     let mut result = Vec::new();
 
     for group in groups {
@@ -40,7 +43,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                     .with_timestamp(utc_timestamp(key.timestamp))
                     .with_tags(has_values_or_none(key.labels));
 
-                    result.push(counter);
+                    result.push(counter.into());
                 }
             }
             GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
@@ -55,7 +58,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                     .with_timestamp(utc_timestamp(key.timestamp))
                     .with_tags(has_values_or_none(key.labels));
 
-                    result.push(gauge);
+                    result.push(gauge.into());
                 }
             }
             GroupKind::Histogram(metrics) => {
@@ -88,7 +91,8 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                             },
                         )
                         .with_timestamp(utc_timestamp(key.timestamp))
-                        .with_tags(has_values_or_none(key.labels)),
+                        .with_tags(has_values_or_none(key.labels))
+                        .into(),
                     );
                 }
             }
@@ -112,7 +116,8 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Metric>, ParserError> 
                             },
                         )
                         .with_timestamp(utc_timestamp(key.timestamp))
-                        .with_tags(has_values_or_none(key.labels)),
+                        .with_tags(has_values_or_none(key.labels))
+                        .into(),
                     );
                 }
             }
@@ -129,6 +134,10 @@ mod test {
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
+
+    fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
+        super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
+    }
 
     #[test]
     fn test_counter() {

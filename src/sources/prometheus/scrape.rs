@@ -10,7 +10,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
@@ -197,7 +197,7 @@ fn prometheus(
                                         byte_size,
                                         count: metrics.len(),
                                     });
-                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                    Some(stream::iter(metrics).map(Ok))
                                 }
                                 Err(error) => {
                                     if url.path() == "/" {
