@@ -105,6 +105,19 @@ mod tests {
                 Ok(()), Ok(4.into()),
             ),
             (
+                r#"if ($foo = true; $foo) { $foo } else { false }"#,
+                Ok(()), Ok(true.into())
+            ),
+            (
+                r#"if ($foo = "sproink"
+                       $foo == "sproink") {
+                      $foo
+                   } else {
+                     false
+                   }"#,
+                Ok(()), Ok("sproink".into())
+            ),
+            (
                 r#"regex_printer(/escaped\/forward slash/)"#,
                 Ok(()), Ok("regex: escaped/forward slash".into()),
             ),
@@ -243,6 +256,11 @@ mod tests {
                 Ok(()),
                 Ok("bar".into()),
             ),
+            (
+                r#"$foo = 1;$nork = $foo + 3;$nork"#,
+                Ok(()),
+                Ok(4.into())
+            )
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

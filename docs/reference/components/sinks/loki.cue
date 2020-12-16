@@ -77,6 +77,13 @@ components: sinks: loki: {
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Loki instance."
+			required:    true
+			type: string: {
+				examples: ["http://localhost:3100"]
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${LOKI_PASSWORD}"
 			username_example: "${LOKI_USERNAME}"
