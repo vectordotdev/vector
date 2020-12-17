@@ -77,9 +77,10 @@ remap: {
 	types: {
 		"array": {
 			description: """
-				A list of items. Items in an array can be of any TRL type, including other arrays.
-				Values inside TRL arrays can be accessed via index (beginning with 0). For the array
-				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
+				A list of values. Items in an array can be of any TRL type, including other arrays
+				and `null`. Values inside TRL arrays can be accessed via index (beginning with 0).
+				For the array `$primary = ["magenta", "yellow", "cyan"]`, for example, `$primary[0]`
+				yields `"magenta"`.
 
 				You can also assign values to arrays by index:
 
@@ -88,10 +89,10 @@ remap: {
 				$stooges[2] = "Curly"
 				```
 
-				You can even assign values to arbitrary indices in arrays; any indices that need to
-				be created are back-filled as `null`. For example, if the `hobbies` field doesn't
-				exist, the expression `.hobbies[2] = "Pogs"` sets `hobbies` to `[null, null,
-				"Pogs"]`.
+				You can even assign values to arbitrary indices in arrays; indices that need to be
+				created are back-filled as `null`. For example, if the `hobbies` field doesn't
+				exist, the expression `.hobbies[2] = "Pogs"` sets the `hobbies` field to
+				`[null, null, "Pogs"]`.
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -158,19 +159,24 @@ remap: {
 		"regex": {
 			description: """
 				A **reg**ular **ex**pression. In TRL, regular expressions are delimited by `/` and
-				use [Rust regex syntax](\(urls.rust_regex_syntax)).
+				use [Rust regex syntax](\(urls.rust_regex_syntax)). Here's an example usage of a
+				regular expression:
+
+				```
+				match("happy", /(happy|sad)/)
+				```
 
 				### Flags
 
-				TRL regexes allow three flags:
+				TRL regular expressions allow three flags:
 
 				Flag | Description
 				:----|:-----------
-				`g` | Search for *all* matches
+				`x` | Ignore whitespace
 				`i` | Case insensitive
 				`m` | Multi-line mode
 
-				Regex flags can be combined, as in `/pattern/gmi` or `/pattern/gi`.
+				Regex flags can be combined, as in `/pattern/xmi`, `/pattern/im`, etc.
 
 				To learn more about regular expressions in Rust—and by extension in TRL—we strongly
 				recommend the in-browser [Rustexp expression editor and
@@ -180,8 +186,7 @@ remap: {
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
 				#"""
-					$pattern = /(foo|bar)/
-					$is_foo_or_bar = match("does contain foo", $pattern)
+					$has_foo_or_bar = match("does contain foo", /(foo|bar)/)
 					"""#,
 			]
 		}
@@ -189,9 +194,9 @@ remap: {
 			description: #"""
 				A sequence of characters. A few things to note about TRL strings:
 
-				* Remap converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any
+				* TRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any
 					invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
-				* Strings can be escaped using `\`, as in `The password is \"opensesame\".`.
+				* Strings can be escaped using `\`, as in `The password is \"opensesame\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
 				"""#
@@ -383,6 +388,22 @@ remap: {
 			]
 		}
 
+		"Multiple lines": {
+			href: "multiple-lines"
+
+			description: """
+				TRL statements can be split across multiple lines using a backslash (`\`):
+
+				```
+				del(.one, .two, .three, .four \
+					.five, .six)
+				```
+
+				This statement is semantically identical to `del(.one, .two, .three, .four, .five,
+				.six)`.
+				"""
+		}
+
 		"Functions": {
 			href: "functions"
 
@@ -416,13 +437,20 @@ remap: {
 					...
 				}
 				```
+
+				Any number of expressions can be combined inside of a block if they're separated by
+				a semicolon (`;`), provided that the last expression resolves to a Boolean:
+
+				```
+				if ($keyword = "sesame"; .password == $keyword) {
+					.entry = true
+				}
+				```
 				"""
 
 			examples: [
 				"""
-					$pattern = /(foo|bar)/g
-
-					if (match("this does contain foo", $pattern)) {
+					if (match("this does contain foo", /(foo|bar)/)) {
 						.contains_foo = true
 					} else {
 						.does_not_contain_foo = true
@@ -442,6 +470,9 @@ remap: {
 				* `$pattern = /(foo|bar)/g`
 				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
+
+				In TRL, `=` represents assignment, while `==` is a [comparison
+				operator](#operators), as in many programming languages.
 
 				If you assign a value to an object field that doesn't already exist, the field is
 				created; if the field does exist, the value is re-assigned.
@@ -467,6 +498,21 @@ remap: {
 				$log_level = "critical"
 				.log_level = $log_level
 				```
+
+				### Assignment using expressions
+
+				Because all TRL expressions return a value (by definition), you can assign using
+				expressions as well:
+
+				```
+				$is_success = .status_code == 200
+				$has_buzzword = contains(.message, "serverless")
+				```
+
+				### No regular expressions
+
+				All value types in TRL can be assigned to variables, with the important exception of
+				regular expressions.
 				"""
 
 			examples: [
