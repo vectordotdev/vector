@@ -388,11 +388,11 @@ remap: {
 			]
 		}
 
-		"Multiple lines": {
-			href: "multiple-lines"
+		"Lines": {
+			href: "lines"
 
 			description: #"""
-				TRL statements can be split across multiple lines using a backslash (`\`):
+				TRL expressions can be split across multiple lines using a backslash (`\`):
 
 				```
 				del(.one, .two, .three, .four \
@@ -401,6 +401,16 @@ remap: {
 
 				This statement is semantically identical to `del(.one, .two, .three, .four, .five,
 				.six)`.
+
+				Conversely, multiple expressions can be collapsed into a single line using a
+				semicolon (`;`) as the separator:
+
+				```
+				$success_code = 200; .success = .success_code == $success_code; del(.success_code)
+				```
+
+				You can also use line collapsing via semicolon in [control flow
+				statements](#control-flow).
 				"""#
 		}
 
