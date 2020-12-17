@@ -1,4 +1,3 @@
-use crate::event;
 use remap::prelude::*;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
@@ -45,8 +44,7 @@ impl Expression for ParseUrlFn {
 
         Url::parse(&String::from_utf8_lossy(&bytes))
             .map_err(|e| format!("unable to parse url: {}", e).into())
-            .map(event::Value::from)
-            .map(Into::into)
+            .map(url_to_value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -58,34 +56,32 @@ impl Expression for ParseUrlFn {
     }
 }
 
-impl From<Url> for event::Value {
-    fn from(url: Url) -> Self {
-        let mut map = BTreeMap::<&str, event::Value>::new();
+fn url_to_value(url: Url) -> Value {
+    let mut map = BTreeMap::<&str, Value>::new();
 
-        map.insert("scheme", url.scheme().to_owned().into());
-        map.insert("username", url.username().to_owned().into());
-        map.insert(
-            "password",
-            url.password()
-                .map(ToOwned::to_owned)
-                .unwrap_or_default()
-                .into(),
-        );
-        map.insert("path", url.path().to_owned().into());
-        map.insert("host", url.host_str().map(ToOwned::to_owned).into());
-        map.insert("port", url.port().map(|v| v as isize).into());
-        map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
-        map.insert(
-            "query",
-            url.query_pairs()
-                .into_owned()
-                .map(|(k, v)| (k, v.into()))
-                .collect::<BTreeMap<String, event::Value>>()
-                .into(),
-        );
+    map.insert("scheme", url.scheme().to_owned().into());
+    map.insert("username", url.username().to_owned().into());
+    map.insert(
+        "password",
+        url.password()
+            .map(ToOwned::to_owned)
+            .unwrap_or_default()
+            .into(),
+    );
+    map.insert("path", url.path().to_owned().into());
+    map.insert("host", url.host_str().map(ToOwned::to_owned).into());
+    map.insert("port", url.port().map(|v| v as i64).into());
+    map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
+    map.insert(
+        "query",
+        url.query_pairs()
+            .into_owned()
+            .map(|(k, v)| (k, v.into()))
+            .collect::<BTreeMap<String, Value>>()
+            .into(),
+    );
 
-        event::Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
-    }
+    Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
 }
 
 #[cfg(test)]

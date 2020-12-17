@@ -1,5 +1,5 @@
-use crate::types::Conversion;
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToBool;
@@ -13,12 +13,12 @@ impl Function for ToBool {
         &[
             Parameter {
                 keyword: "value",
-                accepts: super::is_scalar_value,
+                accepts: crate::util::is_scalar_value,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: super::is_scalar_value,
+                accepts: crate::util::is_scalar_value,
                 required: false,
             },
         ]
@@ -55,16 +55,15 @@ impl Expression for ToBoolFn {
             Integer(v) => Ok(Boolean(v != 0)),
             Float(v) => Ok(Boolean(v != 0.0)),
             Null => Ok(Boolean(false)),
-            Bytes(_) => Conversion::Boolean
-                .convert(value.into())
-                .map(Into::into)
+            Bytes(v) => Conversion::Boolean
+                .convert(v)
                 .map_err(|e| e.to_string().into()),
             Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
                 Err("unable to convert value to boolean".into())
             }
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_bool,

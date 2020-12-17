@@ -4,19 +4,19 @@ rustflags = ["-C", "link-args=-rdynamic"]
 [target.aarch64-unknown-linux-gnu]
 rustflags = ["-C", "link-args=-rdynamic"]
 
-[target.'cfg(target_env = "musl")']
-# Because the `cross` Docker container sets `CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER`, the
-# `linker` key does not work in this file, so we use `rustflags` instead.
-# NOTE: This means that any custom `RUSTFLAGS` variable must include this value!
-rustflags = "-Clinker=scripts/cross/wrappers/linker.sh"
 
-# x86_64-specific libstdc++ search path. When building for musl, Cargo will merge this with the
-# `rustflags` key above.
+[target.'cfg(target_env = "musl")']
+# Turn off self-contained linking mode. This makes rustc rely on the installed musl toolchain to
+# find and link against C and C++ runtime objects, instead of linking against the bundled C ones.
+rustflags = "-Clink-self-contained=no"
+
+# for these musl targets libstdc++ will be linked statically (that's configured in e.g. leveldb-sys)
+# we provide the location of that library here
 [target.x86_64-unknown-linux-musl]
 rustflags = "-Lnative=/usr/local/x86_64-linux-musl/lib"
 
+[target.i686-unknown-linux-musl]
+rustflags = "-Lnative=/usr/local/i686-linux-musl/lib"
+
 [target.aarch64-unknown-linux-musl]
-# Deliberately empty.
-# See `scripts/cross/wrappers/{linker,rustc}.sh`.
-# Basically, we need to carefully edit the ordering of links.
-# Rust doesn't let us have great control of that here, so for now we use those wrappers.
+rustflags = "-Lnative=/usr/local/aarch64-linux-musl/lib"

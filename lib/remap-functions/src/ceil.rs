@@ -1,12 +1,12 @@
-use super::round_to_precision;
+use crate::util::round_to_precision;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Floor;
+pub struct Ceil;
 
-impl Function for Floor {
+impl Function for Ceil {
     fn identifier(&self) -> &'static str {
-        "floor"
+        "ceil"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -28,24 +28,24 @@ impl Function for Floor {
         let value = arguments.required("value")?.boxed();
         let precision = arguments.optional("precision").map(Expr::boxed);
 
-        Ok(Box::new(FloorFn { value, precision }))
+        Ok(Box::new(CeilFn { value, precision }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct FloorFn {
+struct CeilFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,
 }
 
-impl FloorFn {
+impl CeilFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, precision: Option<Box<dyn Expression>>) -> Self {
         Self { value, precision }
     }
 }
 
-impl Expression for FloorFn {
+impl Expression for CeilFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let precision = match &self.precision {
             Some(expr) => expr.execute(state, object)?.try_integer()?,
@@ -53,7 +53,7 @@ impl Expression for FloorFn {
         };
 
         match self.value.execute(state, object)? {
-            Value::Float(f) => Ok(round_to_precision(f, precision, f64::floor).into()),
+            Value::Float(f) => Ok(round_to_precision(f, precision, f64::ceil).into()),
             v @ Value::Integer(_) => Ok(v),
             _ => unreachable!(),
         }
@@ -89,7 +89,7 @@ mod tests {
 
     remap::test_type_def![
         value_float {
-            expr: |_| FloorFn {
+            expr: |_| CeilFn {
                 value: Literal::from(1.0).boxed(),
                 precision: None,
             },
@@ -97,7 +97,7 @@ mod tests {
         }
 
         value_integer {
-            expr: |_| FloorFn {
+            expr: |_| CeilFn {
                 value: Literal::from(1).boxed(),
                 precision: None,
             },
@@ -105,7 +105,7 @@ mod tests {
         }
 
         value_float_or_integer {
-            expr: |_| FloorFn {
+            expr: |_| CeilFn {
                 value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
@@ -113,7 +113,7 @@ mod tests {
         }
 
         fallible_precision {
-            expr: |_| FloorFn {
+            expr: |_| CeilFn {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
@@ -122,43 +122,43 @@ mod tests {
     ];
 
     #[test]
-    fn floor() {
+    fn ceil() {
         let cases = vec![
             (
                 map!["foo": 1234.2],
-                Ok(1234.0.into()),
-                FloorFn::new(Box::new(Path::from("foo")), None),
+                Ok(1235.0.into()),
+                CeilFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(1234.0.into()),
-                FloorFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
+                Ok(1235.0.into()),
+                CeilFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
                 map![],
                 Ok(1234.into()),
-                FloorFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
+                CeilFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
                 map![],
-                Ok(1234.3.into()),
-                FloorFn::new(
+                Ok(1234.4.into()),
+                CeilFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
                     Some(Box::new(Literal::from(1))),
                 ),
             ),
             (
                 map![],
-                Ok(3.1415.into()),
-                FloorFn::new(
-                    Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
+                Ok(1234.5673.into()),
+                CeilFn::new(
+                    Box::new(Literal::from(Value::Float(1234.56725))),
                     Some(Box::new(Literal::from(4))),
                 ),
             ),
             (
                 map![],
-                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
-                FloorFn::new(
+                Ok(9876543210123456789098765432101234567890987654321.98766.into()),
+                CeilFn::new(
                     Box::new(Literal::from(
                         9876543210123456789098765432101234567890987654321.987654321,
                     )),

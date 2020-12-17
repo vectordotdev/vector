@@ -1,6 +1,6 @@
-use crate::types::Conversion;
 use chrono::{TimeZone, Utc};
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
@@ -71,16 +71,15 @@ impl Expression for ToTimestampFn {
             Timestamp(_) => Ok(value),
             Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
             Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
-            Bytes(_) => Conversion::Timestamp
-                .convert(value.into())
-                .map(Into::into)
+            Bytes(v) => Conversion::Timestamp
+                .convert(v)
                 .map_err(|e| e.to_string().into()),
             Boolean(_) | Array(_) | Map(_) | Regex(_) | Null => {
                 Err("unable to convert value to timestamp".into())
             }
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_timestamp,

@@ -60,7 +60,7 @@ impl Expression for ToStringFn {
             Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_string,

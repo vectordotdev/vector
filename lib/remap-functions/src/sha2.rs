@@ -1,5 +1,5 @@
 use remap::prelude::*;
-use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
+use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
 
 const VARIANTS: &[&str] = &[
     "SHA-224",
