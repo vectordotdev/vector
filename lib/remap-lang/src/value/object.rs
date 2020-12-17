@@ -91,6 +91,24 @@ mod tests {
             ),
             (
                 map!["foo": "bar"],
+                vec![Field(Regular("baz".to_owned()))],
+                true.into(),
+                map!["foo": "bar", "baz": true],
+                Ok(()),
+            ),
+            (
+                map!["foo": vec![map!["bar": "baz"]]],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Index(0),
+                    Field(Regular("baz".to_owned())),
+                ],
+                true.into(),
+                map!["foo": Value::Array(vec![map!["bar": "baz", "baz": true].into()])],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
                 map!["foo": "baz"],

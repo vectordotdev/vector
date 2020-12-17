@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod test;
 
-use super::{Look, segmentbuf::SegmentBuf, LookupBuf};
+use super::{segmentbuf::SegmentBuf, Look, LookupBuf};
 use crate::event::lookup::Segment;
 use core::fmt;
 use pest::iterators::Pair;
@@ -107,15 +107,21 @@ impl<'a> Display for Lookup<'a> {
                     name: _,
                     requires_quoting: _,
                 } => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"{}."#, segment)?
+                    }
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
                 Segment::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"[{}]."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"[{}]."#, segment)?
+                    }
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
                 Segment::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"{}."#, segment)?
+                    }
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
             }

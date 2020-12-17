@@ -5,6 +5,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -34,7 +35,17 @@ impl TransformConfig for SplitConfig {
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
+        let types = parse_check_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+            &self.field_names.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
+        )?
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
@@ -104,7 +115,7 @@ impl FunctionTransform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(Value::from(value.to_owned())) {
+                match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }

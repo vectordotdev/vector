@@ -12,13 +12,14 @@ use crate::{
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{Async, Future, Sink, Stream};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures01::{Async, Stream};
 use http::StatusCode;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
+    future,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
@@ -95,7 +96,7 @@ impl SourceConfig for SplunkConfig {
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out.clone());
-        let health_service = source.health_service(out);
+        let health_service = source.health_service();
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
@@ -208,10 +209,12 @@ impl SplunkSource {
                     let out = out.clone();
                     async move {
                         // Construct event parser
-                        futures01::stream::once(raw_event(body, gzip, channel, host))
-                            .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                            .map(|_| ())
-                            .compat()
+                        let event = future::ready(raw_event(body, gzip, channel, host));
+                        futures::stream::once(event)
+                            .forward(
+                                out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
+                            )
+                            .map_ok(|_| ())
                             .await
                     }
                 },
@@ -220,7 +223,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn health_service(&self) -> BoxedFilter<(Response,)> {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -239,23 +242,7 @@ impl SplunkSource {
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
             .and(authorize)
-            .and_then(move |_, _| {
-                let out = out.clone();
-                async move {
-                    match out.clone().poll_ready() {
-                        Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
-                        // Since channel of mpsc::Sender increase by one with each sender, technically
-                        // channel will never be full, and this will never be returned.
-                        // This behavior doesn't fulfill one of the purposes of healthcheck.
-                        Ok(Async::NotReady) => Ok(warp::reply::with_status(
-                            warp::reply(),
-                            StatusCode::SERVICE_UNAVAILABLE,
-                        )
-                        .into_response()),
-                        Err(_) => Err(Rejection::from(ApiError::ServerShutdown)),
-                    }
-                }
-            })
+            .map(move |_, _| warp::reply().into_response())
             .boxed()
     }
 
@@ -317,13 +304,9 @@ async fn process_service_request(
     gzip: bool,
     body: Bytes,
 ) -> Result<(), Rejection> {
-    use futures::compat::Sink01CompatExt;
     use futures::compat::Stream01CompatExt;
-    use futures::{SinkExt, StreamExt};
 
-    let mut out = out
-        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown))
-        .sink_compat();
+    let mut out = out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
 
     let reader: Box<dyn Read + Send> = if gzip {
         Box::new(GzDecoder::new(body.reader()))
@@ -796,8 +779,8 @@ mod tests {
     };
     use chrono::{TimeZone, Utc};
     use futures::{stream, StreamExt};
-    use futures01::sync::mpsc;
     use std::{future::ready, net::SocketAddr};
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -882,7 +865,7 @@ mod tests {
                 .unwrap();
         });
 
-        let events = collect_n(source, n).await.unwrap();
+        let events = collect_n(source, n).await;
         assert_eq!(n, events.len());
 
         events
@@ -1013,7 +996,7 @@ mod tests {
         event.as_mut_log().insert(LookupBuf::from("name"), "bob");
         sink.run(stream::once(ready(event))).await.unwrap();
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
@@ -1033,7 +1016,7 @@ mod tests {
         event.as_mut_log().insert(LookupBuf::from("line"), "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
     }
 
@@ -1046,7 +1029,7 @@ mod tests {
 
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(
             event.as_log()[&*super::SPLUNK_CHANNEL_LOOKUP],
@@ -1106,7 +1089,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
@@ -1127,7 +1110,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let events = collect_n(source, 3).await.unwrap();
+        let events = collect_n(source, 3).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],

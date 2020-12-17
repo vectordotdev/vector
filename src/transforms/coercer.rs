@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf},
+    event::{Event, LookupBuf, Value},
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
@@ -27,7 +27,16 @@ impl_generate_config_from_default!(CoercerConfig);
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
     async fn build(&self) -> crate::Result<Transform> {
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )?
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
@@ -66,7 +75,7 @@ impl FunctionTransform for Coercer {
             let new_log = new_event.as_mut_log();
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field, false) {
-                    match conv.convert(value) {
+                    match conv.convert::<Value>(value.into_bytes()) {
                         Ok(converted) => {
                             new_log.insert(field.clone(), converted);
                         }
@@ -79,7 +88,7 @@ impl FunctionTransform for Coercer {
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field, false) {
-                    match conv.convert(value) {
+                    match conv.convert::<Value>(value.into_bytes()) {
                         Ok(converted) => {
                             log.insert(field.clone(), converted);
                         }

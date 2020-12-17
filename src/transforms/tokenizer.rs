@@ -1,4 +1,3 @@
-use super::util::tokenize::parse;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
@@ -6,7 +5,9 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use shared::tokenize::parse;
 use std::collections::HashMap;
 use std::str;
 
@@ -34,7 +35,17 @@ impl TransformConfig for TokenizerConfig {
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
+        let types = parse_check_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+            &self.field_names.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
+        )?
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
 
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
@@ -96,7 +107,7 @@ impl FunctionTransform for Tokenizer {
 
         if let Some(value) = &value {
             for ((name, conversion), value) in self.types.iter().zip(parse(value).into_iter()) {
-                match conversion.convert(Value::from(value.to_owned())) {
+                match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }

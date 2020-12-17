@@ -114,8 +114,7 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value =
-                                    Value::from(Bytes::from(value[start..end].to_owned()));
+                                let capture = Bytes::from(value[start..end].to_owned());
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
@@ -185,7 +184,17 @@ impl RegexParser {
             .map(LookupBuf::from_str)
             .collect::<crate::Result<Vec<_>>>()?;
 
-        let types = parse_check_conversion_map(&config.types, names)?;
+        let types = parse_check_conversion_map(
+            &config
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+            &names.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
+        )?
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
 
         Ok(Transform::function(RegexParser::new(
             regexset,

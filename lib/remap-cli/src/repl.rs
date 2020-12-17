@@ -44,8 +44,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > Type `help` to learn more.
->      `prev` to load the previous object.
 >      `next` to load the next object, or create a new one.
+>      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
@@ -110,7 +110,7 @@ fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &st
         Some(object) => object,
     };
 
-    let program = match Program::new(program, &[], None) {
+    let program = match Program::new(program, &remap_functions::all(), None) {
         Ok(program) => program,
         Err(err) => return err.to_string(),
     };

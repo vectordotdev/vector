@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf},
+    event::{Event, LookupBuf, PathIter, Value},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -8,6 +8,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -48,7 +49,16 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )?
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
 
         Ok(grok
             .compile(&self.pattern, true)
@@ -117,10 +127,10 @@ impl FunctionTransform for GrokParser {
                         .types
                         .get(&LookupBuf::from(name))
                         .unwrap_or(&Conversion::Bytes);
-                    match conv.convert(value.to_string().into()) {
+                    match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert(path.clone(), value.clone());
+                                event.insert(path.clone(), value);
                             } else {
                                 event.insert(LookupBuf::from(name), value);
                             }

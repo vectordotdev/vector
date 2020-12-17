@@ -1,4 +1,4 @@
-use crate::event::lookup::{Segment, LookSegment};
+use crate::event::lookup::{LookSegment, Segment};
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},

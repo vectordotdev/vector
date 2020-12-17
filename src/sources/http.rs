@@ -219,11 +219,11 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures01::sync::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::{convert::TryInto, net::SocketAddr};
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -305,7 +305,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -333,7 +333,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -362,7 +362,7 @@ mod tests {
         assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
         assert_eq!(200, send(addr, "[{},{},{}]").await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         assert!(events
             .remove(1)
             .as_log()
@@ -384,7 +384,7 @@ mod tests {
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
         assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -413,7 +413,7 @@ mod tests {
             send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
         );
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -444,7 +444,7 @@ mod tests {
             send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
         );
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -485,7 +485,7 @@ mod tests {
             send_with_headers(addr, "{\"key1\":\"value1\"}", headers).await
         );
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -520,7 +520,7 @@ mod tests {
             send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb").await
         );
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();

@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf},
+    event::{Event, LookupBuf, Value},
     internal_events::{
         KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
         KeyValueTargetExists,
@@ -39,7 +39,16 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
     async fn build(&self) -> crate::Result<Transform> {
-        let conversions = parse_conversion_map(&self.types)?;
+        let conversions = parse_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )?
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
         let field = self
             .field
             .clone()
@@ -161,7 +170,7 @@ impl FunctionTransform for KeyValue {
                 let key_lookup_buf = LookupBuf::from(key);
 
                 if let Some(conv) = self.conversions.get(&key_lookup_buf) {
-                    match conv.convert(val.to_string().into()) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             log.insert(key_lookup_buf, value);
                         }

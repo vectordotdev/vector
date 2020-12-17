@@ -1,4 +1,4 @@
-use crate::event::lookup::{SegmentBuf, LookSegment};
+use crate::event::lookup::{LookSegment, SegmentBuf};
 use pest::iterators::Pair;
 use remap::parser::ParserRule;
 use std::{
@@ -251,7 +251,8 @@ impl<'a> Segment<'a> {
                     "Got invalid lookup rule. Got: {:?}. Want: {:?}",
                     rule,
                     ParserRule::lookup_array_index,
-                ).into())
+                )
+                .into())
             }
         };
         tracing::trace!(segment = %segment_str, ?rule, action = %"exit");

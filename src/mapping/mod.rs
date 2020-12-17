@@ -1,3 +1,5 @@
+#![allow(deprecated)] // TODO: This uses things deprecated in https://github.com/timberio/vector/pull/5374
+
 use crate::event::{Event, LookupBuf, Value};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;

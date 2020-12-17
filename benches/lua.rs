@@ -9,7 +9,7 @@ use transforms::lua::v2::LuaConfig;
 use vector::{
     config::TransformConfig,
     event::{Event, LookupBuf},
-    test_util::{collect_ready03, runtime},
+    test_util::{collect_ready, runtime},
     transforms::{self, Transform},
 };
 
@@ -174,7 +174,7 @@ end
                     )
                     .unwrap();
 
-                    let output = futures::executor::block_on(collect_ready03(&mut rx)).unwrap();
+                    let output = futures::executor::block_on(collect_ready(&mut rx));
 
                     let num = output.len();
 

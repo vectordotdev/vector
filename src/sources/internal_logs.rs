@@ -3,8 +3,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::RecvError;
 
@@ -44,9 +43,7 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
     let mut subscriber = crate::trace::subscribe()
         .ok_or_else(|| error!("Tracing is not initialized."))?
         .take_until(shutdown);
-    let mut out = out
-        .sink_map_err(|error| error!(message = "Error sending log.", %error))
-        .sink_compat();
+    let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
@@ -96,7 +93,7 @@ mod tests {
         error!(message = ERROR_TEXT);
 
         delay_for(Duration::from_millis(1)).await;
-        let logs = collect_ready(rx).await.expect("Collecting logs failed");
+        let logs = collect_ready(rx).await;
 
         assert_eq!(logs.len(), 1);
 

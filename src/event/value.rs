@@ -673,7 +673,11 @@ impl Value {
                         trace!(prune, "Map is empty. May need to prune.");
                         is_empty = true
                     } else {
-                        trace!(prune, items = map.len(), "Map is not empty, no possible pruning.");
+                        trace!(
+                            prune,
+                            items = map.len(),
+                            "Map is not empty, no possible pruning."
+                        );
                     };
                     retval
                 } else {
@@ -686,10 +690,14 @@ impl Value {
                                 trace!(prune, "Map is empty. May need to prune.");
                                 inner_is_empty = true
                             } else {
-                                trace!(prune, items = inner.len(), "Map is not empty, no possible pruning.");
+                                trace!(
+                                    prune,
+                                    items = inner.len(),
+                                    "Map is not empty, no possible pruning."
+                                );
                             };
                             ret
-                        },
+                        }
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
@@ -716,7 +724,11 @@ impl Value {
                         trace!(prune, "Array is empty. May need to prune.");
                         is_empty = true
                     } else {
-                        trace!(prune, items = array.len(), "Array is not empty, no possible pruning.");
+                        trace!(
+                            prune,
+                            items = array.len(),
+                            "Array is not empty, no possible pruning."
+                        );
                     };
                     retval
                 } else {

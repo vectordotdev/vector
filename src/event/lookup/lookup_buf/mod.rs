@@ -13,7 +13,7 @@ use std::{
 };
 use toml::Value as TomlValue;
 
-use super::{Look, segmentbuf::SegmentBuf, Lookup};
+use super::{segmentbuf::SegmentBuf, Look, Lookup};
 use crate::event::lookup::Segment;
 use indexmap::map::IndexMap;
 use serde::de::{self, Visitor};
@@ -122,15 +122,21 @@ impl Display for LookupBuf {
                     name: _,
                     requires_quoting: _,
                 } => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"{}."#, segment)?
+                    }
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
                 SegmentBuf::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"[{}]."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"[{}]."#, segment)?
+                    }
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
                 SegmentBuf::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if next.is_field() || next.is_coalesce() => {
+                        write!(f, r#"{}."#, segment)?
+                    }
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
             }

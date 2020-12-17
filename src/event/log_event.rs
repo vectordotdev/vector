@@ -257,7 +257,11 @@ impl LogEvent {
     /// assert_eq!(event.insert(plain_key, i64::MAX), Some(vector::event::Value::from(1)));
     /// assert_eq!(event.insert(lookup_key.clone(), i64::MAX), Some(vector::event::Value::from(2)));
     /// ```
-    pub fn insert(&mut self, lookup: impl Into<LookupBuf>, value: impl Into<Value> + Debug) -> Option<Value> {
+    pub fn insert(
+        &mut self,
+        lookup: impl Into<LookupBuf>,
+        value: impl Into<Value> + Debug,
+    ) -> Option<Value> {
         let mut working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1013,15 +1017,23 @@ mod test {
 
             let mut event = crate::log_event! {
                 LookupBuf::from("foo.bar.baz") => 1,
-            }.into_log();
-            assert_eq!(event.remove(Lookup::from("foo.bar.baz"), true), Some(Value::from(1)));
+            }
+            .into_log();
+            assert_eq!(
+                event.remove(Lookup::from("foo.bar.baz"), true),
+                Some(Value::from(1))
+            );
             assert!(!event.contains(Lookup::from("foo.bar")));
             assert!(!event.contains(Lookup::from("foo")));
 
             let mut event = crate::log_event! {
                 LookupBuf::from("foo.bar") => 1,
-            }.into_log();
-            assert_eq!(event.remove(Lookup::from("foo.bar"), true), Some(Value::from(1)));
+            }
+            .into_log();
+            assert_eq!(
+                event.remove(Lookup::from("foo.bar"), true),
+                Some(Value::from(1))
+            );
             assert!(!event.contains(Lookup::from("foo")));
 
             Ok(())

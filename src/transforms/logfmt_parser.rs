@@ -33,7 +33,16 @@ impl TransformConfig for LogfmtConfig {
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
-        let conversions = parse_conversion_map(&self.types)?;
+        let conversions = parse_conversion_map(
+            &self
+                .types
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        )?
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
 
         Ok(Transform::function(Logfmt {
             field,
@@ -80,7 +89,7 @@ impl FunctionTransform for Logfmt {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(Value::from(val)) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             event.as_mut_log().insert(key, value);
                         }
