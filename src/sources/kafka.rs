@@ -8,8 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{compat::Future01CompatExt, StreamExt};
-use futures01::Sink;
+use futures::{SinkExt, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -196,10 +195,10 @@ fn kafka_source(
             //         .sink_map_err(|error| error!(message = "Error sending to sink.", %error)),
             // )
             .for_each(|item| {
-                let out = out.clone();
+                let mut out = out.clone();
                 async move {
                     if let Ok(item) = item {
-                        if let Err(error) = out.send(item).compat().await {
+                        if let Err(error) = out.send(item).await {
                             error!(message = "Error sending to sink.", %error);
                         }
                     }
@@ -358,7 +357,7 @@ mod integration_test {
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
         tokio::spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],

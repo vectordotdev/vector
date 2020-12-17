@@ -237,7 +237,7 @@ mod test {
         let events = make_events();
         sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let mut output = test_util::collect_ready(rx).await.unwrap();
+        let mut output = test_util::collect_ready(rx).await;
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name.clone());
