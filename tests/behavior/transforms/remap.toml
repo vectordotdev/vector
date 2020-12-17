@@ -1254,29 +1254,6 @@
     "pass.equals" = true
     "fail.equals" = false
 
-[transforms.remap_function_err]
-  inputs = []
-  type = "remap"
-  source = """
-    .pass = err(.a = .a * 3)
-    .fail = err(.b = true * false)
-  """
-[[tests]]
-  name = "remap_function_err"
-  [tests.input]
-    insert_at = "remap_function_err"
-    type = "log"
-    [tests.input.log_fields]
-      a = "a"
-      b = "nope"
-  [[tests.outputs]]
-    extract_from = "remap_function_err"
-    [[tests.outputs.conditions]]
-    "a.equals" = "aaa"
-    "b.equals" = "nope"
-    "pass.equals" = false
-    "fail.equals" = true
-
 [transforms.remap_function_ok_or]
   inputs = []
   type = "remap"

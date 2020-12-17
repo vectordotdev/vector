@@ -14,8 +14,6 @@ mod del;
 mod downcase;
 #[cfg(feature = "ends_with")]
 mod ends_with;
-#[cfg(feature = "err")]
-mod err;
 #[cfg(feature = "exists")]
 mod exists;
 #[cfg(feature = "flatten")]
@@ -123,8 +121,6 @@ pub use del::Del;
 pub use downcase::Downcase;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
-#[cfg(feature = "err")]
-pub use err::ERR;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
 #[cfg(feature = "flatten")]
@@ -228,8 +224,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Downcase),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
-        #[cfg(feature = "err")]
-        Box::new(ERR),
         #[cfg(feature = "exists")]
         Box::new(Exists),
         #[cfg(feature = "flatten")]

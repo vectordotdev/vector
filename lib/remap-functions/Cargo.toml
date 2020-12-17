@@ -41,7 +41,6 @@ default = [
     "del",
     "downcase",
     "ends_with",
-    "err",
     "exists",
     "flatten",
     "floor",
@@ -94,7 +93,6 @@ contains = []
 del = []
 downcase = []
 ends_with = []
-err = []
 exists = []
 flatten = []
 floor = []
