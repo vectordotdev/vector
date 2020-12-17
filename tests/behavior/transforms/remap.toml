@@ -1274,7 +1274,5 @@
       "parts.actions_executed.equals" = "forward"
       "parts.redirect_url.equals" = "<null>"
       "parts.error_reason.equals" = "<null>"
-      "parts.target_port_list.equals" = []
-      "parts.target_status_code_list.equals" = []
       "parts.classification.equals" = "<null>"
       "parts.classification_reason.equals" = "<null>"
