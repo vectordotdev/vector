@@ -1230,3 +1230,26 @@
     [[tests.outputs.conditions]]
     "a.equals" = "fbaro"
     "b.equals" = "fbarbar"
+
+[transforms.remap_function_ok]
+  inputs = []
+  type = "remap"
+  source = """
+    .pass = ok(.a = .a * 3)
+    .fail = ok(.b = true * false)
+  """
+[[tests]]
+  name = "remap_function_ok"
+  [tests.input]
+    insert_at = "remap_function_ok"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "nope"
+  [[tests.outputs]]
+    extract_from = "remap_function_ok"
+    [[tests.outputs.conditions]]
+    "a.equals" = "aaa"
+    "b.equals" = "nope"
+    "pass.equals" = true
+    "fail.equals" = false
