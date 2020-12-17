@@ -123,6 +123,7 @@ mod test {
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn genreate_config() {
@@ -182,19 +183,45 @@ mod test {
     }
 
     fn make_events() -> Vec<Event> {
-        (0..10)
-            .map(|num| {
-                let timestamp = Utc::now().trunc_subsecs(3);
-                Event::Metric(
-                    Metric::new(
-                        format!("gauge_{}", num),
-                        MetricKind::Absolute,
-                        MetricValue::Gauge { value: num as f64 },
-                    )
-                    .with_timestamp(Some(timestamp)),
-                )
-            })
-            .collect()
+        let timestamp = || Utc::now().trunc_subsecs(3);
+        vec![
+            Metric::new(
+                "counter_1".into(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_timestamp(Some(timestamp()))
+            .into(),
+            Metric::new(
+                "gauge_2".into(),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp()))
+            .into(),
+            Metric::new(
+                "histogram_3".into(),
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: crate::buckets![ 2.3 => 11, 4.2 => 85 ],
+                    count: 96,
+                    sum: 156.2,
+                },
+            )
+            .with_timestamp(Some(timestamp()))
+            .into(),
+            Metric::new(
+                "summary_4".into(),
+                MetricKind::Absolute,
+                MetricValue::AggregatedSummary {
+                    quantiles: crate::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
+                    count: 23,
+                    sum: 8.6,
+                },
+            )
+            .with_timestamp(Some(timestamp()))
+            .into(),
+        ]
     }
 }
 
