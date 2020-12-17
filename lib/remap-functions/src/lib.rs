@@ -44,8 +44,6 @@ mod merge;
 mod now;
 #[cfg(feature = "ok")]
 mod ok;
-#[cfg(feature = "ok_or")]
-mod ok_or;
 #[cfg(feature = "only_fields")]
 mod only_fields;
 #[cfg(feature = "parse_duration")]
@@ -147,8 +145,6 @@ pub use merge::Merge;
 pub use now::Now;
 #[cfg(feature = "ok")]
 pub use ok::OK;
-#[cfg(feature = "ok_or")]
-pub use ok_or::OkOr;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_duration")]
@@ -250,8 +246,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Now),
         #[cfg(feature = "ok")]
         Box::new(OK),
-        #[cfg(feature = "ok_or")]
-        Box::new(OkOr),
         #[cfg(feature = "only_fields")]
         Box::new(OnlyFields),
         #[cfg(feature = "parse_duration")]

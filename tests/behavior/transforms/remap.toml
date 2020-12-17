@@ -1253,24 +1253,3 @@
     "b.equals" = "nope"
     "pass.equals" = true
     "fail.equals" = false
-
-[transforms.remap_function_ok_or]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ok_or("a" * 3, .a * 6)
-    .b = ok_or(true * false, "b" * 3)
-    .c = ok_or(true * false, 4 * true)
-  """
-[[tests]]
-  name = "remap_function_ok_or"
-  [tests.input]
-    insert_at = "remap_function_ok_or"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_ok_or"
-    [[tests.outputs.conditions]]
-    "a.equals" = "aaa"
-    "b.equals" = "bbb"
-    "c.exists" = false
