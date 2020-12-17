@@ -391,7 +391,7 @@ remap: {
 		"Multiple lines": {
 			href: "multiple-lines"
 
-			description: """
+			description: #"""
 				TRL statements can be split across multiple lines using a backslash (`\`):
 
 				```
@@ -401,7 +401,7 @@ remap: {
 
 				This statement is semantically identical to `del(.one, .two, .three, .four, .five,
 				.six)`.
-				"""
+				"""#
 		}
 
 		"Functions": {
