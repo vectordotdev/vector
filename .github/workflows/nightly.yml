@@ -524,4 +524,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Nightly failed: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"
+        args: "Nightly failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
