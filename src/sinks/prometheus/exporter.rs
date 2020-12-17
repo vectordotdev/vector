@@ -17,7 +17,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use indexmap::IndexSet;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -150,9 +150,13 @@ impl SinkConfig for PrometheusCompatConfig {
 struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
     config: PrometheusExporterConfig,
-    metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
-    last_flush_timestamp: Arc<RwLock<i64>>,
+    metrics: Arc<RwLock<ExpiringMetrics>>,
     acker: Acker,
+}
+
+struct ExpiringMetrics {
+    map: IndexMap<MetricEntry, bool>,
+    last_flush_timestamp: i64,
 }
 
 fn handle(
@@ -161,7 +165,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
-    metrics: &IndexSet<MetricEntry>,
+    metrics: &IndexMap<MetricEntry, bool>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -169,8 +173,8 @@ fn handle(
         (&Method::GET, "/metrics") => {
             let mut s = collector::StringCollector::new();
 
-            for metric in metrics {
-                s.encode_metric(default_namespace, &buckets, quantiles, expired, &metric.0);
+            for (MetricEntry(metric), _) in metrics {
+                s.encode_metric(default_namespace, &buckets, quantiles, expired, metric);
             }
 
             *response.body_mut() = s.finish().into();
@@ -193,8 +197,10 @@ impl PrometheusExporter {
         Self {
             server_shutdown_trigger: None,
             config,
-            metrics: Arc::new(RwLock::new(IndexSet::new())),
-            last_flush_timestamp: Arc::new(RwLock::new(Utc::now().timestamp())),
+            metrics: Arc::new(RwLock::new(ExpiringMetrics {
+                map: IndexMap::new(),
+                last_flush_timestamp: Utc::now().timestamp(),
+            })),
             acker,
         }
     }
@@ -208,7 +214,6 @@ impl PrometheusExporter {
         let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
-        let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
         let flush_period_secs = self.config.flush_period_secs;
 
         let new_service = make_service_fn(move |_| {
@@ -216,14 +221,12 @@ impl PrometheusExporter {
             let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
-            let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
             let flush_period_secs = flush_period_secs;
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
                     let metrics = metrics.read().unwrap();
-                    let last_flush_timestamp = last_flush_timestamp.read().unwrap();
-                    let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
+                    let interval = (Utc::now().timestamp() - metrics.last_flush_timestamp) as u64;
                     let expired = interval > flush_period_secs;
 
                     let response = info_span!(
@@ -238,7 +241,7 @@ impl PrometheusExporter {
                             &buckets,
                             &quantiles,
                             expired,
-                            &metrics,
+                            &metrics.map,
                         )
                     });
 
@@ -271,29 +274,35 @@ impl StreamSink for PrometheusExporter {
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
 
+            // sets need to be expired from time to time
+            // because otherwise they could grow infinitelly
+            let now = Utc::now().timestamp();
+            let interval = now - metrics.last_flush_timestamp;
+            if interval > self.config.flush_period_secs as i64 {
+                metrics.last_flush_timestamp = now;
+
+                let mut map = IndexMap::new();
+                for (MetricEntry(mut metric), is_incremental_set) in metrics.map.drain(..) {
+                    if is_incremental_set {
+                        metric.reset();
+                    }
+                    map.insert(MetricEntry(metric), is_incremental_set);
+                }
+                metrics.map = map;
+            }
+
             match item.kind {
                 MetricKind::Incremental => {
-                    let new = MetricEntry(item.to_absolute());
-                    if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
-                        if item.value.is_set() {
-                            // sets need to be expired from time to time
-                            // because otherwise they could grow infinitelly
-                            let now = Utc::now().timestamp();
-                            let interval = now - *self.last_flush_timestamp.read().unwrap();
-                            if interval > self.config.flush_period_secs as i64 {
-                                *self.last_flush_timestamp.write().unwrap() = now;
-                                existing.reset();
-                            }
-                        }
+                    let mut new = MetricEntry(item.to_absolute());
+                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&new) {
                         existing.add(&item);
-                        metrics.insert(MetricEntry(existing));
-                    } else {
-                        metrics.insert(new);
-                    };
+                        new = MetricEntry(existing);
+                    }
+                    metrics.map.insert(new, item.value.is_set());
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
-                    metrics.replace(new);
+                    metrics.map.insert(new, false);
                 }
             };
 
