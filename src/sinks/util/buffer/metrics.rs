@@ -304,13 +304,13 @@ mod test {
         buffer
     }
 
-    fn rebuffer(events: Vec<Event>) -> Vec<Vec<Metric>> {
+    fn rebuffer(events: Vec<Metric>) -> Vec<Vec<Metric>> {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let mut buffer = MetricBuffer::new(batch_size);
         let mut result = vec![];
 
         for event in events {
-            match buffer.push(event) {
+            match buffer.push(Event::Metric(event)) {
                 PushResult::Overflow(_) => panic!("overflowed too early"),
                 PushResult::Ok(true) => {
                     result.push(buffer.fresh_replace().finish());
@@ -329,38 +329,38 @@ mod test {
     fn metric_buffer_counters() {
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "counter-0".into(),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("counter-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("counter-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
@@ -451,19 +451,19 @@ mod test {
     fn metric_buffer_aggregated_counters() {
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("counter-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("counter-{}", i),
                 namespace: None,
                 timestamp: None,
@@ -472,7 +472,7 @@ mod test {
                 value: MetricValue::Counter {
                     value: i as f64 * 3.0,
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -524,26 +524,26 @@ mod test {
     fn metric_buffer_gauges() {
         let mut events = Vec::new();
         for i in 1..5 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("gauge-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Gauge { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
         for i in 1..5 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("gauge-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Gauge { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
@@ -595,7 +595,7 @@ mod test {
     fn metric_buffer_aggregated_gauges() {
         let mut events = Vec::new();
         for i in 3..6 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("gauge-{}", i),
                 namespace: None,
                 timestamp: None,
@@ -604,24 +604,24 @@ mod test {
                 value: MetricValue::Gauge {
                     value: i as f64 * 10.0,
                 },
-            });
+            };
             events.push(event);
         }
 
         for i in 1..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("gauge-{}", i),
                 namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Gauge { value: i as f64 },
-            });
+            };
             events.push(event);
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("gauge-{}", i),
                 namespace: None,
                 timestamp: None,
@@ -630,7 +630,7 @@ mod test {
                 value: MetricValue::Gauge {
                     value: i as f64 * 2.0,
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -690,7 +690,7 @@ mod test {
     fn metric_buffer_sets() {
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "set-0".into(),
                 namespace: None,
                 timestamp: None,
@@ -699,12 +699,12 @@ mod test {
                 value: MetricValue::Set {
                     values: vec![format!("{}", i)].into_iter().collect(),
                 },
-            });
+            };
             events.push(event);
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "set-0".into(),
                 namespace: None,
                 timestamp: None,
@@ -713,7 +713,7 @@ mod test {
                 value: MetricValue::Set {
                     values: vec![format!("{}", i)].into_iter().collect(),
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -742,7 +742,7 @@ mod test {
     fn metric_buffer_distributions() {
         let mut events = Vec::new();
         for _ in 2..6 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "dist-2".into(),
                 namespace: None,
                 timestamp: None,
@@ -753,12 +753,12 @@ mod test {
                     sample_rates: vec![10],
                     statistic: StatisticKind::Histogram,
                 },
-            });
+            };
             events.push(event);
         }
 
         for i in 2..6 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("dist-{}", i),
                 namespace: None,
                 timestamp: None,
@@ -769,7 +769,7 @@ mod test {
                     sample_rates: vec![10],
                     statistic: StatisticKind::Histogram,
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -847,7 +847,7 @@ mod test {
     fn metric_buffer_aggregated_histograms_absolute() {
         let mut events = Vec::new();
         for _ in 2..5 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "buckets-2".into(),
                 namespace: None,
                 timestamp: None,
@@ -859,12 +859,12 @@ mod test {
                     count: 6,
                     sum: 10.0,
                 },
-            });
+            };
             events.push(event);
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: format!("buckets-{}", i),
                 namespace: None,
                 timestamp: None,
@@ -876,7 +876,7 @@ mod test {
                     count: 6 * i,
                     sum: 10.0,
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -934,7 +934,7 @@ mod test {
     fn metric_buffer_aggregated_histograms_incremental() {
         let mut events = Vec::new();
         for _ in 0..3 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "buckets-2".into(),
                 namespace: None,
                 timestamp: None,
@@ -946,12 +946,12 @@ mod test {
                     count: 6,
                     sum: 10.0,
                 },
-            });
+            };
             events.push(event);
         }
 
         for i in 1..4 {
-            let event = Event::Metric(Metric {
+            let event = Metric {
                 name: "buckets-2".into(),
                 namespace: None,
                 timestamp: None,
@@ -963,7 +963,7 @@ mod test {
                     count: 6 * i,
                     sum: 10.0,
                 },
-            });
+            };
             events.push(event);
         }
 
@@ -1009,7 +1009,7 @@ mod test {
         let mut events = Vec::new();
         for _ in 0..10 {
             for i in 2..5 {
-                let event = Event::Metric(Metric {
+                let event = Metric {
                     name: format!("quantiles-{}", i),
                     namespace: None,
                     timestamp: None,
@@ -1021,7 +1021,7 @@ mod test {
                         count: 6 * i,
                         sum: 10.0,
                     },
-                });
+                };
                 events.push(event);
             }
         }
