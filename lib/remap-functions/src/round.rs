@@ -82,7 +82,6 @@ impl Expression for RoundFn {
 }
 
 #[cfg(test)]
-#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
     use crate::map;
@@ -150,9 +149,9 @@ mod tests {
             ),
             (
                 map![],
-                Ok(3.1416.into()),
+                Ok(1234.5679.into()),
                 RoundFn::new(
-                    Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
+                    Box::new(Literal::from(Value::Float(1234.56789))),
                     Some(Box::new(Literal::from(4))),
                 ),
             ),

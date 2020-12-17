@@ -122,7 +122,6 @@ mod tests {
     ];
 
     #[test]
-    #[allow(clippy::approx_constant)]
     fn ceil() {
         let cases = vec![
             (
@@ -150,9 +149,9 @@ mod tests {
             ),
             (
                 map![],
-                Ok(3.1416.into()),
+                Ok(1234.5673.into()),
                 CeilFn::new(
-                    Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
+                    Box::new(Literal::from(Value::Float(1234.56725))),
                     Some(Box::new(Literal::from(4))),
                 ),
             ),
