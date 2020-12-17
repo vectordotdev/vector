@@ -143,37 +143,35 @@ lazy_static::lazy_static! {
     static ref METADATA_TARGET: LookupBuf = LookupBuf::from_str("metadata.target").unwrap();
 }
 
-impl From<&tracing::Event<'_>> for Event {
-    fn from(event: &tracing::Event<'_>) -> Self {
-        let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent::default();
-        event.record(&mut maker);
+fn from_tracing_event(event: &tracing::Event<'_>, schema: crate::config::LogSchema) -> Event {
+    let now = chrono::Utc::now();
+    let mut maker = MakeLogEvent::default();
+    event.record(&mut maker);
 
-        let mut log = maker.0;
-        log.insert(crate::config::log_schema().timestamp_key().clone(), now);
+    let mut log = maker.0;
+    log.insert(schema.timestamp_key().clone(), now);
 
-        let meta = event.metadata();
-        log.insert(
-            METADATA_KIND.clone(),
-            if meta.is_event() {
-                Value::Bytes("event".to_string().into())
-            } else if meta.is_span() {
-                Value::Bytes("span".to_string().into())
-            } else {
-                Value::Null
-            },
-        );
-        log.insert(METADATA_LEVEL.clone(), meta.level().to_string());
-        log.insert(
-            METADATA_MODULE_PATH.clone(),
-            meta.module_path()
-                .map(|mp| Value::Bytes(mp.to_string().into()))
-                .unwrap_or(Value::Null),
-        );
-        log.insert(METADATA_TARGET.clone(), meta.target().to_string());
+    let meta = event.metadata();
+    log.insert(
+        METADATA_KIND.clone(),
+        if meta.is_event() {
+            Value::Bytes("event".to_string().into())
+        } else if meta.is_span() {
+            Value::Bytes("span".to_string().into())
+        } else {
+            Value::Null
+        },
+    );
+    log.insert(METADATA_LEVEL.clone(), meta.level().to_string());
+    log.insert(
+        METADATA_MODULE_PATH.clone(),
+        meta.module_path()
+            .map(|mp| Value::Bytes(mp.to_string().into()))
+            .unwrap_or(Value::Null),
+    );
+    log.insert(METADATA_TARGET.clone(), meta.target().to_string());
 
-        log.into()
-    }
+    log.into()
 }
 
 #[derive(Debug, Default)]

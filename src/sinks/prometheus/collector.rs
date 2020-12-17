@@ -262,7 +262,7 @@ impl StringCollector {
     }
 
     pub(super) fn encode_header(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        let r#type = value.prometheus_metric_type().as_str();
+        let r#type = metric_value_to_prometheus_metric_type(value).as_str();
         writeln!(&mut self.result, "# HELP {} {}", fullname, name).ok();
         writeln!(&mut self.result, "# TYPE {} {}", fullname, r#type).ok();
     }
@@ -315,7 +315,7 @@ impl MetricCollector for TimeSeries {
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
         if !self.metadata.contains_key(name) {
-            let r#type = value.prometheus_metric_type();
+            let r#type = metric_value_to_prometheus_metric_type(value);
             let metadata = proto::MetricMetadata {
                 r#type: r#type as i32,
                 metric_family_name: fullname.into(),
@@ -362,23 +362,21 @@ impl MetricCollector for TimeSeries {
     }
 }
 
-impl MetricValue {
-    fn prometheus_metric_type(&self) -> proto::MetricType {
-        use proto::MetricType;
-        match self {
-            MetricValue::Counter { .. } => MetricType::Counter,
-            MetricValue::Gauge { .. } | MetricValue::Set { .. } => MetricType::Gauge,
-            MetricValue::Distribution {
-                statistic: StatisticKind::Histogram,
-                ..
-            } => MetricType::Histogram,
-            MetricValue::Distribution {
-                statistic: StatisticKind::Summary,
-                ..
-            } => MetricType::Summary,
-            MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
-            MetricValue::AggregatedSummary { .. } => MetricType::Summary,
-        }
+fn metric_value_to_prometheus_metric_type(v: &MetricValue) -> proto::MetricType {
+    use proto::MetricType;
+    match v {
+        MetricValue::Counter { .. } => MetricType::Counter,
+        MetricValue::Gauge { .. } | MetricValue::Set { .. } => MetricType::Gauge,
+        MetricValue::Distribution {
+            statistic: StatisticKind::Histogram,
+            ..
+        } => MetricType::Histogram,
+        MetricValue::Distribution {
+            statistic: StatisticKind::Summary,
+            ..
+        } => MetricType::Summary,
+        MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
+        MetricValue::AggregatedSummary { .. } => MetricType::Summary,
     }
 }
 
@@ -386,7 +384,7 @@ impl MetricValue {
 mod tests {
     use super::super::default_summary_quantiles;
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
 
     fn encode_one<T: MetricCollector>(

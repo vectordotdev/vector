@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -241,7 +241,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn basic_counter() {

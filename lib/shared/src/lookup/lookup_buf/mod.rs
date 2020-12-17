@@ -1,8 +1,8 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
-use crate::event::Value;
+use crate::{event::*, lookup::*};
 use pest::iterators::Pair;
-use remap::parser::ParserRule;
+use remap_lang::parser::ParserRule;
 use std::{
     collections::VecDeque,
     convert::TryFrom,
@@ -12,9 +12,8 @@ use std::{
     str::FromStr,
 };
 use toml::Value as TomlValue;
+use tracing::instrument;
 
-use super::{segmentbuf::SegmentBuf, Look, Lookup};
-use crate::event::lookup::Segment;
 use indexmap::map::IndexMap;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -83,7 +82,7 @@ mod test;
 /// For more, investigate `Lookup`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct LookupBuf {
-    pub(super) segments: VecDeque<SegmentBuf>,
+    pub segments: VecDeque<SegmentBuf>,
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {

@@ -1,8 +1,9 @@
-use crate::event::lookup::{LookSegment, Segment};
+use crate::{event::*, lookup::*};
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},
 };
+use tracing::instrument;
 
 /// `SegmentBuf`s are chunks of a `LookupBuf`.
 ///
@@ -55,7 +56,7 @@ impl SegmentBuf {
     }
 
     #[instrument]
-    pub(crate) fn as_segment<'a>(&'a self) -> Segment<'a> {
+    pub fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
             SegmentBuf::Field {
                 name,

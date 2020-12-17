@@ -3,17 +3,17 @@
 #[cfg(test)]
 mod test;
 
-use super::{segmentbuf::SegmentBuf, Look, LookupBuf};
-use crate::event::lookup::Segment;
+use crate::{event::*, lookup::*};
 use core::fmt;
 use pest::iterators::Pair;
 use pest::Parser;
-use remap::parser::{Parser as RemapParser, ParserRule};
+use remap_lang::parser::{Parser as RemapParser, ParserRule};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::{collections::VecDeque, convert::TryFrom, str};
+use tracing::instrument;
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -81,7 +81,7 @@ use std::{collections::VecDeque, convert::TryFrom, str};
 ///   string into a `Lookup`. **Use a `LookupBuf` instead.**
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Lookup<'a> {
-    pub(super) segments: VecDeque<Segment<'a>>,
+    pub segments: VecDeque<Segment<'a>>,
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for Lookup<'a> {

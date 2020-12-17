@@ -326,12 +326,18 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
 
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok((target, Event::from(v.clone()))),
+            Some(v) => Ok((target, shared::log_event! {
+                crate::config::log_schema().message_key().clone() => v.clone(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            })),
             None => Err("input type 'raw' requires the field 'value'".into()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {
-                let mut event = Event::from("");
+                let mut event = shared::log_event! {
+                    crate::config::log_schema().message_key().clone() => String::from(""),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                };
                 for (path, value) in log_fields {
                     let value: Value = match value {
                         TestInputValue::String(s) => Value::from(s.to_owned()),

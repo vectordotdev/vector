@@ -161,7 +161,12 @@ pub fn random_lines_with_stream(
     count: usize,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from);
+    let stream = stream::iter(lines.clone()).map(|v| {
+        shared::log_event! {
+            crate::config::log_schema().message_key().clone() => v,
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        }
+    });
     (lines, stream)
 }
 
@@ -181,7 +186,10 @@ pub fn random_events_with_stream(
     len: usize,
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
-    random_events_with_stream_generic(count, move || Event::from(random_string(len)))
+    random_events_with_stream_generic(count, move || shared::log_event! {
+        crate::config::log_schema().message_key().clone() => random_string(len),
+        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    })
 }
 
 pub fn random_string(len: usize) -> String {

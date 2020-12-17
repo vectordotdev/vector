@@ -352,7 +352,10 @@ impl Ingestor {
                 };
 
                 let stream = lines.filter_map(|line| {
-                    let mut event = Event::from(line);
+                    let mut event = shared::log_event! {
+                        crate::config::log_schema().message_key().clone() => line,
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
 
                     let log = event.as_mut_log();
                     log.insert(LookupBuf::from("bucket"), s3_event.s3.bucket.name.clone());

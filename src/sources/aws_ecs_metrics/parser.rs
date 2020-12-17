@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use shared::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -488,7 +488,7 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
 #[cfg(test)]
 mod test {
     use super::parse;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
 

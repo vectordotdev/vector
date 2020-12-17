@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use shared::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
@@ -448,7 +448,7 @@ impl error::Error for ParseError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;

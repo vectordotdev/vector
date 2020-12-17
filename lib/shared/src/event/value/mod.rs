@@ -1,8 +1,6 @@
-use crate::event::Segment;
-use crate::{
-    event::{timestamp_to_string, Lookup, LookupBuf, SegmentBuf},
-    Result,
-};
+pub mod lua;
+
+use crate::{event::*, lookup::*};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -13,6 +11,7 @@ use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
 };
+use tracing::{instrument, trace_span, trace};
 use toml::value::Value as TomlValue;
 
 /// A value inside an [`crate::event::Event`].
@@ -31,7 +30,8 @@ use toml::value::Value as TomlValue;
 /// Transparently, with plain [`String`](std::string::String)s:
 ///
 /// ```rust
-/// let mut value = vector::event::Value::Map(std::collections::BTreeMap::default());
+/// use shared::{event::*, lookup::*};
+/// let mut value = Value::Map(std::collections::BTreeMap::default());
 /// value.insert(String::from("foo"), 1);
 /// assert!(value.contains("foo"));
 /// assert_eq!(value.get("foo").unwrap(), Some(&vector::event::Value::from(1)));
@@ -40,8 +40,9 @@ use toml::value::Value as TomlValue;
 /// Using remap-style lookups:
 ///
 /// ```rust
-/// let mut value = vector::event::LogEvent::default();
-/// let lookup = vector::event::LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
+/// use shared::{event::*, lookup::*};
+/// let mut value = LogEvent::default();
+/// let lookup = LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
 /// value.insert(lookup.clone(), 1);
 /// assert!(value.contains(&lookup));
 /// assert_eq!(value.get(&lookup), Some(&vector::event::Value::from(1)));
@@ -50,7 +51,8 @@ use toml::value::Value as TomlValue;
 /// It's possible to access the inner values as variants:
 ///
 /// ```rust
-/// let mut value = vector::event::Value::from(1);
+/// use shared::{event::*, lookup::*};
+/// let mut value = Value::from(1);
 /// assert_eq!(value.as_integer(), &1);
 /// assert_eq!(value.as_integer_mut(), &mut 1);
 /// assert_eq!(value.into_integer(), 1);
@@ -73,7 +75,8 @@ pub enum Value {
     /// To treat this as a string:
     ///
     /// ```rust
-    /// let val = vector::event::Value::from(String::from("Foo"));
+    /// use shared::{event::*, lookup::*};
+    /// let val = Value::from(String::from("Foo"));
     /// assert_eq!(String::from_utf8_lossy(&*val.as_bytes()).to_string(), String::from("Foo"));
     /// assert_eq!(String::from_utf8(val.into_bytes().to_vec()).unwrap(), String::from("Foo"));
     /// ```
@@ -260,7 +263,7 @@ impl Value {
     /// This is notably useful for things like influxdb logs where we list only leaves.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -297,7 +300,7 @@ impl Value {
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -334,7 +337,7 @@ impl Value {
     /// Return the number of subvalues the value has.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -371,7 +374,7 @@ impl Value {
     /// Insert a value at a given lookup.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -388,7 +391,7 @@ impl Value {
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
         value: impl Into<Value> + Debug,
-    ) -> Result<Option<Value>> {
+    ) -> crate::Result<Option<Value>> {
         let mut working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
@@ -598,7 +601,7 @@ impl Value {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -619,7 +622,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> Result<Option<Value>> {
+    ) -> crate::Result<Option<Value>> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
@@ -765,7 +768,7 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -780,7 +783,7 @@ impl Value {
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
     #[instrument(level = "trace", skip(self, lookup))]
-    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>> {
+    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> crate::Result<Option<&Value>> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -863,7 +866,7 @@ impl Value {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector::event::{Lookup, Value};
+    /// use shared::{event::*, lookup::*};
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -880,7 +883,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> Result<Option<&mut Value>> {
+    ) -> crate::Result<Option<&mut Value>> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
@@ -1226,12 +1229,12 @@ impl TryFrom<TomlValue> for Value {
             TomlValue::Array(a) => Self::from(
                 a.into_iter()
                     .map(Value::try_from)
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<crate::Result<Vec<_>>>()?,
             ),
             TomlValue::Table(t) => Self::from(
                 t.into_iter()
                     .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
-                    .collect::<Result<BTreeMap<_, _>>>()?,
+                    .collect::<crate::Result<BTreeMap<_, _>>>()?,
             ),
             TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
             TomlValue::Boolean(b) => Self::from(b),
@@ -1378,6 +1381,10 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
+fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+}
+
 impl TryInto<bool> for Value {
     type Error = crate::Error;
 
@@ -1467,9 +1474,9 @@ impl TryInto<DateTime<Utc>> for Value {
     }
 }
 
-impl From<remap::Value> for Value {
-    fn from(v: remap::Value) -> Self {
-        use remap::Value::*;
+impl From<remap_lang::Value> for Value {
+    fn from(v: remap_lang::Value) -> Self {
+        use remap_lang::Value::*;
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -1485,9 +1492,9 @@ impl From<remap::Value> for Value {
     }
 }
 
-impl From<Value> for remap::Value {
+impl From<Value> for remap_lang::Value {
     fn from(v: Value) -> Self {
-        use remap::Value::*;
+        use remap_lang::Value::*;
 
         match v {
             Value::Bytes(v) => Bytes(v),
@@ -1566,9 +1573,8 @@ mod test {
     mod insert_get_remove {
         use super::*;
 
-        #[test]
+        #[test_env_log::test]
         fn single_field() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "root";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1580,9 +1586,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn nested_field() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "root.doot";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1594,9 +1599,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn single_index() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0]";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1608,9 +1612,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn nested_index() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1622,9 +1625,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn field_index() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "root[0]";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1636,9 +1638,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn index_field() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0].boot";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1650,9 +1651,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn nested_index_field() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0].boot";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1664,9 +1664,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn field_with_nested_index_field() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "root[0][0].boot";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1681,9 +1680,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn coalesced_index() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "([0] | [1])";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1695,9 +1693,8 @@ mod test {
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn coalesced_index_with_tail() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "([0] | [1]).bloop";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1720,9 +1717,8 @@ mod test {
     mod corner_cases {
         use super::*;
 
-        #[test]
+        #[test_env_log::test]
         fn remove_prune_map_with_map() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "foo.bar";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1733,9 +1729,8 @@ mod test {
             assert!(!value.contains("foo"));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn remove_prune_map_with_array() {
-            crate::test_util::trace_init();
             let mut value = Value::from(BTreeMap::default());
             let key = "foo[0]";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1746,9 +1741,8 @@ mod test {
             assert!(!value.contains("foo"));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn remove_prune_array_with_map() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0].bar";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1759,9 +1753,8 @@ mod test {
             assert!(!value.contains(0));
         }
 
-        #[test]
+        #[test_env_log::test]
         fn remove_prune_array_with_array() {
-            crate::test_util::trace_init();
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
             let lookup = LookupBuf::from_str(key).unwrap();
@@ -1778,9 +1771,8 @@ mod test {
     //   * Ensures the `serde_json::Value` to `vector::Value` conversions are harmless. (Think UTF-8 errors)
     //
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
-    #[test]
+    #[test_env_log::test]
     fn json_value_to_vector_value_to_json_value() {
-        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
         tracing::trace!(?FIXTURE_ROOT, "Opening");

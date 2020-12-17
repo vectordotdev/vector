@@ -399,7 +399,7 @@ mod integration_tests {
             );
             assert_eq!(
                 log.get(Lookup::from("region")),
-                Some(&Value::from("us-east-1"))
+                Some(&Value::from("us-east-1".to_string()))
             );
         }
     }

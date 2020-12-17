@@ -5170,6 +5170,18 @@ checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
 [[package]]
 name = "rlua"
 version = "0.17.1-alpha.0"
+source = "git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320#25bd7e6bffef9597466a98bfca80a3056c9e6320"
+dependencies = [
+ "bitflags",
+ "bstr",
+ "cc",
+ "libc",
+ "num-traits",
+]
+
+[[package]]
+name = "rlua"
+version = "0.17.1-alpha.0"
 source = "git+https://github.com/kyren/rlua#25bd7e6bffef9597466a98bfca80a3056c9e6320"
 dependencies = [
  "bitflags",
@@ -5875,9 +5887,23 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "chrono",
+ "derive_is_enum_variant",
+ "indexmap",
+ "lazy_static",
+ "metrics",
+ "metrics-util",
  "nom 6.0.1",
+ "pest",
+ "pest_derive",
+ "remap-lang",
+ "rlua 0.17.1-alpha.0 (git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320)",
+ "serde",
+ "serde_json",
  "snafu",
+ "test-env-log",
+ "toml",
  "tracing 0.1.22",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -6331,6 +6357,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb6bfa289a4d7c5766392812c0a1f4c1ba45afa1ad47803c11e1f407d846d75f"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test-env-log"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "356cdd574433fe2bce7ffa193edff9c931fc8d74422c5be4b03144a27f751f18"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.54",
 ]
 
 [[package]]
@@ -7272,7 +7309,7 @@ dependencies = [
  "remap-functions",
  "remap-lang",
  "reqwest",
- "rlua",
+ "rlua 0.17.1-alpha.0 (git+https://github.com/kyren/rlua)",
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",

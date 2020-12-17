@@ -104,8 +104,7 @@ impl FunctionTransform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Lookup, LookupBuf, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{log_event, event::{LogEvent, Lookup, LookupBuf, Value}, config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -114,14 +113,16 @@ mod tests {
     }
 
     async fn parse_it(extra: &str) -> LogEvent {
-        let mut event = Event::from("dummy message");
+        let mut event = log_event! {
+            "message" => "dummy message".to_string(),
+        };
         for &(key, value) in &[
             ("number", "1234"),
             ("bool", "yes"),
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert(LookupBuf::from(key), value);
+            event.as_mut_log().insert(LookupBuf::from(key), value.to_string());
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(&format!(

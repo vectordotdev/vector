@@ -1,8 +1,8 @@
 #![allow(clippy::needless_collect)]
-use crate::event::{
-    lookup::{Segment, SegmentBuf},
-    Lookup, LookupBuf, Value,
-};
+
+pub mod lua;
+
+use crate::{event::*, lookup::*};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -10,6 +10,7 @@ use std::{
     fmt::Debug,
     iter::FromIterator,
 };
+use tracing::{instrument, trace_span, trace, error};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -22,26 +23,27 @@ use std::{
 /// Transparently, as a normal [`BTreeMap`](std::collections::BTreeMap):
 ///
 /// ```rust
-/// let mut event = vector::event::LogEvent::default();
+/// use shared::{event::*, lookup::*};
+/// let mut event = LogEvent::default();
 /// event.insert(String::from("foo"), 1);
 /// assert!(event.contains("foo"));
-/// assert_eq!(event.get("foo"), Some(&vector::event::Value::from(1)));
+/// assert_eq!(event.get("foo"), Some(&Value::from(1)));
 /// ```
 ///
 /// Using remap-style lookups:
 ///
 /// ```rust
-/// let mut event = vector::event::LogEvent::default();
-/// let lookup = vector::event::LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
+/// use shared::{event::*, lookup::*};
+/// let lookup = LookupBuf::from_str("foo[0].(bar | bat)").unwrap();
 /// event.insert(lookup.clone(), 1);
 /// assert!(event.contains(&lookup));
-/// assert_eq!(event.get(&lookup), Some(&vector::event::Value::from(1)));
+/// assert_eq!(event.get(&lookup), Some(&Value::from(1)));
 /// ```
 ///
 /// It's possible to access the inner [`BTreeMap`](std::collections::BTreeMap):
 ///
 /// ```rust
-/// use vector::event::LogEvent;
+/// use shared::{event::*, lookup::*};
 /// let mut event = LogEvent::default();
 /// event.insert(String::from("foo"), 1);
 ///
@@ -56,10 +58,10 @@ use std::{
 /// There exists a `log_event` macro you may also utilize to create this type:
 ///
 /// ```rust
-/// use vector::{log_event, event::{LookupBuf, Lookup}};
+/// use shared::{event::*, lookup::*};
 /// let event = log_event! {
 ///     "foo" => 1,
-///     vector::event::LookupBuf::from_str("bar.baz").unwrap() => 2,
+///     LookupBuf::from_str("bar.baz").unwrap() => 2,
 /// }.into_log();
 /// assert!(event.contains("foo"));
 /// assert!(event.contains(Lookup::from_str("foo").unwrap()));
@@ -74,7 +76,7 @@ impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "foo";
     /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
     /// let event = log_event! {
@@ -150,7 +152,7 @@ impl LogEvent {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "foo";
     /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
     /// let mut event = log_event! {
@@ -226,7 +228,7 @@ impl LogEvent {
     /// Determine if the log event contains a value at a given lookup.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "foo";
     /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
     /// let mut event = log_event! {
@@ -247,7 +249,7 @@ impl LogEvent {
     /// Insert a value at a given lookup, returning any old value that exists.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "foo";
     /// let lookup_key = LookupBuf::from_str("bar.baz").unwrap();
     /// let mut event = log_event! {
@@ -351,7 +353,7 @@ impl LogEvent {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "foo";
     /// let lookup_key = LookupBuf::from_str("bar.baz.slam").unwrap();
     /// let mut event = log_event! {
@@ -443,7 +445,7 @@ impl LogEvent {
     /// and maps. It also returns those array/map values during iteration.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf, Lookup}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let event = log_event! {
@@ -477,7 +479,7 @@ impl LogEvent {
     /// maps. It also returns those array/map values during iteration.
     ///
     /// ```rust
-    /// use vector::{log_event, event::{LookupBuf, Lookup, Value}};
+    /// use shared::{event::*, lookup::*};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let event = log_event! {
@@ -518,7 +520,8 @@ impl LogEvent {
     /// Determine if the log event is empty of fields.
     ///
     /// ```rust
-    /// let event = vector::event::LogEvent::default();
+    /// use shared::{event::*, lookup::*};
+    /// let event = LogEvent::default();
     /// assert!(event.is_empty());
     /// ```
     #[instrument(level = "trace", skip(self))]
@@ -528,7 +531,7 @@ impl LogEvent {
 
     /// Return an entry for the given lookup.
     #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
-    fn entry(&mut self, lookup: LookupBuf) -> crate::Result<Entry<String, Value>> {
+    pub fn entry(&mut self, lookup: LookupBuf) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
 
@@ -588,7 +591,8 @@ impl LogEvent {
     /// Returns the entire event as a `Value::Map`.
     ///
     /// ```rust
-    /// let event = vector::event::LogEvent::default();
+    /// use shared::{event::*, lookup::*};
+    /// let event = LogEvent::default();
     /// assert_eq!(event.take(), std::collections::BTreeMap::default());
     /// ```
     #[instrument(level = "trace", skip(self))]
@@ -599,7 +603,8 @@ impl LogEvent {
     /// Get a borrow of the contained fields.
     ///
     /// ```rust
-    /// let mut event = vector::event::LogEvent::default();
+    /// use shared::{event::*, lookup::*};
+    /// let mut event = LogEvent::default();
     /// assert_eq!(event.inner(), &std::collections::BTreeMap::default());
     /// ```
     #[instrument(level = "trace", skip(self))]
@@ -610,28 +615,14 @@ impl LogEvent {
     /// Get a mutable borrow of the contained fields.
     ///
     /// ```rust
-    /// let mut event = vector::event::LogEvent::default();
+    /// use shared::{event::*, lookup::*};
+    /// let mut event = LogEvent::default();
     /// assert_eq!(event.inner_mut(), &mut std::collections::BTreeMap::default());
     /// ```
     #[instrument(level = "trace", skip(self))]
     pub fn inner_mut(&mut self) -> &mut BTreeMap<String, Value> {
         &mut self.fields
     }
-}
-
-#[macro_export]
-macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
-        #[allow(unused_variables)]
-        {
-            let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
-            let log = event.as_mut_log();
-            $(
-                log.insert($key, $value);
-            )*
-            event
-        }
-    };
 }
 
 impl From<BTreeMap<String, Value>> for LogEvent {
@@ -741,16 +732,15 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::open_fixture;
     use serde_json::json;
     use tracing::trace;
+    use test_env_log::test;
 
     mod insert_get_remove {
         use super::*;
 
-        #[test]
+        #[test_env_log::test]
         fn root() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root")?;
             let mut value = Value::Boolean(true);
@@ -762,10 +752,9 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn quoted_from_str() -> crate::Result<()> {
             // In this test, we make sure the quotes are stripped, since it's a parsed lookup.
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.\"doot\"")?;
             let mut value = Value::Boolean(true);
@@ -777,9 +766,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn root_with_buddy() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root")?;
             let mut value = Value::Boolean(true);
@@ -799,9 +787,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn coalesced_root() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("(snoot | boot).loot")?;
             let mut value = Value::Boolean(true);
@@ -817,9 +804,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn coalesced_nested() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.(snoot | boot)")?;
             let mut value = Value::Boolean(true);
@@ -835,9 +821,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn coalesced_with_nesting() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.(snoot | boot.beep).leep")?;
             let mut value = Value::Boolean(true);
@@ -867,9 +852,8 @@ mod test {
 
             Ok(())
         }
-        #[test]
+        #[test_env_log::test]
         fn map_field() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.field")?;
             let mut value = Value::Boolean(true);
@@ -881,9 +865,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn nested_map_field() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.field.subfield")?;
             let mut value = Value::Boolean(true);
@@ -898,9 +881,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn array_field() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0]")?;
             let mut value = Value::Boolean(true);
@@ -912,9 +894,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn array_reverse_population() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[2]")?;
             let mut value = Value::Boolean(true);
@@ -942,9 +923,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn array_field_nested_array() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0][0]")?;
             let mut value = Value::Boolean(true);
@@ -956,9 +936,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn array_field_nested_map() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0].nested")?;
             let mut value = Value::Boolean(true);
@@ -973,9 +952,8 @@ mod test {
             Ok(())
         }
 
-        #[test]
+        #[test_env_log::test]
         fn perverse() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str(
                 "root[10].nested[10].more[9].than[8].there[7][6][5].we.go.friends.look.at.this",
@@ -1011,9 +989,8 @@ mod test {
         use super::*;
 
         // Prune on deeply nested values is tested in `value.rs`, but we must test root values here.
-        #[test]
+        #[test_env_log::test]
         fn pruning() -> crate::Result<()> {
-            crate::test_util::trace_init();
 
             let mut event = crate::log_event! {
                 LookupBuf::from("foo.bar.baz") => 1,
@@ -1041,9 +1018,8 @@ mod test {
 
         // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
         // there are some cases where we want to insert 1 by one. Make sure this can happen.
-        #[test]
+        #[test_env_log::test]
         fn iteratively_populate_array() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookups = vec![
                 LookupBuf::from_str("root.nested[0]")?,
@@ -1070,9 +1046,8 @@ mod test {
 
         // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
         // there are some cases where we want to insert 1 by one. Make sure this can happen.
-        #[test]
+        #[test_env_log::test]
         fn iteratively_populate_array_reverse() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookups = vec![
                 LookupBuf::from_str("root.nested[1]")?,
@@ -1102,9 +1077,8 @@ mod test {
 
         // While authors should prefer to set an map via `event.insert(lookup_to_map, map)`,
         // there are some cases where we want to insert 1 by one. Make sure this can happen.
-        #[test]
+        #[test_env_log::test]
         fn iteratively_populate_map() -> crate::Result<()> {
-            crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookups = vec![
                 LookupBuf::from_str("root.one")?,
@@ -1134,10 +1108,8 @@ mod test {
         }
     }
 
-    #[test]
+    #[test_env_log::test]
     fn keys_and_pairs() -> crate::Result<()> {
-        crate::test_util::trace_init();
-
         let mut event = LogEvent::default();
         // We opt for very small arrays here to avoid having to iterate a bunch.
         let lookup = LookupBuf::from_str("snooper.booper[1][2]")?;
@@ -1200,102 +1172,5 @@ mod test {
         assert_eq!(pairs[13].0, expected);
 
         Ok(())
-    }
-
-    // This test iterates over the `tests/data/fixtures/log_event` folder and:
-    //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
-    //     item being just plain parsed as json.
-    //
-    // Basically: This test makes sure we aren't mutilating any content users might be sending.
-    #[test]
-    fn json_value_to_vector_log_event_to_json_value() {
-        crate::test_util::trace_init();
-        const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
-
-        trace!(?FIXTURE_ROOT, "Opening.");
-        std::fs::read_dir(FIXTURE_ROOT)
-            .unwrap()
-            .for_each(|fixture_file| match fixture_file {
-                Ok(fixture_file) => {
-                    let path = fixture_file.path();
-                    tracing::trace!(?path, "Opening.");
-                    let serde_value = open_fixture(&path).unwrap();
-
-                    let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
-                    let serde_value_again: serde_json::Value =
-                        vector_value.clone().try_into().unwrap();
-
-                    tracing::trace!(
-                        ?path,
-                        ?serde_value,
-                        ?vector_value,
-                        ?serde_value_again,
-                        "Asserting equal."
-                    );
-                    assert_eq!(serde_value, serde_value_again);
-                }
-                _ => panic!("This test should never read Err'ing test fixtures."),
-            });
-    }
-
-    // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
-    #[test]
-    fn entry() {
-        crate::test_util::trace_init();
-        let fixture =
-            open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
-        let mut event = LogEvent::try_from(fixture).unwrap();
-
-        let lookup = LookupBuf::from_str("non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        trace!(?json);
-        assert_eq!(json.pointer("/non-existing"), Some(&fallback));
-
-        let lookup = LookupBuf::from_str("nulled").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/nulled"), Some(&serde_json::Value::Null));
-
-        let lookup = LookupBuf::from_str("map.basic").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/basic"),
-            Some(&serde_json::Value::Bool(true))
-        );
-
-        let lookup = LookupBuf::from_str("map.map.buddy").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/map/buddy"),
-            Some(&serde_json::Value::Number((-1).into()))
-        );
-
-        let lookup = LookupBuf::from_str("map.map.non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
-        );
-        entry.or_insert_with(|| fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
     }
 }

@@ -1,5 +1,6 @@
-use crate::event::lookup::*;
+use crate::{event::*, lookup::*};
 use std::{fs, io::Read, path::Path};
+use tracing::trace;
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
@@ -17,35 +18,31 @@ lazy_static::lazy_static! {
     ];
 }
 
-#[test]
+#[test_env_log::test]
 fn zero_len_not_allowed() {
-    crate::test_util::trace_init();
     let input = "";
     let maybe_lookup = LookupBuf::from_str(input);
     assert!(maybe_lookup.is_err());
 }
 
-#[test]
+#[test_env_log::test]
 fn we_dont_parse_plain_strings_in_from() {
-    crate::test_util::trace_init();
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
     let lookup = LookupBuf::from(input);
     assert_eq!(lookup[0], SegmentBuf::from(String::from(input)));
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn simple() {
-    crate::test_util::trace_init();
     let input = "some_key";
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup[0], SegmentBuf::from(String::from("some_key")));
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn quoted() {
-    crate::test_util::trace_init();
     let input = "\"start\".\"after\"";
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup[0], SegmentBuf::from(String::from("\"start\"")));
@@ -53,9 +50,8 @@ fn quoted() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn coalesced() {
-    crate::test_util::trace_init();
     let input = "plain.(option_one | option_two)";
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup[0], SegmentBuf::from("plain".to_string()));
@@ -68,9 +64,8 @@ fn coalesced() {
     );
 }
 
-#[test]
+#[test_env_log::test]
 fn coalesced_nesting() {
-    crate::test_util::trace_init();
     let input = "plain.(option_one.inner | option_two.other_inner)";
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup[0], SegmentBuf::from("plain".to_string()));
@@ -89,9 +84,8 @@ fn coalesced_nesting() {
     );
 }
 
-#[test]
+#[test_env_log::test]
 fn push() {
-    crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = LookupBuf::from_str(input).unwrap();
     lookup.push_back(SegmentBuf::from(String::from(input)));
@@ -99,18 +93,16 @@ fn push() {
     assert_eq!(lookup[1], SegmentBuf::from(String::from("some_key")));
 }
 
-#[test]
+#[test_env_log::test]
 fn pop() {
-    crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = LookupBuf::from_str(input).unwrap();
     let out = lookup.pop_back();
     assert_eq!(out, Some(SegmentBuf::from(String::from("some_key"))));
 }
 
-#[test]
+#[test_env_log::test]
 fn array() {
-    crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup[0], SegmentBuf::from(String::from("foo")));
@@ -118,9 +110,8 @@ fn array() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn via_parse() {
-    crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = input.parse::<LookupBuf>().unwrap();
     assert_eq!(lookup[0], SegmentBuf::from(String::from("foo")));
@@ -128,17 +119,15 @@ fn via_parse() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn to_string() {
-    crate::test_util::trace_init();
     let input = SUFFICIENTLY_COMPLEX;
     let lookup = LookupBuf::from_str(input).unwrap();
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test]
+#[test_env_log::test]
 fn impl_index_usize() {
-    crate::test_util::trace_init();
     let lookup = LookupBuf::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
@@ -146,9 +135,8 @@ fn impl_index_usize() {
     }
 }
 
-#[test]
+#[test_env_log::test]
 fn impl_index_mut_index_mut() {
-    crate::test_util::trace_init();
     let mut lookup = LookupBuf::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     for i in 0..SUFFICIENTLY_DECOMPOSED.len() {
@@ -157,9 +145,8 @@ fn impl_index_mut_index_mut() {
     }
 }
 
-#[test]
+#[test_env_log::test]
 fn iter() {
-    crate::test_util::trace_init();
     let lookup = LookupBuf::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
     let mut iter = lookup.iter();
@@ -171,9 +158,8 @@ fn iter() {
     }
 }
 
-#[test]
+#[test_env_log::test]
 fn into_iter() {
-    crate::test_util::trace_init();
     let lookup = LookupBuf::from_str(SUFFICIENTLY_COMPLEX).unwrap();
     let mut iter = lookup.into_iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().cloned().enumerate() {
@@ -198,9 +184,8 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
 // then turned into a string again is the same.
-#[test]
+#[test_env_log::test]
 fn lookup_to_string_and_serialize() {
-    crate::test_util::trace_init();
     const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
     trace!(?FIXTURE_ROOT, "Opening.");

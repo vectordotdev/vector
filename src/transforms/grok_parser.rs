@@ -158,10 +158,10 @@ impl FunctionTransform for GrokParser {
 #[cfg(test)]
 mod tests {
     use super::GrokParserConfig;
-    use crate::event::LogEvent;
     use crate::{
         config::{log_schema, TransformConfig},
-        event, Event,
+        event::{LogEvent, Value, Event},
+        log_event,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -178,7 +178,10 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let event = Event::from(event);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => event,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
             field: field.map(|s| s.into()),
@@ -232,7 +235,7 @@ mod tests {
 
         assert_eq!(2, event.keys(true).count());
         assert_eq!(
-            event::Value::from("Help I'm stuck in an HTTP server"),
+            Value::from("Help I'm stuck in an HTTP server".clone()),
             event[log_schema().message_key()]
         );
         assert!(!event[log_schema().timestamp_key()]
@@ -280,7 +283,7 @@ mod tests {
 
         assert_eq!(2, event.keys(true).count());
         assert_eq!(
-            event::Value::from("i am the only field"),
+            Value::from("i am the only field"),
             event[log_schema().message_key()]
         );
         assert!(!event[log_schema().timestamp_key()]

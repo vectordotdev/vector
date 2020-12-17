@@ -117,7 +117,10 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("raw log line");
+        let event = shared::log_event! {
+            crate::config::log_schema().message_key().clone() => String::from("raw log line"),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let mut buf = [0; 256];

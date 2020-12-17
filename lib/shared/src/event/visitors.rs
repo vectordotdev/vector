@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value};
+use crate::{event::*, lookup::*};
 use bytes::Bytes;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use std::{

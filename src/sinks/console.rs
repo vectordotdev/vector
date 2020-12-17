@@ -156,7 +156,7 @@ impl StreamSink for WriterSink {
 #[cfg(test)]
 mod test {
     use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, LookupBuf, Value};
     use chrono::{offset::TimeZone, Utc};
 

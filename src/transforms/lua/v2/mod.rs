@@ -1,5 +1,3 @@
-mod interop;
-
 use crate::{
     config::DataType,
     config::CONFIG_PATHS,
@@ -13,6 +11,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
+use rlua::prelude::*;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

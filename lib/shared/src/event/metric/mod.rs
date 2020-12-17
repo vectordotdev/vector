@@ -1,3 +1,6 @@
+pub mod lua;
+
+use crate::{event::*, lookup::*};
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
@@ -406,7 +409,7 @@ mod test {
         .collect()
     }
 
-    #[test]
+    #[test_env_log::test]
     fn merge_counters() {
         let mut counter = Metric {
             name: "counter".into(),
@@ -440,7 +443,7 @@ mod test {
         )
     }
 
-    #[test]
+    #[test_env_log::test]
     fn merge_gauges() {
         let mut gauge = Metric {
             name: "gauge".into(),
@@ -474,7 +477,7 @@ mod test {
         )
     }
 
-    #[test]
+    #[test_env_log::test]
     fn merge_sets() {
         let mut set = Metric {
             name: "set".into(),
@@ -514,7 +517,7 @@ mod test {
         )
     }
 
-    #[test]
+    #[test_env_log::test]
     fn merge_histograms() {
         let mut dist = Metric {
             name: "hist".into(),
@@ -560,7 +563,7 @@ mod test {
         )
     }
 
-    #[test]
+    #[test_env_log::test]
     fn display() {
         assert_eq!(
             format!(

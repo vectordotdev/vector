@@ -380,7 +380,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use pretty_assertions::assert_eq;
 

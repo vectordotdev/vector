@@ -7,20 +7,15 @@ use std::collections::{BTreeMap, HashMap};
 pub mod discriminant;
 pub mod merge;
 pub mod merge_state;
-pub mod metric;
 pub mod util;
+#[cfg(test)]
+mod fixtures;
 
-mod log_event;
-mod lookup;
-mod value;
-mod visitors;
+pub use shared::{event::*, lookup::*};
+pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
-pub use log_event::LogEvent;
-pub use lookup::{Lookup, LookupBuf, Segment, SegmentBuf};
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathIter;
-pub use value::Value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -30,59 +25,6 @@ lazy_static::lazy_static! {
     pub static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub enum Event {
-    Log(LogEvent),
-    Metric(Metric),
-}
-
-impl Event {
-    pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::default())
-    }
-
-    pub fn as_log(&self) -> &LogEvent {
-        match self {
-            Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
-        }
-    }
-
-    pub fn as_mut_log(&mut self) -> &mut LogEvent {
-        match self {
-            Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
-        }
-    }
-
-    pub fn into_log(self) -> LogEvent {
-        match self {
-            Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
-        }
-    }
-
-    pub fn as_metric(&self) -> &Metric {
-        match self {
-            Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
-        }
-    }
-
-    pub fn as_mut_metric(&mut self) -> &mut Metric {
-        match self {
-            Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
-        }
-    }
-
-    pub fn into_metric(self) -> Metric {
-        match self {
-            Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
-        }
-    }
-}
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
@@ -127,47 +69,6 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         None => {
             error!("Encoded event contains unknown value kind.");
             None
-        }
-    }
-}
-
-impl From<BTreeMap<String, Value>> for Event {
-    fn from(map: BTreeMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl From<HashMap<String, Value>> for Event {
-    fn from(map: HashMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl TryFrom<serde_json::Value> for Event {
-    type Error = crate::Error;
-
-    fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
-        match map {
-            serde_json::Value::Object(fields) => Ok(Event::from(
-                fields
-                    .into_iter()
-                    .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            _ => Err(crate::Error::from(
-                "Attempted to convert non-Object JSON into an Event.",
-            )),
-        }
-    }
-}
-
-impl TryInto<serde_json::Value> for Event {
-    type Error = serde_json::Error;
-
-    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        match self {
-            Event::Log(fields) => serde_json::to_value(fields),
-            Event::Metric(metric) => serde_json::to_value(metric),
         }
     }
 }
@@ -383,63 +284,6 @@ impl From<Event> for proto::EventWrapper {
                 proto::EventWrapper { event: Some(event) }
             }
         }
-    }
-}
-
-impl From<Bytes> for Event {
-    fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key().clone(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), Utc::now());
-
-        event
-    }
-}
-
-impl From<&str> for Event {
-    fn from(line: &str) -> Self {
-        line.to_owned().into()
-    }
-}
-
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        Bytes::from(line).into()
-    }
-}
-
-impl From<LogEvent> for Event {
-    fn from(log: LogEvent) -> Self {
-        Event::Log(log)
-    }
-}
-
-impl From<Metric> for Event {
-    fn from(metric: Metric) -> Self {
-        Event::Metric(metric)
-    }
-}
-
-impl remap::Object for Event {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
-        unimplemented!()
-    }
-
-    fn remove(&mut self, path: &remap::Path, compact: bool) -> Result<(), String> {
-        unimplemented!()
-    }
-
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
-        unimplemented!()
-    }
-
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        unimplemented!()
     }
 }
 

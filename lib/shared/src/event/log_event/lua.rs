@@ -1,5 +1,5 @@
-use crate::event::{LogEvent, LookupBuf, Value};
-use rlua::prelude::*;
+use rlua::prelude::{ToLua, LuaContext, LuaResult, LuaError, LuaValue, FromLua};
+use crate::{event::*, lookup::*};
 
 impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
@@ -33,8 +33,10 @@ impl<'a> FromLua<'a> for LogEvent {
 mod test {
     use super::*;
     use crate::event::{Event, Lookup, LookupBuf};
+    use rlua::Lua;
+    use test_env_log::test;
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
@@ -72,7 +74,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua() {
         let lua_event = r#"
         {

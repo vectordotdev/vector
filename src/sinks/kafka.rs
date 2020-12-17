@@ -28,6 +28,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    borrow::Borrow,
 };
 use tokio::{sync::Notify, time::Duration};
 
@@ -335,7 +336,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     let client = config.to_rdkafka().unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplate)?
-        .render_string(&Event::from(""))
+        .render_string(shared::log_event! {
+            crate::config::log_schema().message_key().clone() => String::from(""),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        }.borrow())
     {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {

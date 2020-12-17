@@ -1,4 +1,4 @@
-use super::util::{
+use crate::event::lua::{
     table_is_array, table_is_timestamp, table_to_array, table_to_map, table_to_timestamp,
     timestamp_to_table,
 };
@@ -52,7 +52,7 @@ mod test {
     use super::*;
     use chrono::{TimeZone, Utc};
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua() {
         let pairs = vec![
             ("'⍺βγ'", Value::Bytes("⍺βγ".into())),
@@ -74,8 +74,8 @@ mod test {
                             ),
                         ),
                     ]
-                    .into_iter()
-                    .collect(),
+                        .into_iter()
+                        .collect(),
                 ),
             ),
             (
@@ -104,7 +104,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua() {
         let pairs = vec![
             (
@@ -153,8 +153,8 @@ mod test {
                             ),
                         ),
                     ]
-                    .into_iter()
-                    .collect(),
+                        .into_iter()
+                        .collect(),
                 ),
                 r#"
                 function (value)

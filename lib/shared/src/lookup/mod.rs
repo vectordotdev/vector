@@ -9,7 +9,7 @@ mod segment;
 pub use segment::Segment;
 
 use pest::iterators::Pair;
-use remap::parser::ParserRule;
+use remap_lang::parser::ParserRule;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::VecDeque;
 use std::convert::TryFrom;

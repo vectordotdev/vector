@@ -1,4 +1,4 @@
-use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
+use crate::event::lua::{table_to_set, table_to_timestamp, timestamp_to_table};
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
@@ -169,7 +169,7 @@ impl<'a> FromLua<'a> for Metric {
                 statistic: distribution.get("statistic")?,
             }
         } else if let Some(aggregated_histogram) =
-            table.get::<_, Option<LuaTable>>("aggregated_histogram")?
+        table.get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
             let counts: Vec<u32> = aggregated_histogram.get("counts")?;
             let count = counts.iter().sum();
@@ -180,7 +180,7 @@ impl<'a> FromLua<'a> for Metric {
                 sum: aggregated_histogram.get("sum")?,
             }
         } else if let Some(aggregated_summary) =
-            table.get::<_, Option<LuaTable>>("aggregated_summary")?
+        table.get::<_, Option<LuaTable>>("aggregated_summary")?
         {
             MetricValue::AggregatedSummary {
                 quantiles: aggregated_summary.get("quantiles")?,
@@ -211,6 +211,7 @@ impl<'a> FromLua<'a> for Metric {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, Utc};
+    use test_env_log::test;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
         Lua::new().context(|ctx| {
@@ -224,7 +225,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_counter_full() {
         let metric = Metric {
             name: "example counter".into(),
@@ -257,7 +258,7 @@ mod test {
         assert_metric(metric, assertions);
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_counter_minimal() {
         let metric = Metric {
             name: "example counter".into(),
@@ -276,7 +277,7 @@ mod test {
         assert_metric(metric, assertions);
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_gauge() {
         let metric = Metric {
             name: "example gauge".into(),
@@ -290,7 +291,7 @@ mod test {
         assert_metric(metric, assertions);
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_set() {
         let metric = Metric {
             name: "example set".into(),
@@ -314,7 +315,7 @@ mod test {
         assert_metric(metric, assertions);
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_distribution() {
         let metric = Metric {
             name: "example distribution".into(),
@@ -340,7 +341,7 @@ mod test {
         assert_metric(metric, assertions)
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_aggregated_histogram() {
         let metric = Metric {
             name: "example histogram".into(),
@@ -369,7 +370,7 @@ mod test {
         assert_metric(metric, assertions)
     }
 
-    #[test]
+    #[test_env_log::test]
     fn to_lua_aggregated_summary() {
         let metric = Metric {
             name: "example summary".into(),
@@ -396,7 +397,7 @@ mod test {
         assert_metric(metric, assertions)
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_counter_minimal() {
         let value = r#"{
             name = "example counter",
@@ -417,7 +418,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_counter_full() {
         let value = r#"{
             name = "example counter",
@@ -454,7 +455,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_gauge() {
         let value = r#"{
             name = "example gauge",
@@ -475,7 +476,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_set() {
         let value = r#"{
             name = "example set",
@@ -500,7 +501,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_distribution() {
         let value = r#"{
             name = "example distribution",
@@ -527,7 +528,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_aggregated_histogram() {
         let value = r#"{
             name = "example histogram",
@@ -555,7 +556,7 @@ mod test {
         });
     }
 
-    #[test]
+    #[test_env_log::test]
     fn from_lua_aggregated_summary() {
         let value = r#"{
             name = "example summary",

@@ -135,6 +135,7 @@ mod test {
         test_util::{collect_ready, next_addr, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
+        log_event,
     };
     use futures::stream;
     use std::net::SocketAddr;
@@ -164,14 +165,30 @@ mod test {
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
-            Event::from("test"),
-            Event::from("events"),
-            Event::from("to roundtrip"),
-            Event::from("through"),
-            Event::from("the native"),
-            Event::from("sink"),
-            Event::from("and"),
-            Event::from("source"),
+            log_event! {
+                "message" => "test".to_string(),
+            },
+            log_event! {
+                "message" => "events".to_string(),
+            },
+            log_event! {
+                "message" => "to roundtrip".to_string(),
+            },
+            log_event! {
+                "message" => "through".to_string(),
+            },
+            log_event! {
+                "message" => "the native".to_string(),
+            },
+            log_event! {
+                "message" => "sink".to_string(),
+            },
+            log_event! {
+                "message" => "and".to_string(),
+            },
+            log_event! {
+                "message" => "source".to_string(),
+            },
             Event::Metric(Metric {
                 name: String::from("also test a metric"),
                 namespace: None,

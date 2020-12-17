@@ -90,9 +90,15 @@ impl GeneratorConfig {
 
                     if self.sequence {
                         number += 1;
-                        Event::from(&format!("{} {}", number, line)[..])
+                        shared::log_event! {
+                            crate::config::log_schema().message_key().clone() => format!("{} {}", number, line),
+                            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                        }
                     } else {
-                        Event::from(&line[..])
+                        shared::log_event! {
+                            crate::config::log_schema().message_key().clone() => line.clone(),
+                            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                        }
                     }
                 })
                 .map(Ok)
