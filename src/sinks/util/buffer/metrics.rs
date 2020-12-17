@@ -337,10 +337,20 @@ mod test {
         (buffered, sent_requests)
     }
 
-    #[tokio::test]
-    async fn metric_buffer_counters() {
+    async fn rebuffer(events: Vec<Event>) -> Vec<Vec<Metric>> {
         let (sink, sent_batches) = sink();
 
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
+            .await
+            .unwrap();
+
+        Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap()
+    }
+
+    #[tokio::test]
+    async fn metric_buffer_counters() {
         let mut events = Vec::new();
         for i in 0..4 {
             let event = Event::Metric(Metric {
@@ -378,13 +388,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 2);
         assert_eq!(buffer[0].len(), 6);
@@ -469,8 +473,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_aggregated_counters() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for i in 0..4 {
             let event = Event::Metric(Metric {
@@ -498,13 +500,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 4);
@@ -550,8 +546,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_gauges() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for i in 1..5 {
             let event = Event::Metric(Metric {
@@ -577,13 +571,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 4);
@@ -629,8 +617,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_aggregated_gauges() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for i in 3..6 {
             let event = Event::Metric(Metric {
@@ -672,13 +658,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
         assert_eq!(buffer[0].len(), 5);
@@ -732,8 +712,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_sets() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for i in 0..4 {
             let event = Event::Metric(Metric {
@@ -763,13 +741,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
 
@@ -792,8 +764,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_distributions() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for _ in 2..6 {
             let event = Event::Metric(Metric {
@@ -827,13 +797,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
 
@@ -905,8 +869,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_aggregated_histograms_absolute() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for _ in 2..5 {
             let event = Event::Metric(Metric {
@@ -942,13 +904,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
 
@@ -1000,8 +956,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_aggregated_histograms_incremental() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for _ in 0..3 {
             let event = Event::Metric(Metric {
@@ -1037,13 +991,7 @@ mod test {
             events.push(event);
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
 
@@ -1082,8 +1030,6 @@ mod test {
 
     #[tokio::test]
     async fn metric_buffer_aggregated_summaries() {
-        let (sink, sent_batches) = sink();
-
         let mut events = Vec::new();
         for _ in 0..10 {
             for i in 2..5 {
@@ -1104,13 +1050,7 @@ mod test {
             }
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        let buffer = rebuffer(events).await;
 
         assert_eq!(buffer.len(), 1);
 
