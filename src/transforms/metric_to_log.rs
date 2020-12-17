@@ -84,7 +84,7 @@ impl FunctionTransform for MetricToLog {
 
                     let timestamp = log
                         .remove(&self.timestamp_key)
-                        .and_then(|value| Conversion::Timestamp.convert(value).ok())
+                        .and_then(|value| Conversion::Timestamp.convert(value.into_bytes()).ok())
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
                     log.insert(&log_schema().timestamp_key(), timestamp);
 

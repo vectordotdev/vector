@@ -24,7 +24,7 @@ remap: functions: del: {
 				"field3": 3
 			}
 			source: #"""
-				del(".field1", ".field3")
+				del(.field1, .field3)
 				"""#
 			output: {
 				"field2": 2

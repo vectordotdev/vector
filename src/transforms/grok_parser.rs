@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, PathComponent, PathIter},
+    event::{Event, PathComponent, PathIter, Value},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -8,6 +8,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -114,10 +115,10 @@ impl FunctionTransform for GrokParser {
                 let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
-                    match conv.convert(value.to_string().into()) {
+                    match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value.clone());
+                                event.insert_path(path.to_vec(), value);
                             } else {
                                 let path = PathIter::new(name).collect::<Vec<_>>();
                                 self.paths.insert(name.to_string(), path.clone());
