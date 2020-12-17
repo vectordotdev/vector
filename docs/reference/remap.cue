@@ -199,6 +199,13 @@ remap: {
 				* Strings can be escaped using `\`, as in `The password is \"opensesame\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
+
+				Strings can be concatenated using plus (`+`). Here's an example:
+
+				```
+                $name = "Vector Vic"
+				.message = $name + " is a pretty great mascot" + " (though we're a bit biased)"
+				```
 				"""#
 			use: ["parameter", "return"]
 			examples: [
