@@ -96,7 +96,7 @@ mod tests {
                 value: Literal::from(chrono::Utc::now()).boxed(),
                 format: Literal::from("%s").boxed(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         optional_value {
@@ -104,7 +104,7 @@ mod tests {
                 value: Box::new(Noop),
                 format: Literal::from("%s").boxed(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
     ];
 

@@ -66,8 +66,8 @@ mod tests {
                 IfStatement::new(conditional, true_expression, false_expression)
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -80,8 +80,8 @@ mod tests {
                 IfStatement::new(conditional, true_expression, false_expression)
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean | Kind::Null,
+                ..Default::default()
             },
         }
     ];

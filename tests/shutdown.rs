@@ -242,10 +242,10 @@ fn timely_shutdown_http() {
 }
 
 #[test]
-fn timely_shutdown_logplex() {
+fn timely_shutdown_heroku_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "logplex"
+    type = "heroku_logs"
     address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }

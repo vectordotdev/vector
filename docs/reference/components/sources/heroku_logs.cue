@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: logplex: {
+components: sources: heroku_logs: {
 	_port: 80
 
 	title: "Heroku Logplex"
