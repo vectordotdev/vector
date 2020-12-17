@@ -91,6 +91,14 @@ macro_rules! array {
     })
 }
 
+/// Create a `Literal` expression type.
+#[macro_export]
+macro_rules! lit {
+    ($v:tt) => {
+        $crate::expression::Literal::from($crate::value!($v))
+    };
+}
+
 #[macro_export]
 macro_rules! value {
     ([]) => ({

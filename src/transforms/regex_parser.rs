@@ -115,8 +115,7 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value =
-                                    Value::from(Bytes::from(value[start..end].to_owned()));
+                                let capture = Bytes::from(value[start..end].to_owned());
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),

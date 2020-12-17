@@ -88,6 +88,21 @@
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
+/lib/remap-lang/ @JeanMertz @FungusHumungus
+/lib/remap-cli/ @JeanMertz
+/lib/remap-functions/ @JeanMertz
+/lib/remap-functions/src/assert.rs @FungusHumungus
+/lib/remap-functions/src/compact.rs @FungusHumungus
+/lib/remap-functions/src/exists.rs @FungusHumungus
+/lib/remap-functions/src/flatten.rs @FungusHumungus
+/lib/remap-functions/src/ip_cidr_contains.rs @FungusHumungus
+/lib/remap-functions/src/ip_subnet.rs @FungusHumungus
+/lib/remap-functions/src/ip_to_ipv6.rs @FungusHumungus
+/lib/remap-functions/src/ipv6_to_ipv4.rs @FungusHumungus
+/lib/remap-functions/src/log.rs @FungusHumungus
+/lib/remap-functions/src/merge.rs @FungusHumungus
+/lib/remap-functions/src/parse_grok.rs @FungusHumungus
+
 /proto/ @lukesteensen
 
 /scripts/build-* @hoverbear
@@ -191,17 +206,6 @@
 /src/transforms/tokenzier.rs @lukesteensen
 
 /src/remap/ @JeanMertz
-/src/remap/function/assert.rs @FungusHumungus
-/src/remap/function/compact.rs @FungusHumungus
-/src/remap/function/exists.rs @FungusHumungus
-/src/remap/function/flatten.rs @FungusHumungus
-/src/remap/function/ip_cidr_contains.rs @FungusHumungus
-/src/remap/function/ip_subnet.rs @FungusHumungus
-/src/remap/function/ip_to_ipv6.rs @FungusHumungus
-/src/remap/function/ipv6_to_ipv4.rs @FungusHumungus
-/src/remap/function/log.rs @FungusHumungus
-/src/remap/function/merge.rs @FungusHumungus
-/src/remap/function/parse_grok.rs @FungusHumungus
 
 /src/wasm/ @hoverbear @JeanMertz
 

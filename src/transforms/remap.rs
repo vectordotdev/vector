@@ -55,10 +55,11 @@ impl Remap {
             type_def: TypeDef {
                 fallible: true,
                 kind: value::Kind::all(),
+                ..Default::default()
             },
         };
 
-        let program = Program::new(&config.source, &crate::remap::FUNCTIONS_MUT, Some(accepts))?;
+        let program = Program::new(&config.source, &remap_functions::all(), Some(accepts))?;
 
         Ok(Remap {
             program,
