@@ -154,22 +154,22 @@ mod tests {
     remap::test_type_def![
         value_noop {
             expr: |_| ParseAwsVpcFlowFn::new(Box::new(Noop), None),
-            def: TypeDef { fallible: true, kind: Kind::Map },
+            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         value_non_string {
             expr: |_| ParseAwsVpcFlowFn::new(Literal::from(1).boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map },
+            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         value_string {
             expr: |_| ParseAwsVpcFlowFn::new(Literal::from("foo").boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map },
+            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         format_non_string {
             expr: |_| ParseAwsVpcFlowFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
-            def: TypeDef { fallible: true, kind: Kind::Map },
+            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
     ];
 
