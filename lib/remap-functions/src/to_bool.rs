@@ -115,22 +115,22 @@ mod tests {
 
         string_fallible {
             expr: |_| ToBoolFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToBoolFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         array_fallible {
-            expr: |_| ToBoolFn { value: Array::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            expr: |_| ToBoolFn { value: array![].boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         timestamp_fallible {
             expr: |_| ToBoolFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -138,39 +138,43 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
        fallible_value_with_fallible_default {
             expr: |_| ToBoolFn {
-                value: Array::from(vec![0]).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                value: array![].boxed(),
+                default: Some(array![].boxed()),
             },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
        fallible_value_with_infallible_default {
             expr: |_| ToBoolFn {
-                value: Array::from(vec![0]).boxed(),
+                value: array![].boxed(),
                 default: Some(Literal::from(true).boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
         infallible_value_with_fallible_default {
             expr: |_| ToBoolFn {
                 value: Literal::from(true).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                default: Some(array![].boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -182,6 +186,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
     ];

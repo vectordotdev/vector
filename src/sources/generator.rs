@@ -5,8 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, stream::StreamExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{stream::StreamExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::task::Poll;
 use tokio::time::{interval, Duration};
@@ -96,13 +95,14 @@ impl GeneratorConfig {
                         Event::from(&line[..])
                     }
                 })
-                .collect::<Vec<Event>>();
-            let (sink, _) = out
-                .send_all(iter_ok(events))
-                .compat()
+                .map(Ok)
+                .collect::<Vec<Result<Event, _>>>();
+
+            out.send_all(&mut futures::stream::iter(events))
                 .await
-                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
-            out = sink;
+                .map_err(|_: crate::pipeline::ClosedError| {
+                    error!(message = "Failed to forward events; downstream is closed.");
+                })?;
         }
         Ok(())
     }
@@ -112,8 +112,8 @@ impl GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
-    use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -137,19 +137,13 @@ mod tests {
         .await;
 
         for line in &["one", "two"] {
-            let event = rx.poll().unwrap();
-            match event {
-                Ready(Some(event)) => {
-                    let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
-                    assert_eq!(message, *line);
-                }
-                Ready(None) => panic!("Premature end of input"),
-                NotReady => panic!("Generator was not ready"),
-            }
+            let event = rx.try_recv().unwrap();
+            let log = event.as_log();
+            let message = log[&message_key].to_string_lossy();
+            assert_eq!(message, *line);
         }
 
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -161,9 +155,9 @@ mod tests {
         .await;
 
         for _ in 0..10 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -177,19 +171,13 @@ mod tests {
         .await;
 
         for line in &["1 one", "2 two", "3 one", "4 two"] {
-            let event = rx.poll().unwrap();
-            match event {
-                Ready(Some(event)) => {
-                    let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
-                    assert_eq!(message, *line);
-                }
-                Ready(None) => panic!("Premature end of input"),
-                NotReady => panic!("Generator was not ready"),
-            }
+            let event = rx.try_recv().unwrap();
+            let log = event.as_log();
+            let message = log[&message_key].to_string_lossy();
+            assert_eq!(message, *line);
         }
 
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -203,9 +191,9 @@ mod tests {
         .await;
 
         for _ in 0..6 {
-            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+            assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
     }

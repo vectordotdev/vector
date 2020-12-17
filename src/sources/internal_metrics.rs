@@ -5,8 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
@@ -68,9 +67,8 @@ async fn run(
     out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out = out
-        .sink_map_err(|error| error!(message = "Error sending internal metrics.", %error))
-        .sink_compat();
+    let mut out =
+        out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
     let duration = time::Duration::from_secs(interval);
     let mut interval = time::interval(duration).take_until(shutdown);

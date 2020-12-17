@@ -1,4 +1,3 @@
-use crate::event::Event;
 use snafu::Snafu;
 use warp::http::StatusCode;
 
@@ -40,7 +39,7 @@ pub enum RequestError {
         source
     ))]
     ShuttingDown {
-        source: futures01::sync::mpsc::SendError<Event>,
+        source: crate::pipeline::ClosedError,
         request_id: String,
     },
     #[snafu(display("Unsupported encoding: {}", encoding))]

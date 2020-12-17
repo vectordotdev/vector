@@ -200,7 +200,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_float {
@@ -210,7 +210,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         // TODO(jean): we should update the function to ignore `None` values,
@@ -222,7 +222,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
     ];
 

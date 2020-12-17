@@ -109,7 +109,7 @@ mod tests {
                 value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
         }
 
         fallible_precision {
@@ -117,7 +117,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
-            def: TypeDef { fallible: true, kind: Kind::Integer },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
     ];
 
@@ -150,9 +150,9 @@ mod tests {
             ),
             (
                 map![],
-                Ok(3.1416.into()),
+                Ok(1234.5673.into()),
                 CeilFn::new(
-                    Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
+                    Box::new(Literal::from(Value::Float(1234.56725))),
                     Some(Box::new(Literal::from(4))),
                 ),
             ),

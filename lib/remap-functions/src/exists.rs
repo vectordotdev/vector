@@ -45,6 +45,7 @@ impl Expression for ExistsFn {
         TypeDef {
             fallible: false,
             kind: value::Kind::Boolean,
+            ..Default::default()
         }
     }
 }

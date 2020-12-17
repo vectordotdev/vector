@@ -97,7 +97,7 @@ fn repl(object: Vec<Value>) -> Result<(), Error> {
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
     let state = state::Program::default();
     let mut runtime = Runtime::new(state);
-    let program = Program::new(program, &[], None)?;
+    let program = Program::new(program, &remap_functions::all(), None)?;
 
     runtime.execute(object, &program).map_err(Into::into)
 }

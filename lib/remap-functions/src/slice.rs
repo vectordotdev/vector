@@ -132,16 +132,20 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_array {
             expr: |_| SliceFn {
-                value: Array::from(vec!["foo"]).boxed(),
+                value: array!["foo"].boxed(),
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Array },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+            },
         }
 
         value_unknown {
@@ -150,7 +154,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array },
+            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
         }
     ];
 

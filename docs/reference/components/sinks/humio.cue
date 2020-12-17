@@ -78,6 +78,15 @@ components: sinks: _humio: {
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "The base URL of the Humio instance."
+			required:    false
+			type: string: {
+				default: "https://cloud.humio.com"
+				examples: ["http://127.0.0.1", "http://example.com"]
+			}
+		}
 		event_type: {
 			common:      false
 			description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"

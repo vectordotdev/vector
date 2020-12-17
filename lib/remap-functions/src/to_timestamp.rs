@@ -126,27 +126,47 @@ mod tests {
 
         null_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+                ..Default::default()
+            },
         }
 
         string_fallible {
             expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+                ..Default::default()
+            },
         }
 
         map_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+                ..Default::default()
+            },
         }
 
         array_fallible {
-            expr: |_| ToTimestampFn { value: Array::from(vec![0]).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+            expr: |_| ToTimestampFn { value: array![].boxed(), default: None},
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+                ..Default::default()
+            },
         }
 
         boolean_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+                ..Default::default()
+            },
         }
 
         fallible_value_without_default {
@@ -154,39 +174,43 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
+                ..Default::default()
             },
         }
 
        fallible_value_with_fallible_default {
             expr: |_| ToTimestampFn {
-                value: Array::from(vec![0]).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                value: lit!(null).boxed(),
+                default: Some(lit!(null).boxed()),
             },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
+                ..Default::default()
             },
         }
 
        fallible_value_with_infallible_default {
             expr: |_| ToTimestampFn {
-                value: Array::from(vec![0]).boxed(),
+                value: lit!(null).boxed(),
                 default: Some(Literal::from(1).boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Timestamp,
+                ..Default::default()
             },
         }
 
         infallible_value_with_fallible_default {
             expr: |_| ToTimestampFn {
                 value: Literal::from(1).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                default: Some(lit!(null).boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Timestamp,
+                ..Default::default()
             },
         }
 
@@ -198,6 +222,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Timestamp,
+                ..Default::default()
             },
         }
     ];

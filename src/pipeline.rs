@@ -1,14 +1,25 @@
 use crate::{transforms::FunctionTransform, Event};
-use futures01::{
-    sync::mpsc::{channel, Receiver, SendError, Sender},
-    Async, AsyncSink, Poll, Sink,
-};
-use std::collections::VecDeque;
+use futures::{task::Poll, Sink};
+use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
+use tokio::sync::mpsc;
+
+#[derive(Debug)]
+pub struct ClosedError;
+
+impl fmt::Display for ClosedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Pipeline is closed.")
+    }
+}
+
+impl std::error::Error for ClosedError {}
+
+const MAX_ENQUEUED: usize = 1000;
 
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct Pipeline {
-    inner: Sender<Event>,
+    inner: mpsc::Sender<Event>,
     // We really just keep this around in case we need to rebuild.
     #[derivative(Debug = "ignore")]
     inlines: Vec<Box<dyn FunctionTransform>>,
@@ -16,72 +27,96 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn try_flush(&mut self) -> Poll<(), <Self as Sink>::SinkError> {
+    fn try_flush(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
+        use mpsc::error::TrySendError::*;
+
         while let Some(event) = self.enqueued.pop_front() {
-            if let AsyncSink::NotReady(item) = self.inner.start_send(event)? {
-                self.enqueued.push_front(item);
-                return Ok(Async::NotReady);
+            match self.inner.poll_ready(cx) {
+                Poll::Pending => {
+                    self.enqueued.push_front(event);
+                    return Poll::Pending;
+                }
+                Poll::Ready(Ok(())) => {
+                    // continue to send below
+                }
+                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+            }
+
+            match self.inner.try_send(event) {
+                Ok(()) => {
+                    // we good, keep looping
+                }
+                Err(Full(_item)) => {
+                    // We only try to send after a successful call to poll_ready, which reserves
+                    // space for us in the channel. That makes this branch unreachable as long as
+                    // the channel implementation fulfills its own contract.
+                    panic!("Channel was both ready and full; this is a bug.")
+                }
+                Err(Closed(_item)) => {
+                    return Poll::Ready(Err(ClosedError));
+                }
             }
         }
-        Ok(Async::Ready(()))
+        Poll::Ready(Ok(()))
     }
 }
 
-impl Sink for Pipeline {
-    type SinkItem = Event;
-    type SinkError = SendError<Self::SinkItem>;
+impl Sink<Event> for Pipeline {
+    type Error = ClosedError;
 
-    fn start_send(
-        &mut self,
-        item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        match self.try_flush() {
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
-            Ok(Async::Ready(())) => {
-                // Note how this gets **swapped** with `new_working_set` in the loop.
-                // At the end of the loop, it will only contain finalized events.
-                let mut working_set = vec![item];
-                for inline in self.inlines.iter_mut() {
-                    let mut new_working_set = Vec::with_capacity(working_set.len());
-                    for event in working_set.drain(..) {
-                        inline.transform(&mut new_working_set, event);
-                    }
-                    core::mem::swap(&mut new_working_set, &mut working_set);
-                }
-                self.enqueued.extend(working_set);
-                Ok(AsyncSink::Ready)
-            }
-            Err(e) => Err(e),
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.enqueued.len() < MAX_ENQUEUED {
+            Poll::Ready(Ok(()))
+        } else {
+            self.try_flush(cx)
         }
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        futures01::try_ready!(self.try_flush());
-        debug_assert!(self.enqueued.is_empty());
-        self.inner.poll_complete()
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        // Note how this gets **swapped** with `new_working_set` in the loop.
+        // At the end of the loop, it will only contain finalized events.
+        let mut working_set = vec![item];
+        for inline in self.inlines.iter_mut() {
+            let mut new_working_set = Vec::with_capacity(working_set.len());
+            for event in working_set.drain(..) {
+                inline.transform(&mut new_working_set, event);
+            }
+            core::mem::swap(&mut new_working_set, &mut working_set);
+        }
+        self.enqueued.extend(working_set);
+        Ok(())
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.poll_complete()?;
-        self.inner.close()
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.try_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
     }
 }
 
 impl Pipeline {
     #[cfg(test)]
-    pub fn new_test() -> (Self, Receiver<Event>) {
+    pub fn new_test() -> (Self, mpsc::Receiver<Event>) {
         Self::new_with_buffer(100, vec![])
     }
 
     pub fn new_with_buffer(
         n: usize,
         inlines: Vec<Box<dyn FunctionTransform>>,
-    ) -> (Self, Receiver<Event>) {
-        let (tx, rx) = channel(n);
+    ) -> (Self, mpsc::Receiver<Event>) {
+        let (tx, rx) = mpsc::channel(n);
         (Self::from_sender(tx, inlines), rx)
     }
 
-    pub fn from_sender(inner: Sender<Event>, inlines: Vec<Box<dyn FunctionTransform>>) -> Self {
+    pub fn from_sender(
+        inner: mpsc::Sender<Event>,
+        inlines: Vec<Box<dyn FunctionTransform>>,
+    ) -> Self {
         Self {
             inner,
             inlines,
@@ -90,21 +125,17 @@ impl Pipeline {
             enqueued: VecDeque::with_capacity(10),
         }
     }
-
-    pub fn poll_ready(&mut self) -> Poll<(), SendError<()>> {
-        self.inner.poll_ready()
-    }
 }
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
 mod test {
-    use super::*;
+    use super::Pipeline;
     use crate::{
+        test_util::collect_ready,
         transforms::{add_fields::AddFields, filter::Filter},
         Event, Value,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Stream;
+    use futures::SinkExt;
     use serde_json::json;
     use std::convert::TryFrom;
 
@@ -127,15 +158,15 @@ mod test {
             false,
         )?;
 
-        let (pipeline, reciever) =
+        let (mut pipeline, receiver) =
             Pipeline::new_with_buffer(100, vec![Box::new(transform_1), Box::new(transform_2)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
         }))?;
 
-        pipeline.send(event).compat().await?;
-        let out = reciever.wait().collect::<Result<Vec<_>, ()>>().unwrap();
+        pipeline.send(event).await?;
+        let out = collect_ready(receiver).await;
 
         assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
         assert_eq!(out[0].as_log().get(KEYS[1]), Some(&Value::from(VALS[1])));
@@ -154,14 +185,14 @@ mod test {
             },
         )));
 
-        let (pipeline, reciever) = Pipeline::new_with_buffer(100, vec![Box::new(transform_1)]);
+        let (mut pipeline, receiver) = Pipeline::new_with_buffer(100, vec![Box::new(transform_1)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
         }))?;
 
-        pipeline.send(event).compat().await?;
-        let out = reciever.wait().collect::<Result<Vec<_>, ()>>().unwrap();
+        pipeline.send(event).await?;
+        let out = collect_ready(receiver).await;
 
         assert_eq!(out, vec![]);
 

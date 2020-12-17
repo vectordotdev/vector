@@ -67,7 +67,11 @@ mod tests {
 
         non_string {
             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
         }
     ];
 
