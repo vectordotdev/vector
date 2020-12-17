@@ -89,7 +89,7 @@ mod tests {
                 value: Literal::from("foo").boxed(), // Must be an array, hence fallible
                 item: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
     ];
 
