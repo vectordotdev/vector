@@ -1,5 +1,5 @@
-use crate::types::Conversion;
 use remap::prelude::*;
+use shared::conversion::Conversion;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTimestamp;
@@ -68,19 +68,18 @@ impl Expression for ParseTimestampFn {
         let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
-            Value::Bytes(_) => format
+            Value::Bytes(v) => format
                 .clone()
                 .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?
                 .parse::<Conversion>()
                 .map_err(|e| format!("{}", e))?
-                .convert(value.into())
-                .map(Into::into)
+                .convert(v)
                 .map_err(|e| e.to_string().into()),
             Value::Timestamp(_) => Ok(value),
             _ => Err("unable to convert value to integer".into()),
         };
 
-        super::convert_value_or_default(
+        crate::util::convert_value_or_default(
             self.value.execute(state, object),
             self.default.as_ref().map(|v| v.execute(state, object)),
             to_timestamp,

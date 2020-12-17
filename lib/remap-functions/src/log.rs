@@ -1,4 +1,5 @@
 use remap::prelude::*;
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Log;

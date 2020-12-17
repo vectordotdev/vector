@@ -35,6 +35,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/shared",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -44,10 +45,12 @@ members = [
   "lib/vector-api-client",
   "lib/remap-lang",
   "lib/remap-cli",
+  "lib/remap-functions",
 ]
 
 [dependencies]
 # Internal libs
+shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -117,6 +120,7 @@ tui = { version = "0.13.0", optional = true, default-features = false, features 
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
+remap-functions = { path = "lib/remap-functions" }
 
 # External libs
 derivative = "2.1.1"

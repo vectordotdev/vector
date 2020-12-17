@@ -1,7 +1,5 @@
-pub(crate) mod function;
-
-pub use function::*;
 use lazy_static::lazy_static;
+use remap_functions::*;
 
 lazy_static! {
     // List of immutable functions that can be loaded into a remap-lang program.

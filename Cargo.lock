@@ -5044,6 +5044,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "remap-functions"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes 0.5.6",
+ "chrono",
+ "cidr-utils",
+ "grok",
+ "hex",
+ "lazy_static",
+ "md-5 0.9.1",
+ "regex",
+ "remap-lang",
+ "rust_decimal",
+ "serde_json",
+ "sha-1 0.9.1",
+ "sha2 0.9.2",
+ "sha3",
+ "shared",
+ "strip-ansi-escapes",
+ "syslog_loose",
+ "tracing 0.1.22",
+ "url",
+ "uuid 0.8.1",
+]
+
+[[package]]
 name = "remap-lang"
 version = "0.1.0"
 dependencies = [
@@ -5056,6 +5083,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "regex",
+ "serde",
  "thiserror",
 ]
 
@@ -5839,6 +5867,17 @@ checksum = "7b4921be914e16899a80adefb821f8ddb7974e3f1250223575a44ed994882127"
 dependencies = [
  "lazy_static",
  "loom",
+]
+
+[[package]]
+name = "shared"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.5.6",
+ "chrono",
+ "nom 6.0.1",
+ "snafu",
+ "tracing 0.1.22",
 ]
 
 [[package]]
@@ -7230,6 +7269,7 @@ dependencies = [
  "rand_distr",
  "rdkafka",
  "regex",
+ "remap-functions",
  "remap-lang",
  "reqwest",
  "rlua",
@@ -7256,6 +7296,7 @@ dependencies = [
  "sha-1 0.9.1",
  "sha2 0.9.2",
  "sha3",
+ "shared",
  "smpl_jwt",
  "snafu",
  "snap",

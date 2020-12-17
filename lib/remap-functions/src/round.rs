@@ -1,12 +1,12 @@
-use super::round_to_precision;
+use crate::util::round_to_precision;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Ceil;
+pub struct Round;
 
-impl Function for Ceil {
+impl Function for Round {
     fn identifier(&self) -> &'static str {
-        "ceil"
+        "round"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -28,24 +28,24 @@ impl Function for Ceil {
         let value = arguments.required("value")?.boxed();
         let precision = arguments.optional("precision").map(Expr::boxed);
 
-        Ok(Box::new(CeilFn { value, precision }))
+        Ok(Box::new(RoundFn { value, precision }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct CeilFn {
+struct RoundFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,
 }
 
-impl CeilFn {
+impl RoundFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, precision: Option<Box<dyn Expression>>) -> Self {
         Self { value, precision }
     }
 }
 
-impl Expression for CeilFn {
+impl Expression for RoundFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let precision = match &self.precision {
             Some(expr) => expr.execute(state, object)?.try_integer()?,
@@ -53,7 +53,7 @@ impl Expression for CeilFn {
         };
 
         match self.value.execute(state, object)? {
-            Value::Float(f) => Ok(round_to_precision(f, precision, f64::ceil).into()),
+            Value::Float(f) => Ok(round_to_precision(f, precision, f64::round).into()),
             v @ Value::Integer(_) => Ok(v),
             _ => unreachable!(),
         }
@@ -89,7 +89,7 @@ mod tests {
 
     remap::test_type_def![
         value_float {
-            expr: |_| CeilFn {
+            expr: |_| RoundFn {
                 value: Literal::from(1.0).boxed(),
                 precision: None,
             },
@@ -97,7 +97,7 @@ mod tests {
         }
 
         value_integer {
-            expr: |_| CeilFn {
+            expr: |_| RoundFn {
                 value: Literal::from(1).boxed(),
                 precision: None,
             },
@@ -105,7 +105,7 @@ mod tests {
         }
 
         value_float_or_integer {
-            expr: |_| CeilFn {
+            expr: |_| RoundFn {
                 value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
@@ -113,7 +113,7 @@ mod tests {
         }
 
         fallible_precision {
-            expr: |_| CeilFn {
+            expr: |_| RoundFn {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
@@ -122,43 +122,43 @@ mod tests {
     ];
 
     #[test]
-    fn ceil() {
+    fn round() {
         let cases = vec![
             (
                 map!["foo": 1234.2],
-                Ok(1235.0.into()),
-                CeilFn::new(Box::new(Path::from("foo")), None),
+                Ok(1234.0.into()),
+                RoundFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
                 Ok(1235.0.into()),
-                CeilFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
+                RoundFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
                 map![],
                 Ok(1234.into()),
-                CeilFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
+                RoundFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
                 map![],
                 Ok(1234.4.into()),
-                CeilFn::new(
+                RoundFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
                     Some(Box::new(Literal::from(1))),
                 ),
             ),
             (
                 map![],
-                Ok(3.1416.into()),
-                CeilFn::new(
-                    Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
+                Ok(1234.5679.into()),
+                RoundFn::new(
+                    Box::new(Literal::from(Value::Float(1234.56789))),
                     Some(Box::new(Literal::from(4))),
                 ),
             ),
             (
                 map![],
-                Ok(9876543210123456789098765432101234567890987654321.98766.into()),
-                CeilFn::new(
+                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
+                RoundFn::new(
                     Box::new(Literal::from(
                         9876543210123456789098765432101234567890987654321.987654321,
                     )),
