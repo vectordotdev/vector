@@ -317,47 +317,111 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkContext,
         event::{Metric, MetricValue},
         http::HttpClient,
+        test_util::{random_string, trace_init},
     };
-    use futures::{stream, task::Poll};
+    use chrono::Utc;
     use serde_json::Value;
-    use std::{pin::Pin, task::Context};
-    use tokio::time::Duration;
+    use tokio::{sync::mpsc, time};
+
+    const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
     #[tokio::test]
-    async fn prometheus_scrapes_metrics() {
-        crate::test_util::trace_init();
+    async fn prometheus_metrics() {
+        trace_init();
 
+        prometheus_scrapes_metrics().await;
+        time::delay_for(time::Duration::from_millis(500)).await;
+        reset_on_flush_period().await;
+    }
+
+    async fn prometheus_scrapes_metrics() {
         let start = Utc::now().timestamp();
-        let address = "127.0.0.1:9101";
 
         let config = PrometheusExporterConfig {
-            address: address.parse().unwrap(),
+            address: PROMETHEUS_ADDRESS.parse().unwrap(),
             ..Default::default()
         };
-
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(rx)));
 
-        let (name, events) = make_gauges(123.4, 1);
-        let stream = DeliverEventsAndPause { events };
-        tokio::spawn(sink.run(stream));
+        let (name, event) = create_metric_gauge(None, 123.4);
+        tx.send(event).expect("Failed to send.");
+
         // Wait a bit for the prometheus server to scrape the metrics
-        tokio::time::delay_for(Duration::from_secs(2)).await;
+        time::delay_for(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
 
         let data = &result["data"]["result"][0];
         assert_eq!(data["metric"]["__name__"], Value::String(name));
-        assert_eq!(data["metric"]["instance"], Value::String(address.into()));
+        assert_eq!(
+            data["metric"]["instance"],
+            Value::String(PROMETHEUS_ADDRESS.into())
+        );
         assert_eq!(
             data["metric"]["some_tag"],
             Value::String("some_value".into())
         );
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
+    }
+
+    async fn reset_on_flush_period() {
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            flush_period_secs: 3,
+            ..Default::default()
+        };
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(rx)));
+
+        let (name1, event) = create_metric_set(None, vec!["0", "1", "2"]);
+        tx.send(event).expect("Failed to send.");
+        let (name2, event) = create_metric_set(None, vec!["3", "4", "5"]);
+        tx.send(event).expect("Failed to send.");
+
+        // Wait a bit for the prometheus server to scrape the metrics
+        time::delay_for(time::Duration::from_secs(2)).await;
+
+        // Now try to download them from prometheus
+        let result = prometheus_query(&name1).await;
+        assert_eq!(
+            result["data"]["result"][0]["value"][1],
+            Value::String("3".into())
+        );
+        let result = prometheus_query(&name2).await;
+        assert_eq!(
+            result["data"]["result"][0]["value"][1],
+            Value::String("3".into())
+        );
+
+        // Wait a bit for expired metrics
+        time::delay_for(time::Duration::from_secs(3)).await;
+
+        let (name1, event) = create_metric_set(Some(name1), vec!["6", "7"]);
+        tx.send(event).expect("Failed to send.");
+        let (name2, event) = create_metric_set(Some(name2), vec!["8", "9"]);
+        tx.send(event).expect("Failed to send.");
+
+        // Wait a bit for the prometheus server to scrape the metrics
+        time::delay_for(time::Duration::from_secs(2)).await;
+
+        // Now try to download them from prometheus
+        let result = prometheus_query(&name1).await;
+        assert_eq!(
+            result["data"]["result"][0]["value"][1],
+            Value::String("2".into())
+        );
+        let result = prometheus_query(&name2).await;
+        assert_eq!(
+            result["data"]["result"][0]["value"][1],
+            Value::String("2".into())
+        );
     }
 
     async fn prometheus_query(query: &str) -> Value {
@@ -375,44 +439,38 @@ mod integration_tests {
         let result = hyper::body::to_bytes(result.into_body())
             .await
             .expect("Error fetching body");
-        let result = String::from_utf8_lossy(&result).into_owned();
-        serde_json::from_str(&result).expect("Invalid JSON from prometheus")
+        let result = String::from_utf8_lossy(&result);
+        serde_json::from_str(result.as_ref()).expect("Invalid JSON from prometheus")
     }
 
-    #[pin_project::pin_project]
-    struct DeliverEventsAndPause<I> {
-        events: I,
+    fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
+        create_metric(name, MetricValue::Gauge { value })
     }
 
-    impl<I: Iterator<Item = Event>> stream::Stream for DeliverEventsAndPause<I> {
-        type Item = Event;
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            let this = self.project();
-            match this.events.next() {
-                Some(event) => Poll::Ready(Some(event)),
-                None => Poll::Pending,
-            }
+    fn create_metric_set(name: Option<String>, values: Vec<&'static str>) -> (String, Event) {
+        create_metric(
+            name,
+            MetricValue::Set {
+                values: values.into_iter().map(Into::into).collect(),
+            },
+        )
+    }
+
+    fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
+        let event = Metric {
+            name: name.clone(),
+            namespace: None,
+            timestamp: None,
+            tags: Some(
+                vec![("some_tag".to_owned(), "some_value".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+            kind: MetricKind::Incremental,
+            value,
         }
-    }
-
-    fn make_gauges(value: f64, count: usize) -> (String, impl Iterator<Item = Event>) {
-        let name = format!("gauge_{}", crate::test_util::random_string(16));
-        let name2 = name.clone();
-        let events = (0..count).map(move |_| {
-            Metric {
-                name: name2.clone(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![("some_tag".into(), "some_value".into())]
-                        .into_iter()
-                        .collect(),
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }
-            .into()
-        });
-        (name, events)
+        .into();
+        (name, event)
     }
 }
