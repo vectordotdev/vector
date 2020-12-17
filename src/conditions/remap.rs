@@ -29,8 +29,18 @@ impl ConditionConfig for RemapConfig {
             },
         };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, Some(constraint))
-            .map_err(|e| e.to_string())?;
+        // Filter out functions that directly mutate the event.
+        //
+        // TODO(jean): expose this as a method on the `Function` trait, so we
+        // don't need to do this manually.
+        let functions = remap_functions::all()
+            .into_iter()
+            .filter(|f| f.identifier() != "del")
+            .filter(|f| f.identifier() != "only_fields")
+            .collect::<Vec<_>>();
+
+        let program =
+            Program::new(&self.source, &functions, Some(constraint)).map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }

@@ -989,10 +989,16 @@ impl Value {
             match rest.first() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
-                None => {
-                    map.insert(key, new);
-                    return *self = map.into();
-                }
+                None => match self {
+                    Value::Map(map) => {
+                        map.insert(key, new);
+                        return;
+                    }
+                    _ => {
+                        map.insert(key, new);
+                        return *self = map.into();
+                    }
+                },
                 // If there are more segments to traverse, insert an empty map
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.

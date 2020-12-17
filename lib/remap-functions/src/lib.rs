@@ -195,3 +195,104 @@ pub use truncate::Truncate;
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
+
+pub fn all() -> Vec<Box<dyn remap::Function>> {
+    vec![
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
+        #[cfg(feature = "assert")]
+        Box::new(Assert),
+        #[cfg(feature = "ceil")]
+        Box::new(Ceil),
+        #[cfg(feature = "compact")]
+        Box::new(Compact),
+        #[cfg(feature = "contains")]
+        Box::new(Contains),
+        #[cfg(feature = "del")]
+        Box::new(Del),
+        #[cfg(feature = "downcase")]
+        Box::new(Downcase),
+        #[cfg(feature = "ends_with")]
+        Box::new(EndsWith),
+        #[cfg(feature = "exists")]
+        Box::new(Exists),
+        #[cfg(feature = "flatten")]
+        Box::new(Flatten),
+        #[cfg(feature = "floor")]
+        Box::new(Floor),
+        #[cfg(feature = "format_number")]
+        Box::new(FormatNumber),
+        #[cfg(feature = "format_timestamp")]
+        Box::new(FormatTimestamp),
+        #[cfg(feature = "ip_cidr_contains")]
+        Box::new(IpCidrContains),
+        #[cfg(feature = "ip_subnet")]
+        Box::new(IpSubnet),
+        #[cfg(feature = "ip_to_ipv6")]
+        Box::new(IpToIpv6),
+        #[cfg(feature = "ipv6_to_ipv4")]
+        Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "log")]
+        Box::new(Log),
+        #[cfg(feature = "merge")]
+        Box::new(Merge),
+        #[cfg(feature = "now")]
+        Box::new(Now),
+        #[cfg(feature = "only_fields")]
+        Box::new(OnlyFields),
+        #[cfg(feature = "parse_duration")]
+        Box::new(ParseDuration),
+        #[cfg(feature = "parse_grok")]
+        Box::new(ParseGrok),
+        #[cfg(feature = "parse_json")]
+        Box::new(ParseJson),
+        #[cfg(feature = "parse_syslog")]
+        Box::new(ParseSyslog),
+        #[cfg(feature = "parse_timestamp")]
+        Box::new(ParseTimestamp),
+        #[cfg(feature = "parse_url")]
+        Box::new(ParseUrl),
+        #[cfg(feature = "match")]
+        Box::new(Match),
+        #[cfg(feature = "redact")]
+        Box::new(Redact),
+        #[cfg(feature = "replace")]
+        Box::new(Replace),
+        #[cfg(feature = "round")]
+        Box::new(Round),
+        #[cfg(feature = "sha2")]
+        Box::new(Sha2),
+        #[cfg(feature = "sha3")]
+        Box::new(Sha3),
+        #[cfg(feature = "slice")]
+        Box::new(Slice),
+        #[cfg(feature = "split")]
+        Box::new(Split),
+        #[cfg(feature = "starts_with")]
+        Box::new(StartsWith),
+        #[cfg(feature = "strip_ansi_escape_codes")]
+        Box::new(StripAnsiEscapeCodes),
+        #[cfg(feature = "strip_whitespace")]
+        Box::new(StripWhitespace),
+        #[cfg(feature = "to_bool")]
+        Box::new(ToBool),
+        #[cfg(feature = "to_float")]
+        Box::new(ToFloat),
+        #[cfg(feature = "to_int")]
+        Box::new(ToInt),
+        #[cfg(feature = "to_string")]
+        Box::new(ToString),
+        #[cfg(feature = "to_timestamp")]
+        Box::new(ToTimestamp),
+        #[cfg(feature = "tokenize")]
+        Box::new(Tokenize),
+        #[cfg(feature = "truncate")]
+        Box::new(Truncate),
+        #[cfg(feature = "upcase")]
+        Box::new(Upcase),
+        #[cfg(feature = "uuid_v4")]
+        Box::new(UuidV4),
+    ]
+}
