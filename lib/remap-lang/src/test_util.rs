@@ -60,7 +60,9 @@ macro_rules! test_function {
             let mut state = $crate::state::Program::default();
             let mut object: $crate::Value = ::std::collections::BTreeMap::default().into();
 
-            let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
+            let got = expression.execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
             assert_eq!(got, want);
         }
         )+}

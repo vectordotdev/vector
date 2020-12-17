@@ -56,6 +56,7 @@ default = [
     "md5",
     "merge",
     "now",
+    "ok",
     "only_fields",
     "parse_aws_alb_log",
     "parse_duration",
@@ -107,6 +108,7 @@ match = []
 md5 = ["md-5", "hex"]
 merge = []
 now = []
+ok = []
 only_fields = []
 parse_aws_alb_log = ["nom"]
 parse_duration = []
