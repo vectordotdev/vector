@@ -63,10 +63,4 @@ ignore = [
     # Solution: Upgrade to >=0.4.0
     # futures-intrusive v0.3.1
     "RUSTSEC-2020-0072",
-
-    # ordered_float:NotNan may contain NaN after panic in assignment operators
-    # Solution: Upgrade to >=1.1.1, <2.0.0 OR >=2.0.1
-    # ordered-float v2.0.0
-    # ordered-float - can be removed when heim next releases their beta branch
-    "RUSTSEC-2020-0082",
 ]
