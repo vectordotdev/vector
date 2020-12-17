@@ -3,7 +3,7 @@
 use crate::{
     expression::{
         self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not,
-        Path, Target, Variable,
+        Path, Target, TargetResult, Variable,
     },
     path, state, Error as E, Expr, Expression, Function as Fn, Operator, Result, Value,
 };
@@ -219,20 +219,45 @@ impl<'a> Parser<'a> {
     /// on the parser rule being processed.
     fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
-            R::variable => self.variable_from_pair(pair).and_then(|variable| {
-                if let Some(path) = variable.path() {
-                    return Err(Error::VariableAssignmentPath(
-                        variable.ident().to_owned(),
-                        path.to_string(),
-                    )
-                    .into());
-                }
-
-                Ok(Target::Variable(variable))
-            }),
-            R::path => Ok(Target::Path(Path::new(self.path_from_pair(pair)?))),
+            R::variable => self.target_variable_from_pair(pair),
+            R::path => self.target_path_from_pair(pair),
+            R::result => self.target_result_from_pair(pair),
             _ => Err(e(R::target)),
         }
+    }
+
+    fn target_variable_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+        self.variable_from_pair(pair).and_then(|variable| {
+            if let Some(path) = variable.path() {
+                return Err(Error::VariableAssignmentPath(
+                    variable.ident().to_owned(),
+                    path.to_string(),
+                )
+                .into());
+            }
+
+            Ok(Target::Variable(variable))
+        })
+    }
+
+    fn target_path_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+        Ok(Target::Path(Path::new(self.path_from_pair(pair)?)))
+    }
+
+    fn target_result_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+        let s = pair.as_str();
+
+        let variant = match s {
+            _ if s.starts_with("result") => TargetResult::Either,
+            _ if s.starts_with("ok") => TargetResult::Ok,
+            _ if s.starts_with("err") => TargetResult::Err,
+            _ => return Err(e(R::result)),
+        };
+
+        let inner = pair.into_inner().next().ok_or(e(R::result))?;
+        let target = Box::new(self.target_from_pair(inner)?);
+
+        Ok(Target::Result { variant, target })
     }
 
     /// Parse block expressions.

@@ -281,6 +281,56 @@ mod tests {
                     "g": r#"{"1": Integer(1), "true": Boolean(true)}"#,
                 })),
             ),
+            (
+                r#"ok($foo) = 4 / "invalid""#,
+                Ok(()),
+                Ok(value!(false)),
+            ),
+            (
+                r#"ok($foo) = 4 / "invalid"; $foo"#,
+                Ok(()),
+                Ok(value!(null)),
+            ),
+            (
+                r#"ok($foo) = 4 / 2"#,
+                Ok(()),
+                Ok(value!(true)),
+            ),
+            (
+                r#"ok($foo) = 4 / 2; $foo"#,
+                Ok(()),
+                Ok(value!(2.0)),
+            ),
+            (
+                r#"err($foo) = 4 / 2"#,
+                Ok(()),
+                Ok(value!(false)),
+            ),
+            (
+                r#"err($foo) = 4 / 2; $foo"#,
+                Ok(()),
+                Ok(value!(null)), // TODO: fix error message in tests
+            ),
+            (
+                r#"result($foo) = 4 / "invalid""#,
+                Ok(()),
+                Ok(value!(false)),
+            ),
+            (
+                r#"result($foo) = 4 / "invalid"; $foo"#,
+                Ok(()),
+                Ok(value!("value error")),
+            ),
+            (
+                r#"result($foo) = 4 / 2"#,
+                Ok(()),
+                Ok(value!(true)),
+            ),
+            (
+                r#"result($foo) = 4 / 2; $foo"#,
+                Ok(()),
+                Ok(value!(2.0)),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

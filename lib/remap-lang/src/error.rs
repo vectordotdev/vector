@@ -114,6 +114,7 @@ impl fmt::Display for Rule {
             regex_char,
             regex_flags,
             regex_inner,
+            result,
             rule_ident,
             rule_path,
             rule_string_inner,

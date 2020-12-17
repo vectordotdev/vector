@@ -84,7 +84,9 @@ regex_flags =  { ("i" | "x" | "m")* }
 // Other ----------------------------------------------------------------------
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
-target = _{ variable | path }
+target = _{ variable | path | result }
+result = ${ ("ok" | "err" | "result") ~ "(" ~ (variable | path) ~ ")" }
+
 block  =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }

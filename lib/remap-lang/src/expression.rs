@@ -19,7 +19,7 @@ mod variable;
 pub use argument::Argument;
 pub use arithmetic::Arithmetic;
 pub use array::Array;
-pub use assignment::{Assignment, Target};
+pub use assignment::{Assignment, Target, TargetResult};
 pub use block::Block;
 pub use function::Function;
 pub use if_statement::IfStatement;
