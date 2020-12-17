@@ -9,7 +9,7 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
@@ -125,7 +125,11 @@ pub(self) fn parse_event(line: &str) -> Option<Event> {
     }
 }
 
-async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
+async fn statsd_udp(
+    config: UdpConfig,
+    shutdown: ShutdownSignal,
+    mut out: Pipeline,
+) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
@@ -137,7 +141,6 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
     );
 
     let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
-    let mut out = out.sink_compat();
     while let Some(frame) = stream.next().await {
         match frame {
             Ok((bytes, _sock)) => {

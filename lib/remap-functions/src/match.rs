@@ -62,6 +62,7 @@ impl Expression for MatchFn {
 }
 
 #[cfg(test)]
+#[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
     use crate::map;

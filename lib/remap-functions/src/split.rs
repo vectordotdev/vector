@@ -109,6 +109,7 @@ impl Expression for SplitFn {
 }
 
 #[cfg(test)]
+#[allow(clippy::trivial_regex)]
 mod test {
     use super::*;
 

@@ -14,6 +14,8 @@ use futures::{
 };
 use futures01::sync::mpsc;
 
+#[cfg(feature = "sources-host_metrics")]
+use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
 #[cfg(feature = "api")]
@@ -125,6 +127,9 @@ impl Application {
                 };
 
                 info!(message = "Log level is enabled.", level = ?level);
+
+                #[cfg(feature = "sources-host_metrics")]
+                host_metrics::init_roots();
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 

@@ -147,6 +147,7 @@ impl Expression for ReplaceFn {
 }
 
 #[cfg(test)]
+#[allow(clippy::trivial_regex)]
 mod test {
     use super::*;
     use crate::map;
