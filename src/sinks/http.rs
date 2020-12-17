@@ -310,6 +310,7 @@ mod tests {
             util::{http::HttpSink, test::build_test_server},
         },
         test_util::{next_addr, random_lines_with_stream},
+        log_event,
     };
     use bytes::buf::BufExt;
     use flate2::read::GzDecoder;
@@ -327,7 +328,10 @@ mod tests {
     #[test]
     fn http_encode_event_text() {
         let encoding = EncodingConfig::from(Encoding::Text);
-        let event = Event::from("hello world");
+        let event = log_event! {
+                crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
 
         let mut config = default_config(Encoding::Text);
         config.encoding = encoding;
@@ -339,7 +343,10 @@ mod tests {
     #[test]
     fn http_encode_event_json() {
         let encoding = EncodingConfig::from(Encoding::Ndjson);
-        let event = Event::from("hello world");
+        let event = log_event! {
+                crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;

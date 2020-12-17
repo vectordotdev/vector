@@ -169,7 +169,7 @@ impl<'a> FromLua<'a> for Metric {
                 statistic: distribution.get("statistic")?,
             }
         } else if let Some(aggregated_histogram) =
-        table.get::<_, Option<LuaTable>>("aggregated_histogram")?
+            table.get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
             let counts: Vec<u32> = aggregated_histogram.get("counts")?;
             let count = counts.iter().sum();
@@ -180,7 +180,7 @@ impl<'a> FromLua<'a> for Metric {
                 sum: aggregated_histogram.get("sum")?,
             }
         } else if let Some(aggregated_summary) =
-        table.get::<_, Option<LuaTable>>("aggregated_summary")?
+            table.get::<_, Option<LuaTable>>("aggregated_summary")?
         {
             MetricValue::AggregatedSummary {
                 quantiles: aggregated_summary.get("quantiles")?,

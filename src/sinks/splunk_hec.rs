@@ -299,8 +299,7 @@ fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
+    use crate::{log_event, event::Event, sinks::util::{http::HttpSink, test::load_sink}};
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
@@ -327,7 +326,10 @@ mod tests {
 
     #[test]
     fn splunk_encode_event_json() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         event
             .as_mut_log()
@@ -382,7 +384,10 @@ mod tests {
 
     #[test]
     fn splunk_encode_event_text() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
@@ -448,6 +453,7 @@ mod integration_tests {
         sinks,
         test_util::{random_lines_with_stream, random_string},
         Event,
+        log_event,
     };
     use futures::stream;
     use serde_json::Value as JsonValue;
@@ -482,7 +488,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -501,7 +510,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -518,7 +530,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -537,7 +552,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(String::from("index_name"), "custom_index");
@@ -588,7 +606,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
 
@@ -608,7 +629,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         event
             .as_mut_log()
@@ -635,7 +659,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
 
@@ -660,7 +687,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         event
             .as_mut_log()

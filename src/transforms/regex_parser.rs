@@ -192,9 +192,9 @@ impl RegexParser {
                 .collect(),
             &names.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
         )?
-            .into_iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect();
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
 
         Ok(Transform::function(RegexParser::new(
             regexset,
@@ -315,8 +315,11 @@ impl FunctionTransform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::{LogEvent, Lookup, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::TransformConfig,
+        event::{Event, LogEvent, Lookup, Value},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {
@@ -324,7 +327,10 @@ mod tests {
     }
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
-        let event = Event::from(event);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => event.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"
                 patterns = {}

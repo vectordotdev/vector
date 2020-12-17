@@ -307,6 +307,7 @@ mod tests {
         event::Event,
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines, trace_init},
+        log_event,
     };
     use futures::{stream, StreamExt};
     use serde_json::json;
@@ -328,7 +329,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut event1 = Event::from("hello world");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("app"), "notvector");
@@ -336,14 +340,23 @@ mod tests {
             .as_mut_log()
             .insert(LookupBuf::from("magic"), "vector");
 
-        let mut event2 = Event::from("hello world");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("file"), "log.txt");
 
-        let event3 = Event::from("hello world");
+        let event3 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
-        let mut event4 = Event::from("hello world");
+        let mut event4 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event4
             .as_mut_log()
             .insert(LookupBuf::from("env"), "staging");
@@ -401,7 +414,10 @@ mod tests {
         // Create 10 events where the first one contains custom
         // fields that are not just `message`.
         for (i, line) in lines.iter().enumerate() {
-            let mut event = Event::from(line.as_str());
+            let mut event = log_event! {
+                crate::config::log_schema().message_key().clone() => line.to_string(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             let p = i % 2;
             event
                 .as_mut_log()

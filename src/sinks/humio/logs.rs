@@ -97,7 +97,7 @@ impl HumioLogsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::{event::Event, log_event};
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
@@ -114,7 +114,10 @@ mod tests {
 
     #[test]
     fn humio_valid_time_field() {
-        let event = Event::from("hello world");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         let (config, _cx) = load_sink::<HumioLogsConfig>(
             r#"
@@ -147,6 +150,7 @@ mod integration_tests {
         sinks::util::Compression,
         test_util::random_string,
         Event,
+        log_event,
     };
     use chrono::Utc;
     use futures::stream;
@@ -168,7 +172,10 @@ mod integration_tests {
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let log = event.as_mut_log();
         log.insert(log_schema().host_key().clone(), host.clone());
 
@@ -207,7 +214,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
@@ -234,7 +244,10 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let mut event = Event::from(message.clone());
+            let mut event = log_event! {
+                crate::config::log_schema().message_key().clone() => message.clone(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             // Humio expects to find an @timestamp field for JSON lines
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
             event
@@ -262,7 +275,10 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let event = Event::from(message.clone());
+            let event = log_event! {
+                crate::config::log_schema().message_key().clone() => message.clone(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
 
             sink.run(stream::once(ready(event))).await.unwrap();
 

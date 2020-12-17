@@ -1,6 +1,7 @@
 use crate::{
     event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
+    log_event,
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -71,7 +72,10 @@ pub fn udp(
                     // and stretch to end of payload.
                     let mut decoder = BytesDelimitedCodec::new(b'\n');
                     while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                        let mut event = Event::from(line);
+                        let mut event = log_event! {
+                            crate::config::log_schema().message_key().clone() => line,
+                            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        };
 
                         event
                             .as_mut_log()

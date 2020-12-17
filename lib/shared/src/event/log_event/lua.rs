@@ -1,5 +1,5 @@
-use rlua::prelude::{ToLua, LuaContext, LuaResult, LuaError, LuaValue, FromLua};
 use crate::{event::*, lookup::*};
+use rlua::prelude::{FromLua, LuaContext, LuaError, LuaResult, LuaValue, ToLua};
 
 impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {

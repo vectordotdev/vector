@@ -318,7 +318,7 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Event, test_util::random_string};
+    use crate::{log_event, event::Event, test_util::random_string};
     use std::collections::BTreeMap;
 
     #[test]
@@ -329,7 +329,10 @@ mod tests {
     #[test]
     fn kinesis_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &None, &Encoding::Text.into()).unwrap();
+        let event = encode_event(log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }, &None, &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -337,7 +340,10 @@ mod tests {
     #[test]
     fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 
@@ -349,7 +355,10 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_custom_partition_key() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("key"), "some_key");
@@ -361,7 +370,10 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_custom_partition_key_limit() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("key"), random_string(300));
@@ -373,7 +385,10 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_apply_rules() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("key"), "some_key");

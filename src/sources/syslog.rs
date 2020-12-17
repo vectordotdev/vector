@@ -8,6 +8,7 @@ use crate::{
     },
     event::{Event, LookupBuf, SegmentBuf, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
+    log_event,
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -355,7 +356,10 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) -> Option<Event> {
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
-    let mut event = Event::from(&parsed.msg[..]);
+    let mut event = log_event! {
+        crate::config::log_schema().message_key().clone() => parsed.msg[..].to_string(),
+        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+    };
 
     // Add source type
     event.as_mut_log().insert(

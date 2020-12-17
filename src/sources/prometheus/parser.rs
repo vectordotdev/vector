@@ -1,5 +1,5 @@
-use shared::event::metric::{Metric, MetricKind, MetricValue};
 use indexmap::IndexMap;
+use shared::event::metric::{Metric, MetricKind, MetricValue};
 use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
@@ -162,8 +162,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 #[cfg(test)]
 mod test {
     use super::parse;
-    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use pretty_assertions::assert_eq;
+    use shared::event::metric::{Metric, MetricKind, MetricValue};
 
     macro_rules! map {
         ($($key:expr => $value:expr),*) => {

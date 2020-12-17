@@ -270,6 +270,7 @@ mod integration_tests {
         event::{Event, LookupBuf},
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
+        log_event,
     };
     use futures::{future, stream};
     use serde_json::Value;
@@ -314,7 +315,10 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");
@@ -365,7 +369,10 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");
@@ -426,7 +433,10 @@ timestamp_format = "unix""#,
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");
@@ -482,7 +492,10 @@ timestamp_format = "unix""#,
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");
@@ -528,7 +541,10 @@ timestamp_format = "unix""#,
         };
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");

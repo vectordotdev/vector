@@ -2,6 +2,7 @@ use super::query_value::QueryValue;
 use super::Function;
 use crate::{
     event::{Event, Value},
+    log_event,
     mapping::Result,
 };
 use bytes::BytesMut;
@@ -245,7 +246,10 @@ mod tests {
     fn check_compare_query() {
         let cases = vec![
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Integer(15)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(5))),
@@ -254,7 +258,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("unable to multiply left-hand field type Boolean(true)".into()),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Boolean(true))),
@@ -264,7 +271,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from("foo"), Value::Integer(5));
@@ -281,7 +291,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("unable to divide right-hand field type Boolean(true)".into()),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(3))),
@@ -290,7 +303,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("arithmetic can not be performed with regex".to_string()),
                 Arithmetic::new(
                     Box::new(Literal::from(QueryValue::Regex(
@@ -303,7 +319,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Integer(1)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(13))),
@@ -312,7 +331,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Integer(17)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(13))),
@@ -321,7 +343,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::from("foobar")),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::from("foo"))),
@@ -330,7 +355,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Float(17.0)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Float(20.0))),
@@ -339,7 +367,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Float(20.0))),
@@ -348,7 +379,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(19))),
@@ -357,7 +391,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Float(21.0))),
@@ -366,7 +403,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Float(18.0))),
@@ -375,7 +415,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(17))),
@@ -384,7 +427,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
@@ -393,7 +439,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
@@ -402,7 +451,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Integer(18))),
@@ -411,7 +463,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Boolean(true))),
@@ -420,7 +475,10 @@ mod tests {
                 ),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
                     Box::new(Literal::from(Value::Boolean(true))),

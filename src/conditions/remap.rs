@@ -113,37 +113,42 @@ mod test {
     fn check_remap() {
         let checks = vec![
             (
-                log_event![],   // event
+                log_event!{},   // event
                 "true == true", // source
                 Ok(()),         // build result
                 Ok(()),         // check result
             ),
             (
-                log_event![LookupBuf::from("foo") => true, LookupBuf::from("bar") => false],
+                log_event! {
+                    LookupBuf::from("foo") => true,
+                    LookupBuf::from("bar") => false
+                },
                 "to_bool(.bar || .foo)",
                 Ok(()),
                 Ok(()),
             ),
             (
-                log_event![],
+                log_event!{},
                 "true == false",
                 Ok(()),
                 Err("source execution resolved to false"),
             ),
             (
-                log_event![],
+                log_event!{},
                 "null",
                 Err("remap error: program error: expected to resolve to an error, or boolean value, but instead resolves to null value"),
                 Ok(()),
             ),
             (
-                log_event![LookupBuf::from("foo") => "string"],
+                log_event! {
+                    LookupBuf::from("foo") => "string".to_string(),
+                },
                 ".foo",
                 Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
             (
-                log_event![],
+                log_event!{},
                 ".",
                 Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),

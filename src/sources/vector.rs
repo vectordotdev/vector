@@ -131,11 +131,11 @@ mod test {
             metric::{MetricKind, MetricValue},
             Metric,
         },
+        log_event,
         sinks::vector::VectorSinkConfig,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
-        log_event,
     };
     use futures::stream;
     use std::net::SocketAddr;

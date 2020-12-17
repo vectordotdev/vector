@@ -4,6 +4,7 @@ use crate::{
     event::{Event, LookupBuf},
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
+    log_event,
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
     Pipeline,
@@ -306,7 +307,10 @@ fn create_event<'a>(
         byte_size: line.len(),
     });
 
-    let mut event = Event::from(line);
+    let mut event = log_event! {
+        crate::config::log_schema().message_key().clone() => line,
+        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+    };
 
     // Add source type
     event

@@ -312,7 +312,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LookupBuf;
+    use crate::{event::LookupBuf, log_event};
     use std::collections::HashMap;
 
     #[test]
@@ -323,7 +323,10 @@ mod tests {
     #[test]
     fn pulsar_event_json() {
         let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg.clone());
+        let mut evt = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json), &None).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
@@ -333,7 +336,10 @@ mod tests {
     #[test]
     fn pulsar_event_text() {
         let msg = "hello_world".to_owned();
-        let evt = Event::from(msg.clone());
+        let evt = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let event = encode_event(evt, &EncodingConfig::from(Encoding::Text), &None).unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
@@ -352,7 +358,10 @@ mod tests {
         "#;
 
         let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg);
+        let mut evt = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
         let mut encoding = EncodingConfig::from(Encoding::Avro);
         encoding.schema = Some(raw_schema.to_string());
@@ -370,7 +379,10 @@ mod tests {
     fn pulsar_encode_event() {
         let msg = "hello_world";
 
-        let mut evt = Event::from(msg);
+        let mut evt = log_event! {
+            crate::config::log_schema().message_key().clone() => msg,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let event = encode_event(

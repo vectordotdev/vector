@@ -283,13 +283,16 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LookupBuf;
+    use crate::{event::LookupBuf, log_event};
     use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into(), None).unwrap();
+        let event = encode_event(log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }, &Encoding::Text.into(), None).unwrap();
 
         assert_eq!(&event.message_body, &message);
     }
@@ -297,7 +300,10 @@ mod tests {
     #[test]
     fn sqs_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 

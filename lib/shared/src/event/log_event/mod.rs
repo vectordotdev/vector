@@ -10,7 +10,7 @@ use std::{
     fmt::Debug,
     iter::FromIterator,
 };
-use tracing::{instrument, trace_span, trace, error};
+use tracing::{error, instrument, trace, trace_span};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -733,8 +733,8 @@ where
 mod test {
     use super::*;
     use serde_json::json;
-    use tracing::trace;
     use test_env_log::test;
+    use tracing::trace;
 
     mod insert_get_remove {
         use super::*;
@@ -991,7 +991,6 @@ mod test {
         // Prune on deeply nested values is tested in `value.rs`, but we must test root values here.
         #[test_env_log::test]
         fn pruning() -> crate::Result<()> {
-
             let mut event = crate::log_event! {
                 LookupBuf::from("foo.bar.baz") => 1,
             }

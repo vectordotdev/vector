@@ -40,9 +40,9 @@ impl TransformConfig for LogfmtConfig {
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
         )?
-            .into_iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect();
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
 
         Ok(Transform::function(Logfmt {
             field,
@@ -121,7 +121,7 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Lookup, Value},
-        Event,
+        log_event, Event,
     };
 
     #[test]
@@ -130,7 +130,10 @@ mod tests {
     }
 
     async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
-        let event = Event::from(text);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => text.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         let mut parser = LogfmtConfig {
             field: None,

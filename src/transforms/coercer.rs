@@ -104,7 +104,11 @@ impl FunctionTransform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{log_event, event::{LogEvent, Lookup, LookupBuf, Value}, config::TransformConfig, Event};
+    use crate::{
+        config::TransformConfig,
+        event::{LogEvent, Lookup, LookupBuf, Value},
+        log_event, Event,
+    };
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -122,7 +126,9 @@ mod tests {
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert(LookupBuf::from(key), value.to_string());
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from(key), value.to_string());
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(&format!(

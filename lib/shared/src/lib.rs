@@ -5,9 +5,9 @@ pub mod conversion;
 pub mod tokenize;
 
 #[cfg(feature = "event")]
-pub mod lookup;
-#[cfg(feature = "event")]
 pub mod event;
+#[cfg(feature = "event")]
+pub mod lookup;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

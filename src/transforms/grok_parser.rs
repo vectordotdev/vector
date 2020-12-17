@@ -160,7 +160,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, TransformConfig},
-        event::{LogEvent, Value, Event},
+        event::{Event, LogEvent, Value},
         log_event,
     };
     use pretty_assertions::assert_eq;
@@ -179,7 +179,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => event,
+            crate::config::log_schema().message_key().clone() => event.to_string(),
             crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
         };
         let mut parser = GrokParserConfig {

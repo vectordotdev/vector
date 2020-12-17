@@ -2,6 +2,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    log_event,
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -41,11 +42,15 @@ impl TransformConfig for TokenizerConfig {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
-            &self.field_names.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
+            &self
+                .field_names
+                .iter()
+                .map(|k| k.to_string())
+                .collect::<Vec<_>>(),
         )?
-            .into_iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect();
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
 
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
@@ -150,7 +155,10 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let event = Event::from(text);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => text.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let field_names = fields
             .split(' ')
             .map(|s| LookupBuf::from_str(s).unwrap_or_else(|_| LookupBuf::from(s)))

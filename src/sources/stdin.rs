@@ -2,6 +2,7 @@ use crate::{
     config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LookupBuf},
     internal_events::{StdinEventReceived, StdinReadFailed},
+    log_event,
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -116,7 +117,10 @@ where
 }
 
 fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = log_event! {
+        crate::config::log_schema().message_key().clone() => line,
+        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+    };
 
     // Add source type
     event

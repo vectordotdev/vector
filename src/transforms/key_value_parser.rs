@@ -46,9 +46,9 @@ impl TransformConfig for KeyValueConfig {
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
         )?
-            .into_iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect();
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
         let field = self
             .field
             .clone()
@@ -203,7 +203,7 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Lookup, LookupBuf, Value},
-        Event,
+        log_event, Event,
     };
 
     async fn parse_log(
@@ -216,7 +216,10 @@ mod tests {
         trim_key: Option<String>,
         trim_value: Option<String>,
     ) -> LogEvent {
-        let event = Event::from(text);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => text.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         let mut parser = KeyValueConfig {
             separator,

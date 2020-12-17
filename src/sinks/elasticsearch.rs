@@ -488,6 +488,7 @@ mod tests {
     use crate::{
         event::{Event, Lookup},
         sinks::util::retries::RetryAction,
+        log_event,
     };
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
@@ -501,7 +502,10 @@ mod tests {
     #[test]
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some(LookupBuf::from("foo"));
-        let mut event = Event::from("butts");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "butts".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
 
@@ -514,7 +518,10 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some(LookupBuf::from("foo"));
-        let mut event = Event::from("butts");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "butts".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("not_foo"), "bar");
         let mut action = json!({});
 
@@ -526,7 +533,10 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<LookupBuf> = None;
-        let mut event = Event::from("butts");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "butts".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
 
@@ -565,7 +575,10 @@ mod tests {
         };
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
-        let mut event = Event::from("hello there");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello there".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from_str("foo").unwrap(), "bar");
@@ -591,6 +604,7 @@ mod integration_tests {
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
         Event,
+        log_event,
     };
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
@@ -631,7 +645,10 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
+        let mut input_event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         input_event
             .as_mut_log()
             .insert(LookupBuf::from("my_id"), "42");

@@ -74,8 +74,8 @@ mod test {
                             ),
                         ),
                     ]
-                        .into_iter()
-                        .collect(),
+                    .into_iter()
+                    .collect(),
                 ),
             ),
             (
@@ -153,8 +153,8 @@ mod test {
                             ),
                         ),
                     ]
-                        .into_iter()
-                        .collect(),
+                    .into_iter()
+                    .collect(),
                 ),
                 r#"
                 function (value)

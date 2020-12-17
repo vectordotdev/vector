@@ -186,9 +186,11 @@ pub fn random_events_with_stream(
     len: usize,
     count: usize,
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
-    random_events_with_stream_generic(count, move || shared::log_event! {
-        crate::config::log_schema().message_key().clone() => random_string(len),
-        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    random_events_with_stream_generic(count, move || {
+        shared::log_event! {
+            crate::config::log_schema().message_key().clone() => random_string(len),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        }
     })
 }
 

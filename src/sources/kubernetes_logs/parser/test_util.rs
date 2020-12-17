@@ -3,6 +3,7 @@
 use crate::{
     event::{Event, LogEvent, LookupBuf},
     transforms::Transform,
+    log_event,
 };
 use chrono::{DateTime, Utc};
 
@@ -36,7 +37,10 @@ where
     B: Fn() -> Transform,
 {
     for (message, expected) in cases {
-        let input = Event::from(message);
+        let input = log_event! {
+            crate::config::log_schema().message_key().clone() => message,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let mut parser = (builder)();
         let parser = parser.as_function();
 

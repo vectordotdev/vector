@@ -384,8 +384,8 @@ fn metric_value_to_prometheus_metric_type(v: &MetricValue) -> proto::MetricType 
 mod tests {
     use super::super::default_summary_quantiles;
     use super::*;
-    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     fn encode_one<T: MetricCollector>(
         default_namespace: Option<&str>,

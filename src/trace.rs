@@ -90,7 +90,9 @@ impl<F: Subscriber + 'static> Subscriber for BroadcastSubscriber<F> {
     #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
         if self.sender.receiver_count() > 0 {
-            let _ = self.sender.send(event.into()); // Ignore errors
+            let _ = self
+                .sender
+                .send(from_tracing_event(event, crate::config::log_schema())); // Ignore errors
         }
         self.formatter.event(event)
     }
@@ -143,7 +145,7 @@ lazy_static::lazy_static! {
     static ref METADATA_TARGET: LookupBuf = LookupBuf::from_str("metadata.target").unwrap();
 }
 
-fn from_tracing_event(event: &tracing::Event<'_>, schema: crate::config::LogSchema) -> Event {
+fn from_tracing_event(event: &tracing::Event<'_>, schema: &crate::config::LogSchema) -> Event {
     let now = chrono::Utc::now();
     let mut maker = MakeLogEvent::default();
     event.record(&mut maker);

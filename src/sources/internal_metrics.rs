@@ -82,9 +82,9 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use shared::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
+    use shared::event::metric::{Metric, MetricValue, StatisticKind};
     use std::collections::BTreeMap;
 
     #[test]

@@ -1,6 +1,7 @@
 use crate::{
     event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
+    log_event,
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -58,7 +59,10 @@ impl TcpSource for RawTcpSource {
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
         let byte_size = frame.len();
-        let mut event = Event::from(frame);
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => frame,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         event.as_mut_log().insert(
             crate::config::log_schema().source_type_key().clone(),

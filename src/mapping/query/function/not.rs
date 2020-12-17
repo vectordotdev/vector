@@ -24,28 +24,40 @@ impl Function for NotFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
+    use crate::{mapping::query::path::Path, log_event};
 
     #[test]
     fn not() {
         let cases = vec![
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("path .foo not found in event".to_string()),
                 NotFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(false)),
                 NotFn::new(Box::new(Literal::from(Value::Boolean(true)))),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Ok(Value::Boolean(true)),
                 NotFn::new(Box::new(Literal::from(Value::Boolean(false)))),
             ),
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("unable to perform NOT on Bytes(b\"not a bool\") value".to_string()),
                 NotFn::new(Box::new(Literal::from(Value::from("not a bool")))),
             ),

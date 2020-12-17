@@ -228,9 +228,9 @@ impl InfluxDBLogsConfig {
 
 fn value_to_field(v: Value) -> Field {
     match v {
-        Value::Integer(num) => Field::Int(*num),
-        Value::Float(num) => Field::Float(*num),
-        Value::Boolean(b) => Field::Bool(*b),
+        Value::Integer(num) => Field::Int(num),
+        Value::Float(num) => Field::Float(num),
+        Value::Boolean(b) => Field::Bool(b),
         _ => Field::String(v.to_string_lossy()),
     }
 }
@@ -246,6 +246,7 @@ mod tests {
             test::{build_test_server, load_sink},
         },
         test_util::next_addr,
+        log_event,
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
@@ -270,7 +271,10 @@ mod tests {
 
     #[test]
     fn test_encode_event_apply_rules() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "aws.cloud.eur");
@@ -299,7 +303,10 @@ mod tests {
 
     #[test]
     fn test_encode_event_v1() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "aws.cloud.eur");
@@ -351,7 +358,10 @@ mod tests {
 
     #[test]
     fn test_encode_event() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "aws.cloud.eur");
@@ -403,7 +413,10 @@ mod tests {
 
     #[test]
     fn test_encode_event_without_tags() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         event.as_mut_log().insert(LookupBuf::from("value"), 100);
         event
@@ -490,7 +503,10 @@ mod tests {
 
     #[test]
     fn test_add_tag() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from_str("source_type").unwrap(), "file");
@@ -557,7 +573,10 @@ mod tests {
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
-            let mut event = Event::from(line.to_string());
+            let mut event = log_event! {
+                crate::config::log_schema().message_key().clone() => line.to_string(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             event.as_mut_log().insert(
                 LookupBuf::from_str(&format!("key{}", i)).unwrap(),
                 format!("value{}", i),
@@ -625,7 +644,10 @@ mod tests {
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
-            let mut event = Event::from(line.to_string());
+            let mut event = log_event! {
+                crate::config::log_schema().message_key().clone() => line.to_string(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             event
                 .as_mut_log()
                 .insert(LookupBuf::from(format!("key{}", i)), format!("value{}", i));
@@ -709,6 +731,7 @@ mod integration_tests {
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDB2Settings,
         },
+        log_event,
     };
     use chrono::Utc;
     use futures::stream;
@@ -741,7 +764,10 @@ mod integration_tests {
 
         let mut events = Vec::new();
 
-        let mut event1 = Event::from("message_1");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message_1".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("host"), "aws.cloud.eur");
@@ -749,7 +775,10 @@ mod integration_tests {
             .as_mut_log()
             .insert(LookupBuf::from("source_type"), "file");
 
-        let mut event2 = Event::from("message_2");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message_2".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("host"), "aws.cloud.eur");

@@ -14,6 +14,7 @@ use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::LookupBuf,
+    log_event,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
@@ -381,7 +382,10 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<LookupBuf>) -> Event {
-    let mut event = Event::from(line);
+    let mut event = log_event! {
+        crate::config::log_schema().message_key().clone() => line,
+        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+    };
 
     // Add source type.
     event.as_mut_log().insert(

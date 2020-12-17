@@ -42,9 +42,9 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
 }
 
 pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<BTreeMap<K, V>>
-    where
-        K: From<String> + Ord,
-        V: FromLua<'a>,
+where
+    K: From<String> + Ord,
+    V: FromLua<'a>,
 {
     let mut map = BTreeMap::new();
     for pair in t.pairs() {
@@ -55,8 +55,8 @@ pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<BTreeMap<K, V>>
 }
 
 pub fn table_to_set<'a, T>(t: LuaTable<'a>) -> LuaResult<BTreeSet<T>>
-    where
-        T: FromLua<'a> + Ord,
+where
+    T: FromLua<'a> + Ord,
 {
     let mut set = BTreeSet::new();
     for item in t.sequence_values() {
@@ -70,8 +70,8 @@ pub fn table_is_array<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
 }
 
 pub fn table_to_array<'a, T>(t: LuaTable<'a>) -> LuaResult<Vec<T>>
-    where
-        T: FromLua<'a>,
+where
+    T: FromLua<'a>,
 {
     let mut seq = Vec::new();
     for item in t.sequence_values() {
@@ -80,7 +80,6 @@ pub fn table_to_array<'a, T>(t: LuaTable<'a>) -> LuaResult<Vec<T>>
     }
     Ok(seq)
 }
-
 
 impl<'a> ToLua<'a> for Event {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {

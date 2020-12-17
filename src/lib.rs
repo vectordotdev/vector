@@ -79,7 +79,7 @@ pub mod vector_windows;
 pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
-pub use shared::{Result, Error, log_event};
+pub use shared::{log_event, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

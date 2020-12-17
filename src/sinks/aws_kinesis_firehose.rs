@@ -257,7 +257,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LookupBuf;
+    use crate::{event::LookupBuf, log_event};
     use std::collections::BTreeMap;
 
     #[test]
@@ -268,7 +268,10 @@ mod tests {
     #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into()).unwrap();
+        let event = encode_event(log_event! {
+            crate::config::log_schema().message_key().clone() => message,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }, &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -276,7 +279,10 @@ mod tests {
     #[test]
     fn firehose_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into()).unwrap();
 

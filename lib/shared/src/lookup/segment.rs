@@ -1,11 +1,11 @@
 use crate::{event::*, lookup::*};
 use pest::iterators::Pair;
 use remap_lang::parser::ParserRule;
-use tracing::instrument;
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},
 };
+use tracing::instrument;
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
 /// A sequence of Segments can become a lookup.
@@ -57,9 +57,7 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup(
-        segment: Pair<'a, ParserRule>,
-    ) -> crate::Result<VecDeque<Segment<'a>>> {
+    pub fn from_lookup(segment: Pair<'a, ParserRule>) -> crate::Result<VecDeque<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -125,9 +123,7 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup_coalesce(
-        segment: Pair<'a, ParserRule>,
-    ) -> crate::Result<Segment<'a>> {
+    pub fn from_lookup_coalesce(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -173,9 +169,7 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup_field_quoted(
-        segment: Pair<'a, ParserRule>,
-    ) -> crate::Result<Segment<'a>> {
+    pub fn from_lookup_field_quoted(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -235,9 +229,7 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup_array_index(
-        segment: Pair<'a, ParserRule>,
-    ) -> crate::Result<Segment<'a>> {
+    pub fn from_lookup_array_index(segment: Pair<'a, ParserRule>) -> crate::Result<Segment<'a>> {
         let rule = segment.as_rule();
         let segment_str = segment.as_str();
         tracing::trace!(segment = %segment_str, ?rule, action = %"enter");

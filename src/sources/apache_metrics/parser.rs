@@ -1,6 +1,6 @@
-use shared::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
+use shared::event::metric::{Metric, MetricKind, MetricValue};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::{error, fmt, iter, num};
@@ -448,9 +448,9 @@ impl error::Error for ParseError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
+    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use std::collections::BTreeMap;
 
     macro_rules! map {

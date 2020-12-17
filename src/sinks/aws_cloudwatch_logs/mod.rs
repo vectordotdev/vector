@@ -670,6 +670,7 @@ mod tests {
     use crate::{
         event::{Event, LookupBuf, Value},
         rusoto::RegionOrEndpoint,
+        log_event,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
@@ -681,7 +682,10 @@ mod tests {
 
     #[test]
     fn partition_static() {
-        let event = Event::from("hello world");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let stream = Template::try_from("stream").unwrap();
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
@@ -700,7 +704,10 @@ mod tests {
 
     #[test]
     fn partition_event() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         event
             .as_mut_log()
@@ -724,7 +731,10 @@ mod tests {
 
     #[test]
     fn partition_event_with_prefix() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         event
             .as_mut_log()
@@ -748,7 +758,10 @@ mod tests {
 
     #[test]
     fn partition_event_with_postfix() {
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         event
             .as_mut_log()
@@ -772,7 +785,10 @@ mod tests {
 
     #[test]
     fn partition_no_key_event() {
-        let event = Event::from("hello world");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         let stream = Template::try_from("{{log_stream}}").unwrap();
         let group = "group".try_into().unwrap();
@@ -798,7 +814,10 @@ mod tests {
 
     #[test]
     fn cloudwatch_encoded_event_retains_timestamp() {
-        let mut event = Event::from("hello world").into_log();
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }.into_log();
         event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
@@ -813,7 +832,10 @@ mod tests {
 
     #[test]
     fn cloudwatch_encode_log_as_json() {
-        let mut event = Event::from("hello world").into_log();
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }.into_log();
         event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<String, String> = serde_json::from_str(&encoded.message[..]).unwrap();
@@ -822,7 +844,10 @@ mod tests {
 
     #[test]
     fn cloudwatch_encode_log_as_text() {
-        let mut event = Event::from("hello world").into_log();
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }.into_log();
         event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event, &Encoding::Text.into()).unwrap();
         assert_eq!(encoded.message, "hello world");
@@ -862,6 +887,7 @@ mod integration_tests {
         event::LookupBuf,
         rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+        log_event,
     };
     use futures::{stream, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
@@ -1009,7 +1035,10 @@ mod integration_tests {
 
         let mut add_event = |offset: chrono::Duration| {
             let line = input_lines.next().unwrap();
-            let mut event = Event::from(line.clone());
+            let mut event = log_event! {
+                crate::config::log_schema().message_key().clone() => line.clone(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             event
                 .as_mut_log()
                 .insert(log_schema().timestamp_key().clone(), now + offset);
@@ -1173,7 +1202,10 @@ mod integration_tests {
             .into_iter()
             .enumerate()
             .map(|(i, e)| {
-                let mut event = Event::from(e);
+                let mut event = log_event! {
+                    crate::config::log_schema().message_key().clone() => e.to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                };
                 let stream = format!("{}", (i % 2));
                 event.as_mut_log().insert(LookupBuf::from("key"), stream);
                 event

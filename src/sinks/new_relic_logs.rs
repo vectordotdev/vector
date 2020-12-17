@@ -169,6 +169,7 @@ mod tests {
         sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
         test_util::next_addr,
         Event,
+        log_event,
     };
     use bytes::buf::BufExt;
     use futures::{stream, StreamExt};
@@ -316,7 +317,10 @@ mod tests {
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
-        let events = stream::iter(input_lines.clone()).map(Event::from);
+        let events = stream::iter(input_lines.clone()).map(|v| log_event! {
+            crate::config::log_schema().message_key().clone() => v,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        });
         let pump = sink.run(events);
 
         tokio::spawn(server);

@@ -2,6 +2,7 @@ use super::{query_value::QueryValue, Function};
 use crate::{
     event::{util::log::get_value, Event, Lookup, PathIter},
     mapping::Result,
+    log_event,
 };
 
 #[derive(Debug)]
@@ -100,13 +101,19 @@ mod tests {
     fn check_path_query() {
         let cases = vec![
             (
-                Event::from(""),
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => "".to_string(),
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                },
                 Err("path .foo not found in event".to_string()),
                 Path::from(vec![vec!["foo"]]),
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
@@ -117,7 +124,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("\"foo.bar\".baz").unwrap(),
                         Value::Integer(20),
@@ -129,7 +139,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo bar.baz").unwrap(),
                         Value::Integer(20),
@@ -141,7 +154,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo.bar[0].baz").unwrap(),
                         Value::Integer(20),
@@ -153,7 +169,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo bar.baz").unwrap(),
                         Value::Integer(20),
@@ -165,7 +184,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
@@ -176,7 +198,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
@@ -187,7 +212,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        crate::config::log_schema().message_key().clone() => "".to_string(),
+                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from_str("foo.baz").unwrap(), Value::from("buz"));

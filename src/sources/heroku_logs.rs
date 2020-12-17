@@ -5,6 +5,7 @@ use crate::{
     },
     event::{Event, LookupBuf},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    log_event,
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -200,7 +201,10 @@ fn line_to_event(line: String) -> Event {
         let proc_id = parts[5];
         let message = parts[7];
 
-        let mut event = Event::from(message);
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
@@ -219,7 +223,10 @@ fn line_to_event(line: String) -> Event {
             fields = parts.len(),
             rate_limit_secs = 10
         );
-        Event::from(line)
+        log_event! {
+            crate::config::log_schema().message_key().clone() => line.to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }
     };
 
     // Add source type

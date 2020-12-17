@@ -1,7 +1,7 @@
-use shared::{event::*, lookup::*};
-use std::convert::{TryFrom, TryInto};
 use crate::test_util::open_fixture;
 use serde_json::json;
+use shared::{event::*, lookup::*};
+use std::convert::{TryFrom, TryInto};
 
 // This test iterates over the `tests/data/fixtures/log_event` folder and:
 //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
@@ -22,16 +22,15 @@ fn json_value_to_vector_log_event_to_json_value() {
                 let serde_value = open_fixture(&path).unwrap();
 
                 let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
-                let serde_value_again: serde_json::Value =
-                    vector_value.clone().try_into().unwrap();
+                let serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
 
                 tracing::trace!(
-                        ?path,
-                        ?serde_value,
-                        ?vector_value,
-                        ?serde_value_again,
-                        "Asserting equal."
-                    );
+                    ?path,
+                    ?serde_value,
+                    ?vector_value,
+                    ?serde_value_again,
+                    "Asserting equal."
+                );
                 assert_eq!(serde_value, serde_value_again);
             }
             _ => panic!("This test should never read Err'ing test fixtures."),
@@ -41,15 +40,14 @@ fn json_value_to_vector_log_event_to_json_value() {
 // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
 #[test]
 fn entry() {
-    let fixture =
-        open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
+    let fixture = open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
     let mut event = LogEvent::try_from(fixture).unwrap();
 
     let lookup = LookupBuf::from_str("non-existing").unwrap();
     let entry = event.entry(lookup).unwrap();
     let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
-        );
+        "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
+    );
     entry.or_insert_with(|| fallback.clone().into());
     let json: serde_json::Value = event.clone().try_into().unwrap();
     trace!(?json);

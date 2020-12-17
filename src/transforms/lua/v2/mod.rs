@@ -8,10 +8,10 @@ use crate::{
         Transform,
     },
 };
+use rlua::prelude::*;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
-use rlua::prelude::*;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

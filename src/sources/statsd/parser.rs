@@ -1,6 +1,6 @@
-use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use lazy_static::lazy_static;
 use regex::Regex;
+use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::{
     collections::BTreeMap,
     error, fmt,

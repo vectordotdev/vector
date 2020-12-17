@@ -5,14 +5,14 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
+#[cfg(test)]
+mod fixtures;
 pub mod merge;
 pub mod merge_state;
 pub mod util;
-#[cfg(test)]
-mod fixtures;
 
-pub use shared::{event::*, lookup::*};
 pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use shared::{event::*, lookup::*};
 
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathIter;
@@ -24,7 +24,6 @@ pub mod proto {
 lazy_static::lazy_static! {
     pub static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
 }
-
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
@@ -291,14 +290,18 @@ impl From<Event> for proto::EventWrapper {
 mod test {
     use super::*;
     use regex::Regex;
+    use shared::log_event;
     use std::collections::HashSet;
 
     #[test]
     fn serialization() {
         crate::test_util::trace_init();
-        let mut event = Event::from("raw log line");
-        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
-        event.as_mut_log().insert(LookupBuf::from("bar"), "baz");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
+        event.as_mut_log().insert("foo", "bar".to_string());
+        event.as_mut_log().insert("bar", "baz".to_string());
 
         let expected_all = serde_json::json!({
             "message": "raw log line",
@@ -319,13 +322,16 @@ mod test {
         use serde_json::json;
         crate::test_util::trace_init();
 
-        let mut event = Event::from("hello world");
-        event.as_mut_log().insert(LookupBuf::from("int"), 4);
-        event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
-        event.as_mut_log().insert(LookupBuf::from("bool"), true);
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
+        event.as_mut_log().insert("int", 4);
+        event.as_mut_log().insert("float", 5.5);
+        event.as_mut_log().insert("bool", true);
         event
             .as_mut_log()
-            .insert(LookupBuf::from("string"), "thisisastring");
+            .insert("string", "thisisastring".to_string());
 
         let map = serde_json::to_value(event.as_log()).unwrap();
         assert_eq!(map["float"], json!(5.5));
@@ -339,13 +345,12 @@ mod test {
         crate::test_util::trace_init();
         let mut event = Event::new_empty_log();
 
+        event
+            .as_mut_log()
+            .insert("Ke$ha", "It's going down, I'm yelling timber".to_string());
         event.as_mut_log().insert(
-            LookupBuf::from("Ke$ha"),
-            "It's going down, I'm yelling timber",
-        );
-        event.as_mut_log().insert(
-            LookupBuf::from("Pitbull"),
-            "The bigger they are, the harder they fall",
+            "Pitbull",
+            "The bigger they are, the harder they fall".to_string(),
         );
 
         let all = event
@@ -375,17 +380,26 @@ mod test {
         crate::test_util::trace_init();
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert(LookupBuf::from("lZDfzKIL"), Value::from("tOVrjveM"));
-        log.insert(LookupBuf::from("o9amkaRY"), Value::from("pGsfG7Nr"));
-        log.insert(LookupBuf::from("YRjhxXcg"), Value::from("nw8iM5Jr"));
+        log.insert("lZDfzKIL", "tOVrjveM".to_string());
+        log.insert("o9amkaRY", "pGsfG7Nr".to_string());
+        log.insert("YRjhxXcg", "nw8iM5Jr".to_string());
 
         let collected: Vec<_> = log.pairs(true).collect();
         assert_eq!(
             collected,
             vec![
-                (Lookup::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-                (Lookup::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-                (Lookup::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+                (
+                    Lookup::from("YRjhxXcg"),
+                    &Value::from("nw8iM5Jr".to_string())
+                ),
+                (
+                    Lookup::from("lZDfzKIL"),
+                    &Value::from("tOVrjveM".to_string())
+                ),
+                (
+                    Lookup::from("o9amkaRY"),
+                    &Value::from("pGsfG7Nr".to_string())
+                ),
             ]
         );
     }
@@ -398,14 +412,14 @@ mod test {
         let cases = vec![
             (map![], vec![], Ok(Some(map![].into()))),
             (
-                map!["foo": "bar"],
+                map!["foo": "bar".to_string()],
                 vec![],
-                Ok(Some(map!["foo": "bar"].into())),
+                Ok(Some(map!["foo": "bar".to_string()].into())),
             ),
             (
-                map!["foo": "bar"],
+                map!["foo": "bar".to_string()],
                 vec![Field(Regular("foo".to_owned()))],
-                Ok(Some("bar".into())),
+                Ok(Some("bar".to_string().into())),
             ),
             (
                 map!["foo": "bar"],

@@ -349,6 +349,7 @@ mod tests {
             lines_from_file, lines_from_gzip_file, random_events_with_stream,
             random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
+        log_event,
     };
     use futures::stream;
     use std::convert::TryInto;
@@ -374,7 +375,10 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _events) = random_lines_with_stream(100, 64);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(|v| log_event! {
+            crate::config::log_schema().message_key().clone() => v,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        })));
         sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
@@ -399,7 +403,10 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _) = random_lines_with_stream(100, 64);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(|v| log_event! {
+            crate::config::log_schema().message_key().clone() => v,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        })));
         sink.run(events).await.unwrap();
 
         let output = lines_from_gzip_file(template);
@@ -548,7 +555,11 @@ mod tests {
 
         // send initial payload
         for line in input.clone() {
-            tx.send(Event::from(line)).await.unwrap();
+            tx.send(log_event! {
+                    crate::config::log_schema().message_key().clone() => line,
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                }
+            ).await.unwrap();
         }
 
         // wait for file to go idle and be closed
@@ -556,7 +567,10 @@ mod tests {
 
         // trigger another write
         let last_line = "i should go at the end";
-        tx.send(Event::from(last_line)).await.unwrap();
+        tx.send(log_event! {
+            crate::config::log_schema().message_key().clone() => last_line,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        }).await.unwrap();
         input.push(String::from(last_line));
 
         // wait for another flush

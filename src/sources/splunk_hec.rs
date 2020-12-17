@@ -776,6 +776,7 @@ mod tests {
         },
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
+        log_event,
     };
     use chrono::{TimeZone, Utc};
     use futures::{stream, StreamExt};
@@ -892,7 +893,10 @@ mod tests {
     async fn no_compression_text_event() {
         trace_init();
 
-        let message = "gzip_text_event";
+        let message = log_event! {
+            crate::config::log_schema().message_key().clone() => "gzip_text_event".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
@@ -930,7 +934,10 @@ mod tests {
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_text_event_{}", i))
+            .map(|i| log_event! {
+                crate::config::log_schema().message_key().clone() => format!("multiple_simple_text_event_{}", i),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            })
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -948,7 +955,10 @@ mod tests {
     async fn one_simple_json_event() {
         trace_init();
 
-        let message = "one_simple_json_event";
+        let message = log_event! {
+            crate::config::log_schema().message_key().clone() => "one_simple_json_event".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);

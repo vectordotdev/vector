@@ -246,10 +246,12 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, LookupBuf};
-    use crate::sinks::util::http::HttpSink;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
+    use crate::{
+        event::{Event, LookupBuf},
+        sinks::util::{http::HttpSink, test::{build_test_server, load_sink}},
+        test_util,
+        log_event,
+    };
     use futures::StreamExt;
 
     #[test]
@@ -269,7 +271,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut e1 = Event::from("hello world");
+        let mut e1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         e1.as_mut_log()
             .insert(LookupBuf::from_str("foo").unwrap(), "bar");
@@ -306,7 +311,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut e1 = Event::from("hello world");
+        let mut e1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
 
         e1.as_mut_log()
             .insert(LookupBuf::from_str("foo").unwrap(), "bar");
@@ -375,6 +383,7 @@ mod integration_tests {
         sinks::util::test::load_sink,
         template::Template,
         test_util::random_lines,
+        log_event,
     };
     use bytes::Bytes;
     use futures::{stream, StreamExt};
@@ -403,7 +412,10 @@ mod integration_tests {
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
-        let events = lines.clone().into_iter().map(Event::from);
+        let events = lines.clone().into_iter().map(|v| log_event! {
+            crate::config::log_schema().message_key().clone() => v,
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        });
         let _ = sink
             .into_sink()
             .send_all(&mut stream::iter(events).map(Ok))
@@ -440,7 +452,10 @@ mod integration_tests {
 
         let events = random_lines(100)
             .take(10)
-            .map(Event::from)
+            .map(|v| log_event! {
+                crate::config::log_schema().message_key().clone() => v,
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            })
             .collect::<Vec<_>>();
         let _ = sink
             .into_sink()
@@ -477,7 +492,10 @@ mod integration_tests {
         let mut events = lines
             .clone()
             .into_iter()
-            .map(Event::from)
+            .map(|v| log_event! {
+                crate::config::log_schema().message_key().clone() => v,
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            })
             .collect::<Vec<_>>();
 
         for i in 0..10 {
@@ -542,7 +560,10 @@ mod integration_tests {
         let mut events = lines
             .clone()
             .into_iter()
-            .map(Event::from)
+            .map(|v| log_event! {
+                crate::config::log_schema().message_key().clone() => v,
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            })
             .collect::<Vec<_>>();
 
         for i in 0..10 {

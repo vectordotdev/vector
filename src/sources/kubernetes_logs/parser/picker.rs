@@ -66,6 +66,7 @@ mod tests {
         event::{Event, LogEvent, LookupBuf},
         test_util::trace_init,
         transforms::Transform,
+        log_event,
     };
 
     /// Picker has to work for all test cases for underlying parsers.
@@ -89,7 +90,10 @@ mod tests {
         let cases = vec!["", "qwe", "{"];
 
         for message in cases {
-            let input = Event::from(message);
+            let input = log_event! {
+                crate::config::log_schema().message_key().clone() => message,
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            };
             let mut picker = Picker::new();
             let mut output = Vec::new();
             picker.transform(&mut output, input);

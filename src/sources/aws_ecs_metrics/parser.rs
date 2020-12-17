@@ -1,6 +1,6 @@
-use shared::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use shared::event::metric::{Metric, MetricKind, MetricValue};
 use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
@@ -488,9 +488,9 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
 #[cfg(test)]
 mod test {
     use super::parse;
-    use shared::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+    use shared::event::metric::{Metric, MetricKind, MetricValue};
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

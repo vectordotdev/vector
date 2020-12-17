@@ -23,12 +23,12 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
     convert::TryFrom,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    borrow::Borrow,
 };
 use tokio::{sync::Notify, time::Duration};
 
@@ -336,11 +336,13 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     let client = config.to_rdkafka().unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplate)?
-        .render_string(shared::log_event! {
-            crate::config::log_schema().message_key().clone() => String::from(""),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
-        }.borrow())
-    {
+        .render_string(
+            shared::log_event! {
+                crate::config::log_schema().message_key().clone() => String::from(""),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            }
+            .borrow(),
+        ) {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {
             warn!(
@@ -392,7 +394,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::{event::Event, log_event};
     use std::collections::BTreeMap;
 
     #[test]
@@ -405,7 +407,10 @@ mod tests {
         let key = "";
         let message = "hello world".to_string();
         let (key_bytes, bytes) = encode_event(
-            message.clone().into(),
+            log_event! {
+                crate::config::log_schema().message_key().clone() => message.clone(),
+                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            },
             &None,
             &EncodingConfig::from(Encoding::Text),
         );
@@ -417,7 +422,10 @@ mod tests {
     #[test]
     fn kafka_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = Event::from(message.clone());
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => message.clone(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
 
@@ -437,7 +445,10 @@ mod tests {
 
     #[test]
     fn kafka_encode_event_apply_rules() {
-        let mut event = Event::from("hello");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let (key, bytes) = encode_event(

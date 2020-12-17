@@ -4,6 +4,7 @@ use crate::{
         SourceDescription,
     },
     event::{Event, LogEvent, LookupBuf, Value},
+    log_event,
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -174,7 +175,12 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     let converter = |event: LogEvent| Event::Log(event);
     match enc {
         Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
+            .map(|r| {
+                Ok(log_event! {
+                    crate::config::log_schema().message_key().clone() => r?,
+                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                })
+            })
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {

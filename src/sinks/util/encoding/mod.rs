@@ -156,7 +156,7 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::log_schema, event::Lookup};
+    use crate::{log_event, config::log_schema, event::Lookup};
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -294,7 +294,10 @@ mod tests {
         crate::test_util::trace_init();
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::from("Demo");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "Demo".to_string(),
+            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        };
         let timestamp = event
             .as_mut_log()
             .get(log_schema().timestamp_key())
