@@ -2671,7 +2671,7 @@ dependencies = [
 [[package]]
 name = "hyper"
 version = "0.13.9"
-source = "git+https://github.com/timberio/hyper?rev=4ec7442fb74634ea9d128ad58bb741fa1dabefc7#4ec7442fb74634ea9d128ad58bb741fa1dabefc7"
+source = "git+https://github.com/hyperium/hyper?rev=a00cc20afc597cb55cbc62c70b0b25b46c82a0a6#a00cc20afc597cb55cbc62c70b0b25b46c82a0a6"
 dependencies = [
  "bytes 0.5.6",
  "futures-channel",
