@@ -3,18 +3,6 @@ use metrics::counter;
 use prost::DecodeError;
 
 #[derive(Debug)]
-pub struct VectorEventSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for VectorEventSent {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct VectorEventReceived {
     pub byte_size: usize,
 }
