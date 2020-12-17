@@ -2664,8 +2664,7 @@ dependencies = [
 [[package]]
 name = "hyper"
 version = "0.13.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ad767baac13b44d4529fcf58ba2cd0995e36e7b435bc5b039de6f47e880dbf"
+source = "git+https://github.com/timberio/hyper?rev=4ec7442fb74634ea9d128ad58bb741fa1dabefc7#4ec7442fb74634ea9d128ad58bb741fa1dabefc7"
 dependencies = [
  "bytes 0.5.6",
  "futures-channel",
