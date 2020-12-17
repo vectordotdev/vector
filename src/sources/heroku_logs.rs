@@ -35,6 +35,10 @@ inventory::submit! {
     SourceDescription::new::<LogplexConfig>("logplex")
 }
 
+inventory::submit! {
+    SourceDescription::new::<LogplexConfig>("heroku_logs")
+}
+
 impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -65,7 +69,7 @@ impl HttpSource for LogplexSource {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "logplex")]
+#[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(
         &self,
@@ -85,11 +89,41 @@ impl SourceConfig for LogplexConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "logplex"
+        "heroku_logs"
     }
 
     fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct LogplexCompatConfig(LogplexConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "logplex")]
+impl SourceConfig for LogplexCompatConfig {
+    async fn build(
+        &self,
+        name: &str,
+        options: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        self.0.build(name, options, shutdown, out).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.0.output_type()
+    }
+
+    fn source_type(&self) -> &'static str {
+        self.0.source_type()
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        self.0.resources()
     }
 }
 
@@ -191,7 +225,7 @@ fn line_to_event(line: String) -> Event {
     // Add source type
     event
         .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
+        .try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
 
     event
 }
@@ -304,7 +338,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
         assert_eq!(log["appname"], "lumberjack-store".into());
         assert_eq!(log["absent"], Value::Null);
     }
@@ -324,7 +358,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
     }
 
     #[test]
@@ -338,7 +372,7 @@ mod tests {
             "what am i doing here".into()
         );
         assert!(log.get(log_schema().timestamp_key()).is_some());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
     }
 
     #[test]
@@ -356,6 +390,6 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
     }
 }
