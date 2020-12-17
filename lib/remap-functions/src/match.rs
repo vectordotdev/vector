@@ -82,7 +82,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         value_optional {
@@ -90,7 +90,7 @@ mod tests {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
     ];
 

@@ -180,7 +180,8 @@ mod tests {
             ),
             def: TypeDef {
                 fallible: true,
-                kind: Kind::Integer
+                kind: Kind::Integer,
+                ..Default::default()
             },
         }
 

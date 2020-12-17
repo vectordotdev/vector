@@ -55,6 +55,7 @@ impl Remap {
             type_def: TypeDef {
                 fallible: true,
                 kind: value::Kind::all(),
+                ..Default::default()
             },
         };
 

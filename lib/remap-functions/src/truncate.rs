@@ -144,7 +144,11 @@ mod tests {
                 limit: Literal::from(1).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
         }
 
         limit_float {
@@ -162,7 +166,11 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
         }
 
         ellipsis_boolean {
@@ -180,7 +188,11 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: Some(Literal::from("baz").boxed()),
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
         }
     ];
 
