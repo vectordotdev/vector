@@ -574,3 +574,6 @@ required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+hyper = { version = "0.13", git = "https://github.com/timberio/hyper", rev = "4ec7442fb74634ea9d128ad58bb741fa1dabefc7" }
