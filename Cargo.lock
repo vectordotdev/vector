@@ -5036,6 +5036,7 @@ name = "remap-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
+ "remap-functions",
  "remap-lang",
  "rustyline",
  "serde_json",

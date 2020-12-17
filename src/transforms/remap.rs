@@ -58,7 +58,7 @@ impl Remap {
             },
         };
 
-        let program = Program::new(&config.source, &crate::remap::FUNCTIONS_MUT, Some(accepts))?;
+        let program = Program::new(&config.source, &remap_functions::all(), Some(accepts))?;
 
         Ok(Remap {
             program,
