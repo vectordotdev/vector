@@ -259,11 +259,16 @@ jobs:
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events
-      - name: Check cargo deny
+      - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
+      - name: Check cargo deny licenses
+        if: needs.changes.outputs.dependencies == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check licenses
 
   master-failure:
     name: master-failure
