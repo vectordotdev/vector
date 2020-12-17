@@ -1,7 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::proto,
-    internal_events::VectorEventSent,
     sinks::util::tcp::TcpSinkConfig,
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -74,10 +73,6 @@ fn encode_event(event: Event) -> Option<Bytes> {
     let event = proto::EventWrapper::from(event);
     let event_len = event.encoded_len();
     let full_len = event_len + 4;
-
-    emit!(VectorEventSent {
-        byte_size: full_len
-    });
 
     let mut out = BytesMut::with_capacity(full_len);
     out.put_u32(event_len as u32);
