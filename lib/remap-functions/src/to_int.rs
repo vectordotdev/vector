@@ -88,8 +88,6 @@ impl Expression for ToIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
-    use std::collections::BTreeMap;
     use value::Kind;
 
     remap::test_type_def![
@@ -119,7 +117,7 @@ mod tests {
         }
 
         map_fallible {
-            expr: |_| ToIntFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            expr: |_| ToIntFn { value: map!{}.boxed(), default: None },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
 

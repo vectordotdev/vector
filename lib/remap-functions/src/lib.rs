@@ -42,6 +42,8 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
+#[cfg(feature = "ok")]
+mod ok;
 #[cfg(feature = "only_fields")]
 mod only_fields;
 #[cfg(feature = "parse_duration")]
@@ -141,6 +143,8 @@ pub use log::Log;
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
+#[cfg(feature = "ok")]
+pub use ok::OK;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_duration")]
@@ -240,6 +244,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
+        #[cfg(feature = "ok")]
+        Box::new(OK),
         #[cfg(feature = "only_fields")]
         Box::new(OnlyFields),
         #[cfg(feature = "parse_duration")]
