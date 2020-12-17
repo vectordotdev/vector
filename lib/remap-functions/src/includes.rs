@@ -70,10 +70,10 @@ mod tests {
     test_type_def![
         value_non_empty_array {
             expr: |_| IncludesFn {
-                value: Array::from(vec!["foo", true, 27]).boxed(),
+                value: Array::from(vec!["foo", "bar", "baz"]).boxed(),
                 item: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: false, kind: Kind::Boolean },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_empty_array {
@@ -81,7 +81,7 @@ mod tests {
                 value: Array::from(vec![]).boxed(), // Empty array is a-okay
                 item: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: false, kind: Kind::Boolean },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_not_an_array {
