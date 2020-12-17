@@ -18,6 +18,8 @@ mod encode_json;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "find")]
+mod find;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "floor")]
@@ -135,6 +137,8 @@ pub use encode_json::EncodeJson;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "find")]
+pub use find::Find;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "floor")]
@@ -248,6 +252,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "find")]
+        Box::new(Find),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "floor")]

@@ -1409,3 +1409,31 @@
     [[tests.outputs.conditions]]
       "a.equals" = "[1,2,3]"
       "b.equals" = """{"field1":{"field2":1,"field3":null}}"""
+
+[transforms.remap_function_find]
+  inputs = []
+  type = "remap"
+  source = '''
+    . = find(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
+    .bytes_in = to_int(.bytes_in)
+    .status = to_int(.status)
+    .bytes_out = to_int(.bytes_out)
+  '''
+[[tests]]
+  name = "remap_function_find"
+  [tests.input]
+    insert_at = "remap_function_find"
+    type = "log"
+    [tests.input.log_fields]
+      message = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+  [[tests.outputs]]
+    extract_from = "remap_function_find"
+    [[tests.outputs.conditions]]
+    "bytes_in.equals" = 5667
+    "host.equals" = "5.86.210.12"
+    "user.equals" = "zieme4647"
+    "timestamp.equals" = "19/06/2019:17:20:49 -0400"
+    "method.equals" = "GET"
+    "path.equals" = "/embrace/supply-chains/dynamic/vertical"
+    "status.equals" = 201
+    "bytes_out.equals" = 20574
