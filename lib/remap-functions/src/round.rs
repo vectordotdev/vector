@@ -109,7 +109,7 @@ mod tests {
                 value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
         }
 
         fallible_precision {
@@ -117,7 +117,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
-            def: TypeDef { fallible: true, kind: Kind::Integer },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
     ];
 

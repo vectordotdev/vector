@@ -132,7 +132,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         substring_non_string {
@@ -141,7 +141,7 @@ mod tests {
                 substring: Literal::from(true).boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         case_sensitive_non_boolean {
@@ -150,7 +150,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: Some(Literal::from(1).boxed()),
             },
-            def: TypeDef { fallible: true, kind: Kind::Boolean },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
     ];
 

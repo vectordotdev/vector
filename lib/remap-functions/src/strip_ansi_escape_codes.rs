@@ -66,12 +66,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Bytes },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
 
         fallible_expression {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Bytes },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 

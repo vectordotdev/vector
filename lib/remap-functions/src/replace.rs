@@ -176,6 +176,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -202,6 +203,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -215,6 +217,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -241,6 +244,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Bytes,
+                ..Default::default()
             },
         }
     ];

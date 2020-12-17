@@ -26,6 +26,7 @@ impl ConditionConfig for RemapConfig {
             type_def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Boolean,
+                ..Default::default()
             },
         };
 

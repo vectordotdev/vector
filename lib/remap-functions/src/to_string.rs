@@ -116,7 +116,7 @@ mod tests {
         }
 
         array_infallible {
-            expr: |_| ToStringFn { value: Array::from(vec![0]).boxed(), default: None},
+            expr: |_| ToStringFn { value: array![].boxed(), default: None},
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
@@ -130,6 +130,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -141,6 +142,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -152,6 +154,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -163,6 +166,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -174,6 +178,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
     ];
