@@ -13,6 +13,7 @@ allow = [
 ]
 
 unlicensed = "warn"
+default = "warn"
 
 private = { ignore = true }
 
