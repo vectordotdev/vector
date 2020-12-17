@@ -140,6 +140,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Timestamp,
+                ..Default::default()
             },
         }
 
@@ -152,6 +153,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Timestamp,
+                ..Default::default()
             },
         }
 

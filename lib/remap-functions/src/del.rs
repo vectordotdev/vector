@@ -50,6 +50,7 @@ impl Expression for DelFn {
         TypeDef {
             fallible: true,
             kind: value::Kind::Null,
+            ..Default::default()
         }
     }
 }
@@ -65,6 +66,7 @@ mod tests {
         def: TypeDef {
             fallible: true,
             kind: value::Kind::Null,
+            ..Default::default()
         },
     }];
 }

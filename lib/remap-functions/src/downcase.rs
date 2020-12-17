@@ -86,7 +86,7 @@ mod tests {
 
         non_string {
             expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Bytes },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 }

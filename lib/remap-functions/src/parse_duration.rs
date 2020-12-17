@@ -137,7 +137,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 output: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: true, kind: value::Kind::Float },
+            def: TypeDef { fallible: true, kind: value::Kind::Float, ..Default::default() },
         }
 
         optional_expression {
@@ -145,7 +145,7 @@ mod tests {
                 value: Box::new(Noop),
                 output: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: true, kind: value::Kind::Float },
+            def: TypeDef { fallible: true, kind: value::Kind::Float, ..Default::default() },
         }
     ];
 

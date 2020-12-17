@@ -115,22 +115,22 @@ mod tests {
 
         string_fallible {
             expr: |_| ToFloatFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToFloatFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         array_fallible {
-            expr: |_| ToFloatFn { value: Array::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float },
+            expr: |_| ToFloatFn { value: array![].boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToFloatFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -138,39 +138,43 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Float,
+                ..Default::default()
             },
         }
 
        fallible_value_with_fallible_default {
             expr: |_| ToFloatFn {
-                value: Array::from(vec![0]).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                value: array![].boxed(),
+                default: Some(array![].boxed()),
             },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Float,
+                ..Default::default()
             },
         }
 
        fallible_value_with_infallible_default {
             expr: |_| ToFloatFn {
-                value: Array::from(vec![0]).boxed(),
+                value: array![].boxed(),
                 default: Some(Literal::from(1).boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Float,
+                ..Default::default()
             },
         }
 
         infallible_value_with_fallible_default {
             expr: |_| ToFloatFn {
                 value: Literal::from(1).boxed(),
-                default: Some(Array::from(vec![0]).boxed()),
+                default: Some(array![].boxed()),
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -182,6 +186,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Float,
+                ..Default::default()
             },
         }
     ];
