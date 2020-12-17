@@ -190,7 +190,7 @@ mod tests {
                 Some(value!({})),
             ),
             (
-                value!({foo: "bar"}).into(),
+                value!({foo: "bar"}),
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
@@ -199,13 +199,13 @@ mod tests {
                 Some(value!({})),
             ),
             (
-                value!({foo: "bar", baz: "qux"}).into(),
+                value!({foo: "bar", baz: "qux"}),
                 vec![],
                 false,
                 Some(value!({})),
             ),
             (
-                value!({foo: "bar", baz: "qux"}).into(),
+                value!({foo: "bar", baz: "qux"}),
                 vec![],
                 true,
                 Some(value!({})),
