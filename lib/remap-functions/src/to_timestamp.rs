@@ -104,8 +104,6 @@ impl Expression for ToTimestampFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
-    use std::collections::BTreeMap;
     use value::Kind;
 
     remap::test_type_def![
@@ -143,7 +141,7 @@ mod tests {
         }
 
         map_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: map!{}.boxed(), default: None},
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -193,7 +191,7 @@ mod tests {
        fallible_value_with_infallible_default {
             expr: |_| ToTimestampFn {
                 value: lit!(null).boxed(),
-                default: Some(Literal::from(1).boxed()),
+                default: Some(lit!(1).boxed()),
             },
             def: TypeDef {
                 fallible: false,
@@ -204,7 +202,7 @@ mod tests {
 
         infallible_value_with_fallible_default {
             expr: |_| ToTimestampFn {
-                value: Literal::from(1).boxed(),
+                value: lit!(1).boxed(),
                 default: Some(lit!(null).boxed()),
             },
             def: TypeDef {

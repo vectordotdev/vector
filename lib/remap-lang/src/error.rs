@@ -90,6 +90,8 @@ impl fmt::Display for Rule {
             if_condition,
             if_statement,
             integer,
+            kv_pair,
+            map,
             multiplication,
             not,
             null,
