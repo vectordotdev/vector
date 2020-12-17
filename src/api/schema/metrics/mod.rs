@@ -4,7 +4,7 @@ mod processed_bytes;
 mod processed_events;
 mod uptime;
 
-use super::components::{self, Component, COMPONENTS};
+use super::components;
 use crate::{
     event::{Event, Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
@@ -232,11 +232,11 @@ fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
             yield capture_metrics(&controller)
                 .filter_map(|m| match m {
                     Event::Metric(m) => match m.tag_value("component_name") {
-                        Some(name) => match COMPONENTS.read().expect(components::INVARIANT).get(&name) {
+                        Some(name) => match components::state::COMPONENTS.read().expect(components::INVARIANT).get(&name) {
                             Some(t) => Some(match t {
-                                Component::Source(_) => (m, 1),
-                                Component::Transform(_) => (m, 2),
-                                Component::Sink(_) => (m, 3),
+                                components::Component::Source(_) => (m, 1),
+                                components::Component::Transform(_) => (m, 2),
+                                components::Component::Sink(_) => (m, 3),
                             }),
                             _ => None,
                         },
