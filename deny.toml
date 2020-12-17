@@ -26,35 +26,27 @@ license-files = [
 [advisories]
 ignore = [
     # `net2` crate has been deprecated; use `socket2` instead
-    # Solution: No safe upgrade is available!
-    # net2 v0.2.34
+    # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
 
     # Type confusion if __private_get_type_id__ is overriden
-    # Solution: No safe upgrade is available!
-    # failure v0.1.8
+    # https://github.com/timberio/vector/issues/5583
     "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
 
     # dirs is unmaintained, use dirs-next instead
-    # Solution: No safe upgrade is available!
-    # dirs v2.0.2
+    # https://github.com/timberio/vector/issues/5584
     "RUSTSEC-2020-0053",
 
     # stdweb is unmaintained
-    # Solution: No safe upgrade is available!
-    # stdweb v0.4.20
-    # can be removed after next release of `time` crate
-    # https://github.com/time-rs/time/commit/8b2734351a5cd05a9bd3315f1af76c28b5852fec
+    # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
 
     # Some lock_api lock guard objects can cause data races
-    # Solution: Upgrade to >=0.4.2
-    # lock_api v0.3.4
+    # https://github.com/timberio/vector/issues/5587
     "RUSTSEC-2020-0070",
 
     # GenericMutexGuard allows data races of non-Sync types across threads
-    # Solution: Upgrade to >=0.4.0
-    # futures-intrusive v0.3.1
+    # https://github.com/timberio/vector/issues/5586
     "RUSTSEC-2020-0072",
 ]
