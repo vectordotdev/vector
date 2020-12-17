@@ -26,6 +26,17 @@ use std::{collections::VecDeque, convert::TryFrom, str};
 /// You build `Lookup`s from `str`s and other str-like objects with a `from()` or `try_from()`
 /// call. **These do not parse the buffer.**
 ///
+/// ```rust
+/// use vector::event::LookupBuf;
+/// let mut lookup = LookupBuf::from("foo");
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+///
+/// let mut lookup = LookupBuf::from("foo.bar"); // This is **not** two segments.
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+/// ```
+///
 /// From there, you can `push` and `pop` onto the `Lookup`.
 ///
 /// # Parsing
@@ -33,6 +44,34 @@ use std::{collections::VecDeque, convert::TryFrom, str};
 /// To parse buffer into a `Lookup`, use the `std::str::FromStr` implementation. If you're working
 /// something that's not able to be a `str`, you should consult `std::str::from_utf8` and handle the
 /// possible error.
+///
+/// ```rust
+/// use vector::event::LookupBuf;
+/// let mut lookup = LookupBuf::from_str("foo").unwrap();
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+///
+/// let mut lookup = LookupBuf::from_str("foo.bar").unwrap(); // This **is** two segments.
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+/// ```
+///
+/// # Owned Variant
+///
+/// There exists an owned variant of this type appropriate for more flexible contexts or where you
+/// have a string. (Say, most of the time).
+///
+/// To shed ownership use `lookup_buf.into_buf()`. To gain ownership of a `lookup`, use
+/// `lookup.into()`.
+///
+/// ```rust
+/// use vector::event::Lookup;
+/// let mut lookup = Lookup::from_str("foo.bar").unwrap();
+/// let mut owned = lookup.into_buf();
+/// owned.push_back(1);
+/// owned.push_back("bar");
+/// lookup.push_back("baz"); // Does not impact the owned!
+/// ```
 ///
 /// # Warnings
 ///
@@ -93,9 +132,9 @@ impl<'a> Lookup<'a> {
         self.segments.get(index)
     }
 
-    #[instrument(level = "trace")]
-    pub fn push_back(&mut self, segment: Segment<'a>) {
-        self.segments.push_back(segment)
+    #[instrument(level = "trace", skip(segment))]
+    pub fn push_back(&mut self, segment: impl Into<Segment<'a>>) {
+        self.segments.push_back(segment.into())
     }
 
     #[instrument(level = "trace")]
@@ -103,9 +142,9 @@ impl<'a> Lookup<'a> {
         self.segments.pop_back()
     }
 
-    #[instrument(level = "trace")]
-    pub fn push_front(&mut self, segment: Segment<'a>) {
-        self.segments.push_front(segment)
+    #[instrument(level = "trace", skip(segment))]
+    pub fn push_front(&mut self, segment: impl Into<Segment<'a>>) {
+        self.segments.push_front(segment.into())
     }
 
     #[instrument(level = "trace")]

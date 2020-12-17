@@ -35,19 +35,50 @@ mod test;
 ///
 /// From there, you can `push` and `pop` onto the `LookupBuf`.
 ///
+/// ```rust
+/// use vector::event::LookupBuf;
+/// let mut lookup = LookupBuf::from("foo");
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+///
+/// let mut lookup = LookupBuf::from("foo.bar"); // This is **not** two segments.
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+/// ```
+///
 /// # Parsing
 ///
 /// To parse buffer into a `LookupBuf`, use the `std::str::FromStr` implementation. If you're working
 /// something that's not able to be a `str`, you should consult `std::str::from_utf8` and handle the
 /// possible error.
 ///
+/// ```rust
+/// use vector::event::LookupBuf;
+/// let mut lookup = LookupBuf::from_str("foo").unwrap();
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+///
+/// let mut lookup = LookupBuf::from_str("foo.bar").unwrap(); // This **is** two segments.
+/// lookup.push_back(1);
+/// lookup.push_back("bar");
+/// ```
+///
 /// # Unowned Variant
 ///
 /// There exists an unowned variant of this type appropriate for static contexts or where you only
 /// have a view into a long lived string. (Say, deserialization of configs).
 ///
-/// To shed ownership use `lookup_buf.as_lookup()`. To gain ownership of a `lookup`, use
+/// To shed ownership use `lookup_buf.clone_lookup()`. To gain ownership of a `lookup`, use
 /// `lookup.into()`.
+///
+/// ```rust
+/// use vector::event::LookupBuf;
+/// let mut lookup = LookupBuf::from_str("foo.bar").unwrap();
+/// let mut unowned_view = lookup.clone_lookup();
+/// unowned_view.push_back(1);
+/// unowned_view.push_back("bar");
+/// lookup.push_back("baz"); // Does not impact the view!
+/// ```
 ///
 /// For more, investigate `Lookup`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
@@ -118,9 +149,9 @@ impl LookupBuf {
     }
 
     /// Push onto the internal list of segments.
-    #[instrument(level = "trace")]
-    pub fn push_back(&mut self, segment: SegmentBuf) {
-        self.segments.push_back(segment);
+    #[instrument(level = "trace", skip(segment))]
+    pub fn push_back(&mut self, segment: impl Into<SegmentBuf>) {
+        self.segments.push_back(segment.into());
     }
 
     #[instrument(level = "trace")]
@@ -128,9 +159,9 @@ impl LookupBuf {
         self.segments.pop_back()
     }
 
-    #[instrument(level = "trace")]
-    pub fn push_front(&mut self, segment: SegmentBuf) {
-        self.segments.push_front(segment)
+    #[instrument(level = "trace", skip(segment))]
+    pub fn push_front(&mut self, segment: impl Into<SegmentBuf>) {
+        self.segments.push_front(segment.into())
     }
 
     #[instrument(level = "trace")]

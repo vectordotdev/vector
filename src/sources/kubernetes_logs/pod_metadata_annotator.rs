@@ -125,7 +125,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = &fields_spec.pod_labels;
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push_back(Segment::from(key.as_str()).into());
+            path.push_back(key.to_string());
             log.insert(path, val.to_owned());
         }
     }

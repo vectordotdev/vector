@@ -540,7 +540,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event
             .as_mut_log()
-            .insert("index_name".into(), "custom_index");
+            .insert(String::from("index_name"), "custom_index");
         sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;

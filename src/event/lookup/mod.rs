@@ -41,11 +41,11 @@ trait Look<'a>:
 
     fn get(&mut self, index: usize) -> Option<&Self::Segment>;
 
-    fn push_back(&mut self, segment: Self::Segment);
+    fn push_back(&mut self, segment: impl Into<Self::Segment>);
 
     fn pop_back(&mut self) -> Option<Self::Segment>;
 
-    fn push_front(&mut self, segment: Self::Segment);
+    fn push_front(&mut self, segment: impl Into<Self::Segment>);
 
     fn pop_front(&mut self) -> Option<Self::Segment>;
 
@@ -67,9 +67,9 @@ impl<'a> Look<'a> for Lookup<'a> {
     type Segment = Segment<'a>;
 
     fn get(&mut self, index: usize) -> Option<&Self::Segment> { Lookup::get(self, index) }
-    fn push_back(&mut self, segment: Self::Segment) { Lookup::push_back(self, segment) }
+    fn push_back(&mut self, segment: impl Into<Self::Segment>) { Lookup::push_back(self, segment) }
     fn pop_back(&mut self) -> Option<Self::Segment> { Lookup::pop_back(self) }
-    fn push_front(&mut self, segment: Self::Segment) { Lookup::push_front(self, segment) }
+    fn push_front(&mut self, segment: impl Into<Self::Segment>) { Lookup::push_front(self, segment) }
     fn pop_front(&mut self) -> Option<Self::Segment> { Lookup::pop_front(self) }
     fn len(&self) -> usize { self.len() }
     fn is_valid(&self) -> crate::Result<()> { Lookup::is_valid(self) }
@@ -85,9 +85,9 @@ impl Look<'static> for LookupBuf {
     type Segment = SegmentBuf;
 
     fn get(&mut self, index: usize) -> Option<&Self::Segment> { LookupBuf::get(self, index) }
-    fn push_back(&mut self, segment: Self::Segment) { LookupBuf::push_back(self, segment) }
+    fn push_back(&mut self, segment: impl Into<Self::Segment>) { LookupBuf::push_back(self, segment) }
     fn pop_back(&mut self) -> Option<Self::Segment> { LookupBuf::pop_back(self) }
-    fn push_front(&mut self, segment: Self::Segment) { LookupBuf::push_front(self, segment) }
+    fn push_front(&mut self, segment: impl Into<Self::Segment>) { LookupBuf::push_front(self, segment) }
     fn pop_front(&mut self) -> Option<Self::Segment> { LookupBuf::pop_front(self) }
     fn len(&self) -> usize { self.len() }
     fn is_valid(&self) -> crate::Result<()> { LookupBuf::is_valid(self) }
