@@ -2,7 +2,7 @@ use chrono::{prelude::Local, SecondsFormat};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 
-const ERROR_LEVELS: [&'static str; 9] = [
+const ERROR_LEVELS: [&str; 9] = [
     "alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",
 ];
 
@@ -10,9 +10,9 @@ const HTTP_CODES: [usize; 15] = [
     200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,
 ];
 
-const HTTP_VERSIONS: [&'static str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
+const HTTP_VERSIONS: [&str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
 
-const HTTP_ENDPOINTS: [&'static str; 9] = [
+const HTTP_ENDPOINTS: [&str; 9] = [
     "/wp-admin",
     "/controller/setup",
     "/user/booperbot124",
@@ -24,7 +24,7 @@ const HTTP_ENDPOINTS: [&'static str; 9] = [
     "/this/endpoint/prints/money",
 ];
 
-const ERROR_MESSAGES: [&'static str; 9] = [
+const ERROR_MESSAGES: [&str; 9] = [
     "There's a breach in the warp core, captain",
     "Great Scott! We're never gonna reach 88 mph with the flux capacitor in its current state!",
     "You're not gonna believe what just happened",
@@ -36,8 +36,8 @@ const ERROR_MESSAGES: [&'static str; 9] = [
     "Pretty pretty pretty good",
 ];
 
-const APACHE_COMMON_TIME_FORMAT: &'static str = "%d/%b/%Y:%T %z";
-const APACHE_ERROR_TIME_FORMAT: &'static str = "%a %b %d %T %Y";
+const APACHE_COMMON_TIME_FORMAT: &str = "%d/%b/%Y:%T %z";
+const APACHE_ERROR_TIME_FORMAT: &str = "%a %b %d %T %Y";
 
 pub fn apache_common_log_line() -> String {
     // Example log line:
