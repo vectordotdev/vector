@@ -111,14 +111,14 @@ components: sinks: http: {
 				The full URI to make HTTP requests to. This should include the protocol and host,
 				but can also include the port, path, and any other valid part of a URI.
 				"""
-			required:    true
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
 		healthcheck: type: object: options: uri: {
-			common:      false
+			common: false
 			description: """
 				The full URI to make HTTP health check request to. This should include the protocol and host,
 				but can also include the port, path, and any other valid part of a URI.
@@ -126,7 +126,7 @@ components: sinks: http: {
 			required: false
 			warnings: []
 			type: string: {
-				default:  null
+				default: null
 				examples: ["https://10.22.212.22:9000/health"]
 			}
 		}
