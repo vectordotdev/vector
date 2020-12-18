@@ -214,7 +214,7 @@ async fn topology_remove_one_source() {
     config.add_sink("out1", &["in1"], sink1);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -247,7 +247,7 @@ async fn topology_remove_one_sink() {
     config.add_sink("out1", &["in1"], sink(10).1);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -287,7 +287,7 @@ async fn topology_remove_one_transform() {
     config.add_sink("out1", &["t2"], sink(10).1);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -318,7 +318,7 @@ async fn topology_swap_source() {
     config.add_sink("out1", &["in2"], sink1v2);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -355,7 +355,7 @@ async fn topology_swap_sink() {
     config.add_sink("out2", &["in1"], sink2);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -394,7 +394,7 @@ async fn topology_swap_transform() {
     config.add_sink("out1", &["t2"], sink1v2);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
 
@@ -462,7 +462,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], sink(10).1);
 
     assert!(topology
-        .reload_config_and_respawn(config.build().unwrap(), false)
+        .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
     delay_for(Duration::from_millis(10)).await;
@@ -480,12 +480,14 @@ async fn topology_swap_transform_is_atomic() {
 
 #[tokio::test]
 async fn topology_required_healthcheck_fails_start() {
-    let config = basic_config_with_sink_failing_healthcheck();
+    let mut config = basic_config_with_sink_failing_healthcheck();
+    config.healthchecks.require_healthy = true;
     let diff = vector::config::ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    assert!(topology::start_validated(config, diff, pieces, true)
+
+    assert!(topology::start_validated(config, diff, pieces)
         .await
         .is_none());
 }
@@ -497,7 +499,7 @@ async fn topology_optional_healthcheck_does_not_fail_start() {
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    assert!(topology::start_validated(config, diff, pieces, false)
+    assert!(topology::start_validated(config, diff, pieces)
         .await
         .is_some());
 }
@@ -507,10 +509,7 @@ async fn topology_optional_healthcheck_does_not_fail_reload() {
     let config = basic_config();
     let (mut topology, _crash) = start_topology(config, false).await;
     let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology
-        .reload_config_and_respawn(config, false)
-        .await
-        .unwrap());
+    assert!(topology.reload_config_and_respawn(config).await.unwrap());
 }
 
 #[tokio::test]
@@ -518,11 +517,9 @@ async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let config = basic_config();
 
     let (mut topology, _crash) = start_topology(config, false).await;
-    let config = basic_config_with_sink_failing_healthcheck();
-    assert!(topology
-        .reload_config_and_respawn(config, true)
-        .await
-        .unwrap());
+    let mut config = basic_config_with_sink_failing_healthcheck();
+    config.healthchecks.require_healthy = true;
+    assert!(topology.reload_config_and_respawn(config).await.unwrap());
 }
 
 #[tokio::test]
@@ -541,8 +538,7 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
     config.add_source("in1", src);
     config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
 
-    assert!(!topology
-        .reload_config_and_respawn(config.build().unwrap(), true)
-        .await
-        .unwrap());
+    let mut config = config.build().unwrap();
+    config.healthchecks.require_healthy = true;
+    assert!(!topology.reload_config_and_respawn(config).await.unwrap());
 }

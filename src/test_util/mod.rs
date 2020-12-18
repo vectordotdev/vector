@@ -513,17 +513,18 @@ impl CountReceiver<Event> {
 }
 
 pub async fn start_topology(
-    config: Config,
-    require_healthy: bool,
+    mut config: Config,
+    require_healthy: impl Into<Option<bool>>,
 ) -> (
     RunningTopology,
     futures01::sync::mpsc::UnboundedReceiver<()>,
 ) {
+    config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
-    topology::start_validated(config, diff, pieces, require_healthy)
+    topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
 }

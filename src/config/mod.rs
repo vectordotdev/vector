@@ -40,6 +40,7 @@ pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
@@ -125,6 +126,35 @@ impl GlobalOptions {
             .create(&data_subdir)
             .with_context(|| CouldNotCreate { subdir, data_dir })?;
         Ok(data_subdir)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(default)]
+pub struct HealthcheckOptions {
+    pub enabled: bool,
+    pub require_healthy: bool,
+}
+
+impl HealthcheckOptions {
+    pub fn set_require_healthy(&mut self, require_healthy: impl Into<Option<bool>>) {
+        if let Some(require_healthy) = require_healthy.into() {
+            self.require_healthy = require_healthy;
+        }
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.enabled &= other.enabled;
+        self.require_healthy |= other.require_healthy;
+    }
+}
+
+impl Default for HealthcheckOptions {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            require_healthy: false,
+        }
     }
 }
 
