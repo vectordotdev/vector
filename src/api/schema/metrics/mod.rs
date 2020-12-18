@@ -250,32 +250,40 @@ fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 
 /// Get the events processed by component name.
 pub fn component_processed_events_total(component_name: &str) -> Option<ProcessedEventsTotal> {
-    capture_metrics(&GLOBAL_CONTROLLER)
-        .find(|ev| match ev {
-            Event::Metric(m)
-                if m.name.as_str().eq("processed_events_total")
-                    && m.tag_matches("component_name", &component_name) =>
-            {
-                true
-            }
-            _ => false,
-        })
-        .map(|ev| ProcessedEventsTotal::new(ev.into_metric()))
+    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
+        Event::Metric(m)
+            if m.name.as_str().eq("processed_events_total")
+                && m.tag_matches("component_name", &component_name) =>
+        {
+            Some(m)
+        }
+        _ => None,
+    });
+    let m = metrics.next()?;
+
+    Some(ProcessedEventsTotal::new(metrics.fold(m, |mut m1, m2| {
+        m1.add(&m2);
+        m1
+    })))
 }
 
 /// Get the bytes processed by component name.
 pub fn component_processed_bytes_total(component_name: &str) -> Option<ProcessedBytesTotal> {
-    capture_metrics(&GLOBAL_CONTROLLER)
-        .find(|ev| match ev {
-            Event::Metric(m)
-                if m.name.as_str().eq("processed_bytes_total")
-                    && m.tag_matches("component_name", &component_name) =>
-            {
-                true
-            }
-            _ => false,
-        })
-        .map(|ev| ProcessedBytesTotal::new(ev.into_metric()))
+    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
+        Event::Metric(m)
+            if m.name.as_str().eq("processed_bytes_total")
+                && m.tag_matches("component_name", &component_name) =>
+        {
+            Some(m)
+        }
+        _ => None,
+    });
+    let m = metrics.next()?;
+
+    Some(ProcessedBytesTotal::new(metrics.fold(m, |mut m1, m2| {
+        m1.add(&m2);
+        m1
+    })))
 }
 
 type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
