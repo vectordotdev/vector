@@ -185,7 +185,7 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
+		if sinks[Name].features.healthcheck != _|_ {
 			if sinks[Name].features.healthcheck.enabled {
 				healthcheck: {
 					common:      true
