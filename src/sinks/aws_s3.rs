@@ -428,7 +428,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{log_event, event::LookupBuf};
+    use crate::{event::LookupBuf, log_event};
 
     #[test]
     fn generate_config() {
@@ -442,7 +442,7 @@ mod tests {
         let bytes = encode_event(
             log_event! {
                 crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &batch_time_format,
             &Encoding::Text.into(),
@@ -459,7 +459,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
@@ -478,7 +478,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
@@ -578,8 +578,8 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches,
         event::LookupBuf,
-        test_util::{random_lines_with_stream, random_string},
         log_event,
+        test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
@@ -633,7 +633,7 @@ mod integration_tests {
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
             let mut e = log_event! {
                 crate::config::log_schema().message_key().clone() => line,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             let i = if i < 10 {
                 1

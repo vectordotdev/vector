@@ -156,7 +156,7 @@ impl TryFrom<ArgumentList> for FlattenFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{mapping::query::path::Path, event::{LookupBuf}};
+    use crate::{log_event, config::log_schema, mapping::query::path::Path, event::{LookupBuf}};
     use serde_json::json;
 
     #[test]
@@ -164,7 +164,10 @@ mod test {
         let cases = vec![
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from("foo"), Value::from(vec![Value::from(42)]));
@@ -175,7 +178,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from("foo"),
                         Value::from(vec![
@@ -194,7 +200,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from("foo"),
                         Value::from(vec![Value::from(42), Value::Array(vec![]), Value::from(43)]),
@@ -206,7 +215,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from("foo"),
                         Value::from(vec![
@@ -231,7 +243,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(
                         LookupBuf::from("foo"),
                         Value::from(vec![
@@ -251,7 +266,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!({"parent": "child"});
                     event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
@@ -261,7 +279,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!({"parent": { "child1": 1,
                                                  "child2": 2},
                                      "key": "val"});
@@ -275,7 +296,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!({"parent": { "child1": 1,
                                                  "child2": { "grandchild1": 1,
                                                              "grandchild2": 2}},
@@ -292,7 +316,10 @@ mod test {
             (
                 // If the root object is a map, child arrays are not flattened.
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!({"parent": { "child1": [1, [2, 3]],
                                                  "child2": { "grandchild1": 1,
                                                              "grandchild2": [1, [2, 3], 4]}},
@@ -309,7 +336,10 @@ mod test {
             (
                 // If the root object is an array, child maps are not flattened.
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!(
                         [
                             {"parent1": {"child1": 1,
@@ -337,7 +367,10 @@ mod test {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     let map = json!(
                         {"parent1": { "child1": { "grandchild1": 1 },
                                       "child2": { "grandchild2": 2,

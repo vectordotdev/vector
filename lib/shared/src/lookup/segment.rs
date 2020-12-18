@@ -1,4 +1,4 @@
-use crate::{event::*, lookup::*};
+use crate::lookup::*;
 use pest::iterators::Pair;
 use remap_lang::parser::ParserRule;
 use std::{

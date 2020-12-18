@@ -1,6 +1,6 @@
 pub mod lua;
 
-use crate::{event::*, lookup::*};
+use crate::lookup::*;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -628,7 +628,6 @@ impl Value {
         let _guard = span.enter();
 
         let this_segment = working_lookup.pop_front();
-        let mut is_empty = false;
 
         let retval = match (this_segment, &mut *self) {
             // We've met an end without finding a value. (Terminus nodes on arrays/maps detected prior)
@@ -674,7 +673,6 @@ impl Value {
                     let retval = Ok(map.remove(*name));
                     if map.is_empty() {
                         trace!(prune, "Map is empty. May need to prune.");
-                        is_empty = true
                     } else {
                         trace!(
                             prune,
@@ -725,7 +723,6 @@ impl Value {
                     };
                     if array.is_empty() {
                         trace!(prune, "Array is empty. May need to prune.");
-                        is_empty = true
                     } else {
                         trace!(
                             prune,

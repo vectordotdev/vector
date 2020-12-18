@@ -768,6 +768,7 @@ mod tests {
     use crate::{
         config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{Event, Lookup, LookupBuf},
+        log_event,
         shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
@@ -776,7 +777,6 @@ mod tests {
         },
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
-        log_event,
     };
     use chrono::{TimeZone, Utc};
     use futures::{stream, StreamExt};
@@ -895,13 +895,18 @@ mod tests {
 
         let message = log_event! {
             crate::config::log_schema().message_key().clone() => "gzip_text_event".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+        let event = channel_n(vec![message.clone()], sink, source)
+            .await
+            .remove(0);
 
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            message.as_log()[log_schema().message_key()]
+        );
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -913,12 +918,20 @@ mod tests {
     async fn one_simple_text_event() {
         trace_init();
 
-        let message = "one_simple_text_event";
+        let message = log_event! {
+            crate::config::log_schema().message_key().clone() => "one_simple_text_event".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+        let event = channel_n(vec![message.clone()], sink, source)
+            .await
+            .remove(0);
 
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            message.as_log()[log_schema().message_key()]
+        );
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -936,13 +949,16 @@ mod tests {
         let messages = (0..n)
             .map(|i| log_event! {
                 crate::config::log_schema().message_key().clone() => format!("multiple_simple_text_event_{}", i),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             })
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert_eq!(
+                event.as_log()[log_schema().message_key()],
+                msg.as_log()[log_schema().message_key()]
+            );
             assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
@@ -957,13 +973,18 @@ mod tests {
 
         let message = log_event! {
             crate::config::log_schema().message_key().clone() => "one_simple_json_event".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+        let event = channel_n(vec![message.clone()], sink, source)
+            .await
+            .remove(0);
 
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            message.as_log()[log_schema().message_key()]
+        );
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -979,12 +1000,18 @@ mod tests {
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_json_event{}", i))
+            .map(|i| log_event! {
+                crate::config::log_schema().message_key().clone() => format!("multiple_simple_json_event{}", i),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            })
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert_eq!(
+                event.as_log()[log_schema().message_key()],
+                msg.as_log()[log_schema().message_key()]
+            );
             assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
@@ -1034,13 +1061,19 @@ mod tests {
     async fn raw() {
         trace_init();
 
-        let message = "raw";
+        let message = log_event! {
+            crate::config::log_schema().message_key().clone() => "raw".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let (source, address) = source().await;
 
-        assert_eq!(200, post(address, "services/collector/raw", message).await);
+        assert_eq!(200, post(address, "services/collector/raw", "raw").await);
 
         let event = collect_n(source, 1).await.remove(0);
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            message.as_log()[log_schema().message_key()]
+        );
         assert_eq!(
             event.as_log()[&*super::SPLUNK_CHANNEL_LOOKUP],
             "guid".into()
@@ -1077,14 +1110,22 @@ mod tests {
     async fn no_authorization() {
         trace_init();
 
-        let message = "no_authorization";
+        let message = log_event! {
+            crate::config::log_schema().message_key().clone() => "no_authorization".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let (source, address) = source_with(None).await;
         let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
-        let event = channel_n(vec![message], sink, source).await.remove(0);
+        let event = channel_n(vec![message.clone()], sink, source)
+            .await
+            .remove(0);
 
-        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            event.as_log()[log_schema().message_key()],
+            message.as_log()[log_schema().message_key()]
+        );
     }
 
     #[tokio::test]

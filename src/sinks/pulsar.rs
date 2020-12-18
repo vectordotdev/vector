@@ -325,7 +325,7 @@ mod tests {
         let msg = "hello_world".to_owned();
         let mut evt = log_event! {
             crate::config::log_schema().message_key().clone() => msg.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json), &None).unwrap();
@@ -338,7 +338,7 @@ mod tests {
         let msg = "hello_world".to_owned();
         let evt = log_event! {
             crate::config::log_schema().message_key().clone() => msg.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = encode_event(evt, &EncodingConfig::from(Encoding::Text), &None).unwrap();
 
@@ -359,8 +359,8 @@ mod tests {
 
         let msg = "hello_world".to_owned();
         let mut evt = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().message_key().clone() => msg,
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
         let mut encoding = EncodingConfig::from(Encoding::Avro);
@@ -381,7 +381,7 @@ mod tests {
 
         let mut evt = log_event! {
             crate::config::log_schema().message_key().clone() => msg,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         evt.as_mut_log().insert(LookupBuf::from("key"), "value");
 

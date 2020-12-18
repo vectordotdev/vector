@@ -64,7 +64,7 @@ mod test {
         assert_eq!(
             cond.check(&log_event! {
                 crate::config::log_schema().message_key().clone() => "just a log".to_string(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }),
             false
         );

@@ -600,7 +600,7 @@ impl Condition for CheckFields {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{log_event, Event};
+    use crate::log_event;
 
     #[test]
     fn generate_config() {
@@ -671,7 +671,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -736,7 +736,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -808,7 +808,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -865,7 +865,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -943,7 +943,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1019,7 +1019,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "not foo".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1096,7 +1096,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "starts with a bang".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1148,7 +1148,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "ignored message".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1209,7 +1209,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "ignored field".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1243,7 +1243,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1278,7 +1278,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "ignored field".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));

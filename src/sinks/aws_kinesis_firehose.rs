@@ -268,10 +268,14 @@ mod tests {
     #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(log_event! {
-            crate::config::log_schema().message_key().clone() => message,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
-        }, &Encoding::Text.into()).unwrap();
+        let event = encode_event(
+            log_event! {
+                crate::config::log_schema().message_key().clone() => message.clone(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            },
+            &Encoding::Text.into(),
+        )
+        .unwrap();
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -281,7 +285,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into()).unwrap();

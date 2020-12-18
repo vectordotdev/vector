@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
@@ -422,7 +422,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(crate::config::log_schema().message_key())
+                .get(log_schema().message_key())
                 .map(|v| v.clone_into_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -463,7 +463,7 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, log_event};
+    use crate::{config::log_schema, event::LookupBuf, log_event};
 
     #[test]
     fn generate_config() {
@@ -476,8 +476,8 @@ mod tests {
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &batch_time_format,
             &Encoding::Text.into(),
@@ -493,8 +493,8 @@ mod tests {
     fn gcs_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
@@ -505,7 +505,7 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(
-            map.get(&crate::config::log_schema().message_key().to_string()),
+            map.get(&log_schema().message_key().to_string()),
             Some(&message)
         );
         assert_eq!(map["key"], "value".to_string());
@@ -517,8 +517,8 @@ mod tests {
 
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message,
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 

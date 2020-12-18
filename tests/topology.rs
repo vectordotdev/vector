@@ -10,6 +10,7 @@ use std::{
         Arc,
     },
 };
+use vector::{config::log_schema, log_event};
 
 use tokio::time::{delay_for, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
@@ -31,7 +32,7 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 fn into_message(event: Event) -> String {
     event
         .as_log()
-        .get(vector::config::log_schema().message_key())
+        .get(log_schema().message_key())
         .unwrap()
         .to_string_lossy()
 }
@@ -55,10 +56,13 @@ async fn topology_shutdown_while_active() {
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let pump_handle = tokio::spawn(async move {
-        futures::stream::repeat(Event::from("test"))
-            .map(Ok)
-            .forward(in1)
-            .await
+        futures::stream::repeat(log_event! {
+            log_schema().message_key().clone() => "test".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        })
+        .map(Ok)
+        .forward(in1)
+        .await
     });
 
     // Wait until at least 100 events have been seen by the source so we know the pump is running
@@ -79,7 +83,7 @@ async fn topology_shutdown_while_active() {
     );
     for event in processed_events {
         assert_eq!(
-            event.as_log()[vector::config::log_schema().message_key()],
+            event.as_log()[log_schema().message_key()],
             "test transformed".to_owned().into()
         );
     }
@@ -102,7 +106,10 @@ async fn topology_source_and_sink() {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
     in1.send(event.clone()).await.unwrap();
 
     topology.stop().compat().await.unwrap();
@@ -125,8 +132,14 @@ async fn topology_multiple_sources() {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-    let event1 = Event::from("this");
-    let event2 = Event::from("that");
+    let event1 = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
+    let event2 = log_event! {
+        log_schema().message_key().clone() => "that".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
 
     in1.send(event1.clone()).await.unwrap();
 
@@ -155,7 +168,10 @@ async fn topology_multiple_sinks() {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
 
     in1.send(event.clone()).await.unwrap();
 
@@ -183,7 +199,10 @@ async fn topology_transform_chain() {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
 
     in1.send(event).await.unwrap();
 
@@ -218,8 +237,14 @@ async fn topology_remove_one_source() {
         .await
         .unwrap());
 
-    let event1 = Event::from("this");
-    let event2 = Event::from("that");
+    let event1 = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
+    let event2 = log_event! {
+        log_schema().message_key().clone() => "that".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap();
     in2.send(event2.clone()).await.unwrap_err();
@@ -251,7 +276,10 @@ async fn topology_remove_one_sink() {
         .await
         .unwrap());
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
 
     in1.send(event.clone()).await.unwrap();
 
@@ -291,7 +319,10 @@ async fn topology_remove_one_transform() {
         .await
         .unwrap());
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
     let h_out1 = tokio::spawn(out1.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
     topology.stop().compat().await.unwrap();
@@ -322,8 +353,14 @@ async fn topology_swap_source() {
         .await
         .unwrap());
 
-    let event1 = Event::from("this");
-    let event2 = Event::from("that");
+    let event1 = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
+    let event2 = log_event! {
+        log_schema().message_key().clone() => "that".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
 
     let h_out1v1 = tokio::spawn(out1v1.collect::<Vec<_>>());
     let h_out1v2 = tokio::spawn(out1v2.collect::<Vec<_>>());
@@ -359,7 +396,10 @@ async fn topology_swap_sink() {
         .await
         .unwrap());
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
@@ -398,7 +438,10 @@ async fn topology_swap_transform() {
         .await
         .unwrap());
 
-    let event = Event::from("this");
+    let event = log_event! {
+        log_schema().message_key().clone() => "this".to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+    };
     let h_out1v1 = tokio::spawn(out1v1.map(into_message).collect::<Vec<_>>());
     let h_out1v2 = tokio::spawn(out1v2.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
@@ -428,7 +471,10 @@ async fn topology_swap_transform_is_atomic() {
     let events = move || {
         if running.load(Ordering::Acquire) {
             send_counter.fetch_add(1, Ordering::Release);
-            Some(Event::from("this"))
+            Some(log_event! {
+                log_schema().message_key().clone() => "this".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            })
         } else {
             None
         }

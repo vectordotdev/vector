@@ -126,7 +126,7 @@ mod tests {
     fn encode_event_apply_rules() {
         let mut evt = log_event! {
             crate::config::log_schema().message_key().clone() => "vector".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         evt.as_mut_log().insert(LookupBuf::from("magic"), "key");
 

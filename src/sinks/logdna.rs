@@ -304,10 +304,9 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::Event,
+        log_event,
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines, trace_init},
-        log_event,
     };
     use futures::{stream, StreamExt};
     use serde_json::json;
@@ -331,7 +330,7 @@ mod tests {
 
         let mut event1 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event1
             .as_mut_log()
@@ -342,7 +341,7 @@ mod tests {
 
         let mut event2 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event2
             .as_mut_log()
@@ -350,12 +349,12 @@ mod tests {
 
         let event3 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut event4 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event4
             .as_mut_log()
@@ -416,7 +415,7 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = log_event! {
                 crate::config::log_schema().message_key().clone() => line.to_string(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             let p = i % 2;
             event

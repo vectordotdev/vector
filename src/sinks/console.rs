@@ -156,7 +156,10 @@ impl StreamSink for WriterSink {
 #[cfg(test)]
 mod test {
     use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
-    use crate::{log_event, event::{Event, LookupBuf, Value}};
+    use crate::{
+        event::{Event, LookupBuf, Value},
+        log_event,
+    };
     use chrono::{offset::TimeZone, Utc};
     use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
@@ -169,7 +172,7 @@ mod test {
     fn encodes_raw_logs() {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => "foo",
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(
             "foo",

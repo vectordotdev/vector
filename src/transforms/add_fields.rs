@@ -137,7 +137,7 @@ impl FunctionTransform for AddFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Lookup;
+    use crate::{event::Lookup, log_event};
     use std::{iter::FromIterator, string::ToString};
 
     #[test]
@@ -147,7 +147,10 @@ mod tests {
 
     #[test]
     fn add_fields_event() {
-        let event = Event::from("augment me");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "augment me".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
@@ -163,7 +166,10 @@ mod tests {
 
     #[test]
     fn add_fields_templating() {
-        let event = Event::from("augment me");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "augment me".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
@@ -179,7 +185,10 @@ mod tests {
 
     #[test]
     fn add_fields_overwrite() {
-        let mut event = Event::from("");
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => "".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("some_key"), "some_message");
@@ -197,7 +206,10 @@ mod tests {
     #[test]
     fn add_fields_preserves_types() {
         crate::test_util::trace_init();
-        let event = Event::from("hello world");
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let mut fields = IndexMap::new();
         fields.insert(LookupBuf::from_str("float").unwrap(), Value::from(4.5));

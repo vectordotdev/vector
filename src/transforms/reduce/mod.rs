@@ -299,8 +299,9 @@ impl TaskTransform for Reduce {
 mod test {
     use super::*;
     use crate::{
-        config::TransformConfig,
-        event::{Event, Lookup, Value},
+        config::{log_schema, TransformConfig},
+        event::{Lookup, Value},
+        log_event,
     };
     use futures::compat::Stream01CompatExt;
     use serde_json::json;
@@ -326,24 +327,39 @@ group_by = [ "request_id" ]
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
+        let mut e_1 = log_event! {
+            log_schema().message_key().clone() => "test message 1".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_1.as_mut_log().insert(LookupBuf::from("counter"), 1);
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_2 = Event::from("test message 2");
+        let mut e_2 = log_event! {
+            log_schema().message_key().clone() => "test message 2".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_2.as_mut_log().insert(LookupBuf::from("counter"), 2);
         e_2.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
-        let mut e_3 = Event::from("test message 3");
+        let mut e_3 = log_event! {
+            log_schema().message_key().clone() => "test message 3".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_3.as_mut_log().insert(LookupBuf::from("counter"), 3);
         e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_4 = Event::from("test message 4");
+        let mut e_4 = log_event! {
+            log_schema().message_key().clone() => "test message 4".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_4.as_mut_log().insert(LookupBuf::from("counter"), 4);
         e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
         e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
-        let mut e_5 = Event::from("test message 5");
+        let mut e_5 = log_event! {
+            log_schema().message_key().clone() => "test message 5".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
         e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
         e_5.as_mut_log()
@@ -393,13 +409,19 @@ merge_strategies.baz = "max"
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
+        let mut e_1 = log_event! {
+            log_schema().message_key().clone() => "test message 1".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_1.as_mut_log().insert(LookupBuf::from("foo"), "first foo");
         e_1.as_mut_log().insert(LookupBuf::from("bar"), "first bar");
         e_1.as_mut_log().insert(LookupBuf::from("baz"), 2);
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_2 = Event::from("test message 2");
+        let mut e_2 = log_event! {
+            log_schema().message_key().clone() => "test message 2".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_2.as_mut_log()
             .insert(LookupBuf::from("foo"), "second foo");
         e_2.as_mut_log().insert(LookupBuf::from("bar"), 2);
@@ -407,7 +429,10 @@ merge_strategies.baz = "max"
             .insert(LookupBuf::from("baz"), "not number");
         e_2.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_3 = Event::from("test message 3");
+        let mut e_3 = log_event! {
+            log_schema().message_key().clone() => "test message 3".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_3.as_mut_log().insert(LookupBuf::from("foo"), 10);
         e_3.as_mut_log().insert(LookupBuf::from("bar"), "third bar");
         e_3.as_mut_log().insert(LookupBuf::from("baz"), 3);
@@ -450,23 +475,38 @@ group_by = [ "request_id" ]
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
+        let mut e_1 = log_event! {
+            log_schema().message_key().clone() => "test message 1".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_1.as_mut_log().insert(LookupBuf::from("counter"), 1);
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_2 = Event::from("test message 2");
+        let mut e_2 = log_event! {
+            log_schema().message_key().clone() => "test message 2".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_2.as_mut_log().insert(LookupBuf::from("counter"), 2);
 
-        let mut e_3 = Event::from("test message 3");
+        let mut e_3 = log_event! {
+            log_schema().message_key().clone() => "test message 3".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_3.as_mut_log().insert(LookupBuf::from("counter"), 3);
         e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_4 = Event::from("test message 4");
+        let mut e_4 = log_event! {
+            log_schema().message_key().clone() => "test message 4".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_4.as_mut_log().insert(LookupBuf::from("counter"), 4);
         e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
         e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
-        let mut e_5 = Event::from("test message 5");
+        let mut e_5 = log_event! {
+            log_schema().message_key().clone() => "test message 5".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
         e_5.as_mut_log()
             .insert(LookupBuf::from("extra_field"), "value1");
@@ -507,28 +547,40 @@ merge_strategies.bar = "concat"
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
+        let mut e_1 = log_event! {
+            log_schema().message_key().clone() => "test message 1".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_1.as_mut_log()
             .insert(LookupBuf::from("foo"), json!([1, 3]));
         e_1.as_mut_log()
             .insert(LookupBuf::from("bar"), json!([1, 3]));
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_2 = Event::from("test message 2");
+        let mut e_2 = log_event! {
+            log_schema().message_key().clone() => "test message 2".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_2.as_mut_log()
             .insert(LookupBuf::from("foo"), json!([2, 4]));
         e_2.as_mut_log()
             .insert(LookupBuf::from("bar"), json!([2, 4]));
         e_2.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
-        let mut e_3 = Event::from("test message 3");
+        let mut e_3 = log_event! {
+            log_schema().message_key().clone() => "test message 3".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_3.as_mut_log()
             .insert(LookupBuf::from("foo"), json!([5, 7]));
         e_3.as_mut_log()
             .insert(LookupBuf::from("bar"), json!([5, 7]));
         e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_4 = Event::from("test message 4");
+        let mut e_4 = log_event! {
+            log_schema().message_key().clone() => "test message 4".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_4.as_mut_log()
             .insert(LookupBuf::from("foo"), json!("done"));
         e_4.as_mut_log()
@@ -536,14 +588,20 @@ merge_strategies.bar = "concat"
         e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
         e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
-        let mut e_5 = Event::from("test message 5");
+        let mut e_5 = log_event! {
+            log_schema().message_key().clone() => "test message 5".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_5.as_mut_log()
             .insert(LookupBuf::from("foo"), json!([6, 8]));
         e_5.as_mut_log()
             .insert(LookupBuf::from("bar"), json!([6, 8]));
         e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
-        let mut e_6 = Event::from("test message 6");
+        let mut e_6 = log_event! {
+            log_schema().message_key().clone() => "test message 6".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         e_6.as_mut_log()
             .insert(LookupBuf::from("foo"), json!("done"));
         e_6.as_mut_log()

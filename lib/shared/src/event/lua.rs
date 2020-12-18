@@ -2,7 +2,6 @@ use crate::event::{Event, LogEvent, Metric};
 use rlua::prelude::*;
 
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
-use rlua::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
@@ -127,10 +126,7 @@ impl<'a> FromLua<'a> for Event {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        Lookup, LookupBuf, Metric, Value,
-    };
+    use crate::{event::*, lookup::*};
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
         Lua::new().context(|ctx| {

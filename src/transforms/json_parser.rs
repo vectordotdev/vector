@@ -138,7 +138,8 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::{Event, Lookup, LookupBuf},
+        event::{Lookup, LookupBuf},
+        log_event,
     };
     use serde_json::json;
 
@@ -151,7 +152,10 @@ mod test {
     fn json_parser_drop_field() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
 
-        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = log_event! {
+            log_schema().message_key().clone() => r#"{"greeting": "hello", "name": "bob"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -165,7 +169,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = log_event! {
+            log_schema().message_key().clone() => r#"{"greeting": "hello", "name": "bob"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -179,7 +186,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = log_event! {
+            log_schema().message_key().clone() => r#"{"greeting": "hello", "name": "bob"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -206,7 +216,10 @@ mod test {
             "sub.field": { "another.one": "bob"},
         });
 
-        let event = Event::from(test_json.to_string());
+        let event = log_event! {
+            log_schema().message_key().clone() => test_json.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -227,7 +240,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(r#" {"greeting": "hello", "name": "bob"}    "#);
+        let event = log_event! {
+            log_schema().message_key().clone() => r#" {"greeting": "hello", "name": "bob"}    "#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -250,7 +266,10 @@ mod test {
 
         // Field present
 
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(
             LookupBuf::from("data"),
             r#"{"greeting": "hello", "name": "bob"}"#,
@@ -266,7 +285,10 @@ mod test {
         );
 
         // Field missing
-        let event = Event::from("message");
+        let event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let parsed = parser.transform_one(event.clone()).unwrap();
 
@@ -285,9 +307,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(
-            r#"{"log":"{\"type\":\"response\",\"@timestamp\":\"2018-10-04T21:12:33Z\",\"tags\":[],\"pid\":1,\"method\":\"post\",\"statusCode\":200,\"req\":{\"url\":\"/elasticsearch/_msearch\",\"method\":\"post\",\"headers\":{\"host\":\"logs.com\",\"connection\":\"close\",\"x-real-ip\":\"120.21.3.1\",\"x-forwarded-for\":\"121.91.2.2\",\"x-forwarded-host\":\"logs.com\",\"x-forwarded-port\":\"443\",\"x-forwarded-proto\":\"https\",\"x-original-uri\":\"/elasticsearch/_msearch\",\"x-scheme\":\"https\",\"content-length\":\"1026\",\"accept\":\"application/json, text/plain, */*\",\"origin\":\"https://logs.com\",\"kbn-version\":\"5.2.3\",\"user-agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/532.30 (KHTML, like Gecko) Chrome/62.0.3361.210 Safari/533.21\",\"content-type\":\"application/x-ndjson\",\"referer\":\"https://domain.com/app/kibana\",\"accept-encoding\":\"gzip, deflate, br\",\"accept-language\":\"en-US,en;q=0.8\"},\"remoteAddress\":\"122.211.22.11\",\"userAgent\":\"22.322.32.22\",\"referer\":\"https://domain.com/app/kibana\"},\"res\":{\"statusCode\":200,\"responseTime\":417,\"contentLength\":9},\"message\":\"POST /elasticsearch/_msearch 200 225ms - 8.0B\"}\n","stream":"stdout","time":"2018-10-02T21:14:48.2233245241Z"}"#,
-        );
+        let event = log_event! {
+            log_schema().message_key().clone() => r#"{"log":"{\"type\":\"response\",\"@timestamp\":\"2018-10-04T21:12:33Z\",\"tags\":[],\"pid\":1,\"method\":\"post\",\"statusCode\":200,\"req\":{\"url\":\"/elasticsearch/_msearch\",\"method\":\"post\",\"headers\":{\"host\":\"logs.com\",\"connection\":\"close\",\"x-real-ip\":\"120.21.3.1\",\"x-forwarded-for\":\"121.91.2.2\",\"x-forwarded-host\":\"logs.com\",\"x-forwarded-port\":\"443\",\"x-forwarded-proto\":\"https\",\"x-original-uri\":\"/elasticsearch/_msearch\",\"x-scheme\":\"https\",\"content-length\":\"1026\",\"accept\":\"application/json, text/plain, */*\",\"origin\":\"https://logs.com\",\"kbn-version\":\"5.2.3\",\"user-agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/532.30 (KHTML, like Gecko) Chrome/62.0.3361.210 Safari/533.21\",\"content-type\":\"application/x-ndjson\",\"referer\":\"https://domain.com/app/kibana\",\"accept-encoding\":\"gzip, deflate, br\",\"accept-language\":\"en-US,en;q=0.8\"},\"remoteAddress\":\"122.211.22.11\",\"userAgent\":\"22.322.32.22\",\"referer\":\"https://domain.com/app/kibana\"},\"res\":{\"statusCode\":200,\"responseTime\":417,\"contentLength\":9},\"message\":\"POST /elasticsearch/_msearch 200 225ms - 8.0B\"}\n","stream":"stdout","time":"2018-10-02T21:14:48.2233245241Z"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let parsed_event = parser_outer.transform_one(event).unwrap();
 
@@ -314,7 +337,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(invalid);
+        let event = log_event! {
+            log_schema().message_key().clone() => invalid.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let parsed = parser.transform_one(event.clone()).unwrap();
 
@@ -328,7 +354,10 @@ mod test {
             ..Default::default()
         });
 
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("data"), invalid);
 
         let event = parser.transform_one(event).unwrap();
@@ -350,13 +379,22 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(valid);
+        let event = log_event! {
+            log_schema().message_key().clone() => valid.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         assert!(parser.transform_one(event).is_some());
 
-        let event = Event::from(invalid);
+        let event = log_event! {
+            log_schema().message_key().clone() => invalid.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         assert!(parser.transform_one(event).is_none());
 
-        let event = Event::from(not_object);
+        let event = log_event! {
+            log_schema().message_key().clone() => not_object.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         assert!(parser.transform_one(event).is_none());
 
         // Field
@@ -366,22 +404,34 @@ mod test {
             ..Default::default()
         });
 
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("data"), valid);
         assert!(parser.transform_one(event).is_some());
 
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(LookupBuf::from("data"), invalid);
         assert!(parser.transform_one(event).is_none());
 
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("data"), not_object);
         assert!(parser.transform_one(event).is_none());
 
         // Missing field
-        let event = Event::from("message");
+        let event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         assert!(parser.transform_one(event).is_none());
     }
 
@@ -396,9 +446,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(
-            r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#,
-        );
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let event = parser1.transform_one(event).unwrap();
         let event = parser2.transform_one(event).unwrap();
 
@@ -417,8 +468,8 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(
-            r#"{
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"{
               "string": "this is text",
               "null": null,
               "float": 12.34,
@@ -428,8 +479,9 @@ mod test {
               "array": ["z", 7],
               "object": { "nested": "data", "more": "values" },
               "deep": [[[{"a": { "b": { "c": [[[1234]]]}}}]]]
-            }"#,
-        );
+            }"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let event = parser.transform_one(event).unwrap();
 
         assert_eq!(
@@ -476,12 +528,13 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(
-            r#"{
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"{
                 "key": "data",
                 "message": "inner"
-            }"#,
-        );
+            }"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -496,7 +549,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(r#"invalid json"#);
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"invalid json"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = parser.transform_one(event).unwrap();
 
@@ -514,7 +570,10 @@ mod test {
             ..Default::default()
         });
 
-        let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let event = log_event! {
+            log_schema().message_key().clone() => r#"{"greeting": "hello", "name": "bob"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 
@@ -534,7 +593,10 @@ mod test {
         });
 
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
-        let event = Event::from(message);
+        let event = log_event! {
+            log_schema().message_key().clone() => message.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 
@@ -556,7 +618,10 @@ mod test {
         });
 
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
-        let event = Event::from(message);
+        let event = log_event! {
+            log_schema().message_key().clone() => message.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 

@@ -61,7 +61,7 @@ impl TcpSource for RawTcpSource {
         let byte_size = frame.len();
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => frame,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         event.as_mut_log().insert(

@@ -1,6 +1,6 @@
 use crate::{
     config::log_schema,
-    event::{Event, LookupBuf},
+    event::LookupBuf,
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
         SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,

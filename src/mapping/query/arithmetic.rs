@@ -2,7 +2,6 @@ use super::query_value::QueryValue;
 use super::Function;
 use crate::{
     event::{Event, Value},
-    log_event,
     mapping::Result,
 };
 use bytes::BytesMut;
@@ -239,6 +238,7 @@ mod tests {
     use super::*;
     use crate::{
         event::LookupBuf,
+        log_event,
         mapping::query::{path::Path, regex::Regex, Literal},
     };
 
@@ -248,7 +248,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Integer(15)),
                 Arithmetic::new(
@@ -260,7 +260,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Err("unable to multiply left-hand field type Boolean(true)".into()),
                 Arithmetic::new(
@@ -273,7 +273,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event
                         .as_mut_log()
@@ -293,7 +293,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Err("unable to divide right-hand field type Boolean(true)".into()),
                 Arithmetic::new(
@@ -305,7 +305,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Err("arithmetic can not be performed with regex".to_string()),
                 Arithmetic::new(
@@ -321,7 +321,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Integer(1)),
                 Arithmetic::new(
@@ -333,7 +333,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Integer(17)),
                 Arithmetic::new(
@@ -345,7 +345,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::from("foobar")),
                 Arithmetic::new(
@@ -357,7 +357,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Float(17.0)),
                 Arithmetic::new(
@@ -369,7 +369,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -381,7 +381,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -393,7 +393,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -405,7 +405,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
@@ -417,7 +417,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
@@ -429,7 +429,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -441,7 +441,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(
@@ -453,7 +453,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -465,7 +465,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(true)),
                 Arithmetic::new(
@@ -477,7 +477,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Ok(Value::Boolean(false)),
                 Arithmetic::new(

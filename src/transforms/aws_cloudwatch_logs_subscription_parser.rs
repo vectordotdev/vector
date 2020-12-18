@@ -184,8 +184,8 @@ mod test {
                 field: None,
             });
 
-        let mut event = Event::from(
-            r#"
+        let mut event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"
 {
   "messageType": "DATA_MESSAGE",
   "owner": "071959437513",
@@ -207,8 +207,9 @@ mod test {
     }
   ]
 }
-"#,
-        );
+"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let log = event.as_mut_log();
         log.insert(LookupBuf::from("keep"), "field");
 
@@ -250,8 +251,8 @@ mod test {
                 field: None,
             });
 
-        let event = Event::from(
-            r#"
+        let event = log_event! {
+            crate::config::log_schema().message_key().clone() => r#"
 {
   "messageType": "CONTROL_MESSAGE",
   "owner": "CloudwatchLogs",
@@ -266,8 +267,9 @@ mod test {
     }
   ]
 }
-"#,
-        );
+"#.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let mut output: Vec<Event> = Vec::new();
 

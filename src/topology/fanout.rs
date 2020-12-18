@@ -179,7 +179,7 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{test_util::collect_ready01, Event};
+    use crate::{log_event, test_util::collect_ready01, Event};
     use futures::compat::Future01CompatExt;
     use futures01::{stream, sync::mpsc, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
     use tokio::time::{delay_for, Duration};
@@ -579,7 +579,12 @@ mod tests {
 
     fn make_events(count: usize) -> Vec<Event> {
         (0..count)
-            .map(|i| Event::from(format!("line {}", i)))
+            .map(|i| {
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => format!("line {}", i),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                }
+            })
             .collect()
     }
 }

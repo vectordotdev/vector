@@ -5170,18 +5170,6 @@ checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
 [[package]]
 name = "rlua"
 version = "0.17.1-alpha.0"
-source = "git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320#25bd7e6bffef9597466a98bfca80a3056c9e6320"
-dependencies = [
- "bitflags",
- "bstr",
- "cc",
- "libc",
- "num-traits",
-]
-
-[[package]]
-name = "rlua"
-version = "0.17.1-alpha.0"
 source = "git+https://github.com/kyren/rlua#25bd7e6bffef9597466a98bfca80a3056c9e6320"
 dependencies = [
  "bitflags",
@@ -5896,7 +5884,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "remap-lang",
- "rlua 0.17.1-alpha.0 (git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320)",
+ "rlua",
  "serde",
  "serde_json",
  "snafu",
@@ -7309,7 +7297,7 @@ dependencies = [
  "remap-functions",
  "remap-lang",
  "reqwest",
- "rlua 0.17.1-alpha.0 (git+https://github.com/kyren/rlua)",
+ "rlua",
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",

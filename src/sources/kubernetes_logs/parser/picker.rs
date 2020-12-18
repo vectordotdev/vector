@@ -64,9 +64,9 @@ mod tests {
     use super::*;
     use crate::{
         event::{Event, LogEvent, LookupBuf},
+        log_event,
         test_util::trace_init,
         transforms::Transform,
-        log_event,
     };
 
     /// Picker has to work for all test cases for underlying parsers.
@@ -92,7 +92,7 @@ mod tests {
         for message in cases {
             let input = log_event! {
                 crate::config::log_schema().message_key().clone() => message,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             let mut picker = Picker::new();
             let mut output = Vec::new();

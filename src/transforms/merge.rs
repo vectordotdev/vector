@@ -160,7 +160,11 @@ impl TaskTransform for Merge {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{self, Event, Lookup};
+    use crate::{
+        config::log_schema,
+        event::{self, Event, Lookup},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {
@@ -177,7 +181,10 @@ mod test {
         let mut merge = Merge::from(MergeConfig::default());
 
         // A non-partial event.
-        let sample_event = Event::from("hello world");
+        let sample_event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         // Once processed by the transform.
         let merged_event = merge.transform_one(sample_event.clone()).unwrap();
@@ -190,9 +197,18 @@ mod test {
     fn merge_merges_partial_events() {
         let mut merge = Merge::from(MergeConfig::default());
 
-        let partial_event_1 = make_partial(Event::from("hel"));
-        let partial_event_2 = make_partial(Event::from("lo "));
-        let non_partial_event = Event::from("world");
+        let partial_event_1 = make_partial(log_event! {
+            log_schema().message_key().clone() => "hel".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        });
+        let partial_event_2 = make_partial(log_event! {
+            log_schema().message_key().clone() => "lo ".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        });
+        let non_partial_event = log_event! {
+            log_schema().message_key().clone() => "world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         assert!(merge.transform_one(partial_event_1).is_none());
         assert!(merge.transform_one(partial_event_2).is_none());
@@ -222,7 +238,10 @@ mod test {
         });
 
         let make_event = |message, stream| {
-            let mut event = Event::from(message);
+            let mut event = log_event! {
+                log_schema().message_key().clone() => message,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             event
                 .as_mut_log()
                 .insert(stream_discriminant_field.clone(), stream);

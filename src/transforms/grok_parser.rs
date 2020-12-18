@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf, PathIter, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -160,7 +160,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, TransformConfig},
-        event::{Event, LogEvent, Value},
+        event::{LogEvent, Value},
         log_event,
     };
     use pretty_assertions::assert_eq;
@@ -180,7 +180,7 @@ mod tests {
     ) -> LogEvent {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => event.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
@@ -235,7 +235,7 @@ mod tests {
 
         assert_eq!(2, event.keys(true).count());
         assert_eq!(
-            Value::from("Help I'm stuck in an HTTP server".clone()),
+            Value::from("Help I'm stuck in an HTTP server".to_string()),
             event[log_schema().message_key()]
         );
         assert!(!event[log_schema().timestamp_key()]

@@ -275,7 +275,11 @@ pub fn format_error(error: &rlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Lookup, Value};
+    use crate::{
+        config::log_schema,
+        event::{Event, Lookup, Value},
+        log_event,
+    };
 
     #[test]
     fn lua_add_field() {
@@ -289,7 +293,10 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = log_event! {
+            log_schema().message_key().clone() => "program me".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = transform.transform_one(event).unwrap();
 
@@ -309,7 +316,10 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = log_event! {
+            log_schema().message_key().clone() => "Hello, my name is Bob.".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         let event = transform.transform_one(event).unwrap();
 

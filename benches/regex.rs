@@ -3,7 +3,7 @@ use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::{Alphanumeric, Distribution, Uniform};
 
-use vector::{config::TransformConfig, event::Event, test_util::runtime, transforms};
+use vector::{config::TransformConfig, event::Event, log_event, test_util::runtime, transforms};
 
 fn benchmark_regex(c: &mut Criterion) {
     let lines: Vec<String> = http_access_log_lines().take(10).collect();
@@ -13,7 +13,15 @@ fn benchmark_regex(c: &mut Criterion) {
         lines.iter().fold(0, |sum, l| sum + l.len()) as u64,
     ));
 
-    let input: Vec<Event> = lines.into_iter().map(|l| l.into()).collect();
+    let input: Vec<Event> = lines
+        .into_iter()
+        .map(|l| {
+            log_event! {
+                vector::config::log_schema().message_key().clone() => l,
+                vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            }
+        })
+        .collect();
 
     group.bench_function("regex", |b| {
         let mut rt = runtime();

@@ -105,14 +105,17 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, mapping::query::{regex::Regex, path::Path}};
+    use crate::{log_event, config::log_schema, event::LookupBuf, mapping::query::{regex::Regex, path::Path}};
 
     #[test]
     fn check_split() {
         let cases = vec![
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(""));
                     event
                 },
@@ -125,7 +128,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from("foo"), Value::from("This is a long string."));
@@ -146,7 +152,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from("foo"), Value::from("This is a long string."));
@@ -166,7 +175,10 @@ mod tests {
             ),
             (
                 {
-                    let mut event = Event::from("");
+                    let mut event = log_event! {
+                        log_schema().message_key().clone() => "".to_string(),
+                        log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    };
                     event
                         .as_mut_log()
                         .insert(LookupBuf::from("foo"), Value::from("ThisaisAlongAstring."));

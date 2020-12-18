@@ -8,7 +8,6 @@ use crate::{
         Transform,
     },
 };
-use rlua::prelude::*;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
@@ -344,10 +343,12 @@ fn format_error(error: &rlua::Error) -> String {
 mod tests {
     use super::*;
     use crate::{
+        config::log_schema,
         event::{
             metric::{Metric, MetricKind, MetricValue},
             Event, Lookup, LookupBuf, Value,
         },
+        log_event,
         test_util::trace_init,
         transforms::TaskTransform,
     };
@@ -372,7 +373,10 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = log_event! {
+            log_schema().message_key().clone() => "program me".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
         let mut out_stream = transform.transform(in_stream).compat();
         let output = out_stream.next().await.unwrap().unwrap();
@@ -397,7 +401,10 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = log_event! {
+            log_schema().message_key().clone() => "Hello, my name is Bob.".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
         let mut out_stream = transform.transform(in_stream).compat();
         let output = out_stream.next().await.unwrap().unwrap();
@@ -840,7 +847,12 @@ mod tests {
 
         let n: usize = 10;
 
-        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n).map(|i| {
+            log_event! {
+                log_schema().message_key().clone() => format!("program me {}", i),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            }
+        });
 
         let in_stream = Box::new(futures01::stream::iter_ok(events));
         let out_stream = transform.transform(in_stream).compat();

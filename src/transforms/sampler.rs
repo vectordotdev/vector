@@ -123,6 +123,7 @@ mod tests {
         conditions::check_fields::CheckFieldsPredicateArg,
         config::log_schema,
         event::{Event, Lookup},
+        log_event,
         test_util::random_lines,
     };
     use approx::assert_relative_eq;
@@ -205,7 +206,10 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().clone())] {
-            let event = Event::from("i am important");
+            let event = log_event! {
+                log_schema().message_key().clone() => "i am important".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             let mut sampler =
                 Sampler::new(0, key_field.clone(), Some(condition_contains("important")));
             let iterations = 0..1000;
@@ -219,7 +223,10 @@ mod tests {
     #[test]
     fn handles_key_field() {
         for key_field in &[None, Some(log_schema().timestamp_key().clone())] {
-            let event = Event::from("nananana");
+            let event = log_event! {
+                log_schema().message_key().clone() => "nananana".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             let mut sampler = Sampler::new(
                 0,
                 key_field.clone(),
@@ -268,13 +275,24 @@ mod tests {
 
             // If the event passed the regex check, don't include the sampling rate
             let mut sampler = Sampler::new(25, key_field.clone(), Some(condition_contains("na")));
-            let event = Event::from("nananana");
+            let event = log_event! {
+                log_schema().message_key().clone() => "nananana".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             let passing = sampler.transform_one(event).unwrap();
             assert!(passing.as_log().get(Lookup::from("sample_rate")).is_none());
         }
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10).take(n).map(Event::from).collect()
+        random_lines(10)
+            .take(n)
+            .map(|v| {
+                log_event! {
+                    log_schema().message_key().clone() => v,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                }
+            })
+            .collect()
     }
 }

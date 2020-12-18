@@ -384,7 +384,7 @@ impl Source {
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<LookupBuf>) -> Event {
     let mut event = log_event! {
         crate::config::log_schema().message_key().clone() => line,
-        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
 
     // Add source type.

@@ -244,7 +244,7 @@ pub mod tests {
         for message in cases {
             let input = log_event! {
                 crate::config::log_schema().message_key().clone() => message,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             let mut output = Vec::new();
             Docker.transform(&mut output, input);

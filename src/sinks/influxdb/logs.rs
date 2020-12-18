@@ -240,13 +240,13 @@ mod tests {
     use super::*;
     use crate::{
         event::{Event, LookupBuf},
+        log_event,
         sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
         sinks::util::{
             http::HttpSink,
             test::{build_test_server, load_sink},
         },
         test_util::next_addr,
-        log_event,
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
@@ -273,7 +273,7 @@ mod tests {
     fn test_encode_event_apply_rules() {
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -305,7 +305,7 @@ mod tests {
     fn test_encode_event_v1() {
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -360,7 +360,7 @@ mod tests {
     fn test_encode_event() {
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -415,7 +415,7 @@ mod tests {
     fn test_encode_event_without_tags() {
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         event.as_mut_log().insert(LookupBuf::from("value"), 100);
@@ -505,7 +505,7 @@ mod tests {
     fn test_add_tag() {
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -575,7 +575,7 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = log_event! {
                 crate::config::log_schema().message_key().clone() => line.to_string(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             event.as_mut_log().insert(
                 LookupBuf::from_str(&format!("key{}", i)).unwrap(),
@@ -646,7 +646,7 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = log_event! {
                 crate::config::log_schema().message_key().clone() => line.to_string(),
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             event
                 .as_mut_log()
@@ -726,12 +726,12 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         event::LookupBuf,
+        log_event,
         sinks::influxdb::{
             logs::InfluxDBLogsConfig,
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDB2Settings,
         },
-        log_event,
     };
     use chrono::Utc;
     use futures::stream;
@@ -766,7 +766,7 @@ mod integration_tests {
 
         let mut event1 = log_event! {
             crate::config::log_schema().message_key().clone() => "message_1".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event1
             .as_mut_log()
@@ -777,7 +777,7 @@ mod integration_tests {
 
         let mut event2 = log_event! {
             crate::config::log_schema().message_key().clone() => "message_2".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event2
             .as_mut_log()

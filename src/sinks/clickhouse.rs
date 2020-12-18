@@ -267,10 +267,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::{Event, LookupBuf},
+        event::LookupBuf,
+        log_event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
-        log_event,
     };
     use futures::{future, stream};
     use serde_json::Value;
@@ -317,7 +317,7 @@ mod integration_tests {
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()
@@ -371,7 +371,7 @@ mod integration_tests {
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()
@@ -435,7 +435,7 @@ timestamp_format = "unix""#,
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()
@@ -494,7 +494,7 @@ timestamp_format = "unix""#,
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()
@@ -543,7 +543,7 @@ timestamp_format = "unix""#,
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()

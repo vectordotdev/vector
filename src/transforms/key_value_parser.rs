@@ -203,7 +203,7 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Lookup, LookupBuf, Value},
-        log_event, Event,
+        log_event,
     };
 
     async fn parse_log(
@@ -218,7 +218,7 @@ mod tests {
     ) -> LogEvent {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut parser = KeyValueConfig {

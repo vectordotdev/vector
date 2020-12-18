@@ -178,7 +178,7 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             .map(|r| {
                 Ok(log_event! {
                     crate::config::log_schema().message_key().clone() => r?,
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 })
             })
             .collect::<Result<_, _>>(),

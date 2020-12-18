@@ -206,7 +206,10 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 mod tests {
     use super::*;
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::{log_event, event::{Event, LookupBuf, Value}};
+    use crate::{
+        event::{Event, LookupBuf, Value},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {
@@ -217,7 +220,7 @@ mod tests {
     fn encodes_raw_logs() {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => "foo".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(
             "foo",

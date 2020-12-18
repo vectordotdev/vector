@@ -1,8 +1,8 @@
 use super::{query_value::QueryValue, Function};
+use crate::event::util::log::PathIter;
 use crate::{
-    event::{util::log::get_value, Event, Lookup, PathIter},
+    event::{util::log::get_value, Event, Lookup},
     mapping::Result,
-    log_event,
 };
 
 #[derive(Debug)]
@@ -94,7 +94,10 @@ impl Function for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LookupBuf, Value};
+    use crate::{
+        event::{LookupBuf, Value},
+        log_event,
+    };
     use serde_json::json;
 
     #[test]
@@ -103,7 +106,7 @@ mod tests {
             (
                 log_event! {
                     crate::config::log_schema().message_key().clone() => "".to_string(),
-                    crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
                 Err("path .foo not found in event".to_string()),
                 Path::from(vec![vec!["foo"]]),
@@ -112,7 +115,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event
                         .as_mut_log()
@@ -126,7 +129,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("\"foo.bar\".baz").unwrap(),
@@ -141,7 +144,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo bar.baz").unwrap(),
@@ -156,7 +159,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo.bar[0].baz").unwrap(),
@@ -171,7 +174,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event.as_mut_log().insert(
                         LookupBuf::from_str("foo bar.baz").unwrap(),
@@ -186,7 +189,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event
                         .as_mut_log()
@@ -200,7 +203,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event
                         .as_mut_log()
@@ -214,7 +217,7 @@ mod tests {
                 {
                     let mut event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
-                        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+                        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event
                         .as_mut_log()

@@ -1,4 +1,4 @@
-use crate::{event::*, lookup::*};
+use crate::lookup::*;
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},

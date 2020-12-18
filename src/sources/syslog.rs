@@ -358,7 +358,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = log_event! {
         crate::config::log_schema().message_key().clone() => parsed.msg[..].to_string(),
-        crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
 
     // Add source type
@@ -541,7 +541,10 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         {
             let expected = expected.as_mut_log();
@@ -581,7 +584,10 @@ mod test {
             r#"[incorrect x]"#, msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -675,7 +681,10 @@ mod test {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
 
-        let mut expected = Event::from(msg);
+        let mut expected = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
@@ -705,7 +714,10 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
@@ -741,7 +753,10 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = log_event! {
+            crate::config::log_schema().message_key().clone() => msg.to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         {
             let expected = expected.as_mut_log();
             expected.insert(

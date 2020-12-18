@@ -3,7 +3,7 @@ use criterion::{criterion_group, BatchSize, Criterion};
 use chrono::Utc;
 use std::convert::TryFrom;
 
-use vector::{config::log_schema, event::Event};
+use vector::{config::log_schema, log_event};
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use vector::template::Template;
@@ -12,7 +12,10 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 
     group.bench_function("dynamic", |b| {
         let index = Template::try_from("index-%Y.%m.%d").unwrap();
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            vector::config::log_schema().message_key().clone() => "hello world".to_string(),
+            vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), Utc::now());
@@ -26,7 +29,10 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 
     group.bench_function("static", |b| {
         let index = Template::try_from("index").unwrap();
-        let mut event = Event::from("hello world");
+        let mut event = log_event! {
+            vector::config::log_schema().message_key().clone() => "hello world".to_string(),
+            vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), Utc::now());

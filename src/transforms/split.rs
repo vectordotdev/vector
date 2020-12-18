@@ -2,7 +2,6 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
-    log_event,
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -157,8 +156,11 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Lookup, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::TransformConfig,
+        event::{LogEvent, Lookup, Value},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {
@@ -196,7 +198,7 @@ mod tests {
     ) -> LogEvent {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let field_names = fields
             .split(' ')

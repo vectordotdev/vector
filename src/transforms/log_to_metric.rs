@@ -383,6 +383,7 @@ mod tests {
         config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         event::Event,
+        log_event,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
 
@@ -400,7 +401,10 @@ mod tests {
     }
 
     fn create_event(key: &str, value: &str) -> Event {
-        let mut log = Event::from("i am a log");
+        let mut log = log_event! {
+            log_schema().message_key().clone() => "i am a log".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         log.as_mut_log().insert(LookupBuf::from(key), value);
         log.as_mut_log()
             .insert(log_schema().timestamp_key().clone(), ts());
@@ -627,7 +631,10 @@ mod tests {
             "#,
         );
 
-        let mut event = Event::from("i am a log");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "i am a log".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), ts());
@@ -682,7 +689,10 @@ mod tests {
             "#,
         );
 
-        let mut event = Event::from("i am a log");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "i am a log".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), ts());

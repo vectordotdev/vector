@@ -4,15 +4,12 @@ pub mod metric;
 pub mod value;
 pub mod visitors;
 
-use crate::lookup::*;
-use bytes::Bytes;
 pub use log_event::LogEvent;
-pub use metric::Metric;
+pub use metric::{Metric, MetricKind, MetricValue};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
-use tracing::field::Visit;
 pub use value::Value;
 
 #[derive(PartialEq, Debug, Clone)]

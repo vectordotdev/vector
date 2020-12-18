@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::{event::*, lookup::*};
+use crate::lookup::*;
 use core::fmt;
 use pest::iterators::Pair;
 use pest::Parser;

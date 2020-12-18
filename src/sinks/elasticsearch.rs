@@ -485,11 +485,7 @@ fn maybe_set_id(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{Event, Lookup},
-        sinks::util::retries::RetryAction,
-        log_event,
-    };
+    use crate::{event::Lookup, log_event, sinks::util::retries::RetryAction};
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -504,7 +500,7 @@ mod tests {
         let id_key = Some(LookupBuf::from("foo"));
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
@@ -520,7 +516,7 @@ mod tests {
         let id_key = Some(LookupBuf::from("foo"));
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("not_foo"), "bar");
         let mut action = json!({});
@@ -535,7 +531,7 @@ mod tests {
         let id_key: Option<LookupBuf> = None;
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
@@ -577,7 +573,7 @@ mod tests {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello there".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -601,10 +597,9 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         http::HttpClient,
+        log_event,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
-        Event,
-        log_event,
     };
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
@@ -647,7 +642,7 @@ mod integration_tests {
 
         let mut input_event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         input_event
             .as_mut_log()

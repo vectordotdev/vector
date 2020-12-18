@@ -83,7 +83,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value};
+    use crate::{event::Value, log_event};
 
     #[test]
     fn generate_config() {
@@ -97,7 +97,10 @@ mod tests {
                     field: "message".into(),
                 };
 
-                let event = Event::from($in);
+                let event = log_event! {
+                    crate::config::log_schema().message_key().clone() => $in,
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                };
                 let event = transform.transform_one(event).unwrap();
 
                 assert_eq!(

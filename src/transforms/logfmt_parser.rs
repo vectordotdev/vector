@@ -121,7 +121,7 @@ mod tests {
     use crate::{
         config::TransformConfig,
         event::{LogEvent, Lookup, Value},
-        log_event, Event,
+        log_event,
     };
 
     #[test]
@@ -132,7 +132,7 @@ mod tests {
     async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut parser = LogfmtConfig {

@@ -1,8 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use crate::config::log_schema;
-use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use std::collections::{BTreeMap, HashMap};
+use chrono::TimeZone;
+use std::collections::BTreeMap;
 
 pub mod discriminant;
 #[cfg(test)]
@@ -14,7 +12,7 @@ pub mod util;
 pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use shared::{event::*, lookup::*};
 
-use std::convert::{TryFrom, TryInto};
+#[allow(deprecated)]
 pub(crate) use util::log::PathIter;
 
 pub mod proto {
@@ -23,10 +21,6 @@ pub mod proto {
 
 lazy_static::lazy_static! {
     pub static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
-}
-
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
@@ -289,6 +283,7 @@ impl From<Event> for proto::EventWrapper {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::log_schema;
     use regex::Regex;
     use shared::log_event;
     use std::collections::HashSet;
@@ -298,7 +293,7 @@ mod test {
         crate::test_util::trace_init();
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert("foo", "bar".to_string());
         event.as_mut_log().insert("bar", "baz".to_string());
@@ -324,7 +319,7 @@ mod test {
 
         let mut event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert("int", 4);
         event.as_mut_log().insert("float", 5.5);

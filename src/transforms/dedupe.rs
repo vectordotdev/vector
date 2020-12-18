@@ -206,8 +206,11 @@ impl TaskTransform for Dedupe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Lookup, LookupBuf, Value};
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
+    use crate::{
+        event::{Lookup, LookupBuf, Value},
+        log_event,
+    };
     use std::collections::BTreeMap;
 
     #[test]
@@ -246,7 +249,10 @@ mod tests {
     }
 
     fn basic(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "some value");
@@ -255,7 +261,10 @@ mod tests {
             .insert(LookupBuf::from("unmatched"), "another value");
 
         // Test that unmatched field isn't considered
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "some value2");
@@ -264,7 +273,10 @@ mod tests {
             .insert(LookupBuf::from("unmatched"), "another value");
 
         // Test that matched field is considered
-        let mut event3 = Event::from("message");
+        let mut event3 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event3
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "some value");
@@ -304,12 +316,18 @@ mod tests {
     }
 
     fn field_name_matters(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched1"), "some value");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("matched2"), "some value");
@@ -345,7 +363,10 @@ mod tests {
     /// Test that two Events that are considered duplicates get handled that way, even
     /// if the order of the matched fields is different between the two.
     fn field_order_irrelevant(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched1"), "value1");
@@ -354,7 +375,10 @@ mod tests {
             .insert(LookupBuf::from("matched2"), "value2");
 
         // Add fields in opposite order
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("matched2"), "value2");
@@ -393,12 +417,18 @@ mod tests {
 
     /// Test the eviction behavior of the underlying LruCache
     fn age_out(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "some value");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "some value2");
@@ -445,12 +475,18 @@ mod tests {
     /// Test that two events with values for the matched fields that have different
     /// types but the same string representation aren't considered duplicates.
     fn type_matching(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched"), "123");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2.as_mut_log().insert(LookupBuf::from("matched"), 123);
 
         // First event should always be passed through as-is.
@@ -480,12 +516,18 @@ mod tests {
     fn type_matching_nested_objects(mut transform: Dedupe) {
         let mut map1: BTreeMap<String, Value> = BTreeMap::new();
         map1.insert("key".into(), "123".into());
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1.as_mut_log().insert(LookupBuf::from("matched"), map1);
 
         let mut map2: BTreeMap<String, Value> = BTreeMap::new();
         map2.insert("key".into(), 123.into());
-        let mut event2 = Event::from("message");
+        let mut event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event2.as_mut_log().insert(LookupBuf::from("matched"), map2);
 
         // First event should always be passed through as-is.
@@ -518,12 +560,18 @@ mod tests {
 
     /// Test an explicit null vs a field being missing are treated as different.
     fn ignore_vs_missing(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event1
             .as_mut_log()
             .insert(LookupBuf::from("matched"), Value::Null);
 
-        let event2 = Event::from("message");
+        let event2 = log_event! {
+            crate::config::log_schema().message_key().clone() => "message".to_string(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1).unwrap();

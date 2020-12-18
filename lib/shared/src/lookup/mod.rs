@@ -8,15 +8,9 @@ pub use lookup_buf::LookupBuf;
 mod segment;
 pub use segment::Segment;
 
-use pest::iterators::Pair;
-use remap_lang::parser::ParserRule;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::VecDeque;
-use std::convert::TryFrom;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
-use std::ops::{Index, IndexMut};
-use std::str::FromStr;
 
 // This trait, while it is not necessarily imported and used, exists
 // to enforce parity among view/buf types.

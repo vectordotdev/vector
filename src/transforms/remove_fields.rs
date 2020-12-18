@@ -79,7 +79,11 @@ impl FunctionTransform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Lookup, LookupBuf};
+    use crate::{
+        config::log_schema,
+        event::{Lookup, LookupBuf},
+        log_event,
+    };
 
     #[test]
     fn generate_config() {
@@ -88,7 +92,10 @@ mod tests {
 
     #[test]
     fn remove_fields() {
-        let mut event = Event::from("message");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event
             .as_mut_log()
             .insert(LookupBuf::from("to_remove"), "some value");

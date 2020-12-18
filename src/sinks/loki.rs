@@ -247,10 +247,13 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LookupBuf},
-        sinks::util::{http::HttpSink, test::{build_test_server, load_sink}},
-        test_util,
+        event::LookupBuf,
         log_event,
+        sinks::util::{
+            http::HttpSink,
+            test::{build_test_server, load_sink},
+        },
+        test_util,
     };
     use futures::StreamExt;
 
@@ -273,7 +276,7 @@ mod tests {
 
         let mut e1 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         e1.as_mut_log()
@@ -313,7 +316,7 @@ mod tests {
 
         let mut e1 = log_event! {
             crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         e1.as_mut_log()
@@ -378,12 +381,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig,
-        event::{Event, LookupBuf},
-        sinks::util::test::load_sink,
-        template::Template,
-        test_util::random_lines,
-        log_event,
+        config::SinkConfig, event::LookupBuf, log_event, sinks::util::test::load_sink,
+        template::Template, test_util::random_lines,
     };
     use bytes::Bytes;
     use futures::{stream, StreamExt};
@@ -412,9 +411,11 @@ mod integration_tests {
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
-        let events = lines.clone().into_iter().map(|v| log_event! {
-            crate::config::log_schema().message_key().clone() => v,
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+        let events = lines.clone().into_iter().map(|v| {
+            log_event! {
+                crate::config::log_schema().message_key().clone() => v,
+                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            }
         });
         let _ = sink
             .into_sink()
@@ -452,9 +453,11 @@ mod integration_tests {
 
         let events = random_lines(100)
             .take(10)
-            .map(|v| log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            .map(|v| {
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => v,
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                }
             })
             .collect::<Vec<_>>();
         let _ = sink
@@ -492,9 +495,11 @@ mod integration_tests {
         let mut events = lines
             .clone()
             .into_iter()
-            .map(|v| log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            .map(|v| {
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => v,
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                }
             })
             .collect::<Vec<_>>();
 
@@ -560,9 +565,11 @@ mod integration_tests {
         let mut events = lines
             .clone()
             .into_iter()
-            .map(|v| log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            .map(|v| {
+                log_event! {
+                    crate::config::log_schema().message_key().clone() => v,
+                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                }
             })
             .collect::<Vec<_>>();
 

@@ -317,7 +317,7 @@ mod tests {
     use super::RegexParserConfig;
     use crate::{
         config::TransformConfig,
-        event::{Event, LogEvent, Lookup, Value},
+        event::{LogEvent, Lookup, Value},
         log_event,
     };
 
@@ -329,7 +329,7 @@ mod tests {
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => event.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"

@@ -37,14 +37,14 @@ impl LogEventMergeState {
 mod test {
     use super::LogEventMergeState;
     use crate::{
-        event::{Event, LogEvent, Lookup, LookupBuf},
+        event::{LogEvent, Lookup, LookupBuf},
         log_event,
     };
 
     fn log_event_with_message(message: &str) -> LogEvent {
         let event = log_event! {
             crate::config::log_schema().message_key().clone() => message.to_string(),
-            crate::config::log_schema().message_key().clone() => chrono::Utc::now(),
+            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.into_log()
     }
