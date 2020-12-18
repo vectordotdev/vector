@@ -18,6 +18,25 @@ lazy_static! {
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
 }
 
+pub trait Metrics {
+    fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
+}
+
+impl Metrics for Vec<Metric> {
+    fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
+        let mut iter = self.iter();
+        let m = iter.next()?;
+
+        Some(ProcessedEventsTotal::new(iter.fold(
+            m.clone(),
+            |mut m1, m2| {
+                m1.add(m2);
+                m1
+            },
+        )))
+    }
+}
+
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
 pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let controller = get_controller().unwrap();
@@ -65,9 +84,18 @@ pub fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     }
 }
 
+pub fn by_component_name(component_name: &str) -> Vec<Metric> {
+    capture_metrics(&GLOBAL_CONTROLLER)
+        .filter_map(|ev| match ev {
+            Event::Metric(m) if m.tag_matches("component_name", component_name) => Some(m),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Get the events processed by component name.
 pub fn component_processed_events_total(component_name: &str) -> Option<ProcessedEventsTotal> {
-    let mut metrics = capture_metrics(&*GLOBAL_CONTROLLER).filter_map(|ev| match ev {
+    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
         Event::Metric(m)
             if m.name.as_str().eq("processed_events_total")
                 && m.tag_matches("component_name", &component_name) =>
@@ -86,7 +114,7 @@ pub fn component_processed_events_total(component_name: &str) -> Option<Processe
 
 /// Get the bytes processed by component name.
 pub fn component_processed_bytes_total(component_name: &str) -> Option<ProcessedBytesTotal> {
-    let mut metrics = capture_metrics(&*GLOBAL_CONTROLLER).filter_map(|ev| match ev {
+    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
         Event::Metric(m)
             if m.name.as_str().eq("processed_bytes_total")
                 && m.tag_matches("component_name", &component_name) =>
