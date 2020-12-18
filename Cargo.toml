@@ -186,7 +186,7 @@ cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
 k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
-portpicker = "0.1.0"
+portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }
 sha-1 = "0.9"
 sha2 = "0.9"
 sha3 = "0.9"
@@ -199,7 +199,7 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = { version = "0.12.0", optional = true }
+avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 dirs-next = { version = "1", optional = true }
 
 # For WASM

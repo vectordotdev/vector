@@ -434,15 +434,14 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "avro-rs"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bf434d81d873245368207b8423fceea71a3375db67dd5e6022213d828761f7"
+source = "git+https://github.com/flavray/avro-rs?rev=f28acbbb9860bd62cb24ead83878d7526d075454#f28acbbb9860bd62cb24ead83878d7526d075454"
 dependencies = [
  "byteorder",
  "digest 0.9.0",
  "lazy_static",
  "libflate",
  "num-bigint 0.2.6",
- "rand 0.4.6",
+ "rand 0.7.3",
  "serde",
  "serde_json",
  "strum",
@@ -4164,9 +4163,9 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fe9037165d7023b1228bc4ae9a2fa1a2b0095eca6c2998c624723dfd01314a5"
+checksum = "dacdec97876ef3ede8c50efc429220641a0b11ba0048b4b0c357bccbc47c5204"
 dependencies = [
  "num-traits",
 ]
@@ -4463,10 +4462,9 @@ dependencies = [
 [[package]]
 name = "portpicker"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
+source = "git+https://github.com/timberio/portpicker-rs?rev=d15829e906516720881584ff3301a0dd04218fbb#d15829e906516720881584ff3301a0dd04218fbb"
 dependencies = [
- "rand 0.6.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -4725,19 +4723,6 @@ name = "radium"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
-
-[[package]]
-name = "rand"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
-dependencies = [
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "rdrand",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "rand"
