@@ -1,9 +1,11 @@
-use super::{sink, source, transform, Component, INVARIANT};
+use super::{sink, source, transform, Component};
 use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
 };
+
+pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
 lazy_static! {
     pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
@@ -52,4 +54,18 @@ pub fn get_component_names() -> HashSet<String> {
         .keys()
         .cloned()
         .collect::<HashSet<String>>()
+}
+
+/// Gets a component by name. The component is expected to exist.
+pub fn component_by_name(name: &str) -> &Component {
+    COMPONENTS
+        .read()
+        .expect(INVARIANT)
+        .get(name)
+        .expect(INVARIANT)
+}
+
+/// Overwrites component state with new components.
+pub fn update(new_components: HashMap<String, Component>) {
+    *COMPONENTS.write().expect(INVARIANT) = new_components
 }

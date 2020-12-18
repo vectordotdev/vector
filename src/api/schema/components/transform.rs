@@ -1,4 +1,4 @@
-use super::{sink, source, state, Component, INVARIANT};
+use super::{sink, source, state, Component};
 use crate::api::schema::metrics;
 use async_graphql::Object;
 
@@ -29,15 +29,13 @@ impl Transform {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |name| match state::COMPONENTS.read().expect(INVARIANT).get(name) {
-                    Some(t) => match t {
-                        Component::Source(s) => Some(s.clone()),
-                        _ => None,
-                    },
+            .filter_map(|name| match state::component_by_name(name) {
+                Some(t) => match t {
+                    Component::Source(s) => Some(s.clone()),
                     _ => None,
                 },
-            )
+                _ => None,
+            })
             .collect()
     }
 

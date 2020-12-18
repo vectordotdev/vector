@@ -10,8 +10,6 @@ use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use tokio::stream::{Stream, StreamExt};
 
-pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
-
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "name", type = "String"),
@@ -150,12 +148,7 @@ pub fn update_config(config: &Config) {
         .difference(&new_component_names)
         .for_each(|name| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::COMPONENTS
-                    .read()
-                    .expect(INVARIANT)
-                    .get(name)
-                    .expect(INVARIANT)
-                    .clone(),
+                state::component_by_name(name).clone(),
             ));
         });
 
@@ -168,6 +161,6 @@ pub fn update_config(config: &Config) {
             ));
         });
 
-    // Override the old hashmap
-    *state::COMPONENTS.write().expect(INVARIANT) = new_components;
+    // Override the old component state
+    state::update(new_components);
 }
