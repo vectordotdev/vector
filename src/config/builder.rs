@@ -1,8 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, default_data_dir, Config, GlobalOptions, SinkConfig, SinkOuter, SourceConfig,
-    TestDefinition, TransformConfig, TransformOuter,
+    compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter,
+    SourceConfig, TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,8 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
+    #[serde(default)]
+    pub healthchecks: HealthcheckOptions,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     #[serde(default)]
@@ -105,6 +107,8 @@ impl ConfigBuilder {
         if let Err(merge_errors) = self.global.log_schema.merge(with.global.log_schema) {
             errors.extend(merge_errors);
         }
+
+        self.healthchecks.merge(with.healthchecks);
 
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {

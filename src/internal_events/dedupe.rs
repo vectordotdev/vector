@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct DedupeEventProcessed;
-
-impl InternalEvent for DedupeEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct DedupeEventDiscarded {
     pub event: crate::Event,
 }

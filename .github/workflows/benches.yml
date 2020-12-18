@@ -41,7 +41,7 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Download baseline benchmarks
-        uses: dawidd6/action-download-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
+        uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
         continue-on-error: true
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
@@ -49,6 +49,7 @@ jobs:
           branch: master
           name: criterion
           path: target
+          workflow_conclusion: success
       - name: Check if there were master artifacts
         run: |
           test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."

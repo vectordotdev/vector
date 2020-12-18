@@ -1,10 +1,7 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{
-        GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
-        GrokParserMissingField,
-    },
+    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -108,7 +105,6 @@ impl FunctionTransform for GrokParser {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
-        emit!(GrokParserEventProcessed);
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {

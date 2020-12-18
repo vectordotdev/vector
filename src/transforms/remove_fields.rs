@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
+    internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -62,8 +62,6 @@ impl RemoveFields {
 
 impl FunctionTransform for RemoveFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RemoveFieldsEventProcessed);
-
         let log = event.as_mut_log();
         for field in &self.fields {
             let field_string = field.to_string();
