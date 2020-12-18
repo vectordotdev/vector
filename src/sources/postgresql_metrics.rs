@@ -7,11 +7,9 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use futures::{
-    compat::Sink01CompatExt,
     future::{join_all, try_join_all},
     stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
-use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::BTreeMap, future::ready, time::Instant};
@@ -116,9 +114,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         )
         .await?;
 
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {

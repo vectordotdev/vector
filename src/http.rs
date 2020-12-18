@@ -14,7 +14,6 @@ use hyper::{
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
-use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -87,11 +86,7 @@ where
     ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
         let _enter = self.span.enter();
 
-        if !request.headers().contains_key("User-Agent") {
-            request
-                .headers_mut()
-                .insert("User-Agent", self.user_agent.clone());
-        }
+        default_request_headers(&mut request, &self.user_agent);
 
         emit!(http_client::AboutToSendHTTPRequest { request: &request });
 
@@ -134,6 +129,22 @@ where
     }
 }
 
+fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
+    if !request.headers().contains_key("User-Agent") {
+        request
+            .headers_mut()
+            .insert("User-Agent", user_agent.clone());
+    }
+
+    if !request.headers().contains_key("Accept-Encoding") {
+        // hardcoding until we support compressed responses:
+        // https://github.com/timberio/vector/issues/5440
+        request
+            .headers_mut()
+            .insert("Accept-Encoding", HeaderValue::from_static("identity"));
+    }
+}
+
 impl<B> Service<Request<B>> for HttpClient<B>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
@@ -172,49 +183,28 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
     Basic { user: String, password: String },
     Bearer { token: String },
 }
 
-impl Auth {
-    /// Get basic-auth credentials encoded in the url,
-    /// example: http://user:password@example.com/ .
-    /// Remove the credentials from the url if exist.
-    pub fn get_and_strip_basic_auth(url: &str) -> (String, Option<Self>) {
-        match Self::get_and_strip(url) {
-            Some((url, auth)) => (url, Some(auth)),
-            None => (url.to_owned(), None),
-        }
-    }
+pub trait MaybeAuth: Sized {
+    fn choose_one(&self, other: &Self) -> crate::Result<Self>;
+}
 
-    // We can use `?` with this return type.
-    fn get_and_strip(url: &str) -> Option<(String, Self)> {
-        let mut url = url::Url::parse(url).ok()?;
-
-        let user = url.username();
-        let scheme = url.scheme();
-        if !user.is_empty() && (scheme == "http" || scheme == "https") {
-            let user = percent_decode(user.as_bytes())
-                .decode_utf8_lossy()
-                .into_owned();
-
-            let password = url.password().unwrap_or("");
-            let password = percent_decode(password.as_bytes())
-                .decode_utf8_lossy()
-                .into_owned();
-
-            url.set_username("").ok()?;
-            url.set_password(None).ok()?;
-
-            Some((url.to_string(), Auth::Basic { user, password }))
+impl MaybeAuth for Option<Auth> {
+    fn choose_one(&self, other: &Self) -> crate::Result<Self> {
+        if self.is_some() && other.is_some() {
+            Err("Two authorization credentials was provided.".into())
         } else {
-            None
+            Ok(self.clone().or_else(|| other.clone()))
         }
     }
+}
 
+impl Auth {
     pub fn apply<B>(&self, req: &mut Request<B>) {
         self.apply_headers_map(req.headers_mut())
     }
@@ -242,70 +232,35 @@ impl Auth {
 
 #[cfg(test)]
 mod tests {
-    use super::Auth;
-    use http::HeaderMap;
+    use super::*;
 
-    fn test_basic_auth(url: &str) -> (String, Option<String>) {
-        let (url, auth) = Auth::get_and_strip_basic_auth(url);
-        (
-            url,
-            auth.map(|auth| {
-                let mut map = HeaderMap::new();
-                auth.apply_headers_map(&mut map);
-                map["authorization"].to_str().unwrap().to_owned()
-            }),
-        )
+    #[test]
+    fn test_default_request_headers_defaults() {
+        let user_agent = HeaderValue::from_static("vector");
+        let mut request = Request::post("http://example.com").body(()).unwrap();
+        default_request_headers(&mut request, &user_agent);
+        assert_eq!(
+            request.headers().get("Accept-Encoding"),
+            Some(&HeaderValue::from_static("identity")),
+        );
+        assert_eq!(request.headers().get("User-Agent"), Some(&user_agent));
     }
 
     #[test]
-    fn basic_auth_url() {
+    fn test_default_request_headers_does_not_overwrite() {
+        let mut request = Request::post("http://example.com")
+            .header("Accept-Encoding", "gzip")
+            .header("User-Agent", "foo")
+            .body(())
+            .unwrap();
+        default_request_headers(&mut request, &HeaderValue::from_static("vector"));
         assert_eq!(
-            test_basic_auth("http://user:pass@example.com"),
-            (
-                "http://example.com/".to_owned(),
-                Some(format!("Basic {}", base64::encode("user:pass")))
-            )
+            request.headers().get("Accept-Encoding"),
+            Some(&HeaderValue::from_static("gzip")),
         );
-
-        // special character
         assert_eq!(
-            test_basic_auth("http://user:pass;@example.com"),
-            (
-                "http://example.com/".to_owned(),
-                Some(format!("Basic {}", base64::encode("user:pass;")))
-            )
-        );
-
-        // no password
-        assert_eq!(
-            test_basic_auth("http://user@example.com"),
-            (
-                "http://example.com/".to_owned(),
-                Some(format!("Basic {}", base64::encode("user:")))
-            )
-        );
-
-        assert_eq!(
-            test_basic_auth("http://example.com:8080/test"),
-            ("http://example.com:8080/test".to_owned(), None)
-        );
-
-        assert_eq!(
-            test_basic_auth("mailto:admin@example.com"),
-            ("mailto:admin@example.com".to_owned(), None)
-        );
-
-        assert_eq!(test_basic_auth("/test"), ("/test".to_owned(), None));
-
-        // url without protocol is not supported
-        assert_eq!(
-            test_basic_auth("user:pass@example.com/test"),
-            ("user:pass@example.com/test".to_owned(), None)
-        );
-
-        assert_eq!(
-            test_basic_auth("ftp://user:pass@example.com"),
-            ("ftp://user:pass@example.com".to_owned(), None)
+            request.headers().get("User-Agent"),
+            Some(&HeaderValue::from_static("foo"))
         );
     }
 }

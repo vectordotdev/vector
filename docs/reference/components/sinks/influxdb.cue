@@ -5,12 +5,7 @@ components: sinks: _influxdb: {
 		send: {
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "InfluxDB"
-					thing:    "an \(name) database"
-					url:      urls.influxdb
-					versions: null
-				}
+				service: services.influxdb
 
 				interface: {
 					socket: {

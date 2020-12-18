@@ -1,36 +1,14 @@
 package metadata
 
 components: sources: aws_s3: components._aws & {
-	title:       "AWS S3"
-	description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
+	title: "AWS S3"
 
 	features: {
 		multiline: enabled: true
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
-			from: service: {
-				name:     "AWS S3"
-				thing:    "an \(name) bucket"
-				url:      urls.aws_s3
-				versions: null
-
-				setup: [
-					"""
-						Create an [AWS SQS queue][urls.aws_sqs] for Vector to consume bucket
-						notifications from. Then, configure the [bucket
-						notifications](https://docs.aws.amazon.com/AmazonS3/latest/dev/ways-to-add-notification-config-to-bucket.html)
-						to publish to this queue for the following events:
-
-						- PUT
-						- POST
-						- COPY
-						- Multipart upload completed
-
-						These represent object creation events.
-						""",
-				]
-			}
+			from: service:       services.aws_s3
 		}
 	}
 
@@ -52,7 +30,12 @@ components: sources: aws_s3: components._aws & {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			"""
+				The AWS S3 source requires a SQS queue configured to receive S3
+				bucket notifications for the desired S3 buckets.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -243,6 +226,35 @@ components: sources: aws_s3: components._aws & {
 				"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "s3"
+
+			policies: [
+				{
+					_action: "GetObject"
+				},
+			]
+		},
+		{
+			platform:  "aws"
+			_service:  "sqs"
+			_docs_tag: "AWSSimpleQueueService"
+
+			policies: [
+				{
+					_action:       "ReceiveMessage"
+					required_when: "[`strategy`](#strategy) is set to `sqs`"
+				},
+				{
+					_action:       "DeleteMessage"
+					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#delete_message) is set to `true`"
+				},
+			]
+		},
+	]
 
 	telemetry: metrics: {
 		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total

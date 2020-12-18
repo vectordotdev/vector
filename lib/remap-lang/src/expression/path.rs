@@ -54,6 +54,10 @@ impl Path {
     pub(crate) fn new(path: path::Path) -> Self {
         Self { path }
     }
+
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
 }
 
 impl Expression for Path {
@@ -95,7 +99,8 @@ mod tests {
             expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef {
                     fallible: true,
-                    kind: Kind::Bytes
+                    kind: Kind::Bytes,
+                    ..Default::default()
                 });
 
                 Path::from("foo")
@@ -103,6 +108,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 

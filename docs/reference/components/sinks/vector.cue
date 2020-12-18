@@ -3,6 +3,10 @@ package metadata
 components: sinks: vector: {
 	title: "Vector"
 
+	description: """
+		Sends data to another downstream Vector instance via the Vector source.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
@@ -20,7 +24,8 @@ components: sinks: vector: {
 				enabled: true
 				codec: enabled: false
 			}
-			request: enabled: false
+			keepalive: enabled: true
+			request: enabled:   false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -29,12 +34,7 @@ components: sinks: vector: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Vector source"
-					thing:    "a \(name)"
-					url:      urls.vector_source
-					versions: null
-				}
+				service: services.vector
 
 				interface: {
 					socket: {

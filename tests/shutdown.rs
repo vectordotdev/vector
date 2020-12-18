@@ -1,4 +1,4 @@
-#![cfg(all(feature = "shutdown-tests"))]
+#![cfg(feature = "shutdown-tests")]
 
 use assert_cmd::prelude::*;
 use nix::{
@@ -236,15 +236,16 @@ fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
     type = "http"
-    address = "${VECTOR_TEST_ADDRESS}""#,
+    address = "${VECTOR_TEST_ADDRESS}"
+    encoding = "text""#,
     ));
 }
 
 #[test]
-fn timely_shutdown_logplex() {
+fn timely_shutdown_heroku_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "logplex"
+    type = "heroku_logs"
     address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }

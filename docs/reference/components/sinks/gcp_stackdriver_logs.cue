@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_logs: {
-	title:       "GCP Stackdriver Logs"
-	description: "[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications available and performing well."
+	title: "GCP Operations (formerly Stackdrive) Logs"
 
 	classes: {
 		commonly_used: true
@@ -45,12 +44,7 @@ components: sinks: gcp_stackdriver_logs: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "GCP Operations (formerly Stackdriver) logs"
-					thing:    "a \(name) account"
-					url:      urls.gcp_stackdriver_logging
-					versions: null
-				}
+				service: services.gcp_operations_logs
 
 				interface: {
 					socket: {
@@ -220,4 +214,18 @@ components: sinks: gcp_stackdriver_logs: {
 				"""#
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "logging"
+
+			policies: [
+				{
+					_action: "logEntries.create"
+					required_for: ["healthcheck", "write"]
+				},
+			]
+		},
+	]
 }

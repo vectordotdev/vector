@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_sqs: components._aws & {
-	title:       "Amazon Simple Queue Service (SQS)"
-	description: "[Amazon Simple Queue Service (SQS)](\(urls.aws_sqs)) is a fully managed message queuing service that enables you to decouple and scale microservices, distributed systems, and serverless applications."
+	title: "Amazon Simple Queue Service (SQS)"
 
 	classes: {
 		commonly_used: false
@@ -36,12 +35,7 @@ components: sinks: aws_sqs: components._aws & {
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "Amazon Simple Queue Service"
-					thing:    "an \(url) queue"
-					url:      urls.aws_sqs
-					versions: null
-				}
+				service: services.aws_sqs
 
 				interface: {
 					socket: {
@@ -98,4 +92,22 @@ components: sinks: aws_sqs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "sqs"
+			_docs_tag: "AWSSimpleQueueService"
+
+			policies: [
+				{
+					_action: "GetQueueAttributes"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "SendMessage"
+				},
+			]
+		},
+	]
 }

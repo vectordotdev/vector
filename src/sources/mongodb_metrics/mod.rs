@@ -9,11 +9,9 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::Sink01CompatExt,
     future::{join_all, try_join_all},
     stream, SinkExt, StreamExt,
 };
-use futures01::Sink;
 use mongodb::{
     bson::{self, doc, from_document},
     error::Error as MongoError,
@@ -130,9 +128,8 @@ impl SourceConfig for MongoDBMetricsConfig {
         )
         .await?;
 
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
@@ -1043,15 +1040,14 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Stream01CompatExt;
+    use futures::StreamExt;
     use tokio::time::{timeout, Duration};
 
     async fn test_instance(endpoint: &'static str) {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, recv) = Pipeline::new_test();
-        let mut recv = recv.compat();
+        let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
             MongoDBMetricsConfig {
@@ -1086,7 +1082,7 @@ mod integration_tests {
 
         assert!(events.len() > 100);
         for event in events {
-            let metric = event.expect("Valid Event").into_metric();
+            let metric = event.into_metric();
             // validate namespace
             assert!(metric.namespace == Some(namespace.to_string()));
             // validate timestamp

@@ -41,8 +41,10 @@ components: transforms: remap: {
 			type: string: {
 				examples: [
 					"""
-						.type = "foo",
-						.new_field = .old_field * 2
+						. = parse_json(.message)
+						.status = to_int(.status)
+						.duration = parse_duration(.duration, "s")
+						.new_field = .old_field
 						del(.old_field)
 						""",
 				]

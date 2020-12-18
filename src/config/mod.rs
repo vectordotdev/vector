@@ -40,6 +40,7 @@ pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
@@ -128,6 +129,35 @@ impl GlobalOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(default)]
+pub struct HealthcheckOptions {
+    pub enabled: bool,
+    pub require_healthy: bool,
+}
+
+impl HealthcheckOptions {
+    pub fn set_require_healthy(&mut self, require_healthy: impl Into<Option<bool>>) {
+        if let Some(require_healthy) = require_healthy.into() {
+            self.require_healthy = require_healthy;
+        }
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.enabled &= other.enabled;
+        self.require_healthy |= other.require_healthy;
+    }
+}
+
+impl Default for HealthcheckOptions {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            require_healthy: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
     Any,
@@ -185,6 +215,14 @@ pub struct SinkOuter {
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
+}
+
+impl SinkOuter {
+    pub fn resources(&self, name: &str) -> Vec<Resource> {
+        let mut resources = self.inner.resources();
+        resources.append(&mut self.buffer.resources(name));
+        resources
+    }
 }
 
 #[async_trait]
@@ -263,6 +301,7 @@ pub enum Resource {
     Port(SocketAddr),
     SystemFdOffset(usize),
     Stdin,
+    DiskBuffer(String),
 }
 
 impl Resource {
@@ -320,6 +359,7 @@ impl Display for Resource {
             Resource::Port(address) => write!(fmt, "{}", address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Stdin => write!(fmt, "stdin"),
+            Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
 }

@@ -4,6 +4,8 @@ mod object;
 use crate::{Field, Path, Segment, Segment::*};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Serialize, Serializer};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
@@ -24,6 +26,123 @@ pub enum Value {
     Timestamp(DateTime<Utc>),
     Regex(regex::Regex),
     Null,
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use Value::*;
+
+        match &self {
+            Bytes(v) => serializer.serialize_str(&String::from_utf8_lossy(&v)),
+            Integer(v) => serializer.serialize_i64(*v),
+            Float(v) => serializer.serialize_f64(*v),
+            Boolean(v) => serializer.serialize_bool(*v),
+            Map(v) => serializer.collect_map(v),
+            Array(v) => serializer.collect_seq(v),
+            Timestamp(v) => serializer.serialize_str(&v.to_string()),
+            Regex(v) => serializer.serialize_str(&v.to_string()),
+            Null => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> Visitor<'de> for ValueVisitor {
+            type Value = Value;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("any valid JSON value")
+            }
+
+            #[inline]
+            fn visit_bool<E>(self, value: bool) -> Result<Value, E> {
+                Ok(value.into())
+            }
+
+            #[inline]
+            fn visit_i64<E>(self, value: i64) -> Result<Value, E> {
+                Ok(value.into())
+            }
+
+            #[inline]
+            fn visit_u64<E>(self, value: u64) -> Result<Value, E> {
+                Ok((value as i64).into())
+            }
+
+            #[inline]
+            fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
+                Ok(value.into())
+            }
+
+            #[inline]
+            fn visit_str<E>(self, value: &str) -> Result<Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Value::Bytes(Bytes::copy_from_slice(value.as_bytes())))
+            }
+
+            #[inline]
+            fn visit_string<E>(self, value: String) -> Result<Value, E> {
+                Ok(Value::Bytes(value.into()))
+            }
+
+            #[inline]
+            fn visit_none<E>(self) -> Result<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_some<D>(self, deserializer: D) -> Result<Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                Deserialize::deserialize(deserializer)
+            }
+
+            #[inline]
+            fn visit_unit<E>(self) -> Result<Value, E> {
+                Ok(Value::Null)
+            }
+
+            #[inline]
+            fn visit_seq<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                while let Some(value) = visitor.next_element()? {
+                    vec.push(value);
+                }
+
+                Ok(Value::Array(vec))
+            }
+
+            fn visit_map<V>(self, mut visitor: V) -> Result<Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut map = BTreeMap::new();
+                while let Some((key, value)) = visitor.next_entry()? {
+                    map.insert(key, value);
+                }
+
+                Ok(Value::Map(map))
+            }
+        }
+
+        deserializer.deserialize_any(ValueVisitor)
+    }
 }
 
 impl PartialEq for Value {
@@ -70,6 +189,9 @@ pub enum Error {
 
     #[error("unable to divide value type {0} by {1}")]
     Div(Kind, Kind),
+
+    #[error("unable to integer divide value type {0} by {1}")]
+    IntDiv(Kind, Kind),
 
     #[error("unable to add value type {1} to {0}")]
     Add(Kind, Kind),
@@ -159,6 +281,15 @@ impl From<bool> for Value {
 impl From<regex::Regex> for Value {
     fn from(v: regex::Regex) -> Self {
         Value::Regex(v)
+    }
+}
+
+impl<T: Into<Value>> From<Option<T>> for Value {
+    fn from(v: Option<T>) -> Self {
+        match v {
+            Some(v) => v.into(),
+            None => Value::Null,
+        }
     }
 }
 
@@ -359,8 +490,20 @@ impl Value {
         let err = || Error::Div(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv as f64 / f64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv / f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
+        };
+
+        Ok(value)
+    }
+
+    pub fn try_int_div(self, rhs: Self) -> Result<Self, Error> {
+        let err = || Error::IntDiv(self.kind(), rhs.kind());
+
+        let value = match &self {
+            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (*lhv as i64 / i64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
@@ -648,19 +791,19 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use remap_lang::{Path, Value, map};
+    /// # use remap_lang::{value, Path, Value, map};
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
     ///
-    /// let mut value = Value::Array(vec![false.into(), true.into()]);
+    /// let mut value = value!([false, true]);
     /// let path = Path::from_str(".[1].foo").unwrap();
     ///
     /// value.insert_by_path(&path, "bar".into());
     ///
     /// assert_eq!(
     ///     value.get_by_path(&Path::from_str(".").unwrap()),
-    ///     Some(&Value::Array(vec![false.into(), map!["foo": "bar"].into()])),
+    ///     Some(&value!([false, {foo: "bar"}])),
     /// )
     /// ```
     ///
@@ -846,10 +989,16 @@ impl Value {
             match rest.first() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
-                None => {
-                    map.insert(key, new);
-                    return *self = map.into();
-                }
+                None => match self {
+                    Value::Map(map) => {
+                        map.insert(key, new);
+                        return;
+                    }
+                    _ => {
+                        map.insert(key, new);
+                        return *self = map.into();
+                    }
+                },
                 // If there are more segments to traverse, insert an empty map
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
@@ -940,14 +1089,14 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            Value::Bytes(val) => write!(f, r#""{}""#, String::from_utf8_lossy(val)),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
             Value::Boolean(val) => write!(f, "{}", val),
             Value::Map(map) => {
                 let joined = map
                     .iter()
-                    .map(|(key, val)| format!("{}: {}", key, val))
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{{ {} }}", joined)
@@ -961,8 +1110,8 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => write!(f, "{}", val.to_string()),
-            Value::Regex(regex) => write!(f, "{}", regex.to_string()),
-            Value::Null => write!(f, "Null"),
+            Value::Regex(regex) => write!(f, "/{}/", regex.to_string()),
+            Value::Null => write!(f, "null"),
         }
     }
 }
@@ -975,7 +1124,7 @@ mod tests {
     #[test]
     fn test_display() {
         let string = format!("{}", Value::from("Sausage 🌭"));
-        assert_eq!("Sausage 🌭", string);
+        assert_eq!(r#""Sausage 🌭""#, string);
 
         let int = format!("{}", Value::from(42));
         assert_eq!("42", int);
@@ -989,7 +1138,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert("field".to_string(), Value::from(1));
         let map = format!("{}", Value::Map(map));
-        assert_eq!("{ field: 1 }", map);
+        assert_eq!(r#"{ "field": 1 }"#, map);
 
         let array = format!("{}", Value::from(vec![1, 2, 3]));
         assert_eq!("[1, 2, 3]", array);
@@ -997,7 +1146,10 @@ mod tests {
         let timestamp = format!("{}", Value::from(Utc.ymd(2020, 10, 21).and_hms(16, 20, 13)));
         assert_eq!("2020-10-21 16:20:13 UTC", timestamp);
 
+        let regex = format!("{}", Value::from(regex::Regex::new("foo ba+r").unwrap()));
+        assert_eq!("/foo ba+r/", regex);
+
         let null = format!("{}", Value::Null);
-        assert_eq!("Null", null);
+        assert_eq!("null", null);
     }
 }

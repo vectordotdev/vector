@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: http: {
-	title:       "HTTP"
-	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
+	title: "HTTP"
 
 	classes: {
 		commonly_used: true
@@ -123,6 +122,9 @@ components: sinks: http: {
 	}
 
 	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

@@ -34,6 +34,8 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+#[cfg(feature = "transforms-filter")]
+mod filter;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -84,8 +86,6 @@ mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
@@ -108,6 +108,7 @@ mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod topology;
 mod udp;
 mod unix;
 mod vector;
@@ -154,6 +155,8 @@ pub use self::elasticsearch::*;
     feature = "sinks-file",
 ))]
 pub use self::file::*;
+#[cfg(feature = "transforms-filter")]
+pub use self::filter::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
@@ -163,7 +166,8 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-pub use self::http::*;
+#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]
@@ -201,8 +205,6 @@ pub(crate) use self::regex_parser::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
-#[cfg(feature = "transforms-remove_tags")]
-pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
@@ -225,6 +227,7 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;

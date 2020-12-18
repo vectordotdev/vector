@@ -24,7 +24,8 @@ components: sinks: socket: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			keepalive: enabled: true
+			request: enabled:   false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -33,12 +34,7 @@ components: sinks: socket: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "socket receiver"
-					thing:    "a \(name)"
-					url:      urls.socket
-					versions: null
-				}
+				service: services.socket_receiver
 
 				interface: {
 					socket: {
@@ -68,9 +64,9 @@ components: sinks: socket: {
 
 	configuration: {
 		address: {
-			description: "The address to connect to. The address _must_ include a port."
-			groups: ["tcp", "udp"]
-			required: true
+			description:   "The address to connect to. The address _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
@@ -78,8 +74,7 @@ components: sinks: socket: {
 		}
 		mode: {
 			description: "The type of socket to use."
-			groups: ["tcp", "udp", "unix"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				enum: {
@@ -90,9 +85,9 @@ components: sinks: socket: {
 			}
 		}
 		path: {
-			description: "The unix socket path. This should be the absolute path."
-			groups: ["unix"]
-			required: true
+			description:   "The unix socket path. This should be the absolute path."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]

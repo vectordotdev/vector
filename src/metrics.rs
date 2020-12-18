@@ -1,5 +1,5 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, KeyData, Label, Recorder, Unit};
+use metrics::{Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
@@ -16,9 +16,11 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Useful for the end users to help understand the characteristics of their
 // environment and how vectors acts in it.
 const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
-static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(CARDINALITY_KEY_NAME);
+static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
+    [SharedString::const_str(&CARDINALITY_KEY_NAME)];
+static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
 static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
+    CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
 pub fn init() -> crate::Result<()> {
     // Prepare the registry.
@@ -76,7 +78,7 @@ impl VectorRecorder {
 
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::Counter, key);
+        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -84,7 +86,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::Gauge, key);
+        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -97,7 +99,7 @@ impl Recorder for VectorRecorder {
         _unit: Option<Unit>,
         _description: Option<&'static str>,
     ) {
-        let ckey = CompositeKey::new(MetricKind::Histogram, key);
+        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -106,7 +108,7 @@ impl Recorder for VectorRecorder {
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
-        let ckey = CompositeKey::new(MetricKind::Counter, key);
+        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
@@ -114,7 +116,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn update_gauge(&self, key: Key, value: f64) {
-        let ckey = CompositeKey::new(MetricKind::Gauge, key);
+        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
             |handle| handle.update_gauge(value),
@@ -122,7 +124,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn record_histogram(&self, key: Key, value: u64) {
-        let ckey = CompositeKey::new(MetricKind::Histogram, key);
+        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),
@@ -157,7 +159,7 @@ fn snapshot(controller: &Controller) -> Vec<Event> {
     let handles = controller.registry.get_handles();
     handles
         .into_iter()
-        .map(|(ck, m)| {
+        .map(|(ck, (_generation, m))| {
             let (_, k) = ck.into_parts();
             Metric::from_metric_kv(k, m).into()
         })

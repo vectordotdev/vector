@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::RemapConditionExecutionFailed,
+    internal_events::RemapConditionExecutionError,
     Event,
 };
 use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
@@ -26,11 +26,22 @@ impl ConditionConfig for RemapConfig {
             type_def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Boolean,
+                ..Default::default()
             },
         };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, Some(constraint))
-            .map_err(|e| e.to_string())?;
+        // Filter out functions that directly mutate the event.
+        //
+        // TODO(jean): expose this as a method on the `Function` trait, so we
+        // don't need to do this manually.
+        let functions = remap_functions::all()
+            .into_iter()
+            .filter(|f| f.identifier() != "del")
+            .filter(|f| f.identifier() != "only_fields")
+            .collect::<Vec<_>>();
+
+        let program =
+            Program::new(&self.source, &functions, Some(constraint)).map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -69,7 +80,7 @@ impl Condition for Remap {
                 _ => unreachable!("boolean type constraint set"),
             })
             .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
+                emit!(RemapConditionExecutionError);
                 false
             })
     }
@@ -120,8 +131,8 @@ mod test {
             ),
             (
                 log_event![],
-                "",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to null value"),
+                "null",
+                Err("remap error: program error: expected to resolve to an error, or boolean value, but instead resolves to null value"),
                 Ok(()),
             ),
             (

@@ -50,7 +50,6 @@ pub mod metrics;
 pub(crate) mod pipeline;
 #[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
 pub(crate) mod prometheus;
-pub mod remap;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -61,6 +60,7 @@ pub mod sink;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
+pub mod tcp;
 pub mod template;
 pub mod test_util;
 pub mod tls;
@@ -69,6 +69,7 @@ pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
+pub mod trigger;
 pub mod types;
 pub mod unit_test;
 pub mod validate;

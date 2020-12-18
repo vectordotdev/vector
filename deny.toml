@@ -3,8 +3,17 @@ allow = [
   "MIT",
   "CC0-1.0",
   "ISC",
+  "OpenSSL",
   "Unlicense",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "Zlib",
 ]
+
+unlicensed = "warn"
+default = "warn"
 
 private = { ignore = true }
 
@@ -19,11 +28,27 @@ license-files = [
 [advisories]
 ignore = [
     # `net2` crate has been deprecated; use `socket2` instead
+    # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
-    # failure: failure is officially deprecated/unmaintained
+
+    # Type confusion if __private_get_type_id__ is overriden
+    # https://github.com/timberio/vector/issues/5583
+    "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
+
+    # dirs is unmaintained, use dirs-next instead
+    # https://github.com/timberio/vector/issues/5584
+    "RUSTSEC-2020-0053",
+
     # stdweb is unmaintained
-    # can be removed after next release of time
-    # https://github.com/time-rs/time/commit/8b2734351a5cd05a9bd3315f1af76c28b5852fec
+    # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
+
+    # Some lock_api lock guard objects can cause data races
+    # https://github.com/timberio/vector/issues/5587
+    "RUSTSEC-2020-0070",
+
+    # GenericMutexGuard allows data races of non-Sync types across threads
+    # https://github.com/timberio/vector/issues/5586
+    "RUSTSEC-2020-0072",
 ]

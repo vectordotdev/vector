@@ -21,7 +21,6 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    collections::HashSet,
     convert::Infallible,
     net::SocketAddr,
     sync::{Arc, RwLock},
@@ -170,20 +169,11 @@ fn handle(
         (&Method::GET, "/metrics") => {
             let mut s = collector::StringCollector::new();
 
-            // output headers only once
-            let mut processed_headers = HashSet::new();
-
             for metric in metrics {
-                let name = &metric.0.name;
-                if !processed_headers.contains(&name) {
-                    s.encode_header(default_namespace, &metric.0);
-                    processed_headers.insert(name);
-                };
-
                 s.encode_metric(default_namespace, &buckets, quantiles, expired, &metric.0);
             }
 
-            *response.body_mut() = s.result.into();
+            *response.body_mut() = s.finish().into();
 
             response.headers_mut().insert(
                 "Content-Type",
