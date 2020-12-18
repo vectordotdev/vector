@@ -281,14 +281,16 @@ impl StreamSink for PrometheusExporter {
             if interval > self.config.flush_period_secs as i64 {
                 metrics.last_flush_timestamp = now;
 
-                let mut map = IndexMap::new();
-                for (MetricEntry(mut metric), is_incremental_set) in metrics.map.drain(..) {
-                    if is_incremental_set {
-                        metric.reset();
-                    }
-                    map.insert(MetricEntry(metric), is_incremental_set);
-                }
-                metrics.map = map;
+                metrics.map = metrics
+                    .map
+                    .drain(..)
+                    .map(|(MetricEntry(mut metric), is_incremental_set)| {
+                        if is_incremental_set {
+                            metric.reset();
+                        }
+                        (MetricEntry(metric), is_incremental_set)
+                    })
+                    .collect();
             }
 
             match item.kind {
