@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use remap::{Object, Path, Segment};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     collections::{BTreeMap, BTreeSet},
     str::FromStr,
@@ -426,10 +427,19 @@ const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tag
 /// We can get the `type` of the metric in Remap, but can't set  it.
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
 
+#[derive(Debug, Snafu)]
+enum MetricPathError<'a> {
+    #[snafu(display("cannot set root path"))]
+    SetPathError,
+
+    #[snafu(display("invalid path {}: expected one of {}", path, expected))]
+    InvalidPath { path: &'a str, expected: &'a str },
+}
+
 impl Object for Metric {
     fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
         if path.is_root() {
-            return Err("cannot set root path".to_string());
+            return Err(MetricPathError::SetPathError.to_string());
         }
 
         match path.segments() {
@@ -460,10 +470,11 @@ impl Object for Metric {
                 self.kind = MetricKind::try_from(value)?;
                 Ok(())
             }
-            _ => Err(format!(
-                "invalid path {}: expected one of {}",
-                path, VALID_METRIC_PATHS_SET
-            )),
+            _ => Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_SET,
+            }
+            .to_string()),
         }
     }
 
@@ -507,10 +518,11 @@ impl Object for Metric {
             [Segment::Field(type_)] if type_.as_str() == "type" => {
                 Ok(Some(self.value.clone().into()))
             }
-            _ => Err(format!(
-                "invalid path {}: expected one of {}",
-                path, VALID_METRIC_PATHS_GET
-            )),
+            _ => Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_GET,
+            }
+            .to_string()),
         }
     }
 
@@ -537,7 +549,7 @@ impl Object for Metric {
 
     fn remove(&mut self, path: &remap::Path, _compact: bool) -> Result<(), String> {
         if path.is_root() {
-            return Err("cannot set root path".to_string());
+            return Err(MetricPathError::SetPathError.to_string());
         }
 
         match path.segments() {
@@ -553,10 +565,11 @@ impl Object for Metric {
                 self.delete_tag(field.as_str());
                 Ok(())
             }
-            _ => Err(format!(
-                "invalid path {}: expected one of {}",
-                path, VALID_METRIC_PATHS_SET
-            )),
+            _ => Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_SET,
+            }
+            .to_string()),
         }
     }
 }
