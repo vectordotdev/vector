@@ -46,6 +46,8 @@ mod now;
 mod ok;
 #[cfg(feature = "only_fields")]
 mod only_fields;
+#[cfg(feature = "parse_aws_alb_log")]
+mod parse_aws_alb_log;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
 #[cfg(feature = "parse_grok")]
@@ -147,6 +149,8 @@ pub use now::Now;
 pub use ok::OK;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
+#[cfg(feature = "parse_aws_alb_log")]
+pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
 #[cfg(feature = "parse_grok")]
@@ -248,6 +252,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(OK),
         #[cfg(feature = "only_fields")]
         Box::new(OnlyFields),
+        #[cfg(feature = "parse_aws_alb_log")]
+        Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
         #[cfg(feature = "parse_grok")]

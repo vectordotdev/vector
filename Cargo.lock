@@ -5086,6 +5086,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "md-5 0.9.1",
+ "nom 6.0.1",
  "regex",
  "remap-lang",
  "rust_decimal",

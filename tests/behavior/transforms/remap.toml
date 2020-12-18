@@ -1253,3 +1253,49 @@
     "b.equals" = "nope"
     "pass.equals" = true
     "fail.equals" = false
+
+[transforms.remap_function_parse_aws_alb_log]
+  inputs = []
+  type = "remap"
+  source = """
+    .parts = parse_aws_alb_log(.log)
+  """
+[[tests]]
+  name = "remap_function_parse_aws_alb_log"
+  [tests.input]
+    insert_at = "remap_function_parse_aws_alb_log"
+    type = "log"
+    [tests.input.log_fields]
+      log = 'http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"'
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_aws_alb_log"
+    [[tests.outputs.conditions]]
+      "parts.type.equals" = "http"
+      "parts.timestamp.equals" = "2018-11-30T22:23:00.186641Z"
+      "parts.elb.equals" = "app/my-loadbalancer/50dc6c495c0c9188"
+      "parts.client_host.equals" = "192.168.131.39:2817"
+      "parts.target_host.equals" = "<null>"
+      "parts.request_processing_time.equals" = 0.0
+      "parts.target_processing_time.equals" = 0.001
+      "parts.response_processing_time.equals" = 0.0
+      "parts.elb_status_code.equals" = "200"
+      "parts.target_status_code.equals" = "200"
+      "parts.received_bytes.equals" = 34
+      "parts.sent_bytes.equals" = 366
+      "parts.request_method.equals" = "GET"
+      "parts.request_url.equals" = "http://www.example.com:80/"
+      "parts.request_protocol.equals" = "HTTP/1.1"
+      "parts.user_agent.equals" = "curl/7.46.0"
+      "parts.ssl_cipher.equals" = "<null>"
+      "parts.ssl_protocol.equals" = "<null>"
+      "parts.target_group_arn.equals" = "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067"
+      "parts.trace_id.equals" = "Root=1-58337364-23a8c76965a2ef7629b185e3"
+      "parts.domain_name.equals" = "<null>"
+      "parts.chosen_cert_arn.equals" = "<null>"
+      "parts.matched_rule_priority.equals" = "0"
+      "parts.request_creation_time.equals" = "2018-11-30T22:22:48.364000Z"
+      "parts.actions_executed.equals" = "forward"
+      "parts.redirect_url.equals" = "<null>"
+      "parts.error_reason.equals" = "<null>"
+      "parts.classification.equals" = "<null>"
+      "parts.classification_reason.equals" = "<null>"
