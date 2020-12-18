@@ -485,79 +485,70 @@ fn row_get_value<'a, T: FromSql<'a>>(row: &'a Row, key: &'static str) -> Result<
 }
 
 fn config_to_endpoint(config: &Config) -> String {
-    let mut params: Vec<(String, String)> = vec![];
+    let mut params: Vec<(&'static str, String)> = vec![];
 
     // options
     if let Some(options) = config.get_options() {
-        params.push(("options".to_owned(), options.to_string()));
+        params.push(("options", options.to_string()));
     }
 
     // application_name
     if let Some(name) = config.get_application_name() {
-        params.push(("application_name".to_owned(), name.to_string()));
+        params.push(("application_name", name.to_string()));
     }
 
     // ssl_mode, ignore default value (SslMode::Prefer)
     match config.get_ssl_mode() {
-        SslMode::Disable => params.push(("ssl_mode".to_owned(), "disable".to_string())),
+        SslMode::Disable => params.push(("ssl_mode", "disable".to_string())),
         SslMode::Prefer => {} // default, ignore
-        SslMode::Require => params.push(("ssl_mode".to_owned(), "require".to_string())),
+        SslMode::Require => params.push(("ssl_mode", "require".to_string())),
         _ => {} // non_exhaustive
     };
 
     // host
     for host in config.get_hosts() {
         match host {
-            Host::Tcp(host) => params.push(("host".to_owned(), host.to_string())),
+            Host::Tcp(host) => params.push(("host", host.to_string())),
             #[cfg(unix)]
-            Host::Unix(path) => {
-                params.push(("host".to_owned(), path.to_string_lossy().to_string()))
-            }
+            Host::Unix(path) => params.push(("host", path.to_string_lossy().to_string())),
         }
     }
 
     // port
     for port in config.get_ports() {
-        params.push(("port".to_owned(), port.to_string()));
+        params.push(("port", port.to_string()));
     }
 
     // connect_timeout
     if let Some(connect_timeout) = config.get_connect_timeout() {
-        params.push((
-            "connect_timeout".to_owned(),
-            connect_timeout.as_secs().to_string(),
-        ));
+        params.push(("connect_timeout", connect_timeout.as_secs().to_string()));
     }
 
     // keepalives, ignore default value (true)
     if !config.get_keepalives() {
-        params.push(("keepalives".to_owned(), "1".to_owned()));
+        params.push(("keepalives", "1".to_owned()));
     }
 
     // keepalives_idle, ignore default value (2 * 60 * 60)
     let keepalives_idle = config.get_keepalives_idle().as_secs();
     if keepalives_idle != 2 * 60 * 60 {
-        params.push(("keepalives_idle".to_owned(), keepalives_idle.to_string()));
+        params.push(("keepalives_idle", keepalives_idle.to_string()));
     }
 
     // target_session_attrs, ignore default value (TargetSessionAttrs::Any)
     match config.get_target_session_attrs() {
         TargetSessionAttrs::Any => {} // default, ignore
         TargetSessionAttrs::ReadWrite => {
-            params.push(("target_session_attrs".to_owned(), "read-write".to_owned()))
+            params.push(("target_session_attrs", "read-write".to_owned()))
         }
         _ => {} // non_exhaustive
     }
 
     // channel_binding, ignore default value (ChannelBinding::Prefer)
     match config.get_channel_binding() {
-        ChannelBinding::Disable => {
-            params.push(("channel_binding".to_owned(), "disable".to_owned()))
-        }
+        ChannelBinding::Disable => params.push(("channel_binding", "disable".to_owned())),
         ChannelBinding::Prefer => {} // default, ignore
-        ChannelBinding::Require => {
-            params.push(("channel_binding".to_owned(), "require".to_owned()))
-        }
+        ChannelBinding::Require => params.push(("channel_binding", "require".to_owned())),
         _ => {} // non_exhaustive
     }
 
