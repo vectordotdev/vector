@@ -1,39 +1,39 @@
 use chrono::{prelude::Local, SecondsFormat};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
-use lazy_static::lazy_static;
 use rand::{thread_rng, Rng};
 
-lazy_static! {
-    static ref ERROR_LEVELS: Vec<&'static str> =
-        vec!["alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",];
-    static ref HTTP_CODES: Vec<usize> =
-        vec![200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,];
-    static ref HTTP_ENDPOINTS: Vec<&'static str> = vec![
-        "/wp-admin",
-        "/controller/setup",
-        "/user/booperbot124",
-        "/apps/deploy",
-        "/observability/metrics/production",
-        "/secret-info/open-sesame",
-        "/booper/bopper/mooper/mopper",
-        "/do-not-access/needs-work",
-        "/this/endpoint/prints/money",
-    ];
-    static ref HTTP_VERSIONS: Vec<&'static str> = vec!["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
-    static ref ERROR_MESSAGES: Vec<&'static str> = vec![
-        "There's a breach in the warp core, captain",
-        "Great Scott! We're never gonna reach 88 mph with the flux capacitor in its current state!",
-        "You're not gonna believe what just happened",
-        "#hugops to everyone who has to deal with this",
-        "Take a breath, let it go, walk away",
-        "A bug was encountered but not in Vector, which doesn't have bugs",
-        "We're gonna need a bigger boat",
-        "Maybe we just shouldn't use computers",
-        "Pretty pretty pretty good",
-    ];
-    static ref APACHE_COMMON_TIME_FORMAT: &'static str = "%d/%b/%Y:%T %z";
-    static ref APACHE_ERROR_TIME_FORMAT: &'static str = "%a %b %d %T %Y";
-}
+const ERROR_LEVELS: [&'static str; 9] = ["alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",];
+
+const HTTP_CODES: [usize; 15] = [200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,];
+
+const HTTP_VERSIONS: [&'static str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
+
+const HTTP_ENDPOINTS: [&'static str; 9] = [
+    "/wp-admin",
+    "/controller/setup",
+    "/user/booperbot124",
+    "/apps/deploy",
+    "/observability/metrics/production",
+    "/secret-info/open-sesame",
+    "/booper/bopper/mooper/mopper",
+    "/do-not-access/needs-work",
+    "/this/endpoint/prints/money",
+];
+
+const ERROR_MESSAGES: [&'static str; 9] = [
+    "There's a breach in the warp core, captain",
+    "Great Scott! We're never gonna reach 88 mph with the flux capacitor in its current state!",
+    "You're not gonna believe what just happened",
+    "#hugops to everyone who has to deal with this",
+    "Take a breath, let it go, walk away",
+    "A bug was encountered but not in Vector, which doesn't have bugs",
+    "We're gonna need a bigger boat",
+    "Maybe we just shouldn't use computers",
+    "Pretty pretty pretty good",
+];
+
+const APACHE_COMMON_TIME_FORMAT: &'static str = "%d/%b/%Y:%T %z";
+const APACHE_ERROR_TIME_FORMAT: &'static str = "%a %b %d %T %Y";
 
 pub fn apache_common_log_line() -> String {
     // Example log line:
@@ -101,15 +101,15 @@ fn domain() -> String {
 }
 
 fn error_level() -> String {
-    random_from_vec(ERROR_LEVELS.to_vec()).to_string()
+    random_from_array(&ERROR_LEVELS).to_string()
 }
 
 fn error_message() -> String {
-    random_from_vec(ERROR_MESSAGES.to_vec()).to_string()
+    random_from_array(&ERROR_MESSAGES).to_string()
 }
 
 fn http_code() -> String {
-    random_from_vec(HTTP_CODES.to_vec()).to_string()
+    random_from_array(&HTTP_CODES).to_string()
 }
 
 fn byte_size() -> String {
@@ -117,7 +117,7 @@ fn byte_size() -> String {
 }
 
 fn http_endpoint() -> String {
-    random_from_vec(HTTP_ENDPOINTS.to_vec()).into()
+    random_from_array(&HTTP_ENDPOINTS).into()
 }
 
 fn http_method() -> String {
@@ -125,7 +125,7 @@ fn http_method() -> String {
 }
 
 fn http_version() -> String {
-    random_from_vec(HTTP_VERSIONS.to_vec()).into()
+    random_from_array(&HTTP_VERSIONS).into()
 }
 
 fn ipv4_address() -> String {
@@ -157,6 +157,6 @@ fn random_in_range(min: usize, max: usize) -> String {
     thread_rng().gen_range(min, max).to_string()
 }
 
-fn random_from_vec<T: Copy>(v: Vec<T>) -> T {
+fn random_from_array<T: Copy>(v: &[T]) -> T {
     v[thread_rng().gen_range(0, v.len())]
 }

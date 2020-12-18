@@ -25,7 +25,7 @@ pub struct GeneratorConfig {
 
 #[derive(Debug, PartialEq, Snafu)]
 pub enum GeneratorConfigError {
-    #[snafu(display("Expected a non-empty list of lines for random but got an empty list"))]
+    #[snafu(display("A non-empty list of lines is required for the random format"))]
     RandomGeneratorItemsEmpty,
 }
 
@@ -49,27 +49,26 @@ impl OutputFormat {
     fn generate_event(&self, n: usize) -> Event {
         emit!(GeneratorEventProcessed);
 
-        let event_from_log_line = |log: String| -> Event { Event::from(log) };
-
-        match self {
+        let line = match self {
             Self::Random {
                 sequence,
                 ref lines,
-            } => Self::random_line_generate(sequence, lines, n),
-            Self::ApacheCommon => event_from_log_line(apache_common_log_line()),
-            Self::ApacheError => event_from_log_line(apache_error_log_line()),
-            Self::Syslog => event_from_log_line(syslog_5424_log_line()),
-        }
+            } => Self::random_line_generate(*sequence, lines, n),
+            Self::ApacheCommon => apache_common_log_line(),
+            Self::ApacheError => apache_error_log_line(),
+            Self::Syslog => syslog_5424_log_line(),
+        };
+        Event::from(line)
     }
 
-    fn random_line_generate(sequence: &bool, lines: &[String], n: usize) -> Event {
+    fn random_line_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because lines cannot be empty
-        let line: String = lines.choose(&mut rand::thread_rng()).unwrap().into();
+        let line = lines.choose(&mut rand::thread_rng()).unwrap().into();
 
-        if *sequence {
-            Event::from(&format!("{} {}", n, line)[..])
+        if sequence {
+            format!("{} {}", n, line)
         } else {
-            Event::from(&line[..])
+            line
         }
     }
 
@@ -117,9 +116,9 @@ impl GeneratorConfig {
                 interval.next().await;
             }
 
-            let events: Vec<Event> = vec![self.format.generate_event(n)];
+            let event = self.format.generate_event(n);
 
-            out.send_all(&mut futures::stream::iter(events).map(Ok))
+            out.send(event)
                 .await
                 .map_err(|_: crate::pipeline::ClosedError| {
                     error!(message = "Failed to forward events; downstream is closed.");
@@ -146,11 +145,9 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        if let Err(e) = self.format.validate() {
-            return Err(Box::new(e));
-        };
-
-        Ok(self.clone().generator(shutdown, out))
+        self.format.validate()
+            .map_err(Into::into)
+            .map(|()| self.clone().generator(shutdown, out))
     }
 
     fn output_type(&self) -> DataType {
