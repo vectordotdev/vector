@@ -86,6 +86,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 
                         "."
                     }
+                    "" => continue,
                     _ => line,
                 };
 
