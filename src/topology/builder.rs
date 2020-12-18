@@ -161,7 +161,8 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sinks.contains_new(&name))
     {
         let sink_inputs = &sink.inputs;
-        let enable_healthcheck = sink.healthcheck.enabled;
+        let healthcheck = sink.healthcheck();
+        let enable_healthcheck = healthcheck.enabled;
 
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
@@ -181,7 +182,7 @@ pub async fn build_pieces(
 
         let cx = SinkContext {
             acker: acker.clone(),
-            healthcheck: sink.healthcheck.clone(),
+            healthcheck,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {

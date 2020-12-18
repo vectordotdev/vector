@@ -1,5 +1,5 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
+    component::ExampleError, GlobalOptions, HealthcheckOptions, SinkDescription, SourceDescription,
     TransformDescription,
 };
 use colored::*;
@@ -58,7 +58,7 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: bool,
+    pub healthcheck: HealthcheckOptions,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
@@ -264,7 +264,7 @@ fn generate_example(
                         })
                         .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
-                    healthcheck: true,
+                    healthcheck: HealthcheckOptions::default(),
                     inner: example,
                 },
             );
@@ -442,7 +442,7 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
+healthcheck.enabled = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
@@ -473,7 +473,7 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
+healthcheck.enabled = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
@@ -498,7 +498,7 @@ max_length = 102400
 type = "stdin"
 
 [sinks.sink0]
-healthcheck = true
+healthcheck.enabled = true
 inputs = ["source0"]
 target = "stdout"
 type = "console"
@@ -519,7 +519,7 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sinks.sink0]
-healthcheck = true
+healthcheck.enabled = true
 inputs = ["component-name"]
 target = "stdout"
 type = "console"

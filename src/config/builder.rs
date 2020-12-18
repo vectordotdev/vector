@@ -1,8 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter,
-    SourceConfig, TestDefinition, TransformConfig, TransformOuter,
+    compiler, default_data_dir, Config, GlobalOptions, SinkConfig, SinkOuter, SourceConfig,
+    TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -57,15 +57,7 @@ impl ConfigBuilder {
         sink: S,
     ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let sink = SinkOuter {
-            buffer: Default::default(),
-            healthcheck: HealthcheckOptions {
-                enabled: true,
-                uri: None,
-            },
-            inner: Box::new(sink),
-            inputs,
-        };
+        let sink = SinkOuter::new(inputs, Box::new(sink));
 
         self.sinks.insert(name.into(), sink);
     }
