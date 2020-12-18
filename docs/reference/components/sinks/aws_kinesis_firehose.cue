@@ -94,4 +94,21 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "firehose"
+
+			policies: [
+				{
+					_action: "DescribeDeliveryStream"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutRecordBatch"
+				},
+			]
+		},
+	]
 }

@@ -35,6 +35,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/shared",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -44,10 +45,12 @@ members = [
   "lib/vector-api-client",
   "lib/remap-lang",
   "lib/remap-cli",
+  "lib/remap-functions",
 ]
 
 [dependencies]
 # Internal libs
+shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -71,9 +74,9 @@ tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.13.0-alpha.8" }
-metrics-util = { version = "0.4.0-alpha.6"  }
-metrics-tracing-context = { version = "0.1.0-alpha.3"  }
+metrics = { version = "0.13.0-alpha.11" }
+metrics-util = { version = "0.4.0-alpha.8"  }
+metrics-tracing-context = { version = "0.1.0-alpha.5"  }
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
@@ -117,6 +120,7 @@ tui = { version = "0.13.0", optional = true, default-features = false, features 
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
+remap-functions = { path = "lib/remap-functions" }
 
 # External libs
 derivative = "2.1.1"
@@ -182,7 +186,7 @@ cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
 k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
-portpicker = "0.1.0"
+portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }
 sha-1 = "0.9"
 sha2 = "0.9"
 sha3 = "0.9"
@@ -195,7 +199,7 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = { version = "0.12.0", optional = true }
+avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 dirs-next = { version = "1", optional = true }
 
 # For WASM
@@ -313,7 +317,7 @@ sources = [
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes-logs",
-  "sources-logplex",
+  "sources-heroku_logs",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
   "sources-prometheus",
@@ -338,7 +342,7 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-logplex = ["sources-utils-http"]
+sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
@@ -570,3 +574,7 @@ required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+# TODO: update to the next 0.13.x (after 0.13.9, if any) or 0.14 (or higher)
+hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "a00cc20afc597cb55cbc62c70b0b25b46c82a0a6" }

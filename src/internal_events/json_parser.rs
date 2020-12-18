@@ -3,19 +3,6 @@ use metrics::counter;
 use serde_json::Error;
 
 #[derive(Debug)]
-pub(crate) struct JsonParserEventProcessed;
-
-impl InternalEvent for JsonParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
     pub field: &'a str,
     pub value: &'a str,

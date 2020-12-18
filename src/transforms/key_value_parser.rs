@@ -1,10 +1,7 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::Event,
-    internal_events::{
-        KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
-        KeyValueTargetExists,
-    },
+    event::{Event, Value},
+    internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -150,15 +147,13 @@ impl FunctionTransform for KeyValue {
                 }
             }
 
-            emit!(KeyValueEventProcessed);
-
             for (mut key, val) in pairs {
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.to_string().into()) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             log.insert(key, value);
                         }

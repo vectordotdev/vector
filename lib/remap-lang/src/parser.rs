@@ -2,13 +2,14 @@
 
 use crate::{
     expression::{
-        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Noop, Not,
+        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not,
         Path, Target, Variable,
     },
     path, state, Error as E, Expr, Expression, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 #[derive(pest_derive::Parser, Default)]
@@ -148,7 +149,7 @@ impl<'a> Parser<'a> {
         if let Some(expression) = expressions.last() {
             let type_def = expression.type_def(&self.compiler_state);
 
-            if !type_def.kind.is_all() && type_def.kind.contains_regex() {
+            if !type_def.kind.is_all() && type_def.scalar_kind().contains_regex() {
                 return Err(Error::RegexResult.into());
             }
         }
@@ -341,10 +342,7 @@ impl<'a> Parser<'a> {
     /// Parse a [`Value`] into a [`Literal`] expression.
     fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         Ok(match pair.as_rule() {
-            R::string => {
-                let string = pair.into_inner().next().ok_or(e(R::string))?;
-                Literal::from(self.escaped_string_from_pair(string)?).into()
-            }
+            R::string => self.string_from_pair(pair)?.into(),
             R::null => Literal::from(Value::Null).into(),
             R::boolean => Literal::from(pair.as_str() == "true").into(),
             R::integer => {
@@ -354,6 +352,7 @@ impl<'a> Parser<'a> {
                 Literal::from(pair.as_str().parse::<f64>().map_err(|_| e(R::float))?).into()
             }
             R::array => self.array_from_pair(pair)?.into(),
+            R::map => self.map_from_pair(pair)?.into(),
             R::regex => Literal::from(self.regex_from_pair(pair)?).into(),
             _ => return Err(e(R::value)),
         })
@@ -366,6 +365,27 @@ impl<'a> Parser<'a> {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Array::new(expressions))
+    }
+
+    fn map_from_pair(&mut self, pair: Pair<R>) -> Result<Map> {
+        let map = pair
+            .into_inner()
+            .map(|pair| self.kv_from_pair(pair))
+            .collect::<Result<BTreeMap<_, _>>>()?;
+
+        Ok(Map::new(map))
+    }
+
+    fn kv_from_pair(&mut self, pair: Pair<R>) -> Result<(String, Expr)> {
+        let mut inner = pair.into_inner();
+
+        let pair = inner.next().ok_or(e(R::kv_pair))?;
+        let key = self.string_from_pair(pair)?;
+
+        let pair = inner.next().ok_or(e(R::kv_pair))?;
+        let expr = self.expression_from_pair(pair)?;
+
+        Ok((key, expr))
     }
 
     /// Parse function call expressions.
@@ -490,10 +510,7 @@ impl<'a> Parser<'a> {
         let field = pair.into_inner().next().ok_or(e(Rule::path_field))?;
 
         match field.as_rule() {
-            R::string => {
-                let string = field.into_inner().next().ok_or(e(R::string))?;
-                Ok(path::Field::Quoted(self.escaped_string_from_pair(string)?))
-            }
+            R::string => Ok(path::Field::Quoted(self.string_from_pair(field)?)),
             R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
             _ => Err(e(R::path_field)),
         }
@@ -535,6 +552,11 @@ impl<'a> Parser<'a> {
         };
 
         Ok(Variable::new(ident, expr))
+    }
+
+    fn string_from_pair(&self, pair: Pair<R>) -> Result<String> {
+        let string = pair.into_inner().next().ok_or(e(R::string))?;
+        self.escaped_string_from_pair(string)
     }
 
     fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
@@ -667,8 +689,6 @@ mod tests {
             let mut parser = Parser::new(&[]);
             let pairs = parser.program_from_str(source).map_err(RemapError::from);
 
-            dbg!(&pairs);
-
             match pairs {
                 Ok(got) => {
                     if compile_check.is_empty() {
@@ -751,7 +771,7 @@ mod tests {
             ),
             (
                 "if { del(.foo) } else { del(.bar) }",
-                vec![" 1:4\n", "= expected not"],
+                vec![" 1:6\n", "= expected string"],
             ),
             (
                 "if .foo > .bar { del(.foo) } else { .bar = .baz",
@@ -796,6 +816,32 @@ mod tests {
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
                 vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+            ),
+            (
+                r#"/ab/"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"$foo = /ab/"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"[/ab/]"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"
+                    $foo = /ab/
+                    [$foo]
+                "#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"
+                    $foo = [/ab/]
+                    $foo
+                "#,
+                vec!["remap error: parser error: cannot return regex from program"],
             ),
         ];
 

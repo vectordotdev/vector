@@ -15,6 +15,8 @@ pub mod docker_logs;
 pub mod file;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
+#[cfg(feature = "sources-heroku_logs")]
+pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
 pub mod host_metrics;
 #[cfg(feature = "sources-http")]
@@ -29,8 +31,6 @@ pub mod journald;
 pub mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub mod kubernetes_logs;
-#[cfg(feature = "sources-logplex")]
-pub mod logplex;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
 #[cfg(feature = "sources-nginx_metrics")]
