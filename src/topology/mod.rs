@@ -930,8 +930,7 @@ mod reload_tests {
     async fn topology_reuse_old_port_sink() {
         let address = next_addr();
 
-        let source =
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001));
+        let source = GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
         let transform = LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
                 field: "message".to_string(),
@@ -994,7 +993,7 @@ mod reload_tests {
         let mut old_config = Config::builder();
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform("trans", &[&"in"], transform.clone());
         old_config.add_sink(
@@ -1040,7 +1039,7 @@ mod reload_tests {
         old_config.global.data_dir = Some(data_dir);
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform(
             "trans",

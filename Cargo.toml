@@ -201,6 +201,7 @@ dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 dirs-next = { version = "1", optional = true }
+fakedata_generator = "0.2.4"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -334,7 +335,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
-sources-generator = []
+sources-generator = ["sources-utils-fake"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
 sources-internal_logs = []
@@ -352,6 +353,7 @@ sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "
 sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
+sources-utils-fake = []
 sources-utils-http = ["sources-utils-tls", "warp"]
 sources-utils-tcp-keepalive = []
 sources-utils-tls = []

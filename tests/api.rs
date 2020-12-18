@@ -429,8 +429,9 @@ mod tests {
 
                     [sources.processed_events_total_batch_source]
                       type = "generator"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
-                      batch_interval = 0.01
+                      interval = 0.01
 
                     [sinks.processed_events_total_batch_sink]
                       # General
@@ -476,8 +477,9 @@ mod tests {
 
                     [sources.processed_bytes_total_batch_source]
                       type = "generator"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
-                      batch_interval = 0.1
+                      interval = 0.1
 
                     [sinks.processed_bytes_total_batch_sink]
                       # General
@@ -518,8 +520,9 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_added_sink]
                   # General
@@ -564,13 +567,15 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sources.component_added_source_2]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_added_sink]
                   # General
@@ -599,13 +604,15 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sources.component_removed_source_2]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_removed_sink]
                   # General
@@ -651,8 +658,9 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_removed_sink]
                   # General

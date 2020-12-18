@@ -4,6 +4,8 @@ urls: {
 	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
 	apache:                                                   "https://httpd.apache.org/"
+	apache_common:                                            "https://httpd.apache.org/docs/1.3/logs.html#common"
+	apache_error:                                             "https://httpd.apache.org/docs/1.3/logs.html#errorlog"
 	apache_extended_status:                                   "https://httpd.apache.org/docs/current/mod/core.html#extendedstatus"
 	apache_install:                                           "https://httpd.apache.org/docs/current/install.html"
 	apache_mod_status:                                        "http://httpd.apache.org/docs/current/mod/mod_status.html"

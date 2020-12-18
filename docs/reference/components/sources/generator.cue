@@ -41,19 +41,32 @@ components: sources: generator: {
 	}
 
 	configuration: {
-		batch_interval: {
+		format: {
+			description: "The format of the randomly generated output."
+			required:    true
+			warnings: []
+			type: string: {
+				enum: {
+					"shuffle":       "Lines are chosen at random from the list specified using `lines`."
+					"apache_common": "Randomly generated logs in [Apache common](\(urls.apache_common)) format."
+					"apache_error":  "Randomly generated logs in [Apache error](\(urls.apache_error)) format."
+					"syslog":        "Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424)))."
+				}
+			}
+		}
+		interval: {
 			common:      false
-			description: "The amount of time, in seconds, to pause between each batch of output lines. If not set, there will be no delay."
+			description: "The amount of time, in seconds, to pause between each batch of output lines. If not set, there is no delay."
 			required:    false
 			warnings: []
 			type: float: {
 				default: null
-				examples: [1.0]
+				examples: [1.0, 0.1, 0.01]
 			}
 		}
 		count: {
 			common:      false
-			description: "The number of times to repeat outputting the `lines`. By default the source will continuously print logs (infinite)."
+			description: "The total number of lines to output. By default the source continuously prints logs (infinitely)."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -62,15 +75,23 @@ components: sources: generator: {
 			}
 		}
 		lines: {
-			description: "The list of lines to output."
-			required:    true
+			common:        false
+			description:   "The list of lines to output."
+			relevant_when: "`format` = `shuffle`"
+			required:      false
 			warnings: []
-			type: array: items: type: string: examples: ["Line 1", "Line 2"]
+			type: array: {
+				default: null
+				items: type: string: {
+					examples: ["Line 1", "Line 2"]
+				}
+			}
 		}
 		sequence: {
-			common:      false
-			description: "If `true`, each output line will start with an increasing sequence number."
-			required:    false
+			common:        false
+			relevant_when: "`format` = `shuffle`"
+			description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
+			required:      false
 			warnings: []
 			type: bool: default: false
 		}
