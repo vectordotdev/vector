@@ -123,6 +123,7 @@ urls: {
 	cidr:                                                     "https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing"
 	elasticsearch:                                            "https://www.elastic.co/products/elasticsearch"
 	elasticsearch_bulk:                                       "https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html"
+	elasticsearch_data_streams:                               "https://www.elastic.co/guide/en/elasticsearch/reference/current/data-streams.html"
 	elasticsearch_id_field:                                   "https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html"
 	elasticsearch_id_performance:                             "https://www.elastic.co/guide/en/elasticsearch/reference/master/tune-for-indexing-speed.html#_use_auto_generated_ids"
 	elasticsearch_ignore_malformed:                           "https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-malformed.html"
