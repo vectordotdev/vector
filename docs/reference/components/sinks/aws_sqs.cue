@@ -92,4 +92,22 @@ components: sinks: aws_sqs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "sqs"
+			_docs_tag: "AWSSimpleQueueService"
+
+			policies: [
+				{
+					_action: "GetQueueAttributes"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "SendMessage"
+				},
+			]
+		},
+	]
 }

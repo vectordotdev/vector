@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{RemapEventProcessed, RemapMappingError},
+    internal_events::RemapMappingError,
     transforms::{FunctionTransform, Transform},
     Result,
 };
@@ -70,8 +70,6 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RemapEventProcessed);
-
         let mut runtime = Runtime::default();
 
         if let Err(error) = runtime.execute(&mut event, &self.program) {

@@ -80,8 +80,6 @@ impl Expression for ToStringFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
-    use std::collections::BTreeMap;
     use value::Kind;
 
     remap::test_type_def![
@@ -111,7 +109,7 @@ mod tests {
         }
 
         map_infallible {
-            expr: |_| ToStringFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
+            expr: |_| ToStringFn { value: map!{}.boxed(), default: None},
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 

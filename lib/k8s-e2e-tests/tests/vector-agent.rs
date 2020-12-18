@@ -1421,3 +1421,56 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     drop(vector);
     Ok(())
 }
+
+/// This test validates that vector-agent chart properly exposes host metrics
+/// out of the box.
+#[tokio::test]
+async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig::default(),
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut vector_metrics_port_forward =
+        framework.port_forward("test-vector", "daemonset/vector-agent", 9090, 9090)?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
+    // We want to capture the value for the host metrics, but the pipeline for
+    // collecting them takes some time to boot (15s roughly).
+    // We wait twice as much, so the bootstrap is guaranteed.
+    println!("Waiting for Vector bootstrap");
+    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    println!("Done waiting for Vector bootstrap");
+
+    // Ensure the host metrics are exposed in the Prometheus endpoint.
+    metrics::assert_host_metrics_present(&vector_metrics_url).await?;
+
+    drop(vector_metrics_port_forward);
+    drop(vector);
+    Ok(())
+}

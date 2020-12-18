@@ -1,21 +1,23 @@
 package metadata
 
 remap: functions: to_string: {
+	_all_types: ["boolean", "integer", "float", "string", "timestamp", "regex", "null"]
+
 	arguments: [
 		{
 			name:        "value"
 			description: "The value to return a string representation of."
 			required:    true
-			type: ["any"]
+			type:        _all_types
 		},
 		{
 			name:        "default"
 			description: "If the value parameter errors, return this parameter instead."
 			required:    false
-			type: ["any"]
+			type:        _all_types
 		},
 	]
-	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
+	return: ["string"]
 	category: "coerce"
 
 	description: #"""

@@ -145,4 +145,21 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			]
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "kinesis"
+
+			policies: [
+				{
+					_action: "DescribeStream"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutRecords"
+				},
+			]
+		},
+	]
 }

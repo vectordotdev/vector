@@ -31,6 +31,7 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
+        healthchecks: builder.healthchecks,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,

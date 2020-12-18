@@ -436,15 +436,14 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "avro-rs"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bf434d81d873245368207b8423fceea71a3375db67dd5e6022213d828761f7"
+source = "git+https://github.com/flavray/avro-rs?rev=f28acbbb9860bd62cb24ead83878d7526d075454#f28acbbb9860bd62cb24ead83878d7526d075454"
 dependencies = [
  "byteorder",
  "digest 0.9.0",
  "lazy_static",
  "libflate",
  "num-bigint 0.2.6",
- "rand 0.4.6",
+ "rand 0.7.3",
  "serde",
  "serde_json",
  "strum",
@@ -1832,6 +1831,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
+name = "fakedata_generator"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6815202b22ccd0dd16957e52e254c52392c84edafb4d3cc0161b9f30a85dbb88"
+dependencies = [
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "fastrand"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2694,7 +2704,7 @@ dependencies = [
 [[package]]
 name = "hyper"
 version = "0.13.9"
-source = "git+https://github.com/timberio/hyper?rev=4ec7442fb74634ea9d128ad58bb741fa1dabefc7#4ec7442fb74634ea9d128ad58bb741fa1dabefc7"
+source = "git+https://github.com/hyperium/hyper?rev=a00cc20afc597cb55cbc62c70b0b25b46c82a0a6#a00cc20afc597cb55cbc62c70b0b25b46c82a0a6"
 dependencies = [
  "bytes 0.5.6",
  "futures-channel",
@@ -4492,10 +4502,9 @@ dependencies = [
 [[package]]
 name = "portpicker"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
+source = "git+https://github.com/timberio/portpicker-rs?rev=d15829e906516720881584ff3301a0dd04218fbb#d15829e906516720881584ff3301a0dd04218fbb"
 dependencies = [
- "rand 0.6.5",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -4754,19 +4763,6 @@ name = "radium"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "941ba9d78d8e2f7ce474c015eea4d9c6d25b6a3327f9832ee29a4de27f91bbb8"
-
-[[package]]
-name = "rand"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
-dependencies = [
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "rdrand",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "rand"
@@ -5115,6 +5111,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "md-5 0.9.1",
+ "nom 6.0.1",
  "regex",
  "remap-lang",
  "rust_decimal",
@@ -6344,9 +6341,9 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.5.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc84750f2634660415240f7ab6c67022b79d3eccdd9c8f6b969d95e5e409a2c5"
+checksum = "59105a46f64e6e0c60a07061ffd07ef42d137735b5d9796572fe969b21342772"
 dependencies = [
  "chrono",
  "nom 5.1.2",
@@ -7275,6 +7272,7 @@ dependencies = [
  "dyn-clone",
  "evmap",
  "exitcode",
+ "fakedata_generator",
  "file-source",
  "flate2",
  "futures 0.1.30",
