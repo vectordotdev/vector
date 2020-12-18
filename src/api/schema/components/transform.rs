@@ -30,7 +30,7 @@ impl Transform {
             .inputs
             .iter()
             .filter_map(|name| match state::component_by_name(name) {
-                Component::Source(s) => Some(s.clone()),
+                Component::Source(s) => Some(s),
                 _ => None,
             })
             .collect()
