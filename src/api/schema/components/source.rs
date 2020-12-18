@@ -1,5 +1,5 @@
 use super::{sink, state, transform, Component};
-use crate::{api::schema::metrics, config::DataType};
+use crate::config::DataType;
 use async_graphql::{Enum, Object};
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone)]
@@ -65,15 +65,5 @@ impl Source {
             Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
-    }
-
-    /// Metric indicating events processed for the current source
-    pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
-        metrics::component_processed_events_total(&self.0.name)
-    }
-
-    /// Metric indicating bytes processed for the current source
-    pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
-        metrics::component_processed_bytes_total(&self.0.name)
     }
 }
