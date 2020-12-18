@@ -2,8 +2,8 @@
 
 use crate::{
     expression::{
-        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not,
-        Path, Target, TargetResult, Variable,
+        self, assignment, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal,
+        Map, Noop, Not, Path, Target, Variable,
     },
     path, state, Error as E, Expr, Expression, Function as Fn, Operator, Result, Value,
 };
@@ -245,12 +245,14 @@ impl<'a> Parser<'a> {
     }
 
     fn target_result_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+        use assignment::ResultVariant;
+
         let s = pair.as_str();
 
         let variant = match s {
-            _ if s.starts_with("result") => TargetResult::Either,
-            _ if s.starts_with("ok") => TargetResult::Ok,
-            _ if s.starts_with("err") => TargetResult::Err,
+            _ if s.starts_with("result") => ResultVariant::Either,
+            _ if s.starts_with("ok") => ResultVariant::Ok,
+            _ if s.starts_with("err") => ResultVariant::Err,
             _ => return Err(e(R::result)),
         };
 

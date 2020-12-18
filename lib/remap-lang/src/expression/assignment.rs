@@ -3,7 +3,6 @@ use crate::{
     expression::{Path, Variable},
     state, value, Expr, Expression, Object, Result, TypeDef, Value,
 };
-use std::collections::HashMap;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -16,13 +15,13 @@ pub enum Target {
     Path(Path),
     Variable(Variable),
     Result {
-        variant: TargetResult,
+        variant: ResultVariant,
         target: Box<Target>,
     },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TargetResult {
+pub enum ResultVariant {
     Ok,
     Err,
     Either,
@@ -43,9 +42,9 @@ impl Assignment {
                 let mut type_def = type_def.into_fallible(false);
 
                 type_def.kind = match variant {
-                    TargetResult::Err => value::Kind::Bytes,
-                    TargetResult::Ok => type_def.kind,
-                    TargetResult::Either => type_def.kind | value::Kind::Bytes,
+                    ResultVariant::Err => value::Kind::Bytes,
+                    ResultVariant::Ok => type_def.kind,
+                    ResultVariant::Either => type_def.kind | value::Kind::Bytes,
                 };
 
                 assign_type_def(target.as_ref(), type_def, state)
@@ -63,56 +62,10 @@ impl Expression for Assignment {
         let value = self.value.execute(state, object);
 
         match &self.target {
-            Target::Path(path) => {
-                let value = value?;
-
-                object
-                    .insert(path.as_ref(), value.clone())
-                    .map_err(|e| E::Assignment(Error::PathInsertion(e)))?;
-
-                Ok(value.into())
-            }
-
-            Target::Variable(variable) => {
-                let value = value?;
-
-                state
-                    .variables_mut()
-                    .insert(variable.ident().to_owned(), value.clone());
-
-                Ok(value.into())
-            }
-
+            Target::Path(path) => assign_to_object(path, value?, object),
+            Target::Variable(variable) => assign_to_variable(variable, value?, state),
             Target::Result { variant, target } => {
-                let result = match variant {
-                    TargetResult::Err => value.is_err(),
-                    _ => value.is_ok(),
-                };
-
-                let value = match variant {
-                    TargetResult::Ok if result => value.unwrap(),
-                    TargetResult::Err if result => value.unwrap_err().to_string().into(),
-                    TargetResult::Either => value.unwrap_or_else(|err| err.to_string().into()),
-                    _ => return Ok(result.into()),
-                };
-
-                match target.as_ref() {
-                    Target::Path(path) => {
-                        object
-                            .insert(path.as_ref(), value)
-                            .map_err(|e| E::Assignment(Error::PathInsertion(e)))?;
-                    }
-
-                    Target::Variable(variable) => {
-                        state
-                            .variables_mut()
-                            .insert(variable.ident().to_owned(), value);
-                    }
-
-                    _ => unreachable!("cannot assign nested result target"),
-                }
-
-                Ok(result.into())
+                assign_to_result(variant, target, value, object, state)
             }
         }
     }
@@ -138,27 +91,63 @@ impl Expression for Assignment {
 
 fn assign_type_def(target: &Target, type_def: TypeDef, state: &mut state::Compiler) {
     match target {
-        Target::Path(path) => assign(
-            path.as_ref().clone(),
-            type_def,
-            state.path_query_types_mut(),
-        ),
+        Target::Path(path) => state
+            .path_query_types_mut()
+            .insert(path.as_ref().clone(), type_def),
 
-        Target::Variable(variable) => assign(
-            variable.ident().to_owned(),
-            type_def,
-            state.variable_types_mut(),
-        ),
+        Target::Variable(variable) => state
+            .variable_types_mut()
+            .insert(variable.ident().to_owned(), type_def),
 
         _ => unreachable!("cannot assign nested result type-def"),
     };
 }
 
-fn assign<K, V>(key: K, value: V, state: &mut HashMap<K, V>)
-where
-    K: Eq + std::hash::Hash,
-{
-    state.insert(key, value);
+fn assign_to_object(path: &Path, value: Value, object: &mut dyn Object) -> Result<Value> {
+    object
+        .insert(path.as_ref(), value.clone())
+        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?;
+
+    Ok(value)
+}
+
+fn assign_to_variable(
+    variable: &Variable,
+    value: Value,
+    state: &mut state::Program,
+) -> Result<Value> {
+    let ident = variable.ident().to_owned();
+    state.variables_mut().insert(ident, value.clone());
+
+    Ok(value)
+}
+
+fn assign_to_result(
+    variant: &ResultVariant,
+    target: &Target,
+    value: Result<Value>,
+    object: &mut dyn Object,
+    state: &mut state::Program,
+) -> Result<Value> {
+    let result = match variant {
+        ResultVariant::Err => value.is_err(),
+        _ => value.is_ok(),
+    };
+
+    let value = match variant {
+        ResultVariant::Ok if result => value.unwrap(),
+        ResultVariant::Err if result => value.unwrap_err().to_string().into(),
+        ResultVariant::Either => value.unwrap_or_else(|err| err.to_string().into()),
+        _ => return Ok(result.into()),
+    };
+
+    match target {
+        Target::Path(path) => assign_to_object(path, value, object)?,
+        Target::Variable(variable) => assign_to_variable(variable, value, state)?,
+        _ => unreachable!("cannot assign nested result target"),
+    };
+
+    Ok(result.into())
 }
 
 #[cfg(test)]
