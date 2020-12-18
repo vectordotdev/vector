@@ -429,7 +429,7 @@ mod tests {
 
                     [sources.processed_events_total_batch_source]
                       type = "generator"
-                      format = "random"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.01
 
@@ -477,7 +477,7 @@ mod tests {
 
                     [sources.processed_bytes_total_batch_source]
                       type = "generator"
-                      format = "random"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.1
 
@@ -520,7 +520,7 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
@@ -567,13 +567,13 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_added_source_2]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
 
@@ -604,13 +604,13 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_removed_source_2]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
 
@@ -658,7 +658,7 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
-                  format = "random"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 

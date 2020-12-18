@@ -25,8 +25,8 @@ pub struct GeneratorConfig {
 
 #[derive(Debug, PartialEq, Snafu)]
 pub enum GeneratorConfigError {
-    #[snafu(display("A non-empty list of lines is required for the random format"))]
-    RandomGeneratorItemsEmpty,
+    #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
+    ShuffleGeneratorItemsEmpty,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -34,7 +34,7 @@ pub enum GeneratorConfigError {
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
     #[derivative(Default)]
-    Random {
+    Shuffle {
         #[serde(default)]
         sequence: bool,
         lines: Vec<String>,
@@ -50,10 +50,10 @@ impl OutputFormat {
         emit!(GeneratorEventProcessed);
 
         let line = match self {
-            Self::Random {
+            Self::Shuffle {
                 sequence,
                 ref lines,
-            } => Self::random_line_generate(*sequence, lines, n),
+            } => Self::shuffle_generate(*sequence, lines, n),
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
@@ -61,7 +61,7 @@ impl OutputFormat {
         Event::from(line)
     }
 
-    fn random_line_generate(sequence: bool, lines: &[String], n: usize) -> String {
+    fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because lines cannot be empty
         let line = lines.choose(&mut rand::thread_rng()).unwrap().into();
 
@@ -72,12 +72,12 @@ impl OutputFormat {
         }
     }
 
-    // Ensures that the lines list is non-empty if Random is chosen
+    // Ensures that the lines list is non-empty if Shuffle is chosen
     pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
         match self {
-            Self::Random { lines, .. } => {
+            Self::Shuffle { lines, .. } => {
                 if lines.is_empty() {
-                    Err(GeneratorConfigError::RandomGeneratorItemsEmpty)
+                    Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
                 } else {
                     Ok(())
                 }
@@ -97,7 +97,7 @@ impl GeneratorConfig {
         Self {
             count,
             interval,
-            format: OutputFormat::Random {
+            format: OutputFormat::Shuffle {
                 lines,
                 sequence: false,
             },
@@ -145,10 +145,8 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        self.format
-            .validate()
-            .map_err(Into::into)
-            .map(|()| self.clone().generator(shutdown, out))
+        self.format.validate()?;
+        Ok(self.clone().generator(shutdown, out))
     }
 
     fn output_type(&self) -> DataType {
@@ -180,11 +178,11 @@ mod tests {
     }
 
     #[test]
-    fn config_random_lines_not_empty() {
+    fn config_shuffle_lines_not_empty() {
         let empty_lines: Vec<String> = Vec::new();
 
         let errant_config = GeneratorConfig {
-            format: OutputFormat::Random {
+            format: OutputFormat::Shuffle {
                 sequence: false,
                 lines: empty_lines,
             },
@@ -193,15 +191,15 @@ mod tests {
 
         assert_eq!(
             errant_config.format.validate(),
-            Err(GeneratorConfigError::RandomGeneratorItemsEmpty)
+            Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
         );
     }
 
     #[tokio::test]
-    async fn random_generator_copies_lines() {
+    async fn shuffle_generator_copies_lines() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format = "random"
+            r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
                count = 5"#,
         )
@@ -220,9 +218,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn random_generator_limits_count() {
+    async fn shuffle_generator_limits_count() {
         let mut rx = runit(
-            r#"format = "random"
+            r#"format = "shuffle"
                lines = ["one", "two"]
                count = 5"#,
         )
@@ -235,10 +233,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn random_generator_adds_sequence() {
+    async fn shuffle_generator_adds_sequence() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format = "random"
+            r#"format = "shuffle"
                lines = ["one", "two"]
                sequence = true
                count = 5"#,
@@ -256,10 +254,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn random_generator_obeys_interval() {
+    async fn shuffle_generator_obeys_interval() {
         let start = Instant::now();
         let mut rx = runit(
-            r#"format = "random"
+            r#"format = "shuffle"
                lines = ["one", "two"]
                count = 3
                interval = 1.0"#,
