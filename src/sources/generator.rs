@@ -63,12 +63,12 @@ impl OutputFormat {
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because lines cannot be empty
-        let line = lines.choose(&mut rand::thread_rng()).unwrap().into();
+        let line = lines.choose(&mut rand::thread_rng()).unwrap();
 
         if sequence {
             format!("{} {}", n, line)
         } else {
-            line
+            line.into()
         }
     }
 
