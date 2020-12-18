@@ -1,0 +1,136 @@
+[package]
+name = "remap-functions"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+remap = { package = "remap-lang", path = "../remap-lang" }
+
+bytes = { version = "0.5.6", optional = true }
+chrono = { version = "0.4", optional = true }
+cidr-utils = { version = "0.5", optional = true }
+grok = { version = "1", optional = true }
+hex = { version = "0.4", optional = true }
+lazy_static = { version = "1", optional = true }
+md-5 = { version = "0.9", optional = true }
+regex = { version = "1", optional = true }
+rust_decimal = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
+sha-1 = { version = "0.9", optional = true }
+sha-2 = { package = "sha2", version = "0.9", optional = true }
+sha-3 = { package = "sha3", version = "0.9", optional = true }
+shared = { path = "../shared", default-features = false, optional = true }
+strip-ansi-escapes = { version = "0.1", optional = true }
+syslog_loose = { version = "0.5", optional = true }
+tracing = { version = "0.1", optional = true }
+url = { version = "2", optional = true }
+uuid = { version = "0.8", features = ["v4"], optional = true }
+
+[dev-dependencies]
+anyhow = "1"
+
+[features]
+
+default = [
+    "assert",
+    "ceil",
+    "compact",
+    "contains",
+    "del",
+    "downcase",
+    "ends_with",
+    "exists",
+    "flatten",
+    "floor",
+    "format_number",
+    "format_timestamp",
+    "ip_cidr_contains",
+    "ip_subnet",
+    "ip_to_ipv6",
+    "ipv6_to_ipv4",
+    "log",
+    "match",
+    "md5",
+    "merge",
+    "now",
+    "ok",
+    "only_fields",
+    "parse_duration",
+    "parse_grok",
+    "parse_json",
+    "parse_syslog",
+    "parse_timestamp",
+    "parse_url",
+    "redact",
+    "replace",
+    "round",
+    "sha1",
+    "sha2",
+    "sha3",
+    "slice",
+    "split",
+    "starts_with",
+    "strip_ansi_escape_codes",
+    "strip_whitespace",
+    "to_bool",
+    "to_float",
+    "to_int",
+    "to_string",
+    "to_timestamp",
+    "tokenize",
+    "truncate",
+    "upcase",
+    "uuid_v4",
+]
+
+assert = []
+ceil = []
+compact = []
+contains = []
+del = []
+downcase = []
+ends_with = []
+exists = []
+flatten = []
+floor = []
+format_number = ["rust_decimal"]
+format_timestamp = ["chrono"]
+ip_cidr_contains = ["cidr-utils"]
+ip_subnet = ["lazy_static", "regex"]
+ip_to_ipv6 = []
+ipv6_to_ipv4 = []
+log = ["tracing"]
+match = []
+md5 = ["md-5", "hex"]
+merge = []
+now = []
+ok = []
+only_fields = []
+parse_duration = []
+parse_grok = ["grok"]
+parse_json = ["serde_json"]
+parse_syslog = ["syslog_loose"]
+parse_timestamp = ["shared/conversion"]
+parse_url = ["url"]
+redact = []
+replace = []
+round = []
+sha1 = ["sha-1", "hex"]
+sha2 = ["sha-2", "hex"]
+sha3 = ["sha-3", "hex"]
+slice = []
+split = []
+starts_with = []
+strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
+strip_whitespace = []
+to_bool = ["shared/conversion"]
+to_float = ["shared/conversion"]
+to_int = ["shared/conversion"]
+to_string = []
+to_timestamp = ["chrono"]
+tokenize = ["shared/tokenize"]
+truncate = []
+upcase = []
+uuid_v4 = ["bytes", "uuid"]

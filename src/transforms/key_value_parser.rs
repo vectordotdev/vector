@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
@@ -153,7 +153,7 @@ impl FunctionTransform for KeyValue {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.to_string().into()) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             log.insert(key, value);
                         }

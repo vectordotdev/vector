@@ -393,4 +393,26 @@ components: sinks: aws_s3: components._aws & {
 				"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "s3"
+			_docs_tag: "AmazonS3"
+
+			policies: [
+				{
+					_action: "HeadBucket"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "ListBucket"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutObject"
+				},
+			]
+		},
+	]
 }

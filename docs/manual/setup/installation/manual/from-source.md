@@ -390,7 +390,7 @@ features one has to pass a comma-separated list of component features.
 | `sources-journald`                                   | Enables building of [`journald` source][docs.sources.journald].                                                                            |
 | `sources-kafka`                                      | Enables building of [`kafka` source][docs.sources.kafka]. Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.          |
 | `sources-kubernetes_logs`                            | Enables building of [`kubernetes_logs` source][docs.sources.kubernetes_logs].                                                              |
-| `sources-logplex`                                    | Enables building of [`logplex` source][docs.sources.logplex].                                                                              |
+| `sources-heroku_logs`                                | Enables building of [`heroku_logs` source][docs.sources.heroku_logs].                                                                              |
 | `sources-prometheus`                                 | Enables building of [`prometheus` source][docs.sources.prometheus].                                                                        |
 | `sources-socket`                                     | Enables building of [`socket` source][docs.sources.socket].                                                                                |
 | `sources-splunk_hec`                                 | Enables building of [`splunk_hec` source][docs.sources.splunk_hec].                                                                        |
@@ -517,7 +517,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.sources.kubernetes_logs]: /docs/reference/sources/kubernetes_logs/
-[docs.sources.logplex]: /docs/reference/sources/logplex/
+[docs.sources.heroku_logs]: /docs/reference/sources/heroku_logs/
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/

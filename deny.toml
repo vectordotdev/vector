@@ -3,8 +3,17 @@ allow = [
   "MIT",
   "CC0-1.0",
   "ISC",
+  "OpenSSL",
   "Unlicense",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "Zlib",
 ]
+
+unlicensed = "warn"
+default = "warn"
 
 private = { ignore = true }
 
