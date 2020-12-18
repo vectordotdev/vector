@@ -145,7 +145,8 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        self.format.validate()
+        self.format
+            .validate()
             .map_err(Into::into)
             .map(|()| self.clone().generator(shutdown, out))
     }

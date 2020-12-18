@@ -2,9 +2,13 @@ use chrono::{prelude::Local, SecondsFormat};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 
-const ERROR_LEVELS: [&'static str; 9] = ["alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",];
+const ERROR_LEVELS: [&'static str; 9] = [
+    "alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",
+];
 
-const HTTP_CODES: [usize; 15] = [200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,];
+const HTTP_CODES: [usize; 15] = [
+    200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,
+];
 
 const HTTP_VERSIONS: [&'static str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
 
