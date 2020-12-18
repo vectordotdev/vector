@@ -230,22 +230,23 @@ remap: {
 			]
 		}
 		"string": {
-			description: #"""
+			description: """
 				A sequence of characters. A few things to note about TRL strings:
 
-				* TRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any
-					invalid sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
-				* Strings can be escaped using `\`, as in `The password is \"opensesame\"`.
+				* TRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
+					sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
+				* Strings can be escaped using a backslash (`/`), as in `\"The song is called
+					\"My name is Jonas\"\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
 
-				Strings can be concatenated using plus (`+`). Here's an example:
+				You can concatenate strings using plus (`+`). Here's an example:
 
 				```
-                $name = "Vector Vic"
-				.message = $name + " is a pretty great mascot" + " (though we're a bit biased)"
+				$name = \"Vector Vic\"
+				.message = $name + \" is a pretty great mascot\" + \" (though we're a bit biased)\"
 				```
-				"""#
+				"""
 			use: ["parameter", "return"]
 			examples: [
 				"\"I am a teapot\"",
