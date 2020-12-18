@@ -100,6 +100,30 @@ impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
     }
 }
 
+// TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
+impl TryFrom<remap_lang::Path> for LookupBuf {
+    type Error = crate::Error;
+    fn try_from(target: remap_lang::Path) -> crate::Result<Self> {
+        let path_string = target.to_string();
+        // The path string always starts with a `.`, we need to remove it for lookups.
+        assert!(path_string.starts_with('.'));
+        let path_string = &path_string[1..];
+        LookupBuf::from_str(path_string)
+    }
+}
+
+// TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
+impl TryFrom<&remap_lang::Path> for LookupBuf {
+    type Error = crate::Error;
+    fn try_from(target: &remap_lang::Path) -> crate::Result<Self> {
+        let path_string = target.to_string();
+        // The path string always starts with a `.`, we need to remove it for lookups.
+        assert!(path_string.starts_with('.'));
+        let path_string = &path_string[1..];
+        LookupBuf::from_str(path_string)
+    }
+}
+
 impl<'a> TryFrom<VecDeque<SegmentBuf>> for LookupBuf {
     type Error = crate::Error;
 

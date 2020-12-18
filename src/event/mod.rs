@@ -12,9 +12,6 @@ pub mod util;
 pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use shared::{event::*, lookup::*};
 
-#[allow(deprecated)]
-pub(crate) use util::log::PathIter;
-
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
