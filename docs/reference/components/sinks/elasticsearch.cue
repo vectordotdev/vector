@@ -78,7 +78,7 @@ components: sinks: elasticsearch: {
 
 		requirements: [
 			#"""
-				Elasticsearch's Data streams feature require Vector to be configured with the `create` `bulk_action`. *This is not enabled by default.*
+				Elasticsearch's Data streams feature requires Vector to be configured with the `create` `bulk_action`. *This is not enabled by default.*
 				"""#,
 		]
 		warnings: []
@@ -157,7 +157,7 @@ components: sinks: elasticsearch: {
 		}
 		bulk_action: {
 			common:      false
-			description: "Action to use when making requests to the Bulk API. Supports `index` and `create`."
+			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Supports `index` and `create`."
 			required:    false
 			warnings: []
 			type: string: {
@@ -249,11 +249,11 @@ components: sinks: elasticsearch: {
 		conflicts: {
 			title: "Conflicts"
 			body: """
-				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
-				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are inserted
-				via the `index` action. In the case of a conflict, such as a document with the
-				same `id`, Vector will add or _replace_ the document as necessary. If `bulk_action` is
-				configured with `create`, Elasticsearch will _not_ replace an existing document.
+				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's 
+				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are 
+				inserted via the `index` action which will update documents if an existing 
+				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch 
+				will _not_ replace an existing document and instead return a conflict error.
 				"""
 		}
 
