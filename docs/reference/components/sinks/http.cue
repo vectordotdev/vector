@@ -107,7 +107,10 @@ components: sinks: http: {
 			}
 		}
 		uri: {
-			description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
+			description: """
+				The full URI to make HTTP requests to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
 			required:    true
 			warnings: []
 			type: string: {
@@ -115,12 +118,15 @@ components: sinks: http: {
 			}
 		}
 		healthcheck: type: object: options: uri: {
-			common: false
-			description: "The full URI to make HTTP health check request to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
-			required:    false
+			common:      false
+			description: """
+				The full URI to make HTTP health check request to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
+			required: false
 			warnings: []
 			type: string: {
-				default: null
+				default:  null
 				examples: ["https://10.22.212.22:9000/health"]
 			}
 		}

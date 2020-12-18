@@ -193,15 +193,15 @@ components: sinks: [Name=string]: {
 					required:    false
 					type: object: {
 						examples: []
-						options:{
+						options: {
 							enabled: {
-								common: true
+								common:      true
 								description: "Enables/disables the healthcheck upon Vector boot."
 								required:    false
 								type: bool: default: true
 							}
 						}
-					}					
+					}
 				}
 			}
 		}
