@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: include: {
+remap: functions: includes: {
 	arguments: [
 		{
 			name:        "value"
