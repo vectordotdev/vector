@@ -25,8 +25,8 @@ pub struct GeneratorConfig {
 
 #[derive(Debug, PartialEq, Snafu)]
 pub enum GeneratorConfigError {
-    #[snafu(display("Expected a non-empty list of lines for round_robin but got an empty list"))]
-    RoundRobinItemsEmpty,
+    #[snafu(display("Expected a non-empty list of lines for random but got an empty list"))]
+    RandomGeneratorItemsEmpty,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -34,7 +34,7 @@ pub enum GeneratorConfigError {
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
     #[derivative(Default)]
-    RoundRobin {
+    Random {
         #[serde(default)]
         sequence: bool,
         lines: Vec<String>,
@@ -52,17 +52,17 @@ impl OutputFormat {
         let event_from_log_line = |log: String| -> Event { Event::from(log) };
 
         match self {
-            Self::RoundRobin {
+            Self::Random {
                 sequence,
                 ref lines,
-            } => Self::round_robin_generate(sequence, lines, n),
+            } => Self::random_line_generate(sequence, lines, n),
             Self::ApacheCommon => event_from_log_line(apache_common_log_line()),
             Self::ApacheError => event_from_log_line(apache_error_log_line()),
             Self::Syslog => event_from_log_line(syslog_5424_log_line()),
         }
     }
 
-    fn round_robin_generate(sequence: &bool, lines: &[String], n: usize) -> Event {
+    fn random_line_generate(sequence: &bool, lines: &[String], n: usize) -> Event {
         // unwrap can be called here because lines cannot be empty
         let line: String = lines.choose(&mut rand::thread_rng()).unwrap().into();
 
@@ -73,12 +73,12 @@ impl OutputFormat {
         }
     }
 
-    // Ensures that the lines list is non-empty if RoundRobin is chosen
+    // Ensures that the lines list is non-empty if Random is chosen
     pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
         match self {
-            Self::RoundRobin { lines, .. } => {
+            Self::Random { lines, .. } => {
                 if lines.is_empty() {
-                    Err(GeneratorConfigError::RoundRobinItemsEmpty)
+                    Err(GeneratorConfigError::RandomGeneratorItemsEmpty)
                 } else {
                     Ok(())
                 }
@@ -98,7 +98,7 @@ impl GeneratorConfig {
         Self {
             count,
             interval,
-            format: OutputFormat::RoundRobin {
+            format: OutputFormat::Random {
                 lines,
                 sequence: false,
             },
@@ -182,11 +182,11 @@ mod tests {
     }
 
     #[test]
-    fn config_round_robin_lines_not_empty() {
+    fn config_random_lines_not_empty() {
         let empty_lines: Vec<String> = Vec::new();
 
         let errant_config = GeneratorConfig {
-            format: OutputFormat::RoundRobin {
+            format: OutputFormat::Random {
                 sequence: false,
                 lines: empty_lines,
             },
@@ -195,15 +195,15 @@ mod tests {
 
         assert_eq!(
             errant_config.format.validate(),
-            Err(GeneratorConfigError::RoundRobinItemsEmpty)
+            Err(GeneratorConfigError::RandomGeneratorItemsEmpty)
         );
     }
 
     #[tokio::test]
-    async fn round_robin_copies_lines() {
+    async fn random_generator_copies_lines() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format = "round_robin"
+            r#"format = "random"
                lines = ["one", "two", "three", "four"]
                count = 5"#,
         )
@@ -222,9 +222,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn round_robin_limits_count() {
+    async fn random_generator_limits_count() {
         let mut rx = runit(
-            r#"format = "round_robin"
+            r#"format = "random"
                lines = ["one", "two"]
                count = 5"#,
         )
@@ -237,10 +237,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn round_robin_adds_sequence() {
+    async fn random_generator_adds_sequence() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format = "round_robin"
+            r#"format = "random"
                lines = ["one", "two"]
                sequence = true
                count = 5"#,
@@ -258,10 +258,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn round_robin_obeys_interval() {
+    async fn random_generator_obeys_interval() {
         let start = Instant::now();
         let mut rx = runit(
-            r#"format = "round_robin"
+            r#"format = "random"
                lines = ["one", "two"]
                count = 3
                interval = 1.0"#,

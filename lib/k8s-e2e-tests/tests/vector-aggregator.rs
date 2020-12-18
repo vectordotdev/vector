@@ -8,7 +8,7 @@ sources:
   dummy:
     type: "generator"
     rawConfig: |
-      format = "round_robin"
+      format = "random"
       lines = ["Hello world"]
       interval = 60 # once a minute
 

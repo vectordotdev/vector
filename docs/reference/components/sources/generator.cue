@@ -47,7 +47,7 @@ components: sources: generator: {
 			warnings: []
 			type: string: {
 				enum: {
-					"round_robin":   "Lines are chosen at random from the list specified using `lines`."
+					"random":        "Lines are chosen at random from the list specified using `lines`."
 					"apache_common": "Randomly generated logs in [Apache common](\(urls.apache_common)) format."
 					"apache_error":  "Randomly generated logs in [Apache error](\(urls.apache_error)) format."
 					"syslog":        "Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424)))."
@@ -77,7 +77,7 @@ components: sources: generator: {
 		lines: {
 			common:        false
 			description:   "The list of lines to output."
-			relevant_when: "`format` = `round_robin`"
+			relevant_when: "`format` = `random`"
 			required:      false
 			warnings: []
 			type: array: {
@@ -89,7 +89,7 @@ components: sources: generator: {
 		}
 		sequence: {
 			common:        false
-			relevant_when: "`format` = `round_robin`"
+			relevant_when: "`format` = `random`"
 			description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
 			required:      false
 			warnings: []
