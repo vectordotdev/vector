@@ -1,5 +1,5 @@
 use crate::{
-    expression, function, object,
+    expression, function,
     parser::{self, Rule},
     path, program, value,
 };
@@ -34,9 +34,6 @@ pub enum Error {
 
     #[error("path error")]
     Path(#[from] path::Error),
-
-    #[error("object error")]
-    Object(#[from] object::Error),
 
     #[error("unknown error")]
     Unknown,

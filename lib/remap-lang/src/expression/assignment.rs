@@ -1,13 +1,13 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    object, state, Expr, Expression, Object, Result, TypeDef, Value,
+    state, Expr, Expression, Object, Result, TypeDef, Value,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("unable to insert value in path: {0}")]
-    PathInsertion(object::Error),
+    PathInsertion(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
