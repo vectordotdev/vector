@@ -232,14 +232,11 @@ fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
             yield capture_metrics(&controller)
                 .filter_map(|m| match m {
                     Event::Metric(m) => match m.tag_value("component_name") {
-                        Some(name) => match components::state::component_by_name(name) {
-                            Some(t) => Some(match t {
-                                components::Component::Source(_) => (m, 1),
-                                components::Component::Transform(_) => (m, 2),
-                                components::Component::Sink(_) => (m, 3),
-                            }),
-                            _ => None,
-                        },
+                        Some(name) => Some(match components::state::component_by_name(&name) {
+                            components::Component::Source(_) => (m, 1),
+                            components::Component::Transform(_) => (m, 2),
+                            components::Component::Sink(_) => (m, 3),
+                        }),
                         _ => None,
                     },
                     _ => None,

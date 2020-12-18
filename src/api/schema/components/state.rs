@@ -56,13 +56,14 @@ pub fn get_component_names() -> HashSet<String> {
         .collect::<HashSet<String>>()
 }
 
-/// Gets a component by name. The component is expected to exist.
-pub fn component_by_name(name: &str) -> &Component {
+/// Gets a component by name
+pub fn component_by_name(name: &str) -> Component {
     COMPONENTS
         .read()
         .expect(INVARIANT)
         .get(name)
-        .expect(INVARIANT)
+        .expect("Couldn't get component by name")
+        .clone()
 }
 
 /// Overwrites component state with new components.

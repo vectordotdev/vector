@@ -147,9 +147,8 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::component_by_name(name).clone(),
-            ));
+            let _ =
+                COMPONENT_CHANGED.send(ComponentChanged::Removed(state::component_by_name(name)));
         });
 
     // Publish all components that have been added

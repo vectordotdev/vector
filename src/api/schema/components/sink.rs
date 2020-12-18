@@ -30,10 +30,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(|name| match state::component_by_name(name) {
-                Some(components) => match components {
-                    Component::Source(s) => Some(s.clone()),
-                    _ => None,
-                },
+                Component::Source(s) => Some(s.clone()),
                 _ => None,
             })
             .collect()
@@ -45,10 +42,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(|name| match state::component_by_name(name) {
-                Some(components) => match components {
-                    Component::Transform(t) => Some(t.clone()),
-                    _ => None,
-                },
+                Component::Transform(t) => Some(t.clone()),
                 _ => None,
             })
             .collect()
