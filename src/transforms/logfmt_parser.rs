@@ -1,9 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{
-        LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
-    },
+    internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -101,8 +99,6 @@ impl FunctionTransform for Logfmt {
         } else {
             emit!(LogfmtParserMissingField { field: &self.field });
         };
-
-        emit!(LogfmtParserEventProcessed {});
 
         output.push(event);
     }

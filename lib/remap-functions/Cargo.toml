@@ -15,6 +15,7 @@ grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
+nom = { version = "6.0.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -55,7 +56,9 @@ default = [
     "md5",
     "merge",
     "now",
+    "ok",
     "only_fields",
+    "parse_aws_alb_log",
     "parse_aws_vpc_flow",
     "parse_duration",
     "parse_grok",
@@ -106,7 +109,9 @@ match = []
 md5 = ["md-5", "hex"]
 merge = []
 now = []
+ok = []
 only_fields = []
+parse_aws_alb_log = ["nom"]
 parse_aws_vpc_flow = []
 parse_duration = []
 parse_grok = ["grok"]

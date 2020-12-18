@@ -1,9 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{
-        RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
-    },
+    internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
     serde::Fields,
     transforms::{FunctionTransform, Transform},
 };
@@ -68,8 +66,6 @@ impl RenameFields {
 
 impl FunctionTransform for RenameFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RenameFieldsEventProcessed);
-
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
             match log.remove_prune(&old_key, self.drop_empty) {

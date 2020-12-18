@@ -147,12 +147,17 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let config =
+                let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
+
+                if !config.healthchecks.enabled {
+                    info!("Health checks are disabled.");
+                }
+                config.healthchecks.set_require_healthy(require_healthy);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -162,7 +167,7 @@ impl Application {
                 #[cfg(feature = "api")]
                 let api = config.api;
 
-                let result = topology::start_validated(config, diff, pieces, require_healthy).await;
+                let result = topology::start_validated(config, diff, pieces).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
@@ -227,9 +232,10 @@ impl Application {
                         // Reload config
                         let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
-                        if let Some(new_config) = new_config {
+                        if let Some(mut new_config) = new_config {
+                            new_config.healthchecks.set_require_healthy(opts.require_healthy);
                             match topology
-                                .reload_config_and_respawn(new_config, opts.require_healthy)
+                                .reload_config_and_respawn(new_config)
                                 .await
                             {
                                 Ok(true) => {

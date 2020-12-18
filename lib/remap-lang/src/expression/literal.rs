@@ -13,6 +13,12 @@ impl Literal {
             value.kind()
         );
 
+        debug_assert!(
+            !matches!(value, Value::Map(_)),
+            "{} must use expression::Map instead of expression::Literal",
+            value.kind()
+        );
+
         Self(value)
     }
 
@@ -66,7 +72,6 @@ impl Expression for Literal {
 mod tests {
     use super::*;
     use crate::{test_type_def, value::Kind};
-    use std::collections::BTreeMap;
 
     test_type_def![
         boolean {
@@ -87,11 +92,6 @@ mod tests {
         float {
             expr: |_| Literal::from(123.456),
             def: TypeDef { kind: Kind::Float, ..Default::default() },
-        }
-
-        map {
-            expr: |_| Literal::from(BTreeMap::default()),
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
         }
 
         timestamp {
