@@ -2,11 +2,11 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ParseAwsVpcFlow;
+pub struct ParseAwsVpcFlowLog;
 
-impl Function for ParseAwsVpcFlow {
+impl Function for ParseAwsVpcFlowLog {
     fn identifier(&self) -> &'static str {
-        "parse_aws_vpc_flow"
+        "parse_aws_vpc_flow_log"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -28,23 +28,23 @@ impl Function for ParseAwsVpcFlow {
         let value = arguments.required("value")?.boxed();
         let format = arguments.optional("format").map(Expr::boxed);
 
-        Ok(Box::new(ParseAwsVpcFlowFn::new(value, format)))
+        Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ParseAwsVpcFlowFn {
+struct ParseAwsVpcFlowLogFn {
     value: Box<dyn Expression>,
     format: Option<Box<dyn Expression>>,
 }
 
-impl ParseAwsVpcFlowFn {
+impl ParseAwsVpcFlowLogFn {
     fn new(value: Box<dyn Expression>, format: Option<Box<dyn Expression>>) -> Self {
         Self { value, format }
     }
 }
 
-impl Expression for ParseAwsVpcFlowFn {
+impl Expression for ParseAwsVpcFlowLogFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let input = String::from_utf8_lossy(&bytes);
@@ -153,28 +153,28 @@ mod tests {
 
     remap::test_type_def![
         value_noop {
-            expr: |_| ParseAwsVpcFlowFn::new(Box::new(Noop), None),
+            expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),
             def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         value_non_string {
-            expr: |_| ParseAwsVpcFlowFn::new(Literal::from(1).boxed(), None),
+            expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from(1).boxed(), None),
             def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         value_string {
-            expr: |_| ParseAwsVpcFlowFn::new(Literal::from("foo").boxed(), None),
+            expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), None),
             def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
 
         format_non_string {
-            expr: |_| ParseAwsVpcFlowFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
+            expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
             def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
         }
     ];
 
     #[test]
-    fn parse_aws_vpc_flow() {
+    fn parse_aws_vpc_flow_log() {
         // Examples from https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-records-examples.html
         let logs = vec![(
             None,

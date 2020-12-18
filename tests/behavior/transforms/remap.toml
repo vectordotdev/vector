@@ -1300,23 +1300,23 @@
       "parts.classification.equals" = "<null>"
       "parts.classification_reason.equals" = "<null>"
 
-[transforms.remap_function_parse_aws_vpc_flow]
+[transforms.remap_function_parse_aws_vpc_flow_log]
   inputs = []
   type = "remap"
   source = """
-    .a = parse_aws_vpc_flow(.a)
-    .b = parse_aws_vpc_flow(.b, format = "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
+    .a = parse_aws_vpc_flow_log(.a)
+    .b = parse_aws_vpc_flow_log(.b, format = "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
   """
 [[tests]]
-  name = "remap_function_parse_aws_vpc_flow"
+  name = "remap_function_parse_aws_vpc_flow_log"
   [tests.input]
-    insert_at = "remap_function_parse_aws_vpc_flow"
+    insert_at = "remap_function_parse_aws_vpc_flow_log"
     type = "log"
     [tests.input.log_fields]
       a = "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"
       b = "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
   [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_vpc_flow"
+    extract_from = "remap_function_parse_aws_vpc_flow_log"
     [[tests.outputs.conditions]]
       "a.version.equals" = 2
       "a.account_id.equals" = 123456789010

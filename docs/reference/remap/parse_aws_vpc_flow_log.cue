@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: parse_aws_vpc_flow: {
+remap: functions: parse_aws_vpc_flow_log: {
 	arguments: [
 		{
 			name:        "value"
@@ -27,7 +27,7 @@ remap: functions: parse_aws_vpc_flow: {
 				log: #"2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"#
 			}
 			source: #"""
-				.parsed = parse_aws_vpc_flow(.log)
+				.parsed = parse_aws_vpc_flow_log(.log)
 				"""#
 			output: {
 				log: #"2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"#
@@ -56,7 +56,7 @@ remap: functions: parse_aws_vpc_flow: {
 				format: #"instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr"#
 			}
 			source: #"""
-				.parsed = parse_aws_vpc_flow(.log, .format)
+				.parsed = parse_aws_vpc_flow_log(.log, .format)
 				"""#
 			output: {
 				log: #"- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"#
@@ -76,7 +76,7 @@ remap: functions: parse_aws_vpc_flow: {
 				log: "I am not a log"
 			}
 			source: #"""
-				.parsed = parse_aws_vpc_flow(.log)
+				.parsed = parse_aws_vpc_flow_log(.log)
 				"""#
 			output: {
 				error: remap.errors.ParseError
