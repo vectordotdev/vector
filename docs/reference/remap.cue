@@ -150,8 +150,27 @@ remap: {
 			]
 		}
 		"null": {
-			description: "No value."
-			use: ["return"]
+			description: """
+				No value. In TRL, you can assign `null` to fields and variables:
+
+				```
+				.hostname = null
+				$code = null
+				```
+
+				`null` is also the return value of expressions that don't return any other value.
+				The [`del`](#del) function for removing fields, for example, always returns `null`.
+
+				`null` is also convertable to other types using `to_*` functions like `to_string`:
+
+				Type | Conversion
+				:----|:----------
+				string | `""`
+				integer | `0`
+				Boolean | `false`
+				float | `0`
+				"""
+			use: ["parameter", "return"]
 			examples: [
 				"null",
 			]
