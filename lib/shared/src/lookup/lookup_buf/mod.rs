@@ -35,7 +35,7 @@ mod test;
 /// From there, you can `push` and `pop` onto the `LookupBuf`.
 ///
 /// ```rust
-/// use vector::event::LookupBuf;
+/// use shared::lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from("foo");
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -52,7 +52,7 @@ mod test;
 /// possible error.
 ///
 /// ```rust
-/// use vector::event::LookupBuf;
+/// use shared::lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from_str("foo").unwrap();
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -71,7 +71,7 @@ mod test;
 /// `lookup.into()`.
 ///
 /// ```rust
-/// use vector::event::LookupBuf;
+/// use shared::lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from_str("foo.bar").unwrap();
 /// let mut unowned_view = lookup.clone_lookup();
 /// unowned_view.push_back(1);

@@ -1,4 +1,4 @@
-use crate::{event::*, lookup::*};
+use crate::lookup::*;
 use std::{fs, io::Read, path::Path};
 use tracing::trace;
 
@@ -190,7 +190,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 // then turned into a string again is the same.
 #[test_env_log::test]
 fn lookup_to_string_and_serialize() {
-    const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
+    const FIXTURE_ROOT: &str = "tests/fixtures/lookup";
 
     trace!(?FIXTURE_ROOT, "Opening.");
     std::fs::read_dir(FIXTURE_ROOT)

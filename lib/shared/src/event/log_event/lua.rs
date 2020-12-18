@@ -32,9 +32,7 @@ impl<'a> FromLua<'a> for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{event::*, lookup::*};
     use rlua::Lua;
-    use test_env_log::test;
 
     #[test_env_log::test]
     fn to_lua() {

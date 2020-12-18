@@ -143,7 +143,7 @@ impl remap_lang::Object for Event {
                 let val = log.get(&LookupBuf::try_from(path).map_err(|e| format!("{}", e))?);
                 // TODO: This does not need to clone.
                 Ok(val.map(Clone::clone).map(Into::into))
-            },
+            }
             Event::Metric(_) => unimplemented!("Remap is not supported on metrics yet."),
         }
     }
@@ -151,12 +151,15 @@ impl remap_lang::Object for Event {
     fn remove(&mut self, path: &remap_lang::Path, compact: bool) -> Result<(), String> {
         match self {
             Event::Log(log) => {
-                let _val = log.remove(&LookupBuf::try_from(path)
-                    // TODO: We should not degrade the error to a string here.
-                    .map_err(|e| format!("{}", e))?, compact);
+                let _val = log.remove(
+                    &LookupBuf::try_from(path)
+                        // TODO: We should not degrade the error to a string here.
+                        .map_err(|e| format!("{}", e))?,
+                    compact,
+                );
                 // TODO: Why does this not return?
                 Ok(())
-            },
+            }
             Event::Metric(_) => unimplemented!("Remap is not supported on metrics yet."),
         }
     }
@@ -164,24 +167,29 @@ impl remap_lang::Object for Event {
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
         match self {
             Event::Log(log) => {
-                let _val = log.insert(LookupBuf::try_from(path)
-                    // TODO: We should not degrade the error to a string here.
-                                          .map_err(|e| format!("{}", e))?, value);
+                let _val = log.insert(
+                    LookupBuf::try_from(path)
+                        // TODO: We should not degrade the error to a string here.
+                        .map_err(|e| format!("{}", e))?,
+                    value,
+                );
                 // TODO: Why does this not return?
                 Ok(())
-            },
+            }
             Event::Metric(_) => unimplemented!("Remap is not supported on metrics yet."),
         }
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
         match self {
-            Event::Log(log) => log.keys(true)
+            Event::Log(log) => log
+                .keys(true)
                 .map(|v| {
                     remap_lang::Path::from_str(v.to_string().as_str())
                         // TODO: We should not degrade the error to a string here.
                         .map_err(|v| format!("{:?}", v))
-                }).collect(),
+                })
+                .collect(),
             Event::Metric(_) => unimplemented!("Remap is not supported on metrics yet."),
         }
     }

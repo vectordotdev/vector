@@ -27,12 +27,12 @@ use tracing::instrument;
 /// call. **These do not parse the buffer.**
 ///
 /// ```rust
-/// use vector::event::LookupBuf;
-/// let mut lookup = LookupBuf::from("foo");
+/// use shared::lookup::Lookup;
+/// let mut lookup = Lookup::from("foo");
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
 ///
-/// let mut lookup = LookupBuf::from("foo.bar"); // This is **not** two segments.
+/// let mut lookup = Lookup::from("foo.bar"); // This is **not** two segments.
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
 /// ```
@@ -46,12 +46,12 @@ use tracing::instrument;
 /// possible error.
 ///
 /// ```rust
-/// use vector::event::LookupBuf;
-/// let mut lookup = LookupBuf::from_str("foo").unwrap();
+/// use shared::lookup::Lookup;
+/// let mut lookup = Lookup::from_str("foo").unwrap();
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
 ///
-/// let mut lookup = LookupBuf::from_str("foo.bar").unwrap(); // This **is** two segments.
+/// let mut lookup = Lookup::from_str("foo.bar").unwrap(); // This **is** two segments.
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
 /// ```
@@ -65,9 +65,9 @@ use tracing::instrument;
 /// `lookup.into()`.
 ///
 /// ```rust
-/// use vector::event::Lookup;
+/// use shared::lookup::Lookup;
 /// let mut lookup = Lookup::from_str("foo.bar").unwrap();
-/// let mut owned = lookup.into_buf();
+/// let mut owned = lookup.clone().into_buf();
 /// owned.push_back(1);
 /// owned.push_back("bar");
 /// lookup.push_back("baz"); // Does not impact the owned!

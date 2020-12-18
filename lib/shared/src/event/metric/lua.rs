@@ -211,7 +211,6 @@ impl<'a> FromLua<'a> for Metric {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, Utc};
-    use test_env_log::test;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
         Lua::new().context(|ctx| {

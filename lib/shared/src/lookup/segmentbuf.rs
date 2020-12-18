@@ -121,6 +121,12 @@ impl From<String> for SegmentBuf {
     }
 }
 
+impl From<&str> for SegmentBuf {
+    fn from(name: &str) -> Self {
+        Self::from(name.to_string())
+    }
+}
+
 impl From<usize> for SegmentBuf {
     fn from(value: usize) -> Self {
         Self::index(value)
