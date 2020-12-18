@@ -249,10 +249,10 @@ components: sinks: elasticsearch: {
 		conflicts: {
 			title: "Conflicts"
 			body: """
-				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's 
-				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are 
-				inserted via the `index` action which will update documents if an existing 
-				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch 
+				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
+				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are
+				inserted via the `index` action which will update documents if an existing
+				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch
 				will _not_ replace an existing document and instead return a conflict error.
 				"""
 		}
