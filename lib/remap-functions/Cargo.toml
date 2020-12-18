@@ -59,6 +59,7 @@ default = [
     "ok",
     "only_fields",
     "parse_aws_alb_log",
+    "parse_aws_vpc_flow_log",
     "parse_duration",
     "parse_grok",
     "parse_json",
@@ -111,6 +112,7 @@ now = []
 ok = []
 only_fields = []
 parse_aws_alb_log = ["nom"]
+parse_aws_vpc_flow_log = []
 parse_duration = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
