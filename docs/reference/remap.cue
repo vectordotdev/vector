@@ -78,9 +78,9 @@ remap: {
 		"array": {
 			description: """
 				A list of values. Items in an array can be of any TRL type, including other arrays
-				and `null`. Values inside TRL arrays can be accessed via index (beginning with 0).
-				For the array `$primary = ["magenta", "yellow", "cyan"]`, for example, `$primary[0]`
-				yields `"magenta"`.
+				and `null` (which is a value in TRL). Values inside TRL arrays can be accessed via
+				index (beginning with 0). For the array `$primary = ["magenta", "yellow", "cyan"]`,
+				for example, `$primary[0` yields `"magenta"`.
 
 				You can also assign values to arrays by index:
 
@@ -93,6 +93,12 @@ remap: {
 				created are back-filled as `null`. For example, if the `hobbies` field doesn't
 				exist, the expression `.hobbies[2] = "Pogs"` sets the `hobbies` field to
 				`[null, null, "Pogs"]`.
+
+				Because all expressions in TRL return a value, you can put expressions in arrays:
+
+				```
+				.strange = [(false || "booper"), "foo", $bar, .baz]
+				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -124,7 +130,12 @@ remap: {
 		"map": {
 			description: """
 				A key-value map in which keys are strings and values can be of any TRL type,
-				including other maps.
+				including other maps. And as with arrays, you can use expressions to provide the
+				value for a key:
+
+				```
+				.user = { "username": exists(.username) || "none" }
+				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -200,6 +211,15 @@ remap: {
 				To learn more about regular expressions in Rust—and by extension in TRL—we strongly
 				recommend the in-browser [Rustexp expression editor and
 				tester](\(urls.regex_tester)).
+
+				### Limitations
+
+				There are a few things that you can't do with regexes in TRL:
+
+				* You can't assign a regex to an object path. Thus, `.pattern = /foo|bar/i` is not
+					allowed.
+				* Expressions can't return regexes. Thus, you can't, for example, dynamically create
+					regexes.
 				"""
 			use: ["parameter"]
 			examples: [
@@ -502,8 +522,8 @@ remap: {
 				You can assign values to object fields or [variables](#variables) using a single
 				equals sign (`=`). Some examples:
 
-				* `.is_success = (.code > 200) && (.code <= 299)`
-				* `$pattern = /(foo|bar)/g`
+				* `.is_success = .code > 200 && .code <= 299`
+				* `$pattern = /foo|bar/i`
 				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
 
@@ -528,7 +548,7 @@ remap: {
 			description: """
 				You can assign values to variables in TRL. Variables in TRL are prefixed with a `$`
 				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
-				`$my_var`, `$this_is_my_variable`, etc. Here's an example usage of a variable:
+				`$my_var`, `$this_is_my_variable123`, etc. Here's an example usage of a variable:
 
 				```
 				$log_level = "critical"
@@ -544,11 +564,6 @@ remap: {
 				$is_success = .status_code == 200
 				$has_buzzword = contains(.message, "serverless")
 				```
-
-				### No regular expressions
-
-				All value types in TRL can be assigned to variables, with the important exception of
-				regular expressions.
 				"""
 
 			examples: [
