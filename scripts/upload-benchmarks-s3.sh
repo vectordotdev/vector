@@ -11,14 +11,14 @@ set -euo pipefail
 #   It should only be run in CI as we want to ensure that the benchmark
 #   environment is consistent.
 
-if !(${CI:-false}); then
+if ! (${CI:-false}); then
   echo "Aborted: this script is for use in CI, bencmark analysis depends on a consistent bench environment" >&2
   exit 1
 fi
 
 escape() {
   # /s mess up Athena partitioning
-  echo $1 | sed "s#/#_#"
+  echo "${1//\//\#}"
 }
 
 S3_BUCKET=${S3_BUCKET:-test-artifacts.vector.dev}
@@ -40,7 +40,7 @@ timestamp=$(date +"%s")
 object_name="$(echo "s3://$S3_BUCKET/benches/\
 benches_version=${BENCHES_VERSION}/\
 environment_version=${ENVIRONMENT_VERSION}/\
-branch=${git_branch}/\
+branch=$(escape "${git_branch}") /\
 machine=${machine}/\
 operating_system=${operating_system}/\
 libc=${LIBC}/\
@@ -56,7 +56,7 @@ raw.csv" | tr '[:upper:]' '[:lower:]'
 
 (
   echo 'group,function,value,throughput_num,throughput_type,sample_measured_value,unit,iteration_count' ;
-  find target/criterion -type f -path '*/new/*' -name raw.csv -exec bash -c "cat '{}' | tail --lines +2" \;
-) | aws s3 cp - $object_name
+  find target/criterion -type f -path '*/new/*' -name raw.csv -exec bash -c 'cat "$1" | tail --lines +2' _ {} \;
+) | aws s3 cp - "$object_name"
 
 echo "wrote $object_name"
