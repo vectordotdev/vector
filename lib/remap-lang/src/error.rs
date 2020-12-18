@@ -65,8 +65,10 @@ impl fmt::Display for Rule {
                     $(Rule::$rule => {
                         #[allow(unused_variables)]
                         let string = stringify!($rule);
-                        $(let string = $name;)?
 
+                        // Comment out the next two lines when debugging to see
+                        // the original rule names in error messages.
+                        $(let string = $name;)?
                         let string = string.replace('_', " ");
 
                         f.write_str(&string)
