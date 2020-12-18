@@ -5,6 +5,7 @@ use std::str::FromStr;
 pub enum Operator {
     Multiply,
     Divide,
+    IntegerDivide,
     Remainder,
     Add,
     Subtract,
@@ -27,6 +28,7 @@ impl FromStr for Operator {
         Ok(match s {
             "*" => Multiply,
             "/" => Divide,
+            "//" => IntegerDivide,
             "%" => Remainder,
             "+" => Add,
             "-" => Subtract,
@@ -50,6 +52,7 @@ impl AsRef<str> for Operator {
         match self {
             Multiply => "*",
             Divide => "/",
+            IntegerDivide => "//",
             Remainder => "%",
             Add => "+",
             Subtract => "-",

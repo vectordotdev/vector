@@ -1160,7 +1160,7 @@ update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
-	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet,)
+	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained

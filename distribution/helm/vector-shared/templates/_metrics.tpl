@@ -5,7 +5,9 @@ Common Vector configuration partial containing built-in metrics pipeline.
 Internal metrics are common, so we share and reuse the definition.
 */}}
 {{- define "libvector.metricsConfigPartial" -}}
-{{- with .Values.internalMetricsSource }}
+{{- $values := .Values -}}
+{{- $prometheusInputs := .prometheusInputs -}}
+{{- with $values.internalMetricsSource }}
 {{- if .enabled }}
 # Emit internal Vector metrics.
 [sources.{{ .sourceId }}]
@@ -17,11 +19,14 @@ Internal metrics are common, so we share and reuse the definition.
 {{- end }}
 {{- end }}
 
-{{- with .Values.prometheusSink }}
+{{- with $values.prometheusSink }}
 {{- if .enabled }}
 {{- $inputs := .inputs }}
-{{- if and $.Values.internalMetricsSource.enabled (not .excludeInternalMetrics) -}}
-{{- $inputs = prepend $inputs $.Values.internalMetricsSource.sourceId }}
+{{- if $prometheusInputs -}}
+{{- $inputs = concat $inputs $prometheusInputs }}
+{{- end }}
+{{- if and $values.internalMetricsSource.enabled (not .excludeInternalMetrics) -}}
+{{- $inputs = prepend $inputs $values.internalMetricsSource.sourceId }}
 {{- end }}
 # Expose metrics for scraping in the Prometheus format.
 [sinks.{{ .sinkId }}]

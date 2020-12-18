@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers,
-    config::{Config, ConfigDiff, Resource},
+    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{
@@ -57,7 +57,6 @@ pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-    require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
     let (abort_tx, abort_rx) = mpsc::unbounded();
 
@@ -73,7 +72,7 @@ pub async fn start_validated(
     };
 
     if !running_topology
-        .run_healthchecks(&diff, &mut pieces, require_healthy)
+        .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
         .await
     {
         return None;
@@ -221,11 +220,7 @@ impl RunningTopology {
 
     /// On Error, topology is in invalid state.
     /// May change componenets even if reload fails.
-    pub async fn reload_config_and_respawn(
-        &mut self,
-        new_config: Config,
-        require_healthy: bool,
-    ) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
             return Ok(false);
@@ -248,7 +243,7 @@ impl RunningTopology {
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
         {
             if self
-                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
@@ -264,7 +259,7 @@ impl RunningTopology {
         let diff = diff.flip();
         if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
             if self
-                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
@@ -284,26 +279,30 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         pieces: &mut Pieces,
-        require_healthy: bool,
+        options: HealthcheckOptions,
     ) -> bool {
-        let healthchecks = take_healthchecks(diff, pieces)
-            .into_iter()
-            .map(|(_, task)| task);
-        let healthchecks = future::try_join_all(healthchecks);
+        if options.enabled {
+            let healthchecks = take_healthchecks(diff, pieces)
+                .into_iter()
+                .map(|(_, task)| task);
+            let healthchecks = future::try_join_all(healthchecks);
 
-        info!("Running healthchecks.");
-        if require_healthy {
-            let success = healthchecks.await;
+            info!("Running healthchecks.");
+            if options.require_healthy {
+                let success = healthchecks.await;
 
-            if success.is_ok() {
-                info!("All healthchecks passed.");
-                true
+                if success.is_ok() {
+                    info!("All healthchecks passed.");
+                    true
+                } else {
+                    error!("Sinks unhealthy.");
+                    false
+                }
             } else {
-                error!("Sinks unhealthy.");
-                false
+                tokio::spawn(healthchecks);
+                true
             }
         } else {
-            tokio::spawn(healthchecks);
             true
         }
     }
@@ -799,7 +798,7 @@ mod tests {
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap();
 
@@ -862,7 +861,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -899,7 +898,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -922,7 +921,7 @@ mod reload_tests {
         let (mut topology, _crash) =
             start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(old_config.build().unwrap(), false)
+            .reload_config_and_respawn(old_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1104,7 +1103,7 @@ mod reload_tests {
         delay_for(Duration::from_secs(1)).await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config)
             .await
             .unwrap());
 
@@ -1258,7 +1257,7 @@ mod transient_state_tests {
         topology.sources_finished().await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1294,7 +1293,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1338,7 +1337,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }

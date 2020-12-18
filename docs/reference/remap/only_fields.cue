@@ -24,7 +24,7 @@ remap: functions: only_fields: {
 				"field3": 3
 			}
 			source: #"""
-				only_fields(".field1", ".field3")
+				only_fields(.field1, .field3)
 				"""#
 			output: {
 				"field1": 1

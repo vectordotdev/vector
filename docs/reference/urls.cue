@@ -69,6 +69,7 @@ urls: {
 	aws_sqs:                                                  "https://aws.amazon.com/sqs/"
 	aws_sqs_api:                                              "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/Welcome.html"
 	aws_sqs_create:                                           "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-create-queue.html"
+	aws_vpc_flow_logs:                                        "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html"
 	azure_monitor:                                            "https://azure.microsoft.com/en-us/services/monitor/"
 	azure_monitor_logs_endpoints:                             "https://docs.microsoft.com/en-us/rest/api/monitor/"
 	basic_auth:                                               "https://en.wikipedia.org/wiki/Basic_access_authentication"

@@ -24,6 +24,7 @@ impl Expression for Arithmetic {
         match self.op {
             Multiply => lhs.try_mul(rhs),
             Divide => lhs.try_div(rhs),
+            IntegerDivide => lhs.try_int_div(rhs),
             Add => lhs.try_add(rhs),
             Subtract => lhs.try_sub(rhs),
             Or => Ok(lhs.or(rhs)),
@@ -45,7 +46,7 @@ impl Expression for Arithmetic {
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);
-        let type_def = lhs_def | rhs_def;
+        let type_def = lhs_def.clone() | rhs_def.clone();
 
         match self.op {
             Or if lhs_def.kind.is_null() => rhs_def,
@@ -62,6 +63,9 @@ impl Expression for Arithmetic {
             Subtract | Divide | Remainder => type_def
                 .fallible_unless(Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Integer | Kind::Float),
+            IntegerDivide => type_def
+                .fallible_unless(Kind::Integer | Kind::Float)
+                .with_constraint(Kind::Integer),
             Multiply | Add => type_def
                 .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Bytes | Kind::Integer | Kind::Float),
@@ -86,8 +90,8 @@ mod tests {
                 Operator::Or,
             ),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 
@@ -98,8 +102,8 @@ mod tests {
                 Operator::Or,
             ),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -112,6 +116,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes | Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -124,6 +129,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes | Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -136,6 +142,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -148,6 +155,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -160,6 +168,20 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Integer | Kind::Float,
+                ..Default::default()
+            },
+        }
+
+        integer_divide {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::IntegerDivide,
+            ),
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Integer,
+                ..Default::default()
             },
         }
 
@@ -170,8 +192,8 @@ mod tests {
                 Operator::And,
             ),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -182,8 +204,8 @@ mod tests {
                 Operator::Equal,
             ),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -194,8 +216,8 @@ mod tests {
                 Operator::NotEqual,
             ),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -208,6 +230,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -220,6 +243,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -232,6 +256,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
 
@@ -244,6 +269,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
             },
         }
     ];

@@ -126,6 +126,10 @@ components: {
 		// For example, the `http` sink has a `HTTP` title.
 		title: string
 
+		// Platform-specific policies, e.g. AWS IAM policies, that are
+		// required or recommended when using the component.
+		permissions?: iam: [#IAM, ...#IAM]
+
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
 	}
@@ -397,6 +401,33 @@ components: {
 	#Output: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#IAM: {
+		#Policy: {
+			#RequiredFor: "write" | "healthcheck"
+
+			_action:        !=""
+			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			docs_url:       !=""
+			required_when?: !=""
+
+			if platform == "aws" {
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
+				action:   "\(_service):\(_action)"
+			}
+			if platform == "gcp" {
+				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
+				action:   "\(_service).\(_action)"
+			}
+		}
+
+		platform: "aws" | "gcp"
+		policies: [#Policy, ...#Policy]
+		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
+		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
+		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
+		_docs_tag: *_service | !=""
 	}
 
 	#Runtime: {

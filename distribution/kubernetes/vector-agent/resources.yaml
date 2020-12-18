@@ -46,6 +46,9 @@ data:
     # Ingest logs from Kubernetes.
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
+    # Capture the metrics from the host.
+    [sources.host_metrics]
+      type = "host_metrics"
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
@@ -53,7 +56,7 @@ data:
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       type = "prometheus"
-      inputs = ["internal_metrics"]
+      inputs = ["internal_metrics","host_metrics"]
       address = "0.0.0.0:9090"
 ---
 # Source: vector-agent/templates/rbac.yaml
@@ -113,7 +116,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 3dac4d3f040851abd23fb5bf6d48a5babbd001e35aaa5465fa23e45816918c14
+        
+        checksum/config: 75958f6034a2d836d57468a572df3af05ea5d4eaf4b8b5cbd6371e6ec319a696
         
       labels:
         app.kubernetes.io/name: vector-agent
@@ -145,6 +149,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: PROCFS_ROOT
+              value: /host/proc
+            - name: SYSFS_ROOT
+              value: /host/sys
             
             - name: LOG
               value: info
@@ -169,6 +177,14 @@ spec:
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
+              readOnly: true
+            # Host procsfs mount.
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            # Host sysfs mount.
+            - name: sysfs
+              mountPath: /host/sys
               readOnly: true
       terminationGracePeriodSeconds: 60
       tolerations:
@@ -199,3 +215,11 @@ spec:
               - secret:
                   name: vector-agent-config
                   optional: true
+        # Host procsfs.
+        - name: procfs
+          hostPath:
+            path: /proc
+        # Host sysfs.
+        - name: sysfs
+          hostPath:
+            path: /sys
