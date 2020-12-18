@@ -18,22 +18,28 @@ lazy_static! {
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
 }
 
+fn sum_metrics(metrics: &[Metric]) -> Option<Metric> {
+    let mut iter = metrics.iter();
+    let m = iter.next()?;
+
+    Some(iter.fold(m.clone(), |mut m1, m2| {
+        m1.add(m2);
+        m1
+    }))
+}
+
 pub trait Metrics {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
+    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
 }
 
 impl Metrics for Vec<Metric> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
-        let mut iter = self.iter();
-        let m = iter.next()?;
+        Some(ProcessedEventsTotal::new(sum_metrics(self)?))
+    }
 
-        Some(ProcessedEventsTotal::new(iter.fold(
-            m.clone(),
-            |mut m1, m2| {
-                m1.add(m2);
-                m1
-            },
-        )))
+    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
+        Some(ProcessedBytesTotal::new(sum_metrics(self)?))
     }
 }
 
