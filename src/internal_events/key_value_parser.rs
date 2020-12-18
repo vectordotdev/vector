@@ -2,18 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct KeyValueEventProcessed;
-
-impl InternalEvent for KeyValueEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value",
-        );
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct KeyValueParseFailed {
     pub key: String,
     pub error: crate::types::Error,
@@ -31,8 +19,6 @@ impl InternalEvent for KeyValueParseFailed {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
         );
     }
@@ -54,8 +40,6 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "target_field_exists",
         );
     }
@@ -77,8 +61,6 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
         );
     }

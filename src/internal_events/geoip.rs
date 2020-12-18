@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct GeoipEventProcessed;
-
-impl InternalEvent for GeoipEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct GeoipIpAddressParseError<'a> {
     pub address: &'a str,
 }
