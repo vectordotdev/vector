@@ -491,17 +491,15 @@ components: {
 						type: string: {
 							default: "remap"
 							enum: {
-								remap: "Use the [Timber Remap Language (TRL)](\(urls.timber_remap_language)) to define your conditions."
+								remap: "Use the [Timber Remap Language (TRL)](\(urls.timber_remap_language_reference)) to define your conditions."
 							}
 						}
 					}
 					"source": {
-						common:      true
-						description: "The [Timber Remap Language (TRL)](\(urls.timber_remap_language)) conditional source"
+						description: "The [Timber Remap Language (TRL)](\(urls.timber_remap_language_reference)) conditional source"
 						required:    true
 						warnings: []
 						type: string: {
-							default: null
 							examples: [
 								"""
 								.level == "error" && .host == "my.host.com"
