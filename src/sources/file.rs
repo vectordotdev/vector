@@ -72,6 +72,7 @@ pub struct FileConfig {
     // Deprecated name
     #[serde(alias = "fingerprinting")]
     pub fingerprint: FingerprintConfig,
+    pub ignore_not_found: bool,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
     pub multiline: Option<MultilineConfig>,
@@ -125,6 +126,7 @@ impl Default for FileConfig {
                 bytes: 256,
                 ignored_header_bytes: 0,
             },
+            ignore_not_found: false,
             host_key: None,
             data_dir: None,
             glob_minimum_cooldown: 1000, // millis
@@ -210,7 +212,7 @@ pub fn file_source(
         fingerprinter: Fingerprinter {
             strategy: config.fingerprint.clone().into(),
             max_line_length: config.max_line_bytes,
-            ignore_not_found: false,
+            ignore_not_found: config.ignore_not_found,
         },
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
