@@ -3,6 +3,7 @@ package metadata
 urls: {
 	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
+	ansi_escape_codes:                                        "https://en.wikipedia.org/wiki/ANSI_escape_code"
 	apache:                                                   "https://httpd.apache.org/"
 	apache_common:                                            "https://httpd.apache.org/docs/1.3/logs.html#common"
 	apache_error:                                             "https://httpd.apache.org/docs/1.3/logs.html#errorlog"
@@ -198,7 +199,6 @@ urls: {
 	issue_1694:                                               "https://github.com/timberio/vector/issues/1694"
 	jemalloc:                                                 "https://github.com/jemalloc/jemalloc"
 	journald:                                                 "https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html"
-	json:                                                     "https://en.wikipedia.org/wiki/JSON"
 	json:                                                     "https://en.wikipedia.org/wiki/JSON"
 	json_types:                                               "https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax"
 	jsonnet:                                                  "https://jsonnet.org/"
@@ -445,6 +445,7 @@ urls: {
 	vector_website:                                           "https://vector.dev"
 	vote_feature:                                             "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 	wasm:                                                     "https://webassembly.org/"
+	wasm_languages:                                           "https://github.com/appcypher/awesome-wasm-langs"
 	windows:                                                  "https://www.microsoft.com/en-us/windows"
 	windows_installer:                                        "https://en.wikipedia.org/wiki/Windows_Installer"
 	windows_service:                                          "https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service"

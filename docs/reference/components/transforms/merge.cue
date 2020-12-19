@@ -3,6 +3,10 @@ package metadata
 components: transforms: merge: {
 	title: "Merge"
 
+	description: """
+		Merges partial log events into a single event.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"
@@ -24,7 +28,14 @@ components: transforms: merge: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new
+			[`reduce` transform](\(urls.vector_remap_transform)). The `reduce`
+			transform provides a simple syntax for robust data merging.
+			Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

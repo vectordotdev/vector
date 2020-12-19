@@ -3,6 +3,10 @@ package metadata
 components: transforms: lua: {
 	title: "Lua"
 
+	description: """
+		Transform events with a full embedded [Lua](\(urls.lua)) engine.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -31,7 +35,15 @@ components: transforms: lua: {
 
 		requirements: []
 		warnings: []
-		notices: []
+		notices: [
+			"""
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
+			this tranform. The [Timber Remap Language](\(urls.timber_remap_language_reference))
+			is designed for safe, performant, and easy data mapping. It is intended to cover the
+			vast majority of data mapping use cases leaving Lua for very advanced and edge-case
+			situations.
+			""",
+		]
 	}
 
 	configuration: {

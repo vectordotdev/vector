@@ -3,6 +3,10 @@ package metadata
 components: transforms: regex_parser: {
 	title: "Regex Parser"
 
+	description: """
+		Parses a log field's value with a [Regular Expression](\(urls.regex)).
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -30,7 +34,14 @@ components: transforms: regex_parser: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new [`remap` transform's
+			`parse_regex` function](\(urls.vector_remap_transform)#parse_regex). The `remap`
+			transform provides a simple syntax for robust data transformation. Let us know what you
+			think!
+			""",
+		]
 		notices: []
 	}
 
