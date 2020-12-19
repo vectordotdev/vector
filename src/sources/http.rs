@@ -115,7 +115,7 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::tcp(self.address.clone())]
+        vec![Resource::tcp(self.address)]
     }
 }
 
