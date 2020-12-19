@@ -3,7 +3,9 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    sources::util::fake::{apache_common_log_line, apache_error_log_line, json_log_line, syslog_5424_log_line},
+    sources::util::fake::{
+        apache_common_log_line, apache_error_log_line, json_log_line, syslog_5424_log_line,
+    },
     Pipeline,
 };
 use futures::{stream::StreamExt, SinkExt};

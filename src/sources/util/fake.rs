@@ -94,7 +94,7 @@ pub fn json_log_line() -> String {
     //   "PATCH", "request": "/web+services/cross-media/strategize", "protocol":"HTTP/1.1", \
     //   "status":403, "bytes":25926, "referer": "https://www.leadworld-class.org/revolutionize/applications"}
     format!(
-        "{{\"host\":\"{}\", \"user-identifier\":\"{}\", \"datetime\":\"{}\", \"method\":\"{}\", \"request\":\"{}\", \"protocol\":\"{}\", \"status\":\"{}\", \"bytes\":{}, \"referer\":\"{}\"}}",
+        "{{\"host\":\"{}\",\"user-identifier\":\"{}\",\"datetime\":\"{}\",\"method\":\"{}\",\"request\":\"{}\",\"protocol\":\"{}\",\"status\":\"{}\",\"bytes\":{},\"referer\":\"{}\"}}",
         ipv4_address(),
         username(),
         timestamp_json(),
