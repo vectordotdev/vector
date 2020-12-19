@@ -54,7 +54,7 @@ components: transforms: remap: {
 
 	input: {
 		logs:    true
-		metrics: null
+		metrics: true
 	}
 
 	examples: [
