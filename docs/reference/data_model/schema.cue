@@ -46,8 +46,11 @@ data_model: schema: {
 			various metrics services without the need for any
 			transformation.
 
-			Vector's metric data model is heavily inspired by Prometheus,
-			Statsd, and Datadog.
+			Vector's metric data model favors accuracy and correctness over
+			ideological purity. Therefore, Vector's metric types are a
+			conglomeration of various metric types found in the wild, such as
+			Prometheus and Statsd. This	ensures metric data is _correctly_
+			interoperable between systems.
 			"""
 		required: false
 		warnings: []
