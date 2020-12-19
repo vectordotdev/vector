@@ -1,5 +1,8 @@
 use super::{sink, state, transform, Component};
-use crate::config::DataType;
+use crate::{
+    api::schema::metrics::{self, IntoSourceMetrics},
+    config::DataType,
+};
 use async_graphql::{Enum, Object};
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone)]
@@ -65,5 +68,10 @@ impl Source {
             Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
+    }
+
+    /// Source metrics
+    pub async fn metrics(&self) -> metrics::SourceMetrics {
+        metrics::by_component_name(&self.0.name).to_source_metrics(&self.0.component_type)
     }
 }

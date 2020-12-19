@@ -3,7 +3,7 @@ pub mod filter;
 mod host;
 mod processed_bytes;
 mod processed_events;
-mod source;
+pub mod source;
 mod uptime;
 
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
@@ -19,6 +19,7 @@ pub use processed_bytes::{
 pub use processed_events::{
     ComponentProcessedEventsThroughput, ComponentProcessedEventsTotal, ProcessedEventsTotal,
 };
+pub use source::{IntoSourceMetrics, SourceMetrics};
 pub use uptime::Uptime;
 
 #[derive(Interface)]

@@ -1,6 +1,8 @@
+mod file;
 mod generic;
 
 use super::{ProcessedBytesTotal, ProcessedEventsTotal};
+use crate::event::Metric;
 use async_graphql::Interface;
 
 #[derive(Debug, Clone, Interface)]
@@ -9,5 +11,19 @@ use async_graphql::Interface;
     field(name = "processed_bytes_total", type = "Option<ProcessedBytesTotal>")
 )]
 pub enum SourceMetrics {
-    GenericSource(generic::GenericSource),
+    FileSourceMetrics(file::FileSourceMetrics),
+    GenericSourceMetrics(generic::GenericSourceMetrics),
+}
+
+pub trait IntoSourceMetrics {
+    fn to_source_metrics(self, component_type: &str) -> SourceMetrics;
+}
+
+impl IntoSourceMetrics for Vec<Metric> {
+    fn to_source_metrics(self, component_type: &str) -> SourceMetrics {
+        match component_type {
+            "file" => SourceMetrics::FileSourceMetrics(file::FileSourceMetrics::new(self)),
+            _ => SourceMetrics::GenericSourceMetrics(generic::GenericSourceMetrics::new(self)),
+        }
+    }
 }
