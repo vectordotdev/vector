@@ -660,7 +660,7 @@ mod resource_tests {
     use std::net::{Ipv4Addr, SocketAddr};
 
     fn localhost(port: u16) -> Resource {
-        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port).into()
+        Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
     }
 
     fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
@@ -718,7 +718,10 @@ mod resource_tests {
             ("sink_0", vec![localhost(0)]),
             (
                 "sink_1",
-                vec![SocketAddr::new(Ipv4Addr::new(127, 0, 0, 2).into(), 0).into()],
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::new(127, 0, 0, 2).into(),
+                    0,
+                ))],
             ),
         ];
         let conflicting = Resource::conflicts(components);
@@ -731,7 +734,10 @@ mod resource_tests {
             ("sink_0", vec![localhost(0)]),
             (
                 "sink_1",
-                vec![SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0).into()],
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::UNSPECIFIED.into(),
+                    0,
+                ))],
             ),
         ];
         let conflicting = Resource::conflicts(components);
@@ -739,6 +745,28 @@ mod resource_tests {
             conflicting,
             hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
         );
+    }
+
+    #[test]
+    fn different_protocol() {
+        let components = vec![
+            (
+                "sink_0",
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::LOCALHOST.into(),
+                    0,
+                ))],
+            ),
+            (
+                "sink_1",
+                vec![Resource::udp(SocketAddr::new(
+                    Ipv4Addr::LOCALHOST.into(),
+                    0,
+                ))],
+            ),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(conflicting, HashMap::new());
     }
 
     #[test]
