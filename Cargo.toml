@@ -185,7 +185,7 @@ pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runti
 cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
-k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
+k8s-openapi = { version = "0.10", features = ["v1_16"], optional = true }
 portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }
 sha-1 = "0.9"
 sha2 = "0.9"
