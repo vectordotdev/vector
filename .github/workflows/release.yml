@@ -166,11 +166,9 @@ jobs:
       - name: "Download Perl"
         shell: bash
         env:
-          VERSION: "5.30.0.1"
-          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+          VERSION: "5.32.0.1"
         run: |
-          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |

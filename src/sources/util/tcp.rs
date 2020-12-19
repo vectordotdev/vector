@@ -7,10 +7,7 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::Sink01CompatExt, future::BoxFuture, stream, FutureExt, StreamExt, TryFutureExt,
-};
-use futures01::Sink;
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
@@ -164,7 +161,7 @@ async fn handle_stream(
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+    out: impl Sink<Event> + Send + 'static,
 ) {
     tokio::select! {
         result = socket.handshake() => {
@@ -225,7 +222,7 @@ async fn handle_stream(
             None
         }
     }))
-    .forward(out.sink_compat())
+    .forward(out)
     .map_err(|_| warn!(message = "Error received while processing TCP source."))
     .map(|_| debug!("Connection closed."))
     .await

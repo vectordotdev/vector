@@ -147,6 +147,11 @@ async fn validate_healthchecks(
     pieces: &mut Pieces,
     fmt: &mut Formatter,
 ) -> bool {
+    if config.healthchecks.enabled {
+        fmt.warning("Health checks are disabled");
+        return !opts.deny_warnings;
+    }
+
     let healthchecks = topology::take_healthchecks(diff, pieces);
     // We are running health checks in serial so it's easier for the users
     // to parse which errors/warnings/etc. belong to which healthcheck.

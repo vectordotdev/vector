@@ -112,9 +112,24 @@ impl Expression for Array {
             .map(|e| e.type_def(state))
             .any(|d| d.is_fallible());
 
+        let inner_type_def = if self.expressions.is_empty() {
+            None
+        } else {
+            let type_def = self.expressions.iter().fold(
+                TypeDef {
+                    kind: value::Kind::empty(),
+                    ..Default::default()
+                },
+                |type_def, expression| type_def.merge(expression.type_def(state)),
+            );
+
+            Some(type_def.boxed())
+        };
+
         TypeDef {
             fallible,
             kind: value::Kind::Array,
+            inner_type_def,
         }
     }
 }
@@ -135,12 +150,20 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Array,
+                ..Default::default()
             },
         }
 
         one_expression {
             expr: |_| Array::new(vec![Literal::from(true).into()]),
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
+            def: TypeDef {
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Boolean,
+                    ..Default::default()
+                }.boxed()),
+                ..Default::default()
+            },
         }
 
         multiple_expressions {
@@ -149,7 +172,14 @@ mod tests {
                         Literal::from(true).into(),
                         Literal::from(1234).into(),
             ]),
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
+            def: TypeDef {
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
+                    ..Default::default()
+                }.boxed()),
+                ..Default::default()
+            },
         }
 
         last_one_fallible {
@@ -164,6 +194,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    fallible: true,
+                    kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes,
+                    ..Default::default()
+                }.boxed()),
             },
         }
 
@@ -180,6 +215,14 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    fallible: true,
+                    kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes | Kind::Boolean | Kind::Array,
+                    inner_type_def: Some(TypeDef {
+                        kind: Kind::Integer,
+                        ..Default::default()
+                    }.boxed()),
+                }.boxed()),
             },
         }
     ];

@@ -10,6 +10,7 @@ mod block;
 pub(crate) mod function;
 mod if_statement;
 mod literal;
+mod map;
 mod noop;
 mod not;
 pub(crate) mod path;
@@ -23,6 +24,7 @@ pub use block::Block;
 pub use function::Function;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
+pub use map::Map;
 pub use noop::Noop;
 pub use not::Not;
 pub use path::Path;
@@ -159,6 +161,7 @@ expression_dispatch![
     Function,
     IfStatement,
     Literal, // TODO: literal scalar
+    Map,
     Noop,
     Not,
     Path,
@@ -171,6 +174,7 @@ impl<T: Into<Value>> From<T> for Expr {
 
         match value {
             Value::Array(array) => Array::from(array).into(),
+            Value::Map(map) => Map::from(map).into(),
             _ => Literal::from(value).into(),
         }
     }

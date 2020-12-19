@@ -8,8 +8,9 @@ sources:
   dummy:
     type: "generator"
     rawConfig: |
+      format = "shuffle"
       lines = ["Hello world"]
-      batch_interval = 60 # once a minute
+      interval = 60 # once a minute
 
 sinks:
   stdout:
@@ -79,7 +80,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         vector_metrics_port_forward.local_addr_ipv4()
     );
 
-    // Assert that `vector_started`-ish metric is present.
+    // Wait until `vector_started`-ish metric is present.
     metrics::wait_for_vector_started(
         &vector_metrics_url,
         std::time::Duration::from_secs(5),

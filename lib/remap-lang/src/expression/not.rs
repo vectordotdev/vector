@@ -24,11 +24,11 @@ impl Expression for Not {
         Ok((!boolean).into())
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef {
-            fallible: true,
-            kind: value::Kind::Boolean,
-        }
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.expression
+            .type_def(state)
+            .fallible_unless(value::Kind::Boolean)
+            .with_constraint(value::Kind::Boolean)
     }
 }
 
@@ -72,6 +72,7 @@ mod tests {
         def: TypeDef {
             fallible: true,
             kind: Kind::Boolean,
+            ..Default::default()
         },
     }];
 }

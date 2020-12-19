@@ -7,8 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::Sink;
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, net::SocketAddr};
@@ -20,7 +19,7 @@ use warp::{
     Filter,
 };
 
-#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
+#[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) fn add_query_parameters(
     mut events: Vec<Event>,
     query_parameters_config: &[String],
@@ -167,7 +166,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         info!(message = "Handling HTTP request.", headers = ?headers, rate_limit_secs = 30);
 
-                        let out = out.clone();
+                        let mut out = out.clone();
 
                         let body_size = body.len();
                         let events = match auth.is_valid(&auth_header) {
@@ -182,9 +181,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         events_count: events.len(),
                                         byte_size: body_size,
                                     });
-                                    out.send_all(futures01::stream::iter_ok(events))
-                                        .compat()
-                                        .map_err(move |error: futures01::sync::mpsc::SendError<Event>| {
+                                    out.send_all(&mut futures::stream::iter(events).map(Ok))
+                                        .map_err(move |error: crate::pipeline::ClosedError| {
                                             // can only fail if receiving end disconnected, so we are shutting down,
                                             // probably not gracefully.
                                             error!(message = "Failed to forward events, downstream is closed.");

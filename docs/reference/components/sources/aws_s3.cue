@@ -227,6 +227,35 @@ components: sources: aws_s3: components._aws & {
 		}
 	}
 
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "s3"
+
+			policies: [
+				{
+					_action: "GetObject"
+				},
+			]
+		},
+		{
+			platform:  "aws"
+			_service:  "sqs"
+			_docs_tag: "AWSSimpleQueueService"
+
+			policies: [
+				{
+					_action:       "ReceiveMessage"
+					required_when: "[`strategy`](#strategy) is set to `sqs`"
+				},
+				{
+					_action:       "DeleteMessage"
+					required_when: "[`strategy`](#strategy) is set to `sqs` and [`delete_message`](#delete_message) is set to `true`"
+				},
+			]
+		},
+	]
+
 	telemetry: metrics: {
 		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total

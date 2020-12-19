@@ -2,19 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct AwsEc2MetadataEventProcessed;
-
-impl InternalEvent for AwsEc2MetadataEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct AwsEc2MetadataRefreshSuccessful;
 
 impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
