@@ -52,16 +52,17 @@ impl Expression for IncludesFn {
 
         let value_type_def = self.value.type_def(state).fallible_unless(Kind::Array);
 
+        let value_fallible = value_type_def.is_fallible();
+
         let inner_kind = value_type_def
             .inner_type_def
-            .clone()
             .unwrap_or_default()
             .scalar_kind();
 
         let item_type_def = self.item.type_def(state).fallible_unless(inner_kind);
 
         TypeDef {
-            fallible: value_type_def.is_fallible() || item_type_def.is_fallible(),
+            fallible: value_fallible || item_type_def.is_fallible(),
             kind: Kind::Boolean,
             ..Default::default()
         }
