@@ -1338,3 +1338,30 @@
       "b.dstaddr.equals" = "10.0.0.220"
       "b.pkt_srcaddr.equals" = "10.0.1.5"
       "b.pkt_dstaddr.equals" = "203.0.113.5"
+
+[transforms.remap_metrics]
+  inputs = []
+  type = "remap"
+  source = """
+      .tags.host = "ook"
+      .tags.name = .name
+      .tags.namespace = .namespace
+      .tags.type = .type
+   """
+[[tests]]
+  name = "remap_metrics"
+  [tests.input]
+    insert_at = "remap_metrics"
+    type = "metric"
+    [tests.input.metric]
+      name = "example counter"
+      namespace = "zork"
+      kind = "absolute"
+      counter.value = 1.0
+  [[tests.outputs]]
+    extract_from = "remap_metrics"
+    [[tests.outputs.conditions]]
+      "name.equals" = "example counter"
+      "namespace.equals" = "zork"
+      "host.equals" = "ook"
+      "type.equals" = "counter"
