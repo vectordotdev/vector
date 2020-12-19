@@ -3,7 +3,9 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_5424_log_line},
+    sources::util::fake::{
+        apache_common_log_line, apache_error_log_line, syslog_3164_log_line, syslog_5424_log_line,
+    },
     Pipeline,
 };
 use futures::{stream::StreamExt, SinkExt};
@@ -43,6 +45,8 @@ pub enum OutputFormat {
     ApacheError,
     #[serde(alias = "rfc5424")]
     Syslog,
+    #[serde(alias = "rfc3164")]
+    BsdSyslog,
 }
 
 impl OutputFormat {
@@ -57,6 +61,7 @@ impl OutputFormat {
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
+            Self::BsdSyslog => syslog_3164_log_line(),
         };
         Event::from(line)
     }
@@ -302,9 +307,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn syslog_generates_output() {
+    async fn syslog_5424_format_generates_output() {
         let mut rx = runit(
             r#"format = "syslog"
+            count = 5"#,
+        )
+        .await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn syslog_3164_format_generates_output() {
+        let mut rx = runit(
+            r#"format = "bsd_syslog"
             count = 5"#,
         )
         .await;
