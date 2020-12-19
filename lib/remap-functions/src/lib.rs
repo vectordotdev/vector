@@ -24,6 +24,8 @@ mod floor;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "includes")]
+mod includes;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
 #[cfg(feature = "ip_subnet")]
@@ -133,6 +135,8 @@ pub use floor::Floor;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "includes")]
+pub use includes::Includes;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_subnet")]

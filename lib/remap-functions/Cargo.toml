@@ -47,6 +47,7 @@ default = [
     "floor",
     "format_number",
     "format_timestamp",
+    "includes",
     "ip_cidr_contains",
     "ip_subnet",
     "ip_to_ipv6",
@@ -100,6 +101,7 @@ flatten = []
 floor = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+includes = []
 ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
