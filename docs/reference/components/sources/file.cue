@@ -122,9 +122,9 @@ components: sources: file: {
 			type: string: default: "host"
 		}
 		ignore_not_found: {
-			common:	false
+			common:      false
 			description: "Ignore missing files when fingerprinting. This can be used to reduce errors logged when reading from files that may include dangling symlinks."
-			required: false
+			required:    false
 			type: bool: default: false
 		}
 		ignore_older: {
