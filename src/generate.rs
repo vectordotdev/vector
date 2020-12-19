@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, HealthcheckOptions, SinkDescription, SourceDescription,
-    TransformDescription,
+    component::ExampleError, GlobalOptions, SinkDescription, SinkHealthcheckOptions,
+    SourceDescription, TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -58,7 +58,7 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: HealthcheckOptions,
+    pub healthcheck: SinkHealthcheckOptions,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
@@ -264,7 +264,7 @@ fn generate_example(
                         })
                         .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
-                    healthcheck: HealthcheckOptions::default(),
+                    healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
             );
