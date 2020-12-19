@@ -171,6 +171,11 @@ impl TypeDef {
         self
     }
 
+    pub fn with_inner_type(mut self, inner_type: impl Into<Option<Box<Self>>>) -> Self {
+        self.inner_type_def = inner_type.into();
+        self
+    }
+
     pub fn merge(self, other: Self) -> Self {
         self | other
     }

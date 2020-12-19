@@ -50,22 +50,12 @@ impl Expression for IncludesFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let value_type_def = self.value.type_def(state).fallible_unless(Kind::Array);
-
-        let value_fallible = value_type_def.is_fallible();
-
-        let inner_kind = value_type_def
-            .inner_type_def
-            .unwrap_or_default()
-            .scalar_kind();
-
-        let item_type_def = self.item.type_def(state).fallible_unless(inner_kind);
-
-        TypeDef {
-            fallible: value_fallible || item_type_def.is_fallible(),
-            kind: Kind::Boolean,
-            ..Default::default()
-        }
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Array)
+            .merge(self.item.type_def(state))
+            .with_constraint(Kind::Boolean)
+            .with_inner_type(None)
     }
 }
 
@@ -87,14 +77,6 @@ mod tests {
             expr: |_| IncludesFn {
                 value: Literal::from("foo").boxed(), // Must be an array, hence fallible
                 item: Literal::from("foo").boxed(),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-        }
-
-        value_item_mismatched_types_fallible {
-            expr: |_| IncludesFn {
-                value: Array::from(vec!["foo", "bar", "baz"]).boxed(),
-                item: Literal::from(1).boxed(), // Type doesn't match array, hence fallible
             },
             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
