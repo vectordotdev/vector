@@ -34,7 +34,7 @@ components: transforms: filter: {
 
 	configuration: {
 		condition: {
-			description: "The set of logical conditions to be matched against every input event. Only messages that pass all conditions will be forwarded."
+			description: "The condition to be matched against every input event. Only messages that pass the condition will be forwarded."
 			required:    true
 			warnings: []
 			type: object: configuration._conditions
@@ -57,7 +57,10 @@ components: transforms: filter: {
 		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: "level.neq": "debug"
+				condition: {
+					type: "remap"
+					source: '.level == "debug"'
+				}
 			}
 			input: [
 				{log: {

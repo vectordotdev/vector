@@ -4,7 +4,7 @@ components: transforms: grok_parser: {
 	title: "Grok Parser"
 
 	description: """
-		Parses a log field value with [Grok](\(urls.grok))
+		Parses a log field value with [Grok](\(urls.grok)).
 		"""
 
 	classes: {

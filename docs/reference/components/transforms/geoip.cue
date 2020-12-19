@@ -5,7 +5,7 @@ components: transforms: geoip: {
 
 	description: """
 		Enrich events with geolocation data from the MaxMind GeoIP2-City,
-		GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases
+		GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
 		"""
 
 	classes: {

@@ -49,7 +49,7 @@ components: {
 
 		// `description` describes the components with a single paragraph.
 		// It is used for SEO purposes and should be full of relevant keywords.
-		description?: != ""
+		description?: =~"[.]$"
 
 		env_vars: #EnvVars
 

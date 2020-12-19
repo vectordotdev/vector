@@ -4,7 +4,7 @@ components: transforms: dedupe: {
 	title: "Dedupe events"
 
 	description: """
-		Deduplicates events to reduce uncessary data volume.
+		Deduplicates events to reduce data volume by eliminating copies of data.
 		"""
 
 	classes: {
