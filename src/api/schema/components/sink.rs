@@ -1,5 +1,5 @@
 use super::{source, state, transform, Component};
-use crate::api::schema::metrics;
+use crate::api::schema::metrics::{self, MetricsFilter};
 use async_graphql::Object;
 
 #[derive(Debug, Clone)]
@@ -50,11 +50,11 @@ impl Sink {
 
     /// Metric indicating events processed for the current sink
     pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
-        metrics::component_processed_events_total(&self.0.name)
+        metrics::by_component_name(&self.0.name).processed_events_total()
     }
 
     /// Metric indicating bytes processed for the current sink
     pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
-        metrics::component_processed_bytes_total(&self.0.name)
+        metrics::by_component_name(&self.0.name).processed_bytes_total()
     }
 }

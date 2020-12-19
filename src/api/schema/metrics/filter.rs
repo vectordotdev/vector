@@ -18,8 +18,10 @@ lazy_static! {
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
 }
 
-fn sum_metrics(metrics: &[Metric]) -> Option<Metric> {
-    let mut iter = metrics.iter();
+/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// used to get aggregate metrics.
+fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
+    let mut iter = metrics.into_iter();
     let m = iter.next()?;
 
     Some(iter.fold(m.clone(), |mut m1, m2| {
@@ -28,14 +30,19 @@ fn sum_metrics(metrics: &[Metric]) -> Option<Metric> {
     }))
 }
 
-pub trait Metrics {
+pub trait MetricsFilter {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
 }
 
-impl Metrics for Vec<Metric> {
+impl MetricsFilter for Vec<Metric> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
-        Some(ProcessedEventsTotal::new(sum_metrics(self)?))
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name.as_str().eq("processed_events_total")),
+        )?;
+
+        Some(ProcessedEventsTotal::new(sum))
     }
 
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
@@ -97,44 +104,6 @@ pub fn by_component_name(component_name: &str) -> Vec<Metric> {
             _ => None,
         })
         .collect()
-}
-
-/// Get the events processed by component name.
-pub fn component_processed_events_total(component_name: &str) -> Option<ProcessedEventsTotal> {
-    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
-        Event::Metric(m)
-            if m.name.as_str().eq("processed_events_total")
-                && m.tag_matches("component_name", &component_name) =>
-        {
-            Some(m)
-        }
-        _ => None,
-    });
-    let m = metrics.next()?;
-
-    Some(ProcessedEventsTotal::new(metrics.fold(m, |mut m1, m2| {
-        m1.add(&m2);
-        m1
-    })))
-}
-
-/// Get the bytes processed by component name.
-pub fn component_processed_bytes_total(component_name: &str) -> Option<ProcessedBytesTotal> {
-    let mut metrics = capture_metrics(&GLOBAL_CONTROLLER).filter_map(|ev| match ev {
-        Event::Metric(m)
-            if m.name.as_str().eq("processed_bytes_total")
-                && m.tag_matches("component_name", &component_name) =>
-        {
-            Some(m)
-        }
-        _ => None,
-    });
-    let m = metrics.next()?;
-
-    Some(ProcessedBytesTotal::new(metrics.fold(m, |mut m1, m2| {
-        m1.add(&m2);
-        m1
-    })))
 }
 
 type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;

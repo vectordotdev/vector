@@ -1,5 +1,5 @@
 mod errors;
-mod filter;
+pub mod filter;
 mod host;
 mod processed_bytes;
 mod processed_events;
