@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_5424_log_line},
+    sources::util::fake::{apache_common_log_line, apache_error_log_line, json_log_line, syslog_5424_log_line},
     Pipeline,
 };
 use futures::{stream::StreamExt, SinkExt};
@@ -43,6 +43,7 @@ pub enum OutputFormat {
     ApacheError,
     #[serde(alias = "rfc5424")]
     Syslog,
+    Json,
 }
 
 impl OutputFormat {
@@ -57,6 +58,7 @@ impl OutputFormat {
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
+            Self::Json => json_log_line(),
         };
         Event::from(line)
     }
@@ -274,7 +276,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn apache_common_generates_output() {
+    async fn apache_common_format_generates_output() {
         let mut rx = runit(
             r#"format = "apache_common"
             count = 5"#,
@@ -288,7 +290,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn apache_error_generates_output() {
+    async fn apache_error_format_generates_output() {
         let mut rx = runit(
             r#"format = "apache_error"
             count = 5"#,
@@ -302,9 +304,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn syslog_generates_output() {
+    async fn syslog_format_generates_output() {
         let mut rx = runit(
             r#"format = "syslog"
+            count = 5"#,
+        )
+        .await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn json_format_generates_output() {
+        let mut rx = runit(
+            r#"format = "json"
             count = 5"#,
         )
         .await;
