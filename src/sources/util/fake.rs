@@ -76,13 +76,15 @@ pub fn apache_error_log_line() -> String {
 }
 
 pub fn syslog_3164_log_line() -> String {
-    format!("<{}>{} {} {}[{}]: {}",
+    format!(
+        "<{}>{} {} {}[{}]: {}",
         priority(),
         timestamp_syslog_3164(),
         username(),
         application(),
         pid(),
-        error_message())
+        error_message()
+    )
 }
 
 pub fn syslog_5424_log_line() -> String {
