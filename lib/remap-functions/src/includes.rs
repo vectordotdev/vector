@@ -40,12 +40,9 @@ struct IncludesFn {
 impl Expression for IncludesFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let list = self.value.execute(state, object)?.try_array()?;
+        let item = self.item.execute(state, object)?;
 
-        // Immediately return false if the list is empty; if not, check for inclusion
-        let included = !list.is_empty() && {
-            let item = self.item.execute(state, object)?;
-            list.iter().any(|i| i == &item)
-        };
+        let included = list.iter().any(|i| i == &item);
 
         Ok(included.into())
     }
