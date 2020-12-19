@@ -2842,9 +2842,9 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fedd49de24d8c263613701406611410687148ae8c37cd6452650b250f753a0dd"
+checksum = "0f0f7efb804ec95e33db9ad49e4252f049e37e8b0a4652e3cd61f7999f2eff7f"
 dependencies = [
  "ctor",
  "ghost",
@@ -2853,9 +2853,9 @@ dependencies = [
 
 [[package]]
 name = "inventory-impl"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddead8880bc50f57fcd3b5869a7f6ff92570bb4e8f6870c22e2483272f2256da"
+checksum = "75c094e94816723ab936484666968f5b58060492e880f3c8d00489a1e244fa51"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",
