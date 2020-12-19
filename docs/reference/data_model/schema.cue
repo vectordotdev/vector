@@ -11,7 +11,7 @@ data_model: schema: {
 			A key tenet of Vector is to remain schema neutral. This
 			ensures that Vector can work with any schema, supporting
 			legacy and future schemas as your needs evolve. Vector
-			does not require any specific fields, and each compoennt
+			does not require any specific fields, and each component
 			will document the fields it provides.
 			"""
 		required: false
@@ -46,7 +46,7 @@ data_model: schema: {
 			various metrics services without the need for any
 			transformation.
 
-			Vector's metric data model is heavily inspried by Prometheus,
+			Vector's metric data model is heavily inspired by Prometheus,
 			Statsd, and Datadog.
 			"""
 		required: false
