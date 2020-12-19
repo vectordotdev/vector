@@ -5,7 +5,7 @@ components: transforms: remap: {
 
 	description: """
 		Transforms events using the [Timber Remap Language](\(urls.timber_remap_language_reference)),
-		a fast, safe, expressive data mapping language.
+		a fast, safe, self-documenting data mapping language.
 		"""
 
 	classes: {

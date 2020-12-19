@@ -445,6 +445,7 @@ urls: {
 	vector_website:                                           "https://vector.dev"
 	vote_feature:                                             "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 	wasm:                                                     "https://webassembly.org/"
+	wasm_languages:                                           "https://github.com/appcypher/awesome-wasm-langs"
 	windows:                                                  "https://www.microsoft.com/en-us/windows"
 	windows_installer:                                        "https://en.wikipedia.org/wiki/Windows_Installer"
 	windows_service:                                          "https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service"

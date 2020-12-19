@@ -3,6 +3,11 @@ package metadata
 components: transforms: wasm: {
 	title: "WASM"
 
+	description: """
+		Process events using the [WASM](\(urls.wasm)) virtual machine, allowing
+		you to process Vector events with Typescript, Ruby, Java, and [more](\(urls.wasm_languages)).
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"
@@ -35,7 +40,15 @@ components: transforms: wasm: {
 				"""#,
 		]
 		warnings: []
-		notices: []
+		notices: [
+			"""
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
+			this tranform. The [Timber Remap Language](\(urls.timber_remap_language_reference))
+			is designed for safe, performant, and easy data mapping. It is intended to cover the
+			vast majority of data mapping use cases leaving WASM for very advanced and edge-case
+			situations.
+			""",
+		]
 	}
 
 	configuration: {

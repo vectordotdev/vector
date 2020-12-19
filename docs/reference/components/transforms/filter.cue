@@ -62,7 +62,7 @@ components: transforms: filter: {
 			title: "Drop debug logs"
 			configuration: {
 				condition: {
-					type: "remap"
+					type:   "remap"
 					source: '.level == "debug"'
 				}
 			}
