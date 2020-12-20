@@ -88,7 +88,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
-                ..Default::default(),
+                ..Default::default()
             },
         }
     ];
@@ -98,7 +98,7 @@ mod tests {
 
         emergency {
             args: func_args![value: value!(0)],
-            want: Ok(value!("emerge")),
+            want: Ok(value!("emerg")),
         }
 
         alert {
