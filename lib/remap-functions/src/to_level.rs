@@ -42,10 +42,7 @@ impl Expression for ToLevelFn {
             5 => Ok("notice"),
             6 => Ok("info"),
             7 => Ok("debug"),
-            _ => Err(Error::from(format!(
-                "severity level {} not valid",
-                value
-            ))),
+            _ => Err(Error::from(format!("severity level {} not valid", value))),
         };
 
         match level {

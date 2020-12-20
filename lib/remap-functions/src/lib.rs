@@ -202,7 +202,7 @@ pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
 #[cfg(feature = "to_level")]
-pub use to_int::ToLevel;
+pub use to_level::ToLevel;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
 #[cfg(feature = "to_timestamp")]
