@@ -241,9 +241,14 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
+    use flate2::{
+        write::{DeflateEncoder, GzEncoder},
+        Compression,
+    };
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
+    use std::io::Write;
     use std::net::SocketAddr;
     use tokio::sync::mpsc;
 
@@ -310,6 +315,18 @@ mod tests {
         reqwest::Client::new()
             .post(&format!("http://{}?{}", address, query))
             .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
+        reqwest::Client::new()
+            .post(&format!("http://{}/", address))
+            .headers(headers)
+            .body(body)
             .send()
             .await
             .unwrap()
@@ -544,6 +561,37 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_gzip_deflate() {
+        trace_init();
+
+        let body = "test body";
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(body.as_bytes()).unwrap();
+        let body = encoder.finish().unwrap();
+
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(body.as_slice()).unwrap();
+        let body = encoder.finish().unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
+
+        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+
+        assert_eq!(200, send_bytes(addr, body, headers).await);
+
+        let mut events = collect_n(rx, 1).await;
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
