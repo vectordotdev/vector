@@ -10,27 +10,27 @@ impl Function for ToSeverity {
 
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
-            keyword: "level",
+            keyword: "value",
             accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let level = arguments.required("level")?.boxed();
+        let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToSeverityFn { level }))
+        Ok(Box::new(ToSeverityFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct ToSeverityFn {
-    level: Box<dyn Expression>,
+    value: Box<dyn Expression>,
 }
 
 impl Expression for ToSeverityFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let level_bytes = self.level.execute(state, object)?.try_bytes()?;
+        let level_bytes = self.value.execute(state, object)?.try_bytes()?;
 
         let level = String::from_utf8_lossy(&level_bytes);
 
@@ -53,68 +53,87 @@ impl Expression for ToSeverityFn {
         }
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef {
-            kind: value::Kind::Integer,
-            ..Default::default()
-        }
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Bytes)
+            .with_constraint(Kind::Integer)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use value::Kind;
+
+    test_type_def![
+        value_string_infallible {
+            expr: |_| IncludesFn {
+                value: Literal::from("warning").boxed(),
+            },
+            def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
+        }
+
+        value_not_string_fallible {
+            expr: |_| IncludesFn {
+                value: Literal::from(27).boxed(),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+    ];
 
     test_function![
         to_level => ToSeverity;
 
         emergency {
-            args: func_args![level: value!("emerg")],
+            args: func_args![value: value!("emerg")],
             want: Ok(value!(0)),
         }
 
         alert {
-            args: func_args![level: value!("alert")],
+            args: func_args![value: value!("alert")],
             want: Ok(value!(1)),
         }
 
         critical {
-            args: func_args![level: value!("crit")],
+            args: func_args![value: value!("crit")],
             want: Ok(value!(2)),
         }
 
         error {
-            args: func_args![level: value!("err")],
+            args: func_args![value: value!("err")],
             want: Ok(value!(3)),
         }
 
         warning {
-            args: func_args![level: value!("warn")],
+            args: func_args![value: value!("warn")],
             want: Ok(value!(4)),
         }
 
         notice {
-            args: func_args![level: value!("notice")],
+            args: func_args![value: value!("notice")],
             want: Ok(value!(5)),
         }
 
         informational {
-            args: func_args![level: value!("info")],
+            args: func_args![value: value!("info")],
             want: Ok(value!(6)),
         }
 
         debug {
-            args: func_args![level: value!("debug")],
+            args: func_args![value: value!("debug")],
             want: Ok(value!(7)),
         }
 
         invalid_level_1 {
-            args: func_args![level: value!("oopsie")],
+            args: func_args![value: value!("oopsie")],
             want: Err("function call error: level oopsie not valid"),
         }
 
         invalid_level_2 {
-            args: func_args![level: value!("aww shucks")],
+            args: func_args![value: value!("aww shucks")],
             want: Err("function call error:: level aww schucks not valid"),
         }
     ];
