@@ -70,14 +70,14 @@ mod tests {
 
     test_type_def![
         value_string_infallible {
-            expr: |_| IncludesFn {
+            expr: |_| ToSeverityFn {
                 value: Literal::from("warning").boxed(),
             },
             def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
         }
 
         value_not_string_fallible {
-            expr: |_| IncludesFn {
+            expr: |_| ToSeverityFn {
                 value: Literal::from(27).boxed(),
             },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
