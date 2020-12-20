@@ -54,7 +54,7 @@ or [**install Vector**][docs.installation].
 
 * [**Concepts**][docs.concepts]
 * [**Guarantees**][docs.guarantees]
-* [**Architecture**][docs.architecture] - [data model][docs.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [topology model][docs.topology-model], [concurrency model][docs.copncurrency-model], [runtime model][docs.runtime-model]
+* [**Architecture**][docs.architecture] - [data model][docs.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [topology model][docs.topology-model], [concurrency model][docs.concurrency-model], [runtime model][docs.runtime-model]
 
 ### Setup
 
@@ -153,10 +153,12 @@ Vector is an end-to-end, unified, open data platform.
 [docs.administration.process-management]: https://vector.dev/docs/administration/process-management/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.api]: https://vector.dev/docs/reference/api/
+[docs.architecture]: https://vector.dev/docs/about/under-the-hood/architecture/
 [docs.cli]: https://vector.dev/docs/reference/cli/
 [docs.concepts]: https://vector.dev/docs/about/concepts/
 [docs.concurrency-model]: https://vector.dev/docs/about/under-the-hood/architecture/concurrency-model/
 [docs.setup.configuration]: https://vector.dev/docs/setup/configuration/
+[docs.data-model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
 [docs.data-model.log#timestamps]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#timestamps
 [docs.data-model.log#types]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#types
 [docs.data-model.log]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/
