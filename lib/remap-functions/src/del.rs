@@ -9,39 +9,28 @@ impl Function for Del {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        generate_param_list! {
-            accepts = |_| true,
-            required = false,
-            keywords = [
-                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
-            ],
-        }
+        &[Parameter {
+            keyword: "field",
+            accepts: |_| true,
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let mut paths = vec![];
-        paths.push(arguments.required_path("1")?);
+        let field = arguments.required_path("field")?;
 
-        for i in 2..=16 {
-            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
-                paths.push(path)
-            }
-        }
-
-        Ok(Box::new(DelFn { paths }))
+        Ok(Box::new(DelFn { field }))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DelFn {
-    paths: Vec<Path>,
+    path: Path,
 }
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        self.paths
-            .iter()
-            .try_for_each(|path| object.remove(path.as_ref(), false))?;
+        object.remove(self.path.as_ref(), false)?;
 
         Ok(Value::Null)
     }
