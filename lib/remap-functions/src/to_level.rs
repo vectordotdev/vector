@@ -10,30 +10,30 @@ impl Function for ToLevel {
 
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
-            keyword: "severity",
+            keyword: "value",
             accepts: |v| matches!(v, Value::Integer(_)),
             required: true,
         }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let severity = arguments.required("severity")?.boxed();
+        let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToLevelFn { severity }))
+        Ok(Box::new(ToLevelFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct ToLevelFn {
-    severity: Box<dyn Expression>,
+    value: Box<dyn Expression>,
 }
 
 impl Expression for ToLevelFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let severity = self.severity.execute(state, object)?.try_integer()?;
+        let value = self.value.execute(state, object)?.try_integer()?;
 
         // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
-        let level = match severity {
+        let level = match value {
             0 => Ok("emerg"),
             1 => Ok("alert"),
             2 => Ok("crit"),
@@ -44,7 +44,7 @@ impl Expression for ToLevelFn {
             7 => Ok("debug"),
             _ => Err(Error::from(format!(
                 "severity level {} not valid",
-                severity
+                value
             ))),
         };
 
@@ -70,24 +70,24 @@ mod tests {
     use value::Kind;
 
     test_type_def![
-        value_string_non_fallible {
+        value_integer_non_fallible {
             expr: |_| ToLevelFn {
-                value: Literal::from("alert").boxed(),
+                value: Literal::from(3).boxed(),
             },
             def: TypeDef {
                 fallible: false,
-                kind: Kind::Integer,
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }
 
-        value_non_string_fallible {
+        value_non_integer_fallible {
             expr: |_| ToLevelFn {
-                value: Literal::from(27).boxed(),
+                value: Literal::from("foo").boxed(),
             },
             def: TypeDef {
                 fallible: true,
-                kind: Kind::Integer,
+                kind: Kind::Bytes,
                 ..Default::default(),
             },
         }
@@ -97,57 +97,57 @@ mod tests {
         to_level => ToLevel;
 
         emergency {
-            args: func_args![severity: value!(0)],
+            args: func_args![value: value!(0)],
             want: Ok(value!("emerge")),
         }
 
         alert {
-            args: func_args![severity: value!(1)],
+            args: func_args![value: value!(1)],
             want: Ok(value!("alert")),
         }
 
         critical {
-            args: func_args![severity: value!(2)],
+            args: func_args![value: value!(2)],
             want: Ok(value!("crit")),
         }
 
         error {
-            args: func_args![severity: value!(3)],
+            args: func_args![value: value!(3)],
             want: Ok(value!("err")),
         }
 
         warning {
-            args: func_args![severity: value!(4)],
+            args: func_args![value: value!(4)],
             want: Ok(value!("warning")),
         }
 
         notice {
-            args: func_args![severity: value!(5)],
+            args: func_args![value: value!(5)],
             want: Ok(value!("notice")),
         }
 
         informational {
-            args: func_args![severity: value!(6)],
+            args: func_args![value: value!(6)],
             want: Ok(value!("info")),
         }
 
         debug {
-            args: func_args![severity: value!(7)],
+            args: func_args![value: value!(7)],
             want: Ok(value!("debug")),
         }
 
         invalid_severity_next_int {
-            args: func_args![severity: value!(8)],
+            args: func_args![value: value!(8)],
             want: Err("function call error: severity level 8 not valid"),
         }
 
         invalid_severity_larger_int {
-            args: func_args![severity: value!(475)],
+            args: func_args![value: value!(475)],
             want: Err("function call error: severity level 475 not valid"),
         }
 
         invalid_severity_negative_int {
-            args: func_args![severity: value!(-1)],
+            args: func_args![value: value!(-1)],
             want: Err("function call error: severity level -1 not valid"),
         }
     ];
