@@ -148,7 +148,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
 fn decode_read(mut decoder: impl Read, coding: &str) -> Result<Bytes, ErrorMessage> {
     let mut decoded = Vec::new();
     decoder.read_to_end(&mut decoded).map_err(|error| {
-        warn!(message = "Failed decoding payload.",%coding, %error);
+        warn!(message = "Failed decoding payload.", %coding, %error);
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!("Failed decoding payload with {} decoder.", coding),
@@ -199,6 +199,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
+                        let _guard=span.enter();
                         info!(message = "Handling HTTP request.", headers = ?headers, rate_limit_secs = 30);
 
                         let mut out = out.clone();
