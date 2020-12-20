@@ -443,7 +443,7 @@ components: transforms: lua: {
 				{
 					title: "Type Mappings"
 					body:  """
-						The correspondence between Vector's [data types][docs.about.data-model.log#types] and Lua data type is summarized
+						The correspondence between Vector's [data types](\(urls.vector_log_data_types)) and Lua data type is summarized
 						by the following table:
 
 						| Vector Type                                         | Lua Type                        | Comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
