@@ -58,10 +58,10 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: SinkHealthcheckOptions,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
+    pub healthcheck: SinkHealthcheckOptions,
     pub buffer: crate::buffers::BufferConfig,
 }
 
@@ -442,13 +442,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck.enabled = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -473,13 +475,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck.enabled = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -498,13 +502,15 @@ max_length = 102400
 type = "stdin"
 
 [sinks.sink0]
-healthcheck.enabled = true
 inputs = ["source0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -519,13 +525,15 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sinks.sink0]
-healthcheck.enabled = true
 inputs = ["component-name"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"

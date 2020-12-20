@@ -212,15 +212,19 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
-    #[serde(default)]
-    pub buffer: crate::buffers::BufferConfig,
-    // We are accepting bool and uri for backward compatibility reasons.
+    pub inputs: Vec<String>,
+
+    // We are accepting this option for backward compatibility.
+    healthcheck_uri: Option<UriSerde>,
+
+    // We are accepting bool for backward compatibility.
     #[serde(deserialize_with = "crate::serde::bool_or_struct")]
     #[serde(default)]
     healthcheck: SinkHealthcheckOptions,
-    // We are accepting this option for backward compatibility.
-    healthcheck_uri: Option<UriSerde>,
-    pub inputs: Vec<String>,
+
+    #[serde(default)]
+    pub buffer: crate::buffers::BufferConfig,
+
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
 }
