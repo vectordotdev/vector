@@ -18,7 +18,7 @@ remap: {
 			2. **Safety** - TRL is Rust native and performs compile-time checks at boot time to
 			   ensure safety. In addition, TRL's simplicity and lack of complex \"footguns\" are
 			   ideal for collaboration.
-			3. **Easy** - A TRL script's intentions are clear even at first glance because the
+			3. **Self-documenting** - A TRL script's intentions are clear even at first glance because the
 			   language is designed to have a very gentle learning curve.
 
 			TRL is designed and maintained by [Timber](\(urls.timber)) and built specifically for
