@@ -409,6 +409,7 @@ urls: {
 	vector_issues:                                            "https://github.com/timberio/vector/issues"
 	vector_journald_source:                                   "https://vector.dev/docs/reference/sources/journald/"
 	vector_kubernetes_logs_source:                            "https://vector.dev/docs/reference/sources/kubernetes_logs/"
+	vector_log:                                               "https://vector.dev/docs/about/data-model/log/"
 	vector_log_data_types:                                    "https://vector.dev/docs/about/data-model/log/#types"
 	vector_lua_rfc:                                           "https://github.com/timberio/vector/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md"
 	vector_msi_source_files:                                  "https://github.com/timberio/vector/tree/master/distribution/msi"
