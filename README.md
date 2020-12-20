@@ -43,7 +43,8 @@ or [**install Vector**][docs.installation].
 
 * Vector is relied on by startups and enterprises like **T-Mobile**,
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
-  **Tuple**, **Douban**, and many more.
+  **Tuple**, **Douban**, **Visa**, **Mambu**, **Blockfi**, **Claranet**,
+  **Instacart**, **PNC**, **JP Morgan Chase**, **Forcepoint**, and many more.
 * Vector is **downloaded over 100,000 times per day**.
 * Vector's largest user **processes over 30TB daily**.
 * Vector has **over 100 contributors** and growing.
