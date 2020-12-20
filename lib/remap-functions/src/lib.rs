@@ -92,6 +92,8 @@ mod to_bool;
 mod to_float;
 #[cfg(feature = "to_int")]
 mod to_int;
+#[cfg(feature = "to_level")]
+mod to_level;
 #[cfg(feature = "to_string")]
 mod to_string;
 #[cfg(feature = "to_timestamp")]
@@ -199,6 +201,8 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
+#[cfg(feature = "to_level")]
+pub use to_int::ToLevel;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
 #[cfg(feature = "to_timestamp")]
@@ -306,6 +310,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_level")]
+        Box::new(ToLevel),
         #[cfg(feature = "to_string")]
         Box::new(ToString),
         #[cfg(feature = "to_timestamp")]

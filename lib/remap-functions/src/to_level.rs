@@ -54,17 +54,44 @@ impl Expression for ToLevelFn {
         }
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef {
-            kind: value::Kind::Bytes,
-            ..Default::default()
-        }
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Integer)
+            .with_constraint(Kind::Bytes)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use value::Kind;
+
+    test_type_def![
+        value_string_non_fallible {
+            expr: |_| ToLevelFn {
+                value: Literal::from("alert").boxed(),
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Integer,
+                ..Default::default()
+            },
+        }
+
+        value_non_string_fallible {
+            expr: |_| ToLevelFn {
+                value: Literal::from(27).boxed(),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Integer,
+                ..Default::default(),
+            },
+        }
+    ];
 
     test_function![
         to_level => ToLevel;
