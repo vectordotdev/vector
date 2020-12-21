@@ -1,6 +1,10 @@
 use crate::{
-    buffers::Acker, conditions, event::Metric, shutdown::ShutdownSignal, sinks, sources,
-    transforms, Pipeline,
+    buffers::Acker,
+    conditions,
+    event::Metric,
+    shutdown::ShutdownSignal,
+    sinks::{self, util::UriSerde},
+    sources, transforms, Pipeline,
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
@@ -208,20 +212,85 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
+    pub inputs: Vec<String>,
+
+    // We are accepting this option for backward compatibility.
+    healthcheck_uri: Option<UriSerde>,
+
+    // We are accepting bool for backward compatibility.
+    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
+    #[serde(default)]
+    healthcheck: SinkHealthcheckOptions,
+
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
-    #[serde(default = "healthcheck_default")]
-    pub healthcheck: bool,
-    pub inputs: Vec<String>,
+
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
 }
 
 impl SinkOuter {
+    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+        SinkOuter {
+            buffer: Default::default(),
+            healthcheck: SinkHealthcheckOptions::default(),
+            healthcheck_uri: None,
+            inner,
+            inputs,
+        }
+    }
+
     pub fn resources(&self, name: &str) -> Vec<Resource> {
         let mut resources = self.inner.resources();
         resources.append(&mut self.buffer.resources(name));
         resources
+    }
+
+    pub fn healthcheck(&self) -> SinkHealthcheckOptions {
+        if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
+            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
+        } else if self.healthcheck_uri.is_some() {
+            warn!("`healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead. ")
+        }
+        SinkHealthcheckOptions {
+            uri: self
+                .healthcheck
+                .uri
+                .clone()
+                .or_else(|| self.healthcheck_uri.clone()),
+            ..self.healthcheck.clone()
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct SinkHealthcheckOptions {
+    pub enabled: bool,
+    pub uri: Option<UriSerde>,
+}
+
+impl Default for SinkHealthcheckOptions {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            uri: None,
+        }
+    }
+}
+
+impl From<bool> for SinkHealthcheckOptions {
+    fn from(enabled: bool) -> Self {
+        Self { enabled, uri: None }
+    }
+}
+
+impl From<UriSerde> for SinkHealthcheckOptions {
+    fn from(uri: UriSerde) -> Self {
+        Self {
+            enabled: true,
+            uri: Some(uri),
+        }
     }
 }
 
@@ -246,12 +315,16 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct SinkContext {
     pub(super) acker: Acker,
+    pub(super) healthcheck: SinkHealthcheckOptions,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
-        Self { acker: Acker::Null }
+        Self {
+            acker: Acker::Null,
+            healthcheck: SinkHealthcheckOptions::default(),
+        }
     }
 
     pub fn acker(&self) -> Acker {
@@ -443,10 +516,6 @@ fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec
         }
     }
     Ok(())
-}
-
-fn healthcheck_default() -> bool {
-    true
 }
 
 #[cfg(all(
