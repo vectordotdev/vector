@@ -3,6 +3,7 @@ use crate::{
     event::Metric,
 };
 use async_graphql::Object;
+use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct FileSourceMetrics(Vec<Metric>);
@@ -13,19 +14,27 @@ impl FileSourceMetrics {
     }
 }
 
-pub struct FileSourceMetricFile<'a>(&'a Metric);
+pub struct FileSourceMetricFile<'a> {
+    name: String,
+    metrics: Vec<&'a Metric>,
+}
 
 impl<'a> FileSourceMetricFile<'a> {
-    fn new(metric: &'a Metric) -> Self {
-        Self(metric)
+    fn new(name: String, metrics: Vec<&'a Metric>) -> Self {
+        Self { name, metrics }
     }
 }
 
 #[Object]
 impl FileSourceMetricFile<'_> {
     /// File name
-    async fn name(&self) -> Option<String> {
-        self.0.tag_value("file")
+    async fn name(&self) -> &str {
+        &*self.name
+    }
+
+    /// Total events processed for the file
+    async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
+        self.metrics.processed_events_total()
     }
 }
 
@@ -41,7 +50,14 @@ impl FileSourceMetrics {
         self.0.processed_bytes_total()
     }
 
+    /// File metrics
     pub async fn files(&self) -> Vec<FileSourceMetricFile<'_>> {
-        self.0.iter().map(FileSourceMetricFile::new).collect()
+        self.0
+            .iter()
+            .filter(|m| m.tag_value("file").is_some())
+            .group_by(|m| m.tag_value("file").unwrap())
+            .into_iter()
+            .map(|(file, m)| FileSourceMetricFile::new(file, m.collect()))
+            .collect()
     }
 }

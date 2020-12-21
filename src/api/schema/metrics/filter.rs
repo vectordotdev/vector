@@ -50,6 +50,24 @@ impl MetricsFilter for Vec<Metric> {
     }
 }
 
+impl<'a> MetricsFilter for Vec<&'a Metric> {
+    fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
+        let sum = sum_metrics(
+            self.into_iter()
+                .filter(|m| m.name.as_str().eq("processed_events_total"))
+                .map(|m| *m),
+        )?;
+
+        Some(ProcessedEventsTotal::new(sum))
+    }
+
+    fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
+        Some(ProcessedBytesTotal::new(sum_metrics(
+            self.into_iter().map(|m| *m),
+        )?))
+    }
+}
+
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
 pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let controller = get_controller().unwrap();
@@ -97,6 +115,7 @@ pub fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     }
 }
 
+/// Return Vec<Metric> based on a component name tag.
 pub fn by_component_name(component_name: &str) -> Vec<Metric> {
     capture_metrics(&GLOBAL_CONTROLLER)
         .filter_map(|ev| match ev {
