@@ -535,6 +535,92 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "File name",
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating events processed for the current file",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating bytes processed for the current file",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "FileSourceMetricFile",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "File metrics",
+              "isDeprecated": false,
+              "name": "files",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "FileSourceMetricFile",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "FileSourceMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Free bytes",
               "isDeprecated": false,
               "name": "freeBytes",
@@ -1647,6 +1733,18 @@
                 "name": "ProcessedBytesTotal",
                 "ofType": null
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Source metrics",
+              "isDeprecated": false,
+              "name": "metrics",
+              "type": {
+                "kind": "UNION",
+                "name": "SourceMetrics",
+                "ofType": null
+              }
             }
           ],
           "inputFields": null,
@@ -1660,6 +1758,22 @@
           "kind": "OBJECT",
           "name": "Source",
           "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "UNION",
+          "name": "SourceMetrics",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "FileSourceMetrics",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,
