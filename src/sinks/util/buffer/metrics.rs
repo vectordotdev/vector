@@ -134,8 +134,8 @@ impl Batch for MetricBuffer {
         } else {
             let item = item.into_metric();
 
-            match &item.value {
-                MetricValue::Counter { value } if item.kind.is_absolute() => {
+            match (item.kind, &item.value) {
+                (MetricKind::Absolute, MetricValue::Counter { value }) => {
                     let new = MetricEntry(item.clone());
                     if let Some(MetricEntry(Metric {
                         value: MetricValue::Counter { value: value0, .. },
@@ -167,7 +167,7 @@ impl Batch for MetricBuffer {
                         self.state.insert(new);
                     }
                 }
-                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
                     let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
@@ -193,7 +193,7 @@ impl Batch for MetricBuffer {
                         self.metrics.insert(MetricEntry(initial));
                     }
                 }
-                _metric if item.kind.is_absolute() => {
+                (MetricKind::Absolute, _) => {
                     let new = MetricEntry(item);
                     self.metrics.replace(new);
                 }

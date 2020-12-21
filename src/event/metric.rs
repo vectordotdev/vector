@@ -26,7 +26,7 @@ pub struct Metric {
     pub value: MetricValue,
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 /// A metric may be an incremental value, updating the previous value of
 /// the metric, or absolute, which sets the reference for future
