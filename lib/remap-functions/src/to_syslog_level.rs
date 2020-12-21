@@ -5,7 +5,7 @@ pub struct ToSyslogLevel;
 
 impl Function for ToSyslogLevel {
     fn identifier(&self) -> &'static str {
-        "to_level"
+        "to_syslog_level"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
