@@ -8,7 +8,7 @@ itself.
 ## Scope
 
 This RFC only covers distribution of the `trl` tool as well as some related issues. It does *not*
-cover TRL syntax, functions, etc. and assumes a separate development process.
+cover TRL syntax, functions, semantics, and the like.
 
 ## Motivation
 
@@ -25,8 +25,8 @@ the command manually could be a significant impediment to TRL adoption.
 ### General build setup
 
 Our build setup—`Makefile`, scripts, etc.—would need to be revised pretty significantly, as what we
-currently have revolves around a single artifact, Vector itself. We would need separate scripts and
-`make` commands for `trl` and update our GitHub Actions CI setup, most notably
+currently have revolves around a single artifact: Vector itself. We would need separate scripts and
+`make` commands for `trl` and to update our GitHub Actions CI setup, most notably
 [`release.yml`][release_yml].
 
 ### Release and versioning
@@ -68,13 +68,13 @@ that this will always be the case.
 
 Another artifact to package, release, distribute, document, maintain, etc. does introduce continuing
 humanpower burdens. This RFC presumes that those burdens are worthwhile but should be rejected if
-deemed otherwise.
+it's deemed otherwise.
 
 ## Alternatives
 
-The alternative would be to continue requiring would-be users to clone the repo and install Rust.
-It's not clear that there's a desirable third alternative between the status quo and full
-distribution.
+The alternative would be to continue requiring would-be users to clone the repo, install Rust, and
+run `trl` manually. It's not clear that there's a desirable third alternative between the status quo
+and full distribution.
 
 ## Plan Of Attack
 
