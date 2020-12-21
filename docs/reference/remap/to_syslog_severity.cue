@@ -24,7 +24,7 @@ remap: functions: to_syslog_severity: {
 			input: {
 				string: "alert"
 			}
-			source: ".severity = to_severity(.log_level)"
+			source: ".severity = to_syslog_severity(.log_level)"
 			output: {
 				integer: 1
 			}
