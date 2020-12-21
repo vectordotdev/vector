@@ -14,7 +14,7 @@ remap: functions: encode_json: {
 	return: ["string"]
 	category: "encode"
 
-	description: "Returns the JSON representation of the first parameter."
+	description: "Returns the JSON representation of the argument."
 	examples: [
 		{
 			title: "Success"
