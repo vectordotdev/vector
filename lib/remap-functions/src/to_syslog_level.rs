@@ -1,9 +1,9 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ToLevel;
+pub struct ToSyslogLevel;
 
-impl Function for ToLevel {
+impl Function for ToSyslogLevel {
     fn identifier(&self) -> &'static str {
         "to_level"
     }
@@ -24,11 +24,11 @@ impl Function for ToLevel {
 }
 
 #[derive(Debug, Clone)]
-struct ToLevelFn {
+struct ToSyslogLevelFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToLevelFn {
+impl Expression for ToSyslogLevelFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_integer()?;
 
@@ -68,7 +68,7 @@ mod tests {
 
     test_type_def![
         value_integer_non_fallible {
-            expr: |_| ToLevelFn {
+            expr: |_| ToSyslogLevelFn {
                 value: Literal::from(3).boxed(),
             },
             def: TypeDef {
@@ -79,7 +79,7 @@ mod tests {
         }
 
         value_non_integer_fallible {
-            expr: |_| ToLevelFn {
+            expr: |_| ToSyslogLevelFn {
                 value: Literal::from("foo").boxed(),
             },
             def: TypeDef {
@@ -91,7 +91,7 @@ mod tests {
     ];
 
     test_function![
-        to_level => ToLevel;
+        to_syslog_level => ToSyslogLevel;
 
         emergency {
             args: func_args![value: value!(0)],
