@@ -7,6 +7,7 @@ use std::{
     cmp::Ordering,
     collections::{hash_map::DefaultHasher, HashSet},
     hash::{Hash, Hasher},
+    ops::Deref,
 };
 
 #[derive(Clone, Debug)]
@@ -56,6 +57,13 @@ impl PartialEq for MetricEntry {
         let hash2 = state.finish();
 
         hash1 == hash2
+    }
+}
+
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
     }
 }
 
@@ -136,16 +144,17 @@ impl Batch for MetricBuffer {
 
             match (item.kind, &item.value) {
                 (MetricKind::Absolute, MetricValue::Counter { value }) => {
-                    let new = MetricEntry(item.clone());
+                    let value = *value;
+                    let item = MetricEntry(item);
                     if let Some(MetricEntry(Metric {
                         value: MetricValue::Counter { value: value0, .. },
                         ..
-                    })) = self.state.get(&new)
+                    })) = self.state.get(&item)
                     {
                         // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
-                            name: item.name.to_string(),
+                            name: item.name.clone(),
                             namespace: item.namespace.clone(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
@@ -162,9 +171,9 @@ impl Batch for MetricBuffer {
                         } else {
                             self.metrics.insert(delta);
                         }
-                        self.state.replace(new);
+                        self.state.replace(item);
                     } else {
-                        self.state.insert(new);
+                        self.state.insert(item);
                     }
                 }
                 (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
