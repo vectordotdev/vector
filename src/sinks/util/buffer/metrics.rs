@@ -306,12 +306,6 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
-        let mut buffer = buffer.to_owned();
-        buffer.sort_by_key(|k| format!("{:?}", k));
-        buffer
-    }
-
     fn rebuffer(events: Vec<Metric>) -> Vec<Vec<Metric>> {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let mut buffer = MetricBuffer::new(batch_size);
@@ -330,7 +324,15 @@ mod test {
         if !buffer.is_empty() {
             result.push(buffer.finish())
         }
+
+        // Sort each batch to provide a predictable result ordering
         result
+            .into_iter()
+            .map(|mut batch| {
+                batch.sort_by_key(|k| format!("{:?}", k));
+                batch
+            })
+            .collect()
     }
 
     #[test]
@@ -355,7 +357,7 @@ mod test {
         assert_eq!(buffer[1].len(), 2);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_counter(0, "production", Incremental, 6.0),
                 sample_counter(0, "staging", Incremental, 0.0),
@@ -367,7 +369,7 @@ mod test {
         );
 
         assert_eq!(
-            sorted(&buffer[1].clone()),
+            buffer[1],
             [
                 sample_counter(2, "production", Incremental, 2.0),
                 sample_counter(3, "production", Incremental, 3.0),
@@ -392,7 +394,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_counter(0, "production", Incremental, 0.0),
                 sample_counter(1, "production", Incremental, 2.0),
@@ -419,7 +421,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_gauge(1, Absolute, 2.0),
                 sample_gauge(2, Absolute, 4.0),
@@ -450,7 +452,7 @@ mod test {
         assert_eq!(buffer[0].len(), 5);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
@@ -476,7 +478,7 @@ mod test {
 
         assert_eq!(buffer.len(), 1);
 
-        assert_eq!(sorted(&buffer[0].clone()), [sample_set(0, &[0, 1, 2, 3])]);
+        assert_eq!(buffer[0], [sample_set(0, &[0, 1, 2, 3])]);
     }
 
     #[test]
@@ -495,7 +497,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_distribution_histogram(2, 50),
                 sample_distribution_histogram(3, 10),
@@ -534,7 +536,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_histogram(2, Absolute, 1.0, 2, 10.0),
                 sample_aggregated_histogram(3, Absolute, 1.0, 3, 10.0),
@@ -559,7 +561,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
                 sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
@@ -581,7 +583,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_summary(2),
                 sample_aggregated_summary(3),
