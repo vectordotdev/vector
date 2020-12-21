@@ -19,7 +19,7 @@ impl Function for ToSyslogSeverity {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToSeverityFn { value }))
+        Ok(Box::new(ToSyslogSeverityFn { value }))
     }
 }
 
@@ -133,8 +133,8 @@ mod tests {
         }
 
         invalid_level_2 {
-            args: func_args![value: value!("aww shucks")],
-            want: Err("function call error:: level aww schucks not valid"),
+            args: func_args![value: value!("aww schucks")],
+            want: Err("function call error: level aww schucks not valid"),
         }
     ];
 }
