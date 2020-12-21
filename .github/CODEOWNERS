@@ -76,6 +76,7 @@
 /docs/reference/remap/merge.cue @FungusHumungus
 /docs/reference/remap/parse_grok.cue @FungusHumungus
 /docs/reference/remap/parse_aws_alb_log.cue @fanatid
+/docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
 
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @vector-kubernetes
@@ -102,7 +103,8 @@
 /lib/remap-functions/src/ipv6_to_ipv4.rs @FungusHumungus
 /lib/remap-functions/src/log.rs @FungusHumungus
 /lib/remap-functions/src/merge.rs @FungusHumungus
-/src/remap/function/parse_aws_alb_log.rs @fanatid
+/lib/remap/functions/src/parse_aws_alb_log.rs @fanatid
+/lib/remap/functions/src/parse_aws_vpc_flow_log.rs @fanatid
 /lib/remap-functions/src/parse_grok.rs @FungusHumungus
 
 /proto/ @lukesteensen

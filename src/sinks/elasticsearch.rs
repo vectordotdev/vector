@@ -61,6 +61,8 @@ pub struct ElasticSearchConfig {
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
+    pub bulk_action: BulkAction,
 }
 
 lazy_static! {
@@ -82,6 +84,31 @@ pub enum Encoding {
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
     Aws { assume_role: Option<String> },
+}
+
+#[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum BulkAction {
+    #[derivative(Default)]
+    Index,
+    Create,
+}
+
+impl BulkAction {
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "index",
+            BulkAction::Create => "create",
+        }
+    }
+
+    pub fn as_json_pointer(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "/index",
+            BulkAction::Create => "/create",
+        }
+    }
 }
 
 inventory::submit! {
@@ -146,6 +173,7 @@ pub struct ElasticSearchCommon {
     compression: Compression,
     region: Region,
     query_params: HashMap<String, String>,
+    bulk_action: BulkAction,
 }
 
 #[derive(Debug, Snafu)]
@@ -177,14 +205,16 @@ impl HttpSink for ElasticSearchCommon {
             .ok()?;
 
         let mut action = json!({
-            "index": {
+            self.bulk_action.as_str(): {
                 "_index": index,
                 "_type": self.doc_type,
             }
         });
         maybe_set_id(
             self.config.id_key.as_ref(),
-            action.pointer_mut("/index").unwrap(),
+            action
+                .pointer_mut(self.bulk_action.as_json_pointer())
+                .unwrap(),
             &mut event,
         );
 
@@ -374,6 +404,7 @@ impl ElasticSearchCommon {
         let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let bulk_action = config.bulk_action.clone();
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -406,6 +437,7 @@ impl ElasticSearchCommon {
             compression,
             region,
             query_params,
+            bulk_action,
         })
     }
 
@@ -527,6 +559,31 @@ mod tests {
         maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
+    }
+
+    #[test]
+    fn sets_create_action_when_configured() {
+        use crate::config::log_schema;
+        use chrono::{TimeZone, Utc};
+
+        let config = ElasticSearchConfig {
+            bulk_action: BulkAction::Create,
+            index: Some(String::from("vector")),
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert(
+            log_schema().timestamp_key(),
+            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        );
+        let encoded = es.encode_event(event).unwrap();
+        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
     }
 
     #[test]

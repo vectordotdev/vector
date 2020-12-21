@@ -4,8 +4,8 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	title: "AWS CloudWatch Logs Subscription Parser"
 
 	description: """
-		Parses AWS CloudWatch Logs events coming from the `aws_kinesis_firehose`
-		source.
+		Parses AWS CloudWatch Logs events (configured through AWS Cloudwatch
+		subscriptions) coming from the `aws_kinesis_firehose` source.
 		"""
 
 	classes: {

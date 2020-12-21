@@ -36,7 +36,29 @@ pub enum Error {
     Regex(#[from] regex::Error),
 
     #[error(transparent)]
-    Pest(#[from] pest::error::Error<R>),
+    Pest(pest::error::Error<R>),
+}
+
+impl From<pest::error::Error<R>> for Error {
+    fn from(mut error: pest::error::Error<R>) -> Self {
+        use pest::error::ErrorVariant;
+
+        if let ErrorVariant::ParsingError {
+            ref mut positives,
+            negatives: _,
+        } = error.variant
+        {
+            *positives = positives
+                .clone()
+                .into_iter()
+                .filter(|rule| !rule.to_string().is_empty())
+                .collect::<Vec<_>>();
+        }
+
+        error = error.renamed_rules(|rule| rule.to_string());
+
+        Error::Pest(error)
+    }
 }
 
 // Auto-generate a set of parser functions to parse different operations.
@@ -660,19 +682,18 @@ mod tests {
                 vec![],
                 Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
             ),
+            ("..", vec![" 1:2\n", "= expected path segment"], Ok(vec![])),
             (
-                "..",
-                vec![" 1:2\n", "= expected path_segment"],
+                ". bar",
+                vec![
+                    " 1:3\n",
+                    "= expected assignment, if-statement, query, operator, or block",
+                ],
                 Ok(vec![]),
             ),
             (
-                ". bar",
-                vec![" 1:3\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
-                Ok(vec![])
-            ),
-            (
                 r#". "bar""#,
-                vec![" 1:2\n", "= expected path_segment"], // TODO: improve error message
+                vec![" 1:2\n", "= expected path segment"], // TODO: improve error message
                 Ok(vec![]),
             ),
         ];
@@ -728,35 +749,50 @@ mod tests {
         let cases = vec![
             (
                 ".foo bar",
-                vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+                vec![
+                    " 1:6\n",
+                    "= expected assignment, if-statement, query, operator, or block",
+                ],
             ),
             (
                 ".=",
-                vec![" 1:3\n", "= expected assignment, if_statement, not, or block"],
+                vec![
+                    " 1:3\n",
+                    "= expected assignment, if-statement, query, or block",
+                ],
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected primary, operator_not, or ident"],
+                vec![
+                    " 1:9\n",
+                    "= expected value, variable, path, group or function call, value, variable, path, group, !",
+                ],
             ),
             (
                 ".foo = to_string",
-                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
+                vec![
+                    " 1:8\n",
+                    "= expected assignment, if-statement, query, or block",
+                ],
             ),
             (
                 r#"foo = "bar""#,
                 vec![
                     " 1:1\n",
-                    "= expected assignment, if_statement, not, or block",
+                    "= expected assignment, if-statement, query, or block",
                 ],
             ),
             (
                 r#".foo.bar = "baz" and this"#,
-                vec![" 1:18\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+                vec![
+                    " 1:18\n",
+                    "= expected assignment, if-statement, query, operator, or block",
+                ],
             ),
-            (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected not"]),
+            (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23\n", "= expected path_field"],
+                vec![" 1:23\n", "= expected path field"],
             ),
             (
                 r#"if .foo > 0 { .foo = "bar" } else"#,
@@ -766,7 +802,7 @@ mod tests {
                 "if .foo { }",
                 vec![
                     " 1:11\n",
-                    "= expected assignment, if_statement, not, or block",
+                    "= expected assignment, if-statement, query, or block",
                 ],
             ),
             (
@@ -776,31 +812,36 @@ mod tests {
             (
                 "if .foo > .bar { del(.foo) } else { .bar = .baz",
                 // This message isn't great, ideally I'd like "expected closing bracket"
-                vec![" 1:48\n", "= expected assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, path_index, or block"],
+                vec![
+                    " 1:48\n",
+                    "= expected assignment, if-statement, query, operator, path index, or block",
+                ],
             ),
-            (
-                "only_fields(.foo,)",
-                vec![" 1:18\n", "= expected argument"],
-            ),
-            (
-                "only_fields(,)",
-                vec![" 1:13\n", "= expected argument"],
-            ),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
+            ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
+            ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
                 // doesn't actually recognize this as a string literal.
                 r#".foo = "invalid escape \k sequence""#,
-                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
+                vec![
+                    " 1:8\n",
+                    "= expected assignment, if-statement, query, or block",
+                ],
             ),
             (
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
-                vec![" 1:6\n", "= expected path_segment"],
+                vec![" 1:6\n", "= expected path segment"],
             ),
             (
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
-                vec![" 1:23\n", "= expected assignment, if_statement, not, or block"],
+                vec![
+                    " 1:23\n",
+                    "= expected assignment, if-statement, query, or block",
+                ],
             ),
             (
                 // we cannot assign a regular expression to a field.
@@ -815,7 +856,10 @@ mod tests {
             (
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
-                vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+                vec![
+                    " 1:6\n",
+                    "= expected assignment, if-statement, query, operator, or block",
+                ],
             ),
             (
                 r#"/ab/"#,
