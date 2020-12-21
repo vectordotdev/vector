@@ -1,10 +1,10 @@
 package metadata
 
-remap: functions: to_level: {
+remap: functions: to_syslog_level: {
 	arguments: [
 		{
-			name:        "severity"
-			description: "The integer severity level."
+			name:        "value"
+			description: "The severity level."
 			required:    true
 			type: ["integer"]
 		},

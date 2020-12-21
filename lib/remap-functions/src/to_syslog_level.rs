@@ -19,7 +19,7 @@ impl Function for ToSyslogLevel {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToLevelFn { value }))
+        Ok(Box::new(ToSyslogLevelFn { value }))
     }
 }
 
