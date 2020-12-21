@@ -352,10 +352,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 2);
-        assert_eq!(buffer[0].len(), 6);
-        assert_eq!(buffer[1].len(), 2);
-
         assert_eq!(
             buffer[0],
             [
@@ -375,6 +371,8 @@ mod test {
                 sample_counter(3, "production", Incremental, 3.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 2);
     }
 
     #[test]
@@ -390,9 +388,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
         assert_eq!(
             buffer[0],
             [
@@ -402,6 +397,8 @@ mod test {
                 sample_counter(3, "production", Incremental, 6.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -417,9 +414,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
         assert_eq!(
             buffer[0],
             [
@@ -429,6 +423,8 @@ mod test {
                 sample_gauge(4, Absolute, 8.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -448,9 +444,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 5);
-
         assert_eq!(
             buffer[0],
             [
@@ -461,6 +454,8 @@ mod test {
                 sample_gauge(5, Absolute, 50.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -476,9 +471,9 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(buffer[0], [sample_set(0, &[0, 1, 2, 3])]);
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -494,8 +489,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
             buffer[0],
             [
@@ -505,6 +498,8 @@ mod test {
                 sample_distribution_histogram(5, 10),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -533,8 +528,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
             buffer[0],
             [
@@ -543,6 +536,8 @@ mod test {
                 sample_aggregated_histogram(4, Absolute, 1.0, 4, 10.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -558,8 +553,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
             buffer[0],
             [
@@ -567,6 +560,8 @@ mod test {
                 sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -580,8 +575,6 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
             buffer[0],
             [
@@ -590,6 +583,8 @@ mod test {
                 sample_aggregated_summary(4),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
