@@ -25,7 +25,7 @@ fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Met
     let m = iter.next()?;
 
     Some(iter.fold(m.clone(), |mut m1, m2| {
-        m1.add(m2);
+        m1.update_value(m2);
         m1
     }))
 }
