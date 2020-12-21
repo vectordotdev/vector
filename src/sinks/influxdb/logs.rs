@@ -157,8 +157,6 @@ impl HttpSink for InfluxDBLogsSink {
     type Output = Vec<u8>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        let mut output = String::new();
-
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
@@ -187,7 +185,8 @@ impl HttpSink for InfluxDBLogsSink {
             }
         });
 
-        influx_line_protocol(
+        let mut output = String::new();
+        if let Err(error) = influx_line_protocol(
             self.protocol_version,
             measurement,
             "logs",
@@ -195,7 +194,10 @@ impl HttpSink for InfluxDBLogsSink {
             Some(fields),
             timestamp,
             &mut output,
-        );
+        ) {
+            warn!(message = "Failed to encode event; dropping event.", %error, rate_limit_secs = 30);
+            return None;
+        };
 
         Some(output.into_bytes())
     }

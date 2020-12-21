@@ -176,12 +176,12 @@ pub(in crate::sinks) fn influx_line_protocol(
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut String,
-) {
+) -> Result<(), &'static str> {
     // Fields
     let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
-        return;
+        return Err("fields must not be empty");
     }
 
     encode_string(measurement, line_protocol);
@@ -200,6 +200,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     // Timestamp
     line_protocol.push_str(&timestamp.to_string());
     line_protocol.push('\n');
+    Ok(())
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {

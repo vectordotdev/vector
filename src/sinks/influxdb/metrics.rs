@@ -228,7 +228,7 @@ fn encode_events(
         let tags = merge_tags(&event, tags);
         let (metric_type, fields) = get_type_and_fields(event.value, &quantiles);
 
-        influx_line_protocol(
+        if let Err(error) = influx_line_protocol(
             protocol_version,
             fullname,
             metric_type,
@@ -236,7 +236,9 @@ fn encode_events(
             fields,
             ts,
             &mut output,
-        );
+        ) {
+            warn!(message = "Failed to encode event; dropping event.", %error, rate_limit_secs = 30);
+        };
     }
 
     // remove last '\n'
