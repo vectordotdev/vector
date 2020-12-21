@@ -894,6 +894,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn insert_metrics_over_https() {
+        crate::test_util::trace_init();
         let database = onboarding_v1("https://localhost:8087").await;
 
         let cx = SinkContext::new_test();
@@ -961,6 +962,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb2_metrics_put_data() {
+        crate::test_util::trace_init();
         onboarding_v2().await;
 
         let cx = SinkContext::new_test();
