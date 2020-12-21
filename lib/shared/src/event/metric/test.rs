@@ -1,5 +1,6 @@
 use super::*;
-use chrono::{offset::TimeZone, DateTime, Utc};
+use chrono::{TimeZone, DateTime, Utc};
+use crate::{event::*, lookup::*};
 
 fn ts() -> DateTime<Utc> {
     Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -309,4 +310,173 @@ fn display() {
         ),
         r#"six{} = count=2 sum=127 1@63 2@64"#
     );
+}
+
+mod remap {
+    use super::*;
+    use remap_lang::{Segment, Path, map, Object};
+
+
+    #[test_env_log::test]
+    fn object_metric_all_fields() {
+        let metric = Metric {
+            name: "zub".into(),
+            namespace: Some("zoob".into()),
+            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        assert_eq!(
+            Ok(Some(
+                map! {
+                    "name": "zub",
+                     "namespace": "zoob",
+                     "timestamp": Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
+                     "tags": map!{"tig": "tog"},
+                     "kind": "absolute",
+                     "type": "counter"
+                }.into()
+            )),
+            metric.get(&Path::from_str(".").unwrap())
+        );
+    }
+
+    #[test_env_log::test]
+    fn object_metric_paths() {
+        let metric = Metric {
+            name: "zub".into(),
+            namespace: Some("zoob".into()),
+            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        assert_eq!(
+            Ok(
+                ["name", "namespace", "timestamp", "tags.tig", "kind", "type"]
+                    .iter()
+                    .map(|path| Path::from_str(path).expect("invalid path"))
+                    .collect()
+            ),
+            metric.paths()
+        );
+    }
+
+    #[test_env_log::test]
+    fn object_metric_fields() {
+        let mut metric = Metric {
+            name: "name".into(),
+            namespace: None,
+            timestamp: None,
+            tags: Some({
+                let mut map = BTreeMap::new();
+                map.insert("tig".to_string(), "tog".to_string());
+                map
+            }),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        let cases = vec![
+            (
+                "name",                    // Path
+                Some(remap_lang::Value::from("name")), // Current value
+                remap_lang::Value::from("namefoo"),    // New value
+                false,                     // Test deletion
+            ),
+            ("namespace", None, "namespacefoo".into(), true),
+            (
+                "timestamp",
+                None,
+                Utc.ymd(2020, 12, 8).and_hms(12, 0, 0).into(),
+                true,
+            ),
+            (
+                "kind",
+                Some(remap_lang::Value::from("absolute")),
+                "incremental".into(),
+                false,
+            ),
+            ("tags.thing", None, "footag".into(), true),
+        ];
+
+        for (path, current, new, delete) in cases {
+            let path = Path::from_str(path).unwrap();
+
+            assert_eq!(Ok(current), metric.get(&path));
+            assert_eq!(Ok(()), metric.insert(&path, new.clone()));
+            assert_eq!(Ok(Some(new)), metric.get(&path));
+
+            if delete {
+                assert_eq!(Ok(()), metric.remove(&path, true));
+                assert_eq!(Ok(None), metric.get(&path));
+            }
+        }
+    }
+
+    #[test_env_log::test]
+    fn object_metric_invalid_paths() {
+        let mut metric = Metric {
+            name: "name".into(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.23 },
+        };
+
+        let validpaths_get = vec![
+            ".name",
+            ".namespace",
+            ".timestamp",
+            ".kind",
+            ".tags",
+            ".type",
+        ];
+
+        let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
+
+        assert_eq!(
+            Err(format!(
+                "invalid path .zork: expected one of {}",
+                validpaths_get.join(", ")
+            )),
+            metric.get(&Path::from_str("zork").unwrap())
+        );
+
+        assert_eq!(
+            Err(format!(
+                "invalid path .zork: expected one of {}",
+                validpaths_set.join(", ")
+            )),
+            metric.insert(&Path::from_str("zork").unwrap(), "thing".into())
+        );
+
+        assert_eq!(
+            Err(format!(
+                "invalid path .zork: expected one of {}",
+                validpaths_set.join(", ")
+            )),
+            metric.remove(&Path::from_str("zork").unwrap(), true)
+        );
+
+        assert_eq!(
+            Err(format!(
+                "invalid path .tags.foo.flork: expected one of {}",
+                validpaths_get.join(", ")
+            )),
+            metric.get(&Path::from_str("tags.foo.flork").unwrap())
+        );
+    }
 }

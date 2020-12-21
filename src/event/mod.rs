@@ -3,8 +3,6 @@ use chrono::{TimeZone};
 use std::collections::{BTreeMap};
 
 pub mod discriminant;
-#[cfg(test)]
-mod fixtures;
 pub mod merge;
 pub mod merge_state;
 pub mod util;

@@ -1,4 +1,6 @@
-use super::*;
+use crate::{test::open_fixture, event::*, lookup::*};
+use serde_json::json;
+use tracing::trace;
 
 mod insert_get_remove {
     use super::*;
@@ -434,4 +436,386 @@ fn keys_and_pairs() -> crate::Result<()> {
     assert_eq!(pairs[13].0, expected);
 
     Ok(())
+}
+
+// This test iterates over the `tests/data/fixtures/log_event` folder and:
+//   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
+//     item being just plain parsed as json.
+//
+// Basically: This test makes sure we aren't mutilating any content users might be sending.
+#[test_env_log::test]
+fn json_value_to_vector_log_event_to_json_value() {
+    const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
+
+    trace!(?FIXTURE_ROOT, "Opening.");
+    std::fs::read_dir(FIXTURE_ROOT)
+        .unwrap()
+        .for_each(|fixture_file| match fixture_file {
+            Ok(fixture_file) => {
+                let path = fixture_file.path();
+                tracing::trace!(?path, "Opening.");
+                let serde_value = open_fixture(&path).unwrap();
+
+                let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
+                let serde_value_again: serde_json::Value =
+                    vector_value.clone().try_into().unwrap();
+
+                tracing::trace!(
+                        ?path,
+                        ?serde_value,
+                        ?vector_value,
+                        ?serde_value_again,
+                        "Asserting equal."
+                    );
+                assert_eq!(serde_value, serde_value_again);
+            }
+            _ => panic!("This test should never read Err'ing test fixtures."),
+        });
+}
+
+// We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
+#[test_env_log::test]
+fn entry() {
+    let fixture =
+        open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
+    let mut event = LogEvent::try_from(fixture).unwrap();
+
+    let lookup = LookupBuf::from_str("non-existing").unwrap();
+    let entry = event.entry(lookup).unwrap();
+    let fallback = json!(
+            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
+        );
+    entry.or_insert_with(|| fallback.clone().into());
+    let json: serde_json::Value = event.clone().try_into().unwrap();
+    trace!(?json);
+    assert_eq!(json.pointer("/non-existing"), Some(&fallback));
+
+    let lookup = LookupBuf::from_str("nulled").unwrap();
+    let entry = event.entry(lookup).unwrap();
+    let fallback = json!(
+            "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
+        );
+    entry.or_insert_with(|| fallback.clone().into());
+    let json: serde_json::Value = event.clone().try_into().unwrap();
+    assert_eq!(json.pointer("/nulled"), Some(&serde_json::Value::Null));
+
+    let lookup = LookupBuf::from_str("map.basic").unwrap();
+    let entry = event.entry(lookup).unwrap();
+    let fallback = json!(
+            "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
+        );
+    entry.or_insert_with(|| fallback.clone().into());
+    let json: serde_json::Value = event.clone().try_into().unwrap();
+    assert_eq!(
+        json.pointer("/map/basic"),
+        Some(&serde_json::Value::Bool(true))
+    );
+
+    let lookup = LookupBuf::from_str("map.map.buddy").unwrap();
+    let entry = event.entry(lookup).unwrap();
+    let fallback = json!(
+            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
+        );
+    entry.or_insert_with(|| fallback.clone().into());
+    let json: serde_json::Value = event.clone().try_into().unwrap();
+    assert_eq!(
+        json.pointer("/map/map/buddy"),
+        Some(&serde_json::Value::Number((-1).into()))
+    );
+
+    let lookup = LookupBuf::from_str("map.map.non-existing").unwrap();
+    let entry = event.entry(lookup).unwrap();
+    let fallback = json!(
+            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
+        );
+    entry.or_insert_with(|| fallback.clone().into());
+    let json: serde_json::Value = event.clone().try_into().unwrap();
+    assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
+}
+
+
+mod remap {
+    use super::*;
+    use crate::test_util::open_fixture;
+    use serde_json::json;
+    use std::str::FromStr;
+    use tracing::trace;
+    use nom::combinator::map;
+    use std::collections::BTreeMap;
+    use remap_lang::{map, Object};
+    use std::convert::{TryFrom, TryInto};
+
+    #[test_env_log::test]
+    fn object_get() {
+        let cases = vec![
+            (map![], vec![], Ok(Some(map![].into()))),
+            (
+                map!["foo": "bar"],
+                vec![],
+                Ok(Some(map!["foo": "bar"].into())),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned()))],
+                Ok(Some("bar".into())),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("bar".to_owned()))],
+                Ok(None),
+            ),
+            (
+                map!["foo": vec![map!["bar": true]]],
+                vec![
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
+                    remap_lang::Segment::Index(0),
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("bar".to_owned())),
+                ],
+                Ok(Some(true.into())),
+            ),
+            (
+                map!["foo": map!["bar baz": map!["baz": 2]]],
+                vec![
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
+                    remap_lang::Segment::Coalesce(vec![
+                        remap_lang::Field::Regular("qux".to_owned()),
+                        remap_lang::Field::Quoted("bar baz".to_owned()),
+                    ]),
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("baz".to_owned())),
+                ],
+                Ok(Some(2.into())),
+            ),
+        ];
+
+        for (value, segments, expect) in cases {
+            let value: BTreeMap<String, Value> = value;
+            let event = LogEvent::from(value);
+            let path = remap_lang::Path::new_unchecked(segments);
+
+            assert_eq!(Object::get(&event, &path), expect)
+        }
+    }
+
+    #[test_env_log::test]
+    fn object_insert() {
+        let cases = vec![
+            (
+                map!["foo": "bar"],
+                vec![],
+                map!["baz": "qux"].into(),
+                map!["baz": "qux"],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned()))],
+                "baz".into(),
+                map!["foo": "baz"],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
+                    Index(2),
+                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("a".to_owned())),
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("b".to_owned())),
+                ],
+                true.into(),
+                map![
+                    "foo":
+                        vec![
+                            Value::Null,
+                            Value::Null,
+                            map!["bar baz": map!["a": map!["b": true]],].into()
+                        ]
+                ],
+                Ok(()),
+            ),
+            (
+                map!["foo": vec![0, 1, 2]],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), Index(5)],
+                "baz".into(),
+                map![
+                    "foo":
+                        vec![
+                            0.into(),
+                            1.into(),
+                            2.into(),
+                            Value::Null,
+                            Value::Null,
+                            Value::from("baz"),
+                        ]
+                ],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![])],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into()])],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                "baz".into(),
+                map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(1)],
+                "baz".into(),
+                map!["foo": Value::Array(vec![0.into(), "baz".into()])],
+                Ok(()),
+            ),
+        ];
+
+        for (object, segments, value, expect, result) in cases {
+            let object: BTreeMap<String, Value> = object;
+            let mut event = LogEvent::from(object);
+            let expect = LogEvent::from(expect);
+            let value: remap::Value = value;
+            let path = Path::new_unchecked(segments);
+
+            assert_eq!(remap_lang::Object::insert(&mut event, &path, value.clone()), result);
+            assert_eq!(event, expect);
+            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+        }
+    }
+
+    #[test_env_log::test]
+    fn object_remove() {
+        let cases = vec![
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned()))],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![remap_lang::Segment::Coalesce(vec![
+                    remap_lang::Field::Quoted("foo bar".to_owned()),
+                    remap_lang::Field::Regular("foo".to_owned()),
+                ])],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                false,
+                Some(map!["foo": Value::Array(vec![])].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(0)],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!{"foo": map!{"bar baz": vec![0]}, "bar": "baz"},
+                vec![
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
+                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
+                    remap_lang::Segment::Index(0),
+                ],
+                false,
+                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+            ),
+            (
+                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                vec![
+                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
+                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
+                    remap_lang::Segment::Index(0),
+                ],
+                true,
+                Some(map!["bar": "baz"].into()),
+            ),
+        ];
+
+        for (object, segments, compact, expect) in cases {
+            let mut event = LogEvent::from(object);
+            let path = remap_lang::Path::new_unchecked(segments);
+
+            assert_eq!(remap_lang::Object::remove(&mut event, &path, compact), Ok(()));
+            assert_eq!(remap_lang::Object::get(&event, &remap_lang::Path::root()), Ok(expect))
+        }
+    }
+
+    #[test_env_log::test]
+    fn object_paths() {
+        use remap::{Object, Path};
+        use std::str::FromStr;
+
+        let cases = vec![
+            (map!{}, Ok(vec!["."])),
+            (map!{ "foo bar baz": "bar" }, Ok(vec![r#"."foo bar baz""#])),
+            (map!{ "foo": "bar", "baz": "qux" }, Ok(vec![".baz", ".foo"])),
+            (map!{ "foo": map!{ "bar": "baz" }}, Ok(vec![".foo.bar"])),
+            (map!{ "a": vec![0, 1] }, Ok(vec![".a[0]", ".a[1]"])),
+            (
+                map!{
+                    "a": map!{ "b": "c" },
+                    "d": 12,
+                    "e": vec![
+                        map!{"f": 1},
+                        map!{"g": 2},
+                        map!{"h": 3},
+                    ],
+                },
+                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
+            ),
+            (
+                map!{
+                    "a": vec![
+                        map!{
+                            "b": vec![map!{"c": map!{"d": map!{"e": vec![vec![0, 1]]}}}],
+                        },
+                    ],
+                },
+                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
+            ),
+        ];
+
+        for (object, expect) in cases {
+            let object: BTreeMap<String, Value> = object;
+            let event = LogEvent::from(object);
+
+            assert_eq!(
+                event.paths(),
+                expect.map(|vec| vec.iter().map(|s| remap_lang::Path::from_str(s).unwrap()).collect())
+            );
+        }
+    }
 }

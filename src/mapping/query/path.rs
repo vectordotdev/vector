@@ -230,7 +230,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value), "Query path failed: {:?}", query);
         }
     }
 }
