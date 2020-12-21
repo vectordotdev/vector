@@ -110,7 +110,7 @@ pub struct RootOpts {
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
-    #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
+    #[structopt(short, long)]
     pub watch_config: bool,
 }
 
