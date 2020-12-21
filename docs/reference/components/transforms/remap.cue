@@ -58,8 +58,15 @@ components: transforms: remap: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	examples: [
