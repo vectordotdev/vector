@@ -358,6 +358,7 @@ urls: {
 	syslog_3164:                                              "https://tools.ietf.org/html/rfc3164"
 	syslog_5424:                                              "https://tools.ietf.org/html/rfc5424"
 	syslog_6587:                                              "https://tools.ietf.org/html/rfc6587"
+	syslog_levels:                                            "https://en.wikipedia.org/wiki/Syslog#Severity_level"
 	systemd:                                                  "https://systemd.io/"
 	systemd_limit_resources:                                  "https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html"
 	systemd_resolved:                                         "https://wiki.archlinux.org/index.php/Systemd-resolved"

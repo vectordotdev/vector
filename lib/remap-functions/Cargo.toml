@@ -81,6 +81,7 @@ default = [
     "to_bool",
     "to_float",
     "to_int",
+    "to_syslog_level",
     "to_string",
     "to_timestamp",
     "tokenize",
@@ -136,6 +137,7 @@ to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
 to_string = []
+to_syslog_level = []
 to_timestamp = ["chrono"]
 tokenize = ["shared/tokenize"]
 truncate = []
