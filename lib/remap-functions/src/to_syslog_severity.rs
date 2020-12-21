@@ -49,7 +49,7 @@ impl Expression for ToSyslogSeverityFn {
 
         match severity {
             Ok(severity) => Ok(Value::from(severity)),
-            Err(e) => Err(Error::Call(e)),
+            Err(e) => Err(Error::from(e)),
         }
     }
 
