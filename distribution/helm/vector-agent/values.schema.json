@@ -1,0 +1,1129 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": {},
+  "examples": [
+      {
+          "image": {
+              "repository": "timberio/vector",
+              "pullPolicy": "IfNotPresent",
+              "tag": "",
+              "version": "",
+              "base": "debian"
+          },
+          "imagePullSecrets": [],
+          "nameOverride": "",
+          "fullnameOverride": "",
+          "updateStrategy": "RollingUpdate",
+          "serviceAccount": {
+              "create": true,
+              "annotations": {},
+              "name": ""
+          },
+          "podRollmeAnnotation": false,
+          "podValuesChecksumAnnotation": false,
+          "podAnnotations": {},
+          "podLabels": {},
+          "podSecurityContext": {},
+          "securityContext": {},
+          "env": [],
+          "tolerations": [
+              {
+                  "key": "node-role.kubernetes.io/master",
+                  "effect": "NoSchedule"
+              }
+          ],
+          "resources": {},
+          "nodeSelector": {},
+          "affinity": {},
+          "extraContainersPorts": [],
+          "extraConfigDirSources": [],
+          "extraVolumes": [],
+          "extraVolumeMounts": [],
+          "rbac": {
+              "enabled": true
+          },
+          "psp": {
+              "enabled": false
+          },
+          "existingConfigMap": "",
+          "globalOptions": {
+              "dataDir": "/vector-data-dir"
+          },
+          "logSchema": {
+              "hostKey": "host",
+              "messageKey": "message",
+              "sourceTypeKey": "source_type",
+              "timestampKey": "timestamp"
+          },
+          "kubernetesLogsSource": {
+              "enabled": true,
+              "sourceId": "kubernetes_logs",
+              "rawConfig": null
+          },
+          "vectorSink": {
+              "enabled": false,
+              "sinkId": "vector_sink",
+              "inputs": null,
+              "host": null,
+              "port": null,
+              "rawConfig": null
+          },
+          "internalMetricsSource": {
+              "enabled": true,
+              "sourceId": "internal_metrics",
+              "rawConfig": null
+          },
+          "hostMetricsSource": {
+              "enabled": true,
+              "sourceId": "host_metrics",
+              "rawConfig": null
+          },
+          "prometheusSink": {
+              "enabled": true,
+              "sinkId": "prometheus_sink",
+              "inputs": [],
+              "excludeInternalMetrics": false,
+              "listenAddress": "0.0.0.0",
+              "listenPort": "9090",
+              "rawConfig": null,
+              "addPodAnnotations": false,
+              "podMonitor": {
+                  "enabled": false,
+                  "extraRelabelings": []
+              }
+          },
+          "sources": {},
+          "transforms": {},
+          "sinks": {}
+      }
+  ],
+  "required": [
+      "image",
+      "nameOverride",
+      "fullnameOverride",
+      "updateStrategy",
+      "serviceAccount",
+      "podRollmeAnnotation",
+      "podValuesChecksumAnnotation",
+      "podAnnotations",
+      "podLabels",
+      "podSecurityContext",
+      "securityContext",
+      "env",
+      "tolerations",
+      "resources",
+      "nodeSelector",
+      "affinity",
+      "extraContainersPorts",
+      "extraConfigDirSources",
+      "extraVolumes",
+      "extraVolumeMounts",
+      "rbac",
+      "psp",
+      "existingConfigMap",
+      "globalOptions",
+      "logSchema",
+      "kubernetesLogsSource",
+      "vectorSink",
+      "internalMetricsSource",
+      "hostMetricsSource",
+      "prometheusSink",
+      "sources",
+      "transforms",
+      "sinks"
+  ],
+  "properties": {
+      "image": {
+          "$id": "#/properties/image",
+          "type": "object",
+          "title": "The image schema",
+          "description": "An explanation about the purpose of this instance.",
+          "default": {},
+          "examples": [
+              {
+                  "repository": "timberio/vector",
+                  "pullPolicy": "IfNotPresent",
+                  "tag": "",
+                  "version": "",
+                  "base": "debian"
+              }
+          ],
+          "required": [
+              "repository",
+              "pullPolicy",
+              "tag",
+              "version",
+              "base"
+          ],
+          "properties": {
+              "repository": {
+                  "$id": "#/properties/image/properties/repository",
+                  "type": "string",
+                  "title": "Image repository schema",
+                  "default": "timberio/vector",
+                  "examples": [
+                      "timberio/vector"
+                  ]
+              },
+              "pullPolicy": {
+                  "$id": "#/properties/image/properties/pullPolicy",
+                  "type": "string",
+                  "title": "Image pullPolicy schema",
+                  "description": "An explanation about the purpose of this instance.",
+                  "default": "IfNotPresent",
+                  "examples": [
+                      "IfNotPresent"
+                  ]
+              },
+              "tag": {
+                  "$id": "#/properties/image/properties/tag",
+                  "type": "string",
+                  "title": "Image tag schema",
+                  "description": "Overrides the image tag, the default is `{image.version}-{image.base}`.",
+                  "default": ""
+              },
+              "version": {
+                  "$id": "#/properties/image/properties/version",
+                  "type": "string",
+                  "title": "Image version schema",
+                  "description": "Overrides the image version, the default is the Chart appVersion.",
+                  "default": ""
+              },
+              "base": {
+                  "$id": "#/properties/image/properties/base",
+                  "type": "string",
+                  "title": "Image base schema",
+                  "description": "Sets the image base.",
+                  "default": "debian",
+                  "examples": [
+                      "debian"
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "imagePullSecrets": {
+          "$id": "#/properties/imagePullSecrets",
+          "type": "array",
+          "title": "The imagePullSecrets schema",
+          "description": "Image pull secrets to use at the `Pod`s managed by `DaemonSet`.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/imagePullSecrets/items"
+          }
+      },
+      "nameOverride": {
+          "$id": "#/properties/nameOverride",
+          "type": "string",
+          "title": "The nameOverride schema",
+          "description": "Override the chart name used in templates.",
+          "default": ""
+      },
+      "fullnameOverride": {
+          "$id": "#/properties/fullnameOverride",
+          "type": "string",
+          "title": "The fullnameOverride schema",
+          "description": "Override the full chart name (name prefixed with release name) used in templates.",
+          "default": ""
+      },
+      "updateStrategy": {
+          "$id": "#/properties/updateStrategy",
+          "type": "string",
+          "title": "The updateStrategy schema",
+          "description": "Kubernetes update strategy.",
+          "default": "RollingUpdate",
+          "examples": [
+              "RollingUpdate"
+          ]
+      },
+      "serviceAccount": {
+          "$id": "#/properties/serviceAccount",
+          "type": "object",
+          "title": "The serviceAccount schema",
+          "description": "Service account specifications.",
+          "default": {},
+          "examples": [
+              {
+                  "create": true,
+                  "annotations": {},
+                  "name": ""
+              }
+          ],
+          "required": [
+              "create",
+              "annotations",
+              "name"
+          ],
+          "properties": {
+              "create": {
+                  "$id": "#/properties/serviceAccount/properties/create",
+                  "type": "boolean",
+                  "title": "The create schema",
+                  "description": "Specifies whether a service account should be created.",
+                  "default": true,
+                  "examples": [
+                      false
+                  ]
+              },
+              "annotations": {
+                  "$id": "#/properties/serviceAccount/properties/annotations",
+                  "type": "object",
+                  "title": "The annotations schema",
+                  "description": "Annotations to add to the service account.",
+                  "default": {},
+                  "required": [],
+                  "additionalProperties": true
+              },
+              "name": {
+                  "$id": "#/properties/serviceAccount/properties/name",
+                  "type": "string",
+                  "title": "The service account name schema",
+                  "description": "The name of the service account to use. If not set and `create` is true, a name is generated using the `fullname` template.",
+                  "default": ""
+              }
+          },
+          "additionalProperties": true
+      },
+      "podRollmeAnnotation": {
+          "$id": "#/properties/podRollmeAnnotation",
+          "type": "boolean",
+          "title": "The podRollmeAnnotation schema",
+          "description": "An annotation with a random value. Enabling this will cause the `Pod`s to be recreated every time the value changes.",
+          "default": false,
+          "examples": [
+              false
+          ]
+      },
+      "podValuesChecksumAnnotation": {
+          "$id": "#/properties/podValuesChecksumAnnotation",
+          "type": "boolean",
+          "title": "The podValuesChecksumAnnotation schema",
+          "description": "An annotation with a checksum of the Helm release values. Will cause the `Pod`s to be recreated every time values change.",
+          "default": false,
+          "examples": [
+              false
+          ]
+      },
+      "podAnnotations": {
+          "$id": "#/properties/podAnnotations",
+          "type": "object",
+          "title": "The podAnnotations schema",
+          "description": "Annotations to add to the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "additionalProperties": true
+      },
+      "podLabels": {
+          "$id": "#/properties/podLabels",
+          "type": "object",
+          "title": "The podLabels schema",
+          "description": "Labels to add to the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "additionalProperties": true
+      },
+      "podSecurityContext": {
+          "$id": "#/properties/podSecurityContext",
+          "type": "object",
+          "title": "The podSecurityContext schema",
+          "description": "PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "examples": [
+              {
+                  "fsGroup": 2000
+              }
+          ],
+          "additionalProperties": true
+      },
+      "securityContext": {
+          "$id": "#/properties/securityContext",
+          "type": "object",
+          "title": "The securityContext schema",
+          "description": "Security context to set at the `vector` container at the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "examples": [
+              {
+                  "capabilities":
+                  {
+                      "drop": [ "ALL" ]
+                  },
+                  "readOnlyRootFilesystem": true,
+                  "runAsNonRoot": true,
+                  "runAsUser": 1000
+              }
+          ],
+          "required": [],
+          "additionalProperties": true
+      },
+      "env": {
+          "$id": "#/properties/env",
+          "type": "array",
+          "title": "The env schema",
+          "description": "Extra env vars to pass to the `vector` container.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/env/items"
+          }
+      },
+      "tolerations": {
+          "$id": "#/properties/tolerations",
+          "type": "array",
+          "title": "The tolerations schema",
+          "description": "Tolerations to set for the `Pod`s managed by `DaemonSet`.",
+          "default": [
+              {
+                  "key": "node-role.kubernetes.io/master",
+                  "effect": "NoSchedule"
+              }
+          ],
+          "examples": [
+              [
+                  {
+                      "key": "node-role.kubernetes.io/master",
+                      "effect": "NoSchedule"
+                  }
+              ]
+          ],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/tolerations/items",
+              "anyOf": [
+                  {
+                      "$id": "#/properties/tolerations/items/anyOf/0",
+                      "type": "object",
+                      "title": "The first anyOf schema",
+                      "description": "An explanation about the purpose of this instance.",
+                      "default": {},
+                      "examples": [
+                          {
+                              "key": "node-role.kubernetes.io/master",
+                              "effect": "NoSchedule"
+                          }
+                      ],
+                      "required": [
+                          "key",
+                          "effect"
+                      ],
+                      "properties": {
+                          "key": {
+                              "$id": "#/properties/tolerations/items/anyOf/0/properties/key",
+                              "type": "string",
+                              "title": "The key schema",
+                              "description": "An explanation about the purpose of this instance.",
+                              "default": "",
+                              "examples": [
+                                  "node-role.kubernetes.io/master"
+                              ]
+                          },
+                          "effect": {
+                              "$id": "#/properties/tolerations/items/anyOf/0/properties/effect",
+                              "type": "string",
+                              "title": "The effect schema",
+                              "description": "An explanation about the purpose of this instance.",
+                              "default": "",
+                              "examples": [
+                                  "NoSchedule"
+                              ]
+                          }
+                      },
+                      "additionalProperties": true
+                  }
+              ]
+          }
+      },
+      "resources": {
+          "$id": "#/properties/resources",
+          "type": "object",
+          "title": "The resources schema",
+          "description": "Resource tweakable for the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "additionalProperties": true
+      },
+      "nodeSelector": {
+          "$id": "#/properties/nodeSelector",
+          "type": "object",
+          "title": "The nodeSelector schema",
+          "description": "NodeSelector tweakable for the `Pod`s managed by `DaemonSet`",
+          "default": {},
+          "additionalProperties": true
+      },
+      "affinity": {
+          "$id": "#/properties/affinity",
+          "type": "object",
+          "title": "The affinity schema",
+          "description": "Affinity  tweakable for the `Pod`s managed by `DaemonSet`.",
+          "default": {},
+          "additionalProperties": true
+      },
+      "extraContainersPorts": {
+          "$id": "#/properties/extraContainersPorts",
+          "type": "array",
+          "title": "The extraContainersPorts schema",
+          "description": "Additional container ports to pass to the `vector` container of the `Pod`s managed by `DaemonSet`.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/extraContainersPorts/items"
+          }
+      },
+      "extraConfigDirSources": {
+          "$id": "#/properties/extraConfigDirSources",
+          "type": "array",
+          "title": "The extraConfigDirSources schema",
+          "description": "Additional sources to include at the `config-dir` projection of the `Pod`s managed by `DaemonSet`.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/extraConfigDirSources/items"
+          }
+      },
+      "extraVolumes": {
+          "$id": "#/properties/extraVolumes",
+          "type": "array",
+          "title": "The extraVolumes schema",
+          "description": "Additional volumes to pass to the `Pod`s managed by `DaemonSet`.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/extraVolumes/items"
+          }
+      },
+      "extraVolumeMounts": {
+          "$id": "#/properties/extraVolumeMounts",
+          "type": "array",
+          "title": "The extraVolumeMounts schema",
+          "description": "Additional volume mounts to pass to the `vector` container of the `Pod`s managed by `DaemonSet`.",
+          "default": [],
+          "additionalItems": true,
+          "items": {
+              "$id": "#/properties/extraVolumeMounts/items"
+          }
+      },
+      "rbac": {
+          "$id": "#/properties/rbac",
+          "type": "object",
+          "title": "The rbac schema",
+          "description": "An explanation about the purpose of this instance.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": true
+              }
+          ],
+          "required": [
+              "enabled"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/rbac/properties/enabled",
+                  "type": "boolean",
+                  "title": "Rbac enabled schema",
+                  "description": "Whether to create rbac resources or not. Disable for non-rbac clusters.",
+                  "default": true,
+                  "examples": [
+                      true
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "psp": {
+          "$id": "#/properties/psp",
+          "type": "object",
+          "title": "The psp schema",
+          "description": "An explanation about the purpose of this instance.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": false
+              }
+          ],
+          "required": [
+              "enabled"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/psp/properties/enabled",
+                  "type": "boolean",
+                  "title": "Psp enabled schema",
+                  "description": "Whether to create `PodSecurityPolicy` or not.",
+                  "default": false,
+                  "examples": [
+                      false
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "existingConfigMap": {
+          "$id": "#/properties/existingConfigMap",
+          "type": "string",
+          "title": "The existingConfigMap schema",
+          "description": "Set this to non-empty value to use existing `ConfigMap` for `vector`, instead of using a generated one.",
+          "default": ""
+      },
+      "globalOptions": {
+          "$id": "#/properties/globalOptions",
+          "type": "object",
+          "title": "The globalOptions schema",
+          "description": "Global parts of the generated `vector` config.",
+          "default": {
+              "dataDir": "/vector-data-dir"
+          },
+          "examples": [
+              {
+                  "dataDir": "/vector-data-dir"
+              }
+          ],
+          "required": [
+              "dataDir"
+          ],
+          "properties": {
+              "dataDir": {
+                  "$id": "#/properties/globalOptions/properties/dataDir",
+                  "type": "string",
+                  "title": "The dataDir schema",
+                  "description": "Specifies the (in-container) data dir used by `vector`.",
+                  "default": "",
+                  "examples": [
+                      "/vector-data-dir"
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "logSchema": {
+          "$id": "#/properties/logSchema",
+          "type": "object",
+          "title": "The logSchema schema",
+          "description": "Schema part of the generated `vector` config.",
+          "default": {},
+          "examples": [
+              {
+                  "hostKey": "host",
+                  "messageKey": "message",
+                  "sourceTypeKey": "source_type",
+                  "timestampKey": "timestamp"
+              }
+          ],
+          "required": [
+              "hostKey",
+              "messageKey",
+              "sourceTypeKey",
+              "timestampKey"
+          ],
+          "properties": {
+              "hostKey": {
+                  "$id": "#/properties/logSchema/properties/hostKey",
+                  "type": "string",
+                  "title": "The hostKey schema",
+                  "description": "Vector config schema hostKey.",
+                  "default": "host",
+                  "examples": [
+                      "host"
+                  ]
+              },
+              "messageKey": {
+                  "$id": "#/properties/logSchema/properties/messageKey",
+                  "type": "string",
+                  "title": "The messageKey schema",
+                  "description": "Vector config schema messageKey.",
+                  "default": "message",
+                  "examples": [
+                      "message"
+                  ]
+              },
+              "sourceTypeKey": {
+                  "$id": "#/properties/logSchema/properties/sourceTypeKey",
+                  "type": "string",
+                  "title": "The sourceTypeKey schema",
+                  "description": "Vector config schema sourceTypeKey.",
+                  "default": "source_type",
+                  "examples": [
+                      "source_type"
+                  ]
+              },
+              "timestampKey": {
+                  "$id": "#/properties/logSchema/properties/timestampKey",
+                  "type": "string",
+                  "title": "The timestampKey schema",
+                  "description": "Vector config schema timestampKey.",
+                  "default": "timestamp",
+                  "examples": [
+                      "timestamp"
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "kubernetesLogsSource": {
+          "$id": "#/properties/kubernetesLogsSource",
+          "type": "object",
+          "title": "The kubernetesLogsSource schema",
+          "description": "The 'built-in' kubernetes logs source to collect logs from the `Pod`s running on the `Node`, added by default, unless explicitly disabled.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": true,
+                  "sourceId": "kubernetes_logs",
+                  "rawConfig": null
+              }
+          ],
+          "required": [
+              "enabled",
+              "sourceId",
+              "rawConfig"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/kubernetesLogsSource/properties/enabled",
+                  "type": "boolean",
+                  "title": "The enabled schema",
+                  "description": "Disable to omit the kubernetes logs source from being added.",
+                  "default": true,
+                  "examples": [
+                      false
+                  ]
+              },
+              "sourceId": {
+                  "$id": "#/properties/kubernetesLogsSource/properties/sourceId",
+                  "type": "string",
+                  "title": "The sourceId schema",
+                  "description": "The name to use for the 'built-in' kubernetes logs source.",
+                  "default": "kubernetes_logs",
+                  "examples": [
+                      "kubernetes_logs"
+                  ]
+              },
+              "rawConfig": {
+                  "$id": "#/properties/kubernetesLogsSource/properties/rawConfig",
+                  "type": "null",
+                  "title": "The rawConfig schema",
+                  "description": "Raw TOML config to embed at the kubernetes logs source.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "vectorSink": {
+          "$id": "#/properties/vectorSink",
+          "type": "object",
+          "title": "The vectorSink schema",
+          "description": "The 'built-in' vector sink, to send the logs to the vector aggregator.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": false,
+                  "sinkId": "vector_sink",
+                  "inputs": null,
+                  "host": null,
+                  "port": null,
+                  "rawConfig": null
+              }
+          ],
+          "required": [
+              "enabled",
+              "sinkId",
+              "inputs",
+              "host",
+              "port",
+              "rawConfig"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/vectorSink/properties/enabled",
+                  "type": "boolean",
+                  "title": "The enabled schema",
+                  "description": "Disable to omit the vector sink from being added.",
+                  "default": false,
+                  "examples": [
+                      false
+                  ]
+              },
+              "sinkId": {
+                  "$id": "#/properties/vectorSink/properties/sinkId",
+                  "type": "string",
+                  "title": "The sinkId schema",
+                  "description": "The name to use for the 'built-in' vector sink.",
+                  "default": "vector_sink",
+                  "examples": [
+                      "vector_sink"
+                  ]
+              },
+              "inputs": {
+                  "$id": "#/properties/vectorSink/properties/inputs",
+                  "type": "null",
+                  "title": "The inputs schema",
+                  "description": "Inputs of the built-in vector sink.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              },
+              "host": {
+                  "$id": "#/properties/vectorSink/properties/host",
+                  "type": "null",
+                  "title": "The host schema",
+                  "description": "The host of the Vector to send the data to.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              },
+              "port": {
+                  "$id": "#/properties/vectorSink/properties/port",
+                  "type": "null",
+                  "title": "The port schema",
+                  "description": "The port of the Vector to send the data to.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              },
+              "rawConfig": {
+                  "$id": "#/properties/vectorSink/properties/rawConfig",
+                  "type": "null",
+                  "title": "The rawConfig schema",
+                  "description": "Raw TOML config to embed at the vector sink.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "internalMetricsSource": {
+          "$id": "#/properties/internalMetricsSource",
+          "type": "object",
+          "title": "The internalMetricsSource schema",
+          "description": "The 'built-in' internal metrics source emitting Vector's internal opertaional metrics.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": true,
+                  "sourceId": "internal_metrics",
+                  "rawConfig": null
+              }
+          ],
+          "required": [
+              "enabled",
+              "sourceId",
+              "rawConfig"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/internalMetricsSource/properties/enabled",
+                  "type": "boolean",
+                  "title": "The enabled schema",
+                  "description": "Disable to omit the internal metrics source from being added.",
+                  "default": true,
+                  "examples": [
+                      false
+                  ]
+              },
+              "sourceId": {
+                  "$id": "#/properties/internalMetricsSource/properties/sourceId",
+                  "type": "string",
+                  "title": "The sourceId schema",
+                  "description": "The name to use for the 'built-in' internal metrics source.",
+                  "default": "internal_metrics",
+                  "examples": [
+                      "internal_metrics"
+                  ]
+              },
+              "rawConfig": {
+                  "$id": "#/properties/internalMetricsSource/properties/rawConfig",
+                  "type": "null",
+                  "title": "The rawConfig schema",
+                  "description": "Raw TOML config to embed at the internal metrics source.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "hostMetricsSource": {
+          "$id": "#/properties/hostMetricsSource",
+          "type": "object",
+          "title": "The hostMetricsSource schema",
+          "description": "The 'built-in' host metrics source emitting the metrics gathered from the node that Vector is executing on.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": true,
+                  "sourceId": "host_metrics",
+                  "rawConfig": null
+              }
+          ],
+          "required": [
+              "enabled",
+              "sourceId",
+              "rawConfig"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/hostMetricsSource/properties/enabled",
+                  "type": "boolean",
+                  "title": "The enabled schema",
+                  "description": "Disable to omit the host metrics source from being added.",
+                  "default": true,
+                  "examples": [
+                      false
+                  ]
+              },
+              "sourceId": {
+                  "$id": "#/properties/hostMetricsSource/properties/sourceId",
+                  "type": "string",
+                  "title": "The sourceId schema",
+                  "description": "The name to use for the 'built-in' host metrics source.",
+                  "default": "host_metrics",
+                  "examples": [
+                      "host_metrics"
+                  ]
+              },
+              "rawConfig": {
+                  "$id": "#/properties/hostMetricsSource/properties/rawConfig",
+                  "type": "null",
+                  "title": "The rawConfig schema",
+                  "description": "Raw TOML config to embed at the host metrics source.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              }
+          },
+          "additionalProperties": true
+      },
+      "prometheusSink": {
+          "$id": "#/properties/prometheusSink",
+          "type": "object",
+          "title": "The prometheusSink schema",
+          "description": "The 'built-in' prometheus sink exposing metrics in the Prometheus scraping format. We automatically configure container ports, and ensure things are ready for discovery and scraping via Prometheus' `kubernetes_sd_configs` jobs.",
+          "default": {},
+          "examples": [
+              {
+                  "enabled": true,
+                  "sinkId": "prometheus_sink",
+                  "inputs": [],
+                  "excludeInternalMetrics": false,
+                  "listenAddress": "0.0.0.0",
+                  "listenPort": "9090",
+                  "rawConfig": null,
+                  "addPodAnnotations": false,
+                  "podMonitor": {
+                      "enabled": false,
+                      "extraRelabelings": []
+                  }
+              }
+          ],
+          "required": [
+              "enabled",
+              "sinkId",
+              "inputs",
+              "excludeInternalMetrics",
+              "listenAddress",
+              "listenPort",
+              "rawConfig",
+              "addPodAnnotations",
+              "podMonitor"
+          ],
+          "properties": {
+              "enabled": {
+                  "$id": "#/properties/prometheusSink/properties/enabled",
+                  "type": "boolean",
+                  "title": "The enabled schema",
+                  "description": "Disable to omit the prometheus sink from being added.",
+                  "default": true,
+                  "examples": [
+                      false
+                  ]
+              },
+              "sinkId": {
+                  "$id": "#/properties/prometheusSink/properties/sinkId",
+                  "type": "string",
+                  "title": "The sinkId schema",
+                  "description": "The name to use for the 'built-in' prometheus sink.",
+                  "default": "prometheus_sink",
+                  "examples": [
+                      "prometheus_sink"
+                  ]
+              },
+              "inputs": {
+                  "$id": "#/properties/prometheusSink/properties/inputs",
+                  "type": "array",
+                  "title": "The inputs schema",
+                  "description": "Inputs of the built-in prometheus sink. If you have built-in internal metrics source enabled, we'll add it as a input here under the hood, so you don't have to pass it here.",
+                  "default": [],
+                  "additionalItems": true,
+                  "items": {
+                      "$id": "#/properties/prometheusSink/properties/inputs/items"
+                  }
+              },
+              "excludeInternalMetrics": {
+                  "$id": "#/properties/prometheusSink/properties/excludeInternalMetrics",
+                  "type": "boolean",
+                  "title": "The excludeInternalMetrics schema",
+                  "description": "Set this to `true` to opt-out from automatically adding the built-in internal metrics source to the inputs.",
+                  "default": false,
+                  "examples": [
+                      false
+                  ]
+              },
+              "listenAddress": {
+                  "$id": "#/properties/prometheusSink/properties/listenAddress",
+                  "type": "string",
+                  "title": "The listenAddress schema",
+                  "description": "The address to listen at.",
+                  "default": "0.0.0.0",
+                  "examples": [
+                      "0.0.0.0"
+                  ]
+              },
+              "listenPort": {
+                  "$id": "#/properties/prometheusSink/properties/listenPort",
+                  "type": "string",
+                  "title": "The listenPort schema",
+                  "description": "The port to listen at.",
+                  "default": "9090",
+                  "examples": [
+                      "9090"
+                  ]
+              },
+              "rawConfig": {
+                  "$id": "#/properties/prometheusSink/properties/rawConfig",
+                  "type": "null",
+                  "title": "The rawConfig schema",
+                  "description": "Raw TOML config to embed at the vector source.",
+                  "default": null,
+                  "examples": [
+                      null
+                  ]
+              },
+              "addPodAnnotations": {
+                  "$id": "#/properties/prometheusSink/properties/addPodAnnotations",
+                  "type": "boolean",
+                  "title": "The addPodAnnotations schema",
+                  "description": "Add Prometheus annotations to Pod to opt-in for Prometheus scraping.",
+                  "default": false,
+                  "examples": [
+                      false
+                  ]
+              },
+              "podMonitor": {
+                  "$id": "#/properties/prometheusSink/properties/podMonitor",
+                  "type": "object",
+                  "title": "The podMonitor schema",
+                  "description": "Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping. To be used in clusters that rely on prometheus-operator to gather metrics.",
+                  "default": {},
+                  "examples": [
+                      {
+                          "enabled": false,
+                          "extraRelabelings": []
+                      }
+                  ],
+                  "required": [
+                      "enabled",
+                      "extraRelabelings"
+                  ],
+                  "properties": {
+                      "enabled": {
+                          "$id": "#/properties/prometheusSink/properties/podMonitor/properties/enabled",
+                          "type": "boolean",
+                          "title": "The enabled schema",
+                          "description": "Whether to add the `PodMonitor` resource or not.",
+                          "default": false,
+                          "examples": [
+                              false
+                          ]
+                      },
+                      "extraRelabelings": {
+                          "$id": "#/properties/prometheusSink/properties/podMonitor/properties/extraRelabelings",
+                          "type": "array",
+                          "title": "The extraRelabelings schema",
+                          "description": "Additional relabelings to include in the `PodMonitor`.",
+                          "default": [],
+                          "examples": [
+                              []
+                          ],
+                          "additionalItems": true,
+                          "items": {
+                              "$id": "#/properties/prometheusSink/properties/podMonitor/properties/extraRelabelings/items"
+                          }
+                      }
+                  },
+                  "additionalProperties": true
+              }
+          },
+          "additionalProperties": true
+      },
+      "sources": {
+          "$id": "#/properties/sources",
+          "type": "object",
+          "title": "The sources schema",
+          "description": "Sources to add to the generated `vector` config (besides 'built-in' kubernetes logs source).",
+          "default": {},
+          "examples": [
+              {
+                  "source_name": {
+                     "type": "source_type",
+                     "rawConfig": "option = \"value\"\n"
+                  }
+              }
+          ],
+          "required": [],
+          "additionalProperties": true
+      },
+      "transforms": {
+          "$id": "#/properties/transforms",
+          "type": "object",
+          "title": "The transforms schema",
+          "description": "Transforms to add to the generated `vector` config.",
+          "default": {},
+          "examples": [
+            {
+                "transform_name": {
+                    "type": "transform_type",
+                    "inputs": [
+                        "input1",
+                        "input2"
+                    ],
+                    "rawConfig": "option = \"value\"\n"
+                }
+           }
+          ],
+          "required": [],
+          "additionalProperties": true
+      },
+      "sinks": {
+          "$id": "#/properties/sinks",
+          "type": "object",
+          "title": "The sinks schema",
+          "description": "Sinks to add to the generated `vector` config.",
+          "default": {},
+          "examples": [
+            {
+                "sink_name": {
+                    "type": "sink_type",
+                    "inputs": [
+                        "input1",
+                        "input2"
+                    ],
+                    "rawConfig": "option = \"value\"\n"
+                }
+           }
+          ],
+          "required": [],
+          "additionalProperties": true
+      }
+  },
+  "additionalProperties": true
+}
