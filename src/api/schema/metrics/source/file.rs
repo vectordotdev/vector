@@ -3,7 +3,7 @@ use crate::{
     event::Metric,
 };
 use async_graphql::Object;
-use itertools::Itertools;
+use nom::lib::std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct FileSourceMetrics(Vec<Metric>);
@@ -33,24 +33,19 @@ impl FileSourceMetricFile<'_> {
         &*self.name
     }
 
-    /// Total events processed for the file
+    /// Metric indicating events processed for the current file
     async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
         self.metrics.processed_events_total()
+    }
+
+    /// Metric indicating bytes processed for the current file
+    async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
+        self.metrics.processed_bytes_total()
     }
 }
 
 #[Object]
 impl FileSourceMetrics {
-    /// Metric indicating events processed for the current file source
-    pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
-        self.0.processed_events_total()
-    }
-
-    /// Metric indicating bytes processed for the current file source
-    pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
-        self.0.processed_bytes_total()
-    }
-
     /// File metrics
     pub async fn files(&self) -> Vec<FileSourceMetricFile<'_>> {
         self.0
@@ -59,7 +54,10 @@ impl FileSourceMetrics {
                 Some(file) => Some((file, m)),
                 _ => None,
             })
-            .into_group_map()
+            .fold(BTreeMap::new(), |mut map, (file, m)| {
+                map.entry(file).or_insert_with(|| Vec::new()).push(m);
+                map
+            })
             .into_iter()
             .map(FileSourceMetricFile::from_tuple)
             .collect()
