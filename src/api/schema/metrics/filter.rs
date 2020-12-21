@@ -150,11 +150,26 @@ pub fn component_counter_metrics(
     metrics_sorted(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| {
-                let component_name = m.tag_value("component_name")?;
+            .filter_map(|m| match m.tag_value("component_name") {
+                Some(name) => Some((name, m)),
+                _ => None,
+            })
+            .fold(BTreeMap::new(), |mut map, (name, m)| {
+                map.entry(name).or_insert_with(Vec::new).push(m);
+                map
+            })
+            .into_iter()
+            .filter_map(|(name, metrics)| {
+                let mut iter = metrics.into_iter();
+                let mut m = iter.next()?;
+                m = iter.fold(m, |mut m1, m2| {
+                    m1.update_value(&m2);
+                    m1
+                });
+
                 match m.value {
                     MetricValue::Counter { value }
-                        if cache.insert(component_name, value).unwrap_or(0.00) < value =>
+                        if cache.insert(name, value).unwrap_or(0.00) < value =>
                     {
                         Some(m)
                     }
@@ -199,11 +214,26 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| {
-                    let component_name = m.tag_value("component_name")?;
+                .filter_map(|m| match m.tag_value("component_name") {
+                    Some(name) => Some((name, m)),
+                    _ => None,
+                })
+                .fold(BTreeMap::new(), |mut map, (name, m)| {
+                    map.entry(name).or_insert_with(Vec::new).push(m);
+                    map
+                })
+                .into_iter()
+                .filter_map(|(name, metrics)| {
+                    let mut iter = metrics.into_iter();
+                    let mut m = iter.next()?;
+                    m = iter.fold(m, |mut m1, m2| {
+                        m1.update_value(&m2);
+                        m1
+                    });
+
                     match m.value {
                         MetricValue::Counter { value } => {
-                            let last = cache.insert(component_name, value).unwrap_or(0.00);
+                            let last = cache.insert(name, value).unwrap_or(0.00);
                             let throughput = value - last;
                             Some((m, throughput))
                         }
