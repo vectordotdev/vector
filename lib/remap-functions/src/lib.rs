@@ -92,10 +92,10 @@ mod to_bool;
 mod to_float;
 #[cfg(feature = "to_int")]
 mod to_int;
-#[cfg(feature = "to_syslog_severity")]
-mod to_syslog_severity;
 #[cfg(feature = "to_string")]
 mod to_string;
+#[cfg(feature = "to_syslog_severity")]
+mod to_syslog_severity;
 #[cfg(feature = "to_timestamp")]
 mod to_timestamp;
 #[cfg(feature = "tokenize")]
@@ -201,10 +201,10 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
-#[cfg(feature = "to_syslog_severity")]
-pub use to_syslog_severity::ToSyslogSeverity;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
+#[cfg(feature = "to_syslog_severity")]
+pub use to_syslog_severity::ToSyslogSeverity;
 #[cfg(feature = "to_timestamp")]
 pub use to_timestamp::ToTimestamp;
 #[cfg(feature = "tokenize")]
