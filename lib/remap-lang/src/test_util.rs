@@ -60,11 +60,28 @@ macro_rules! test_function {
             let mut state = $crate::state::Program::default();
             let mut object: $crate::Value = ::std::collections::BTreeMap::default().into();
 
-            let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
+            let got = expression.execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
             assert_eq!(got, want);
         }
         )+}
     };
+}
+
+#[macro_export]
+macro_rules! map {
+    () => ({
+        let map = ::std::collections::BTreeMap::<String, $crate::Expr>::new();
+        $crate::expression::Map::new(map)
+    });
+    ($($k:tt: $v:expr),+ $(,)?) => ({
+        let map: ::std::collections::BTreeMap<String, $crate::Expr> = vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>();
+
+        $crate::expression::Map::new(map)
+    });
 }
 
 #[macro_export]
@@ -77,6 +94,14 @@ macro_rules! array {
         let vec: Vec<$crate::Value> = vec![$($v.into()),+];
         $crate::expression::Array::from(vec)
     })
+}
+
+/// Create a `Literal` expression type.
+#[macro_export]
+macro_rules! lit {
+    ($v:tt) => {
+        $crate::expression::Literal::from($crate::value!($v))
+    };
 }
 
 #[macro_export]

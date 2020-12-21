@@ -3,6 +3,10 @@ package metadata
 components: transforms: grok_parser: {
 	title: "Grok Parser"
 
+	description: """
+		Parses a log field value with [Grok](\(urls.grok)).
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -32,11 +36,10 @@ components: transforms: grok_parser: {
 		requirements: []
 		warnings: [
 			"""
-				Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
-				While this is still plenty fast for most use cases we recommend using the
-				[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
-				performance issues.
-				""",
+			This component has been deprecated in favor of the new [`remap` transform's `parse_grok`
+			function](\(urls.vector_remap_transform)#parse_grok)` The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: [
 			"""

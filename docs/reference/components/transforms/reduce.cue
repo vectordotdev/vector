@@ -3,6 +3,11 @@ package metadata
 components: transforms: reduce: {
 	title: "Reduce"
 
+	description: """
+		Reduces multiple log events into a single log event based on a set of
+		conditions and merge strategies.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"
@@ -31,7 +36,7 @@ components: transforms: reduce: {
 	configuration: {
 		ends_when: {
 			common:      false
-			description: "A condition used to distinguish the final event of a transaction. If this condition resolves to true for an event the transaction it belongs to is immediately flushed."
+			description: "A condition used to distinguish the final event of a transaction. If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event."
 			required:    false
 			warnings: []
 			type: object: configuration._conditions
@@ -112,6 +117,13 @@ components: transforms: reduce: {
 					}
 				}
 			}
+		}
+		starts_when: {
+			common:      false
+			description: "A condition used to distinguish the first event of a transaction. If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started."
+			required:    false
+			warnings: []
+			type: object: configuration._conditions
 		}
 	}
 

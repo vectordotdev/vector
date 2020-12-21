@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_cloud_storage: {
-	title:       "GCP Cloud Storage (GCS)"
-	description: "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data."
+	title: "GCP Cloud Storage (GCS)"
 
 	classes: {
 		commonly_used: true
@@ -279,4 +278,22 @@ components: sinks: gcp_cloud_storage: {
 					"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "storage"
+
+			policies: [
+				{
+					_action: "objects.create"
+					required_for: ["write"]
+				},
+				{
+					_action: "objects.get"
+					required_for: ["healthcheck"]
+				},
+			]
+		},
+	]
 }

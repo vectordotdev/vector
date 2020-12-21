@@ -3,8 +3,7 @@ package metadata
 components: sources: statsd: {
 	_port: 8125
 
-	title:       "StatsD"
-	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
+	title: "StatsD"
 
 	classes: {
 		commonly_used: false
@@ -18,12 +17,7 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "StatsD"
-					thing:    "a \(name) client"
-					url:      urls.statsd
-					versions: null
-				}
+				service: services.statsd
 
 				interface: socket: {
 					api: {
@@ -64,9 +58,9 @@ components: sources: statsd: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			groups: ["tcp", "udp"]
-			required: true
+			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
@@ -74,8 +68,7 @@ components: sources: statsd: {
 		}
 		mode: {
 			description: "The type of socket to use."
-			groups: ["tcp", "udp", "unix"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				enum: {
@@ -86,19 +79,19 @@ components: sources: statsd: {
 			}
 		}
 		path: {
-			description: "The unix socket path. *This should be an absolute path*."
-			groups: ["unix"]
-			required: true
+			description:   "The unix socket path. *This should be an absolute path*."
+			relevant_when: "mode = `unix`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
 			}
 		}
 		shutdown_timeout_secs: {
-			common:      false
-			description: "The timeout before a connection is forcefully closed during shutdown."
-			groups: ["tcp"]
-			required: false
+			common:        false
+			description:   "The timeout before a connection is forcefully closed during shutdown."
+			relevant_when: "mode = `tcp`"
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 30

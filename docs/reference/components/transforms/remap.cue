@@ -3,6 +3,11 @@ package metadata
 components: transforms: remap: {
 	title: "Remap"
 
+	description: """
+		Transforms events using the [Timber Remap Language](\(urls.timber_remap_language_reference)),
+		a fast, safe, self-documenting data mapping language.
+		"""
+
 	classes: {
 		commonly_used: true
 		development:   "beta"
@@ -41,8 +46,10 @@ components: transforms: remap: {
 			type: string: {
 				examples: [
 					"""
-						.type = "foo",
-						.new_field = .old_field * 2
+						. = parse_json(.message)
+						.status = to_int(.status)
+						.duration = parse_duration(.duration, "s")
+						.new_field = .old_field
 						del(.old_field)
 						""",
 				]

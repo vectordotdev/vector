@@ -6,6 +6,9 @@ use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+#[cfg(feature = "repl")]
+mod repl;
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "TRL", about = "Timber Remap Language CLI")]
 struct TRL {
@@ -15,7 +18,7 @@ struct TRL {
     #[structopt(name = "PROGRAM")]
     program: Option<String>,
 
-    /// File containing the object to manipulate, leave empty to use stdin
+    /// File containing the object(s) to manipulate, leave empty to use stdin
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
@@ -42,32 +45,59 @@ enum Error {
 
     #[error("json error")]
     Json(#[from] serde_json::Error),
+
+    #[cfg(not(feature = "repl"))]
+    #[error("repl feature disabled, program input required")]
+    ReplFeature,
 }
 
 fn main() {
     match run(TRL::from_args()) {
-        Ok(out) => println!("{}", out),
+        Ok(_) => {}
         Err(err) => eprintln!("{}", err),
     }
 }
 
-fn run(opt: TRL) -> Result<String, Error> {
-    let mut object = read_into_object(opt.input_file.as_ref())?;
+fn run(opt: TRL) -> Result<(), Error> {
+    let objects = read_into_objects(opt.input_file.as_ref())?;
     let program = read_program(opt.program.as_deref(), opt.program_file.as_ref())?;
 
-    execute(&mut object, &program).map(|v| {
-        if opt.print_object {
-            object.to_string()
-        } else {
-            v.to_string()
+    if program.is_empty() {
+        repl(objects)
+    } else {
+        for mut object in objects {
+            let result = execute(&mut object, &program).map(|v| {
+                if opt.print_object {
+                    object.to_string()
+                } else {
+                    v.to_string()
+                }
+            });
+
+            match result {
+                Ok(ok) => println!("{}", ok),
+                Err(err) => eprintln!("{}", err),
+            }
         }
-    })
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "repl")]
+fn repl(objects: Vec<Value>) -> Result<(), Error> {
+    repl::run(objects)
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(object: Vec<Value>) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
     let state = state::Program::default();
     let mut runtime = Runtime::new(state);
-    let program = Program::new(program, &[], None)?;
+    let program = Program::new(program, &remap_functions::all(), None)?;
 
     runtime.execute(object, &program).map_err(Into::into)
 }
@@ -82,15 +112,18 @@ fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, 
     }
 }
 
-fn read_into_object(input: Option<&PathBuf>) -> Result<Value, Error> {
+fn read_into_objects(input: Option<&PathBuf>) -> Result<Vec<Value>, Error> {
     let input = match input {
         Some(path) => read(File::open(path)?),
         None => read(io::stdin()),
     }?;
 
     match input.as_str() {
-        "" => Ok(Value::Map(BTreeMap::default())),
-        _ => Ok(serde_to_remap(serde_json::from_str(&input)?)),
+        "" => Ok(vec![Value::Map(BTreeMap::default())]),
+        _ => input
+            .lines()
+            .map(|line| Ok(serde_to_remap(serde_json::from_str(&line)?)))
+            .collect::<Result<Vec<Value>, Error>>(),
     }
 }
 

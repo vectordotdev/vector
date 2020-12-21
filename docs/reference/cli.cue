@@ -215,6 +215,7 @@ cli: {
 					description: "Format the list in an encoding schema"
 					default:     "text"
 					enum: {
+						avro: "Output components in Apache Avro format"
 						json: "Output components as JSON"
 						text: "Output components as text"
 					}
@@ -228,6 +229,33 @@ cli: {
 				therefore subject to change. For guidance on how to write unit tests check
 				out: https://vector.dev/docs/setup/guides/unit-testing/
 				"""
+
+			options: {
+				"config-toml": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. TOML file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_TOML"
+				}
+				"config-json": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. JSON file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_JSON"
+				}
+				"config-yaml": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. YAML file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_YAML"
+				}
+			}
 
 			args: {
 				paths: _paths_arg & {

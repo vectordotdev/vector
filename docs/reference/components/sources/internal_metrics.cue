@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: internal_metrics: {
-	title:       "Internal Metrics"
-	description: "The internal metrics source exposes metrics emitted by the running Vector instance (as opposed to components in its topology)."
+	title: "Internal Metrics"
+
+	description: """
+		Exposes Vector's own internal metrics, allowing you to collect, process,
+		and route Vector's internal metrics just like other metrics.
+		"""
 
 	classes: {
 		commonly_used: true
@@ -15,12 +19,7 @@ components: sources: internal_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: service: {
-				name:     "Vector instance"
-				thing:    "a \(name)"
-				url:      urls.vector_docs
-				versions: ">= 0.11.0"
-			}
+			from: service:       services.vector
 		}
 		multiline: enabled: false
 	}

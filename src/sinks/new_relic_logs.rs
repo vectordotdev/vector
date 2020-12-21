@@ -147,7 +147,6 @@ impl NewRelicLogsConfig {
         Ok(HttpSinkConfig {
             uri: uri.into(),
             method: Some(HttpMethod::Post),
-            healthcheck_uri: None,
             auth: None,
             headers: Some(headers),
             compression: self.compression,
@@ -202,7 +201,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri),
+            format!("{}", http_config.uri.uri),
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -230,7 +229,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri),
+            format!("{}", http_config.uri.uri),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
@@ -265,7 +264,7 @@ mod tests {
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
-            format!("{}", http_config.uri),
+            format!("{}", http_config.uri.uri),
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));

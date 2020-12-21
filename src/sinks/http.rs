@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
@@ -43,7 +43,6 @@ enum BuildError {
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
-    pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     #[serde(default)]
@@ -61,7 +60,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
     HttpSinkConfig {
         uri: Default::default(),
         method: Default::default(),
-        healthcheck_uri: Default::default(),
         auth: Default::default(),
         headers: Default::default(),
         compression: Default::default(),
@@ -119,12 +117,22 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
-        let mut config = self.clone();
-        config.uri = build_uri(config.uri.clone()).into();
+        let healthcheck = match cx.healthcheck.uri.clone() {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
+
+        let config = HttpSinkConfig {
+            auth: self.auth.choose_one(&self.uri.auth)?,
+            uri: self.uri.with_default_parts(),
+            ..self.clone()
+        };
+        validate_headers(&config.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -137,20 +145,14 @@ impl SinkConfig for HttpSinkConfig {
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
-            client.clone(),
+            client,
             cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
         let sink = super::VectorSink::Sink(Box::new(sink));
 
-        match self.healthcheck_uri.clone() {
-            Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client).boxed();
-                Ok((sink, healthcheck))
-            }
-            None => Ok((sink, future::ok(()).boxed())),
-        }
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -212,7 +214,7 @@ impl HttpSink for HttpSinkConfig {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
         };
-        let uri: Uri = self.uri.clone().into();
+        let uri: Uri = self.uri.uri.clone();
 
         let ct = match self.encoding.codec() {
             Encoding::Text => "text/plain",
@@ -259,8 +261,9 @@ impl HttpSink for HttpSinkConfig {
 }
 
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
-    let uri = build_uri(uri);
-    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
+    let auth = auth.choose_one(&uri.auth)?;
+    let uri = uri.with_default_parts();
+    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -292,16 +295,6 @@ fn validate_headers(
         }
     }
     Ok(())
-}
-
-fn build_uri(base: UriSerde) -> Uri {
-    let base: Uri = base.into();
-    Uri::builder()
-        .scheme(base.scheme_str().unwrap_or("http"))
-        .authority(base.authority().map(|a| a.as_str()).unwrap_or("127.0.0.1"))
-        .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
-        .build()
-        .expect("bug building uri")
 }
 
 #[cfg(test)]

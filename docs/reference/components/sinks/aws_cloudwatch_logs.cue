@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_cloudwatch_logs: components._aws & {
-	title:       "AWS Cloudwatch Logs"
-	description: sinks._aws_cloudwatch.description
+	title: "AWS Cloudwatch Logs"
 
 	classes: {
 		commonly_used: true
@@ -49,7 +48,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			}
 			tls: enabled: false
 			to: {
-				service: services.aws_cloudwatch
+				service: services.aws_cloudwatch_logs
 
 				interface: {
 					socket: {
@@ -116,6 +115,34 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "logs"
+
+			policies: [
+				{
+					_action:       "CreateLogGroup"
+					required_when: "[`create_missing_group`](#create_missing_group) is set to `true`"
+				},
+				{
+					_action:       "CreateLogStream"
+					required_when: "[`create_missing_stream`](#create_missing_stream) is set to `true`"
+				},
+				{
+					_action: "DescribeLogGroups"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "DescribeLogStreams"
+				},
+				{
+					_action: "PutLogEvents"
+				},
+			]
+		},
+	]
 
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total

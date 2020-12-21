@@ -3,6 +3,10 @@ package metadata
 components: transforms: filter: {
 	title: "Filter"
 
+	description: """
+		Filters events based on a set of conditions.
+		"""
+
 	classes: {
 		commonly_used: true
 		development:   "stable"
@@ -24,13 +28,13 @@ components: transforms: filter: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [transforms.add_fields.support.warnings[0]]
 		notices: []
 	}
 
 	configuration: {
 		condition: {
-			description: "The set of logical conditions to be matched against every input event. Only messages that pass all conditions will be forwarded."
+			description: "The condition to be matched against every input event. Only messages that pass the condition will be forwarded."
 			required:    true
 			warnings: []
 			type: object: configuration._conditions
@@ -38,15 +42,29 @@ components: transforms: filter: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+	}
+
+	telemetry: metrics: {
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
 
 	examples: [
 		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: "level.neq": "debug"
+				condition: {
+					type:   "remap"
+					source: '.level == "debug"'
+				}
 			}
 			input: [
 				{log: {

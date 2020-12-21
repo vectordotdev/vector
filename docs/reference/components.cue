@@ -126,6 +126,10 @@ components: {
 		// For example, the `http` sink has a `HTTP` title.
 		title: string
 
+		// Platform-specific policies, e.g. AWS IAM policies, that are
+		// required or recommended when using the component.
+		permissions?: iam: [#IAM, ...#IAM]
+
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
 	}
@@ -377,12 +381,12 @@ components: {
 	})
 
 	#MetricInput: {
-		counter:      bool
-		distribution: bool
-		gauge:        bool
-		histogram:    bool
-		summary:      bool
-		set:          bool
+		counter:      *false | bool
+		distribution: *false | bool
+		gauge:        *false | bool
+		histogram:    *false | bool
+		set:          *false | bool
+		summary:      *false | bool
 	}
 
 	#MetricOutput: [Name=string]: close({
@@ -397,6 +401,33 @@ components: {
 	#Output: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#IAM: {
+		#Policy: {
+			#RequiredFor: "write" | "healthcheck"
+
+			_action:        !=""
+			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			docs_url:       !=""
+			required_when?: !=""
+
+			if platform == "aws" {
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
+				action:   "\(_service):\(_action)"
+			}
+			if platform == "gcp" {
+				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
+				action:   "\(_service).\(_action)"
+			}
+		}
+
+		platform: "aws" | "gcp"
+		policies: [#Policy, ...#Policy]
+		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
+		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
+		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
+		_docs_tag: *_service | !=""
 	}
 
 	#Runtime: {
@@ -813,7 +844,7 @@ components: {
 					:------|:------------|:-------
 					`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
 					`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
-					`%FT%T` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+					`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
 					`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
 					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
 					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
@@ -858,8 +889,9 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum:
+				"type": string: enum: #Enum | *{
 					"\(Name)": "The type of this component."
+				}
 			}
 		}
 

@@ -10,6 +10,7 @@ mod block;
 pub(crate) mod function;
 mod if_statement;
 mod literal;
+mod map;
 mod noop;
 mod not;
 pub(crate) mod path;
@@ -23,6 +24,7 @@ pub use block::Block;
 pub use function::Function;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
+pub use map::Map;
 pub use noop::Noop;
 pub use not::Not;
 pub use path::Path;
@@ -53,7 +55,16 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + fmt::Debug + dyn_clone::DynClone {
+    /// Resolve an expression to a concrete [`Value`].
+    ///
+    /// This method is executed at runtime.
+    ///
+    /// An expression is allowed to fail, which aborts the running program.
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
+
+    /// Resolve an expression to its [`TypeDef`] type definition.
+    ///
+    /// This method is executed at compile-time.
     fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
@@ -149,7 +160,8 @@ expression_dispatch![
     Block,
     Function,
     IfStatement,
-    Literal,
+    Literal, // TODO: literal scalar
+    Map,
     Noop,
     Not,
     Path,
@@ -162,6 +174,7 @@ impl<T: Into<Value>> From<T> for Expr {
 
         match value {
             Value::Array(array) => Array::from(array).into(),
+            Value::Map(map) => Map::from(map).into(),
             _ => Literal::from(value).into(),
         }
     }

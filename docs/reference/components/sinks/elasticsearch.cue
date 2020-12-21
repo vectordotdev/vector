@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: elasticsearch: {
-	title:       "Elasticsearch"
-	description: "[Elasticsearch](\(urls.elasticsearch)) is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch."
+	title: "Elasticsearch"
 
 	classes: {
 		commonly_used: true
@@ -77,7 +76,11 @@ components: sinks: elasticsearch: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			#"""
+				Elasticsearch's Data streams feature requires Vector to be configured with the `create` `bulk_action`. *This is not enabled by default.*
+				"""#,
+		]
 		warnings: []
 		notices: []
 	}
@@ -150,6 +153,16 @@ components: sinks: elasticsearch: {
 						}
 					}
 				}
+			}
+		}
+		bulk_action: {
+			common:      false
+			description: "Action to use when making requests to the [Elasticsearch Bulk API](elasticsearch_bulk). Supports `index` and `create`."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "index"
+				examples: ["index", "create"]
 			}
 		}
 		doc_type: {
@@ -237,9 +250,19 @@ components: sinks: elasticsearch: {
 			title: "Conflicts"
 			body: """
 				Vector [batches](#buffers--batches) data flushes it to Elasticsearch's
-				[`_bulk` API endpoint][urls.elasticsearch_bulk]. All events are inserted
-				via the `index` action. In the case of an conflict, such as a document with the
-				same `id`, Vector will add or _replace_ the document as necessary.
+				[`_bulk` API endpoint][urls.elasticsearch_bulk]. By default, all events are
+				inserted via the `index` action which will update documents if an existing
+				one has the same `id`. If `bulk_action` is configured with `create`, Elasticsearch
+				will _not_ replace an existing document and instead return a conflict error.
+				"""
+		}
+
+		data_streams: {
+			title: "Data streams"
+			body: """
+				By default, Vector will use the `index` action with Elasticsearch's Bulk API.
+				To use [Data streams][urls.elasticsearch_data_streams], `bulk_action` must be configured
+				with the `create` option.
 				"""
 		}
 
