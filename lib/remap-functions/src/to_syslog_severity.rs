@@ -1,9 +1,9 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ToSeverity;
+pub struct ToSyslogSeverity;
 
-impl Function for ToSeverity {
+impl Function for ToSyslogSeverity {
     fn identifier(&self) -> &'static str {
         "to_severity"
     }
@@ -24,11 +24,11 @@ impl Function for ToSeverity {
 }
 
 #[derive(Debug, Clone)]
-struct ToSeverityFn {
+struct ToSyslogSeverityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSeverityFn {
+impl Expression for ToSyslogSeverityFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let level_bytes = self.value.execute(state, object)?.try_bytes()?;
 
@@ -70,14 +70,14 @@ mod tests {
 
     test_type_def![
         value_string_infallible {
-            expr: |_| ToSeverityFn {
+            expr: |_| ToSyslogSeverityFn {
                 value: Literal::from("warning").boxed(),
             },
             def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
         }
 
         value_not_string_fallible {
-            expr: |_| ToSeverityFn {
+            expr: |_| ToSyslogSeverityFn {
                 value: Literal::from(27).boxed(),
             },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
@@ -85,7 +85,7 @@ mod tests {
     ];
 
     test_function![
-        to_level => ToSeverity;
+        to_level => ToSyslogSeverity;
 
         emergency {
             args: func_args![value: value!("emerg")],

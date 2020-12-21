@@ -1,9 +1,9 @@
 package metadata
 
-remap: functions: to_severity: {
+remap: functions: to_syslog_severity: {
 	arguments: [
 		{
-			name:        "level"
+			name:        "value"
 			description: "The Syslog level keyword to convert."
 			required:    true
 			type: ["string"]
