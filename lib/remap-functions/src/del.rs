@@ -25,20 +25,31 @@ impl Function for Del {
 
 #[derive(Debug, Clone)]
 pub struct DelFn {
-    path: Path,
+    field: Path,
 }
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        object.remove(self.path.as_ref(), false)?;
-
-        Ok(Value::Null)
+        match object.remove_and_get(self.field.as_ref(), false) {
+            Ok(Some(val)) => Ok(val),
+            _ => Ok(Value::Null),
+        }
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
         TypeDef {
-            fallible: true,
-            kind: value::Kind::Null,
+            fallible: false,
+            kind: Kind::Bytes
+                | Kind::Integer
+                | Kind::Float
+                | Kind::Boolean
+                | Kind::Map
+                | Kind::Array
+                | Kind::Timestamp
+                | Kind::Regex
+                | Kind::Null,
             ..Default::default()
         }
     }
@@ -50,10 +61,10 @@ mod tests {
 
     test_type_def![static_type_def {
         expr: |_| DelFn {
-            paths: vec![Path::from("foo")]
+            field: Path::from("foo"),
         },
         def: TypeDef {
-            fallible: true,
+            fallible: false,
             kind: value::Kind::Null,
             ..Default::default()
         },
