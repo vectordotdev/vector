@@ -203,13 +203,12 @@ impl Batch for MetricBuffer {
                     }
                 }
                 (MetricKind::Absolute, _) => {
-                    let new = MetricEntry(item);
-                    self.metrics.replace(new);
+                    self.metrics.replace(MetricEntry(item));
                 }
                 _ => {
-                    let new = MetricEntry(item.clone());
+                    let new = MetricEntry(item);
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
+                        existing.add(&new);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         self.metrics.insert(new);
