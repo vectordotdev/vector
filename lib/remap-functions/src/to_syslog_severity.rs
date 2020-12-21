@@ -5,7 +5,7 @@ pub struct ToSyslogSeverity;
 
 impl Function for ToSyslogSeverity {
     fn identifier(&self) -> &'static str {
-        "to_severity"
+        "to_syslog_severity"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
