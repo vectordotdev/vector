@@ -2,7 +2,7 @@ use crate::{
     conditions::{CheckFieldsConfig, Condition, ConditionConfig},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, LookupBuf},
-    internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
+    internal_events::SamplerEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -82,8 +82,6 @@ impl Sampler {
 
 impl FunctionTransform for Sampler {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(SamplerEventProcessed);
-
         if let Some(condition) = self.exclude.as_ref() {
             if condition.check(&event) {
                 output.push(event);

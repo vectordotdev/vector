@@ -3,6 +3,10 @@ package metadata
 components: transforms: rename_fields: {
 	title: "Rename Fields"
 
+	description: """
+		Renames one or more log fields.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -24,7 +28,14 @@ components: transforms: rename_fields: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new
+			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
+			transform provides a simple syntax for robust data transformation.
+			Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

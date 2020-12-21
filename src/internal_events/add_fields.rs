@@ -3,15 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct AddFieldsEventProcessed;
-
-impl InternalEvent for AddFieldsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct AddFieldsTemplateRenderingError<'a> {
     pub field: &'a LookupBuf,
 }

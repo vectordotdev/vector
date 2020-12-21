@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, LookupBuf},
-    internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
+    internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -62,8 +62,6 @@ impl RemoveFields {
 
 impl FunctionTransform for RemoveFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RemoveFieldsEventProcessed);
-
         let log = event.as_mut_log();
         for field in &self.fields {
             let old_val = log.remove(field, self.drop_empty);

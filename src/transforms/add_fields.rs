@@ -4,8 +4,7 @@ use crate::{
     event::LookupBuf,
     event::{Event, Value},
     internal_events::{
-        AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
-        AddFieldsTemplateRenderingError,
+        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, AddFieldsTemplateRenderingError,
     },
     template::Template,
     transforms::{FunctionTransform, Transform},
@@ -105,8 +104,6 @@ impl AddFields {
 
 impl FunctionTransform for AddFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(AddFieldsEventProcessed);
-
         for (key, value_or_template) in self.fields.clone() {
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {

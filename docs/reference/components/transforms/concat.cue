@@ -3,6 +3,10 @@ package metadata
 components: transforms: concat: {
 	title: "Concat"
 
+	description: """
+		Slices log string fields and joins them into a single field.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -24,7 +28,7 @@ components: transforms: concat: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [transforms.add_fields.support.warnings[0]]
 		notices: []
 	}
 

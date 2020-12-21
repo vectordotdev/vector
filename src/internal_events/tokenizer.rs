@@ -3,15 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct TokenizerEventProcessed;
-
-impl InternalEvent for TokenizerEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct TokenizerFieldMissing<'a> {
     pub field: &'a LookupBuf,
 }

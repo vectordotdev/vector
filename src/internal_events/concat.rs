@@ -3,15 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ConcatEventProcessed;
-
-impl InternalEvent for ConcatEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
     pub source: &'a LookupBuf,
     pub condition: &'a str,

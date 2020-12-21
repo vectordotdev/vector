@@ -1,15 +1,5 @@
 use super::InternalEvent;
 use crate::event::LookupBuf;
-use metrics::counter;
-
-#[derive(Debug)]
-pub struct RemoveFieldsEventProcessed;
-
-impl InternalEvent for RemoveFieldsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
 
 #[derive(Debug)]
 pub struct RemoveFieldsFieldMissing<'a> {

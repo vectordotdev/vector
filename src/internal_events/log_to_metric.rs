@@ -3,18 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 use std::num::ParseFloatError;
 
-pub(crate) struct LogToMetricEventProcessed;
-
-impl InternalEvent for LogToMetricEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
 pub(crate) struct LogToMetricFieldNotFound<'a> {
     pub field: &'a LookupBuf,
 }

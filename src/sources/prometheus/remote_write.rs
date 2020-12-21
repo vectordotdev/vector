@@ -115,10 +115,9 @@ impl HttpSource for RemoteWriteSource {
         _header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let byte_size = body.len();
         let result = self.decode_body(body)?;
         let count = result.len();
-        emit!(PrometheusRemoteWriteReceived { byte_size, count });
+        emit!(PrometheusRemoteWriteReceived { count });
         Ok(result)
     }
 }

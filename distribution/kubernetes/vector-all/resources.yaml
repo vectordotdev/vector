@@ -63,6 +63,9 @@ data:
       type = "vector"
       inputs = ["kubernetes_logs"]
       address = "vector-aggregator:9000"
+    # Capture the metrics from the host.
+    [sources.host_metrics]
+      type = "host_metrics"
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
@@ -70,7 +73,7 @@ data:
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       type = "prometheus"
-      inputs = ["internal_metrics"]
+      inputs = ["internal_metrics","host_metrics"]
       address = "0.0.0.0:9090"
 ---
 # Source: vector/charts/vector-aggregator/templates/configmap.yaml
@@ -247,6 +250,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: PROCFS_ROOT
+              value: /host/proc
+            - name: SYSFS_ROOT
+              value: /host/sys
             
             - name: "LOG"
               value: "info"
@@ -271,6 +278,14 @@ spec:
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
+              readOnly: true
+            # Host procsfs mount.
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            # Host sysfs mount.
+            - name: sysfs
+              mountPath: /host/sys
               readOnly: true
       terminationGracePeriodSeconds: 60
       tolerations:
@@ -301,6 +316,14 @@ spec:
               - secret:
                   name: vector-agent-config
                   optional: true
+        # Host procsfs.
+        - name: procfs
+          hostPath:
+            path: /proc
+        # Host sysfs.
+        - name: sysfs
+          hostPath:
+            path: /sys
 ---
 # Source: vector/charts/vector-aggregator/templates/statefulset.yaml
 apiVersion: apps/v1

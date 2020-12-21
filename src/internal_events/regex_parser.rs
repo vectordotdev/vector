@@ -3,19 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct RegexParserEventProcessed;
-
-impl InternalEvent for RegexParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct RegexParserFailedMatch<'a> {
     pub value: &'a [u8],
 }

@@ -3,8 +3,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{Event, LogEvent, LookupBuf},
     internal_events::{
-        LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
-        LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
+        LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
     transforms::{FunctionTransform, Transform},
@@ -353,7 +353,6 @@ impl FunctionTransform for LogToMetric {
         for config in self.config.metrics.iter() {
             match to_metric(&config, &event) {
                 Ok(metric) => {
-                    emit!(LogToMetricEventProcessed);
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => {

@@ -3,15 +3,6 @@ use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct SplitEventProcessed;
-
-impl InternalEvent for SplitEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
     pub field: &'a LookupBuf,
 }

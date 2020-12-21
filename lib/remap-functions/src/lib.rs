@@ -24,6 +24,8 @@ mod floor;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "includes")]
+mod includes;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
 #[cfg(feature = "ip_subnet")]
@@ -42,8 +44,14 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
+#[cfg(feature = "ok")]
+mod ok;
 #[cfg(feature = "only_fields")]
 mod only_fields;
+#[cfg(feature = "parse_aws_alb_log")]
+mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_vpc_flow_log")]
+mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
 #[cfg(feature = "parse_grok")]
@@ -127,6 +135,8 @@ pub use floor::Floor;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "includes")]
+pub use includes::Includes;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_subnet")]
@@ -141,8 +151,14 @@ pub use log::Log;
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
+#[cfg(feature = "ok")]
+pub use ok::OK;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
+#[cfg(feature = "parse_aws_alb_log")]
+pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_vpc_flow_log")]
+pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
 #[cfg(feature = "parse_grok")]
@@ -226,6 +242,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "includes")]
+        Box::new(Includes),
         #[cfg(feature = "ip_cidr_contains")]
         Box::new(IpCidrContains),
         #[cfg(feature = "ip_subnet")]
@@ -240,8 +258,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
+        #[cfg(feature = "ok")]
+        Box::new(OK),
         #[cfg(feature = "only_fields")]
         Box::new(OnlyFields),
+        #[cfg(feature = "parse_aws_alb_log")]
+        Box::new(ParseAwsAlbLog),
+        #[cfg(feature = "parse_aws_vpc_flow_log")]
+        Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
         #[cfg(feature = "parse_grok")]

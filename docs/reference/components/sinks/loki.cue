@@ -135,7 +135,8 @@ components: sinks: loki: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["some_tenant_id"]
+				examples: ["some_tenant_id", "{{ event_field }}"]
+				templateable: true
 			}
 		}
 	}
