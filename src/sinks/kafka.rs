@@ -165,7 +165,12 @@ impl KafkaSinkConfig {
                                     The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
                                     Please delete one.", key, value, val).into());
                 }
-                debug!(librdkafka_option = key, batch_option = "timeout_secs", value, "Applying batch option as librdkafka option.");
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "timeout_secs",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
                 client_config.set(key, &(value * 1000).to_string());
             }
             if let Some(value) = self.batch.max_events {
@@ -178,7 +183,12 @@ impl KafkaSinkConfig {
                                     The config already sets this as `librdkafka_options.batch.num.messages={}`.\
                                     Please delete one.", key, value, val).into());
                 }
-                debug!(librdkafka_option = key, batch_option = "max_events", value, "Applying batch option as librdkafka option.");
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "max_events",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
                 client_config.set(key, &value.to_string());
             }
             if let Some(value) = self.batch.max_bytes {
@@ -194,7 +204,12 @@ impl KafkaSinkConfig {
                                     The config already sets this as `librdkafka_options.batch.size={}`.\
                                     Please delete one.", key, value, val).into());
                 }
-                debug!(librdkafka_option = key, batch_option = "max_bytes", value, "Applying batch option as librdkafka option.");
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "max_bytes",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
                 client_config.set(key, &value.to_string());
             }
         }
@@ -585,7 +600,8 @@ mod integration_test {
             }
             .into_iter()
             .collect()
-        ).await
+        )
+        .await
         .is_err())
     }
 
@@ -599,8 +615,10 @@ mod integration_test {
                 max_size: None,
                 timeout_secs: Some(2),
             },
-            indexmap::indexmap! {}.into_iter().collect()
-        ).await.unwrap();
+            indexmap::indexmap! {}.into_iter().collect(),
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -618,7 +636,8 @@ mod integration_test {
             }
             .into_iter()
             .collect()
-        ).await
+        )
+        .await
         .is_err())
     }
 
@@ -637,7 +656,8 @@ mod integration_test {
             }
             .into_iter()
             .collect()
-        ).await
+        )
+        .await
         .is_err())
     }
 
