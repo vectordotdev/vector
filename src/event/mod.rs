@@ -1,8 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use crate::config::log_schema;
-use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use std::collections::{BTreeMap, HashMap};
+use chrono::{TimeZone};
+use std::collections::{BTreeMap};
 
 pub mod discriminant;
 #[cfg(test)]

@@ -13,6 +13,7 @@ use std::{
     iter::FromIterator,
 };
 use tracing::{error, instrument, trace, trace_span};
+use std::str::FromStr;
 
 /// A map of [`crate::event::Value`].
 ///
@@ -627,6 +628,48 @@ impl LogEvent {
         &mut self.fields
     }
 }
+
+impl remap_lang::Object for LogEvent {
+    fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
+        let val = self.get(&LookupBuf::try_from(path).map_err(|e| format!("{}", e))?);
+        // TODO: This does not need to clone.
+        Ok(val.map(Clone::clone).map(Into::into))
+    }
+
+    fn remove(&mut self, path: &remap_lang::Path, compact: bool) -> Result<(), String> {
+        let _val = self.remove(
+            &LookupBuf::try_from(path)
+                // TODO: We should not degrade the error to a string here.
+                .map_err(|e| format!("{}", e))?,
+            compact,
+        );
+        // TODO: Why does this not return?
+        Ok(())
+    }
+
+    fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
+        let _val = self.insert(
+            LookupBuf::try_from(path)
+                // TODO: We should not degrade the error to a string here.
+                .map_err(|e| format!("{}", e))?,
+            value,
+        );
+        // TODO: Why does this not return?
+        Ok(())
+    }
+
+    fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
+        self
+            .keys(true)
+            .map(|v| {
+                remap_lang::Path::from_str(v.to_string().as_str())
+                    // TODO: We should not degrade the error to a string here.
+                    .map_err(|v| format!("{:?}", v))
+            })
+            .collect()
+    }
+}
+
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {

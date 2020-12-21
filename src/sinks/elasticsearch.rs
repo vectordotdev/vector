@@ -586,9 +586,12 @@ mod tests {
         };
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
-        let mut event = Event::from("hello there");
+        let mut event = shared::log_event! {
+            log_schema().message_key().clone() => "hello there".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         event.as_mut_log().insert(
-            log_schema().timestamp_key(),
+            log_schema().timestamp_key().clone(),
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
         let encoded = es.encode_event(event).unwrap();

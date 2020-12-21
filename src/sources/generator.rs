@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, log_schema, SourceConfig, SourceDescription},
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
@@ -58,7 +58,10 @@ impl OutputFormat {
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
         };
-        Event::from(line)
+        shared::log_event! {
+            log_schema().message_key().clone() => line,
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        }
     }
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
