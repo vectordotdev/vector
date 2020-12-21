@@ -55,7 +55,7 @@ impl FileSourceMetrics {
                 _ => None,
             })
             .fold(BTreeMap::new(), |mut map, (file, m)| {
-                map.entry(file).or_insert_with(|| Vec::new()).push(m);
+                map.entry(file).or_insert_with(Vec::new).push(m);
                 map
             })
             .into_iter()

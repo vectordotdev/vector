@@ -58,9 +58,9 @@ impl MetricsFilter for Vec<Metric> {
 impl<'a> MetricsFilter for Vec<&'a Metric> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
         let sum = sum_metrics(
-            self.into_iter()
+            self.iter()
                 .filter(|m| m.name.as_str().eq("processed_events_total"))
-                .map(|m| *m),
+                .copied(),
         )?;
 
         Some(ProcessedEventsTotal::new(sum))
@@ -68,9 +68,9 @@ impl<'a> MetricsFilter for Vec<&'a Metric> {
 
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal> {
         let sum = sum_metrics(
-            self.into_iter()
+            self.iter()
                 .filter(|m| m.name.as_str().eq("processed_bytes_total"))
-                .map(|m| *m),
+                .copied(),
         )?;
 
         Some(ProcessedBytesTotal::new(sum))
