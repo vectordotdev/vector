@@ -28,15 +28,27 @@ license-files = [
 [advisories]
 ignore = [
     # `net2` crate has been deprecated; use `socket2` instead
+    # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
-    # failure: failure is officially deprecated/unmaintained
+
+    # Type confusion if __private_get_type_id__ is overriden
+    # https://github.com/timberio/vector/issues/5583
+    "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
+
+    # dirs is unmaintained, use dirs-next instead
+    # https://github.com/timberio/vector/issues/5584
+    "RUSTSEC-2020-0053",
+
     # stdweb is unmaintained
-    # can be removed after next release of time
-    # https://github.com/time-rs/time/commit/8b2734351a5cd05a9bd3315f1af76c28b5852fec
+    # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
-    # ordered_flat - can be removed when heim next releases their beta branch
-    "RUSTSEC-2020-0082",
-    # lucet-runtime-internals - we'll need to upgrade here
-    "RUSTSEC-2020-0004",
+
+    # Some lock_api lock guard objects can cause data races
+    # https://github.com/timberio/vector/issues/5587
+    "RUSTSEC-2020-0070",
+
+    # GenericMutexGuard allows data races of non-Sync types across threads
+    # https://github.com/timberio/vector/issues/5586
+    "RUSTSEC-2020-0072",
 ]

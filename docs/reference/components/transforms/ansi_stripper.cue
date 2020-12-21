@@ -3,6 +3,10 @@ package metadata
 components: transforms: ansi_stripper: {
 	title: "ANSI Stripper"
 
+	description: """
+		Strips [ANSI escape sequences](\(urls.ansi_escape_codes)).
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -24,7 +28,7 @@ components: transforms: ansi_stripper: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [transforms.add_fields.support.warnings[0]]
 		notices: []
 	}
 

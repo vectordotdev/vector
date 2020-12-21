@@ -84,8 +84,6 @@ mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
@@ -108,6 +106,7 @@ mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod topology;
 mod udp;
 mod unix;
 mod vector;
@@ -202,8 +201,6 @@ pub(crate) use self::regex_parser::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
-#[cfg(feature = "transforms-remove_tags")]
-pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
@@ -226,6 +223,7 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;

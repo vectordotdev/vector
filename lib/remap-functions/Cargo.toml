@@ -15,6 +15,7 @@ grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
+nom = { version = "6.0.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -23,7 +24,7 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.5", optional = true }
+syslog_loose = { version = "0.7", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
@@ -46,6 +47,7 @@ default = [
     "floor",
     "format_number",
     "format_timestamp",
+    "includes",
     "ip_cidr_contains",
     "ip_subnet",
     "ip_to_ipv6",
@@ -57,6 +59,8 @@ default = [
     "now",
     "ok",
     "only_fields",
+    "parse_aws_alb_log",
+    "parse_aws_vpc_flow_log",
     "parse_duration",
     "parse_grok",
     "parse_json",
@@ -97,6 +101,7 @@ flatten = []
 floor = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+includes = []
 ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
@@ -108,6 +113,8 @@ merge = []
 now = []
 ok = []
 only_fields = []
+parse_aws_alb_log = ["nom"]
+parse_aws_vpc_flow_log = []
 parse_duration = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]

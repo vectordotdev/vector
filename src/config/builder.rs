@@ -59,12 +59,7 @@ impl ConfigBuilder {
         sink: S,
     ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
-        let sink = SinkOuter {
-            buffer: Default::default(),
-            healthcheck: true,
-            inner: Box::new(sink),
-            inputs,
-        };
+        let sink = SinkOuter::new(inputs, Box::new(sink));
 
         self.sinks.insert(name.into(), sink);
     }

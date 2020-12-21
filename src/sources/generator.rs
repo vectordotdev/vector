@@ -3,34 +3,129 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
+    sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_5424_log_line},
     Pipeline,
 };
 use futures::{stream::StreamExt, SinkExt};
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct GeneratorConfig {
-    #[serde(default)]
-    sequence: bool,
-    lines: Vec<String>,
-    #[serde(default)]
-    batch_interval: Option<f64>,
+    #[serde(alias = "batch_interval")]
+    interval: Option<f64>,
     #[serde(default = "usize::max_value")]
     count: usize,
+    #[serde(flatten)]
+    format: OutputFormat,
+}
+
+#[derive(Debug, PartialEq, Snafu)]
+pub enum GeneratorConfigError {
+    #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
+    ShuffleGeneratorItemsEmpty,
+}
+
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(tag = "format", rename_all = "snake_case")]
+pub enum OutputFormat {
+    #[derivative(Default)]
+    Shuffle {
+        #[serde(default)]
+        sequence: bool,
+        lines: Vec<String>,
+    },
+    ApacheCommon,
+    ApacheError,
+    #[serde(alias = "rfc5424")]
+    Syslog,
+}
+
+impl OutputFormat {
+    fn generate_event(&self, n: usize) -> Event {
+        emit!(GeneratorEventProcessed);
+
+        let line = match self {
+            Self::Shuffle {
+                sequence,
+                ref lines,
+            } => Self::shuffle_generate(*sequence, lines, n),
+            Self::ApacheCommon => apache_common_log_line(),
+            Self::ApacheError => apache_error_log_line(),
+            Self::Syslog => syslog_5424_log_line(),
+        };
+        Event::from(line)
+    }
+
+    fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
+        // unwrap can be called here because lines cannot be empty
+        let line = lines.choose(&mut rand::thread_rng()).unwrap();
+
+        if sequence {
+            format!("{} {}", n, line)
+        } else {
+            line.into()
+        }
+    }
+
+    // Ensures that the lines list is non-empty if Shuffle is chosen
+    pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
+        match self {
+            Self::Shuffle { lines, .. } => {
+                if lines.is_empty() {
+                    Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
 }
 
 impl GeneratorConfig {
+    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
+        Box::pin(self.inner(shutdown, out))
+    }
+
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
         Self {
-            lines,
             count,
-            batch_interval,
-            ..Self::default()
+            interval,
+            format: OutputFormat::Shuffle {
+                lines,
+                sequence: false,
+            },
         }
+    }
+
+    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
+        let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
+
+        for n in 0..self.count {
+            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
+                break;
+            }
+
+            if let Some(interval) = &mut interval {
+                interval.next().await;
+            }
+
+            let event = self.format.generate_event(n);
+
+            out.send(event)
+                .await
+                .map_err(|_: crate::pipeline::ClosedError| {
+                    error!(message = "Failed to forward events; downstream is closed.");
+                })?;
+        }
+
+        Ok(())
     }
 }
 
@@ -50,6 +145,7 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        self.format.validate()?;
         Ok(self.clone().generator(shutdown, out))
     }
 
@@ -59,52 +155,6 @@ impl SourceConfig for GeneratorConfig {
 
     fn source_type(&self) -> &'static str {
         "generator"
-    }
-}
-
-impl GeneratorConfig {
-    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-        Box::pin(self.inner(shutdown, out))
-    }
-
-    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
-        let mut batch_interval = self
-            .batch_interval
-            .map(|i| interval(Duration::from_secs_f64(i)));
-        let mut number: usize = 0;
-
-        for _ in 0..self.count {
-            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-                break;
-            }
-
-            if let Some(batch_interval) = &mut batch_interval {
-                batch_interval.next().await;
-            }
-
-            let events = self
-                .lines
-                .iter()
-                .map(|line| {
-                    emit!(GeneratorEventProcessed);
-
-                    if self.sequence {
-                        number += 1;
-                        Event::from(&format!("{} {}", number, line)[..])
-                    } else {
-                        Event::from(&line[..])
-                    }
-                })
-                .map(Ok)
-                .collect::<Vec<Result<Event, _>>>();
-
-            out.send_all(&mut futures::stream::iter(events))
-                .await
-                .map_err(|_: crate::pipeline::ClosedError| {
-                    error!(message = "Failed to forward events; downstream is closed.");
-                })?;
-        }
-        Ok(())
     }
 }
 
@@ -127,74 +177,141 @@ mod tests {
         rx
     }
 
-    #[tokio::test]
-    async fn copies_lines() {
-        let message_key = log_schema().message_key();
-        let mut rx = runit(
-            r#"lines = ["one", "two"]
-               count = 1"#,
-        )
-        .await;
+    #[test]
+    fn config_shuffle_lines_not_empty() {
+        let empty_lines: Vec<String> = Vec::new();
 
-        for line in &["one", "two"] {
-            let event = rx.try_recv().unwrap();
-            let log = event.as_log();
-            let message = log[&message_key].to_string_lossy();
-            assert_eq!(message, *line);
-        }
+        let errant_config = GeneratorConfig {
+            format: OutputFormat::Shuffle {
+                sequence: false,
+                lines: empty_lines,
+            },
+            ..GeneratorConfig::default()
+        };
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(
+            errant_config.format.validate(),
+            Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
+        );
     }
 
     #[tokio::test]
-    async fn limits_count() {
+    async fn shuffle_generator_copies_lines() {
+        let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"lines = ["one", "two"]
+            r#"format = "shuffle"
+               lines = ["one", "two", "three", "four"]
                count = 5"#,
         )
         .await;
 
-        for _ in 0..10 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
-        }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
-    }
+        let lines = &["one", "two", "three", "four"];
 
-    #[tokio::test]
-    async fn adds_sequence() {
-        let message_key = log_schema().message_key();
-        let mut rx = runit(
-            r#"lines = ["one", "two"]
-               count = 2
-               sequence = true"#,
-        )
-        .await;
-
-        for line in &["1 one", "2 two", "3 one", "4 two"] {
+        for _ in 0..5 {
             let event = rx.try_recv().unwrap();
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
-            assert_eq!(message, *line);
+            assert!(lines.contains(&&*message));
         }
 
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
-    async fn obeys_batch_interval() {
-        let start = Instant::now();
+    async fn shuffle_generator_limits_count() {
         let mut rx = runit(
-            r#"lines = ["one", "two"]
-               count = 3
-               batch_interval = 1.0"#,
+            r#"format = "shuffle"
+               lines = ["one", "two"]
+               count = 5"#,
         )
         .await;
 
-        for _ in 0..6 {
+        for _ in 0..5 {
             assert!(matches!(rx.try_recv(), Ok(_)));
         }
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn shuffle_generator_adds_sequence() {
+        let message_key = log_schema().message_key();
+        let mut rx = runit(
+            r#"format = "shuffle"
+               lines = ["one", "two"]
+               sequence = true
+               count = 5"#,
+        )
+        .await;
+
+        for n in 0..5 {
+            let event = rx.try_recv().unwrap();
+            let log = event.as_log();
+            let message = log[&message_key].to_string_lossy();
+            assert!(message.starts_with(&n.to_string()));
+        }
+
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn shuffle_generator_obeys_interval() {
+        let start = Instant::now();
+        let mut rx = runit(
+            r#"format = "shuffle"
+               lines = ["one", "two"]
+               count = 3
+               interval = 1.0"#,
+        )
+        .await;
+
+        for _ in 0..3 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn apache_common_generates_output() {
+        let mut rx = runit(
+            r#"format = "apache_common"
+            count = 5"#,
+        )
+        .await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn apache_error_generates_output() {
+        let mut rx = runit(
+            r#"format = "apache_error"
+            count = 5"#,
+        )
+        .await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
+
+    #[tokio::test]
+    async fn syslog_generates_output() {
+        let mut rx = runit(
+            r#"format = "syslog"
+            count = 5"#,
+        )
+        .await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 }

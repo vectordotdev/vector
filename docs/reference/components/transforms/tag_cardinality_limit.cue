@@ -3,6 +3,12 @@ package metadata
 components: transforms: tag_cardinality_limit: {
 	title: "Tag Cardinality Limit"
 
+	description: """
+		Limits the cardinality of tags on metric events, protecting against
+		accidental high cardinality usage that can commonly disrupt the stability
+		of metrics storages.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"

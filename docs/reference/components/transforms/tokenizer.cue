@@ -1,8 +1,11 @@
 package metadata
 
 components: transforms: tokenizer: {
-	title:       "Tokenizer"
-	description: "Tokenizes a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
+	title: "Tokenizer"
+	description: """
+		Tokenizes a field's value by splitting on white space, ignoring special
+		wrapping characters, and zip the tokens into ordered field names.
+		"""
 
 	classes: {
 		commonly_used: true
@@ -31,7 +34,13 @@ components: transforms: tokenizer: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new [`remap` transform's `tokenize`
+			function](\(urls.vector_remap_transform)#tokenize). The `remap` transform provides a simple
+			syntax for robust data transformation. Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

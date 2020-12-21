@@ -2,8 +2,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
-        RegexParserMissingField, RegexParserTargetExists,
+        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
+        RegexParserTargetExists,
     },
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
@@ -239,7 +239,6 @@ impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(&value).into_iter().next();

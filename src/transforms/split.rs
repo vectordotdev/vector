@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
+    internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -121,8 +121,6 @@ impl FunctionTransform for Split {
         } else {
             emit!(SplitFieldMissing { field: &self.field });
         };
-
-        emit!(SplitEventProcessed);
 
         output.push(event);
     }
