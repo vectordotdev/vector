@@ -226,46 +226,11 @@ fn encode_events(
         );
         let ts = encode_timestamp(event.timestamp);
         let tags = merge_tags(&event, tags);
-        match event.value {
-            MetricValue::Counter { value } => {
-                let fields = to_fields(value);
 
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "counter",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                )
-            }
-            MetricValue::Gauge { value } => {
-                let fields = to_fields(value);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "gauge",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::Set { values } => {
-                let fields = to_fields(values.len() as f64);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "set",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
+        let (metric_type, fields) = match event.value {
+            MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
+            MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
+            MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
             MetricValue::AggregatedHistogram {
                 buckets,
                 counts,
@@ -280,15 +245,7 @@ fn encode_events(
                 fields.insert("count".to_owned(), Field::UnsignedInt(count));
                 fields.insert("sum".to_owned(), Field::Float(sum));
 
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "histogram",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
+                ("histogram", Some(fields))
             }
             MetricValue::AggregatedSummary {
                 quantiles,
@@ -304,15 +261,7 @@ fn encode_events(
                 fields.insert("count".to_owned(), Field::UnsignedInt(count));
                 fields.insert("sum".to_owned(), Field::Float(sum));
 
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "summary",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
+                ("summary", Some(fields))
             }
             MetricValue::Distribution {
                 values,
@@ -324,18 +273,19 @@ fn encode_events(
                     StatisticKind::Summary => quantiles,
                 };
                 let fields = encode_distribution(&values, &sample_rates, quantiles);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "distribution",
-                    tags,
-                    fields,
-                    ts,
-                    &mut output,
-                );
+                ("distribution", fields)
             }
-        }
+        };
+
+        influx_line_protocol(
+            protocol_version,
+            fullname,
+            metric_type,
+            tags,
+            fields,
+            ts,
+            &mut output,
+        );
     }
 
     // remove last '\n'
