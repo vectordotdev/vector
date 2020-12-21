@@ -6,11 +6,6 @@ use crate::{
 use async_graphql::{Enum, Object};
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone)]
-pub enum SourceType {
-    File,
-}
-
-#[derive(Debug, Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
     Any,
     Log,

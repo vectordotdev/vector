@@ -1,5 +1,4 @@
 mod file;
-mod generic;
 
 use crate::event::Metric;
 use async_graphql::Union;

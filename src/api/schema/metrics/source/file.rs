@@ -20,7 +20,8 @@ pub struct FileSourceMetricFile<'a> {
 }
 
 impl<'a> FileSourceMetricFile<'a> {
-    fn new(name: String, metrics: Vec<&'a Metric>) -> Self {
+    /// Returns a new FileSourceMetricFile from a (name, Vec<&Metric>) tuple
+    fn from_tuple((name, metrics): (String, Vec<&'a Metric>)) -> Self {
         Self { name, metrics }
     }
 }
@@ -54,10 +55,13 @@ impl FileSourceMetrics {
     pub async fn files(&self) -> Vec<FileSourceMetricFile<'_>> {
         self.0
             .iter()
-            .filter(|m| m.tag_value("file").is_some())
-            .group_by(|m| m.tag_value("file").unwrap())
+            .filter_map(|m| match m.tag_value("file") {
+                Some(file) => Some((file, m)),
+                _ => None,
+            })
+            .into_group_map()
             .into_iter()
-            .map(|(file, m)| FileSourceMetricFile::new(file, m.collect()))
+            .map(FileSourceMetricFile::from_tuple)
             .collect()
     }
 }
