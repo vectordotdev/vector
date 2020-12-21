@@ -304,7 +304,7 @@ pub enum Resource {
     DiskBuffer(String),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Copy)]
 pub enum Protocol {
     Tcp,
     Udp,
@@ -331,7 +331,7 @@ impl Resource {
             for resource in resources {
                 if let Resource::Port(address, protocol) = &resource {
                     if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), address.port(), protocol.clone()));
+                        unspecified.push((key.clone(), address.port(), *protocol));
                     }
                 }
 
@@ -373,7 +373,7 @@ impl Display for Protocol {
 impl Display for Resource {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Resource::Port(address, protocol) => write!(fmt, "{}://{}", protocol, address),
+            Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Stdin => write!(fmt, "stdin"),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
