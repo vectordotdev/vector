@@ -12,7 +12,7 @@ remap: functions: encode_json: {
 		},
 	]
 	return: ["string"]
-	category: "coerce"
+	category: "encode"
 
 	description: "Returns the JSON representation of the first parameter."
 	examples: [
