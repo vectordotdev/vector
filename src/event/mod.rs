@@ -1,6 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use chrono::{TimeZone};
-use std::collections::{BTreeMap};
+use chrono::TimeZone;
+use std::collections::BTreeMap;
 
 pub mod discriminant;
 pub mod merge;

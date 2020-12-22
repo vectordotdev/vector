@@ -1,4 +1,4 @@
-use std::{fs::{File}, path::Path};
+use std::{fs::File, path::Path};
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
     let test_file = match File::open(path) {

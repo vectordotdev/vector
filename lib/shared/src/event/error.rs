@@ -4,9 +4,7 @@ pub use EventError::*;
 
 #[derive(Debug)]
 pub enum EventError {
-    PrimitiveDescent {
-        location: LookupBuf,
-    },
+    PrimitiveDescent { location: LookupBuf },
     LookupError(crate::lookup::LookupError),
     EmptyCoalesceSubSegment,
 }
@@ -14,19 +12,14 @@ pub enum EventError {
 impl fmt::Display for EventError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PrimitiveDescent { location } => write!(f,
+            PrimitiveDescent { location } => write!(
+                f,
                 "Cannot insert value nested inside primitive located at {}",
                 location,
             ),
-            LookupError(e) => write!(f,
-                 "Lookup Error: {:?}",
-                 e,
-            ),
-            EmptyCoalesceSubSegment => write!(f,
-                "Empty coalesce subsegment found."
-            )
+            LookupError(e) => write!(f, "Lookup Error: {:?}", e,),
+            EmptyCoalesceSubSegment => write!(f, "Empty coalesce subsegment found."),
         }
-
     }
 }
 

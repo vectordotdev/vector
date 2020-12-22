@@ -2,7 +2,7 @@ pub mod lua;
 #[cfg(test)]
 mod test;
 
-use crate::{lookup::*, event::*};
+use crate::{event::*, lookup::*};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -412,9 +412,9 @@ impl Value {
             | (_, Value::Bytes(_))
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
-            | (_, Value::Integer(_)) => {
-                Err(EventError::PrimitiveDescent { location: working_lookup })
-            }
+            | (_, Value::Integer(_)) => Err(EventError::PrimitiveDescent {
+                location: working_lookup,
+            }),
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -511,9 +511,7 @@ impl Value {
                                 let mut cursor_set = set;
                                 loop {
                                     match cursor_set.get(0).and_then(|v| v.get(0)) {
-                                        None => {
-                                            return Err(EventError::EmptyCoalesceSubSegment)
-                                        }
+                                        None => return Err(EventError::EmptyCoalesceSubSegment),
                                         Some(SegmentBuf::Field { .. }) => {
                                             break {
                                                 let mut inner = Value::Map(Default::default());
@@ -644,7 +642,9 @@ impl Value {
             | (_, Value::Float(_))
             | (_, Value::Integer(_))
             | (_, Value::Null) => {
-                return Err(EventError::PrimitiveDescent { location: working_lookup.into_buf() })
+                return Err(EventError::PrimitiveDescent {
+                    location: working_lookup.into_buf(),
+                })
             }
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
@@ -782,7 +782,10 @@ impl Value {
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
     #[instrument(level = "trace", skip(self, lookup))]
-    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>, EventError> {
+    pub fn get<'a>(
+        &self,
+        lookup: impl Into<Lookup<'a>> + Debug,
+    ) -> Result<Option<&Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();

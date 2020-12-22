@@ -1,5 +1,5 @@
-use std::fmt;
 use remap_lang::parser::ParserRule;
+use std::fmt;
 use std::num::ParseIntError;
 pub use LookupError::*;
 
@@ -19,10 +19,10 @@ pub enum LookupError {
 impl fmt::Display for LookupError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            WrongRule { wants, got } => write!(f,
+            WrongRule { wants, got } => write!(
+                f,
                 "Got invalid lookup rule. Got: {:?}. Want: {:?}",
-                got,
-                wants,
+                got, wants,
             ),
             MissingIndex => write!(f, "Expected array index, did not get one."),
             IndexParsing(e) => write!(f, "Array index parsing error: {:?}", e),
@@ -30,7 +30,6 @@ impl fmt::Display for LookupError {
             NoTokens => write!(f, "No tokens found to parse."),
             PestParser(e) => write!(f, "Parsing error: {:?}", e),
         }
-
     }
 }
 

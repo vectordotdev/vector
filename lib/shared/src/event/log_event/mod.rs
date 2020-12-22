@@ -6,14 +6,14 @@ mod test;
 
 use crate::{event::*, lookup::*};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
 };
-use tracing::{error, instrument, trace, trace_span};
-use std::str::FromStr;
+use tracing::{debug, error, instrument, trace, trace_span};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -134,8 +134,8 @@ impl LogEvent {
                 } else {
                     trace!(field = %name, "Descending into map.");
                     match self.fields.get(name) {
-                        Some(v) => v.get(working_lookup).unwrap_or_else(|e| {
-                            trace!(?e);
+                        Some(v) => v.get(working_lookup).unwrap_or_else(|error| {
+                            debug!("{:?}", error);
                             None
                         }),
                         None => None,
@@ -210,8 +210,8 @@ impl LogEvent {
                 } else {
                     trace!(field = %name, "Descending into map.");
                     match self.fields.get_mut(name) {
-                        Some(v) => v.get_mut(working_lookup).unwrap_or_else(|e| {
-                            trace!(?e);
+                        Some(v) => v.get_mut(working_lookup).unwrap_or_else(|error| {
+                            debug!("{:?}", error);
                             None
                         }),
                         None => None,
@@ -336,8 +336,8 @@ impl LogEvent {
                         next_value
                     })
                     .insert(working_lookup, value)
-                    .unwrap_or_else(|e| {
-                        trace!(?e);
+                    .unwrap_or_else(|error| {
+                        debug!("{:?}", error);
                         None
                     })
             }
@@ -653,15 +653,10 @@ impl remap_lang::Object for LogEvent {
         } else {
             trace!(path = %path_string, "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
-            let _val = self.remove(
-                &lookup,
-                compact,
-            );
+            let _val = self.remove(&lookup, compact);
             // TODO: Why does this not return?
             Ok(())
         }
-
-
     }
 
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
@@ -679,19 +674,14 @@ impl remap_lang::Object for LogEvent {
             trace!(path = %path_string, "Converting to LookupBuf.");
             // TODO: We should not degrade the error to a string here.
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
-            let _val = self.insert(
-                lookup,
-                value,
-            );
+            let _val = self.insert(lookup, value);
             // TODO: Why does this not return?
             Ok(())
         }
-
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        self
-            .keys(true)
+        self.keys(true)
             .map(|v| {
                 remap_lang::Path::from_str(v.to_string().as_str())
                     // TODO: We should not degrade the error to a string here.
@@ -700,7 +690,6 @@ impl remap_lang::Object for LogEvent {
             .collect()
     }
 }
-
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {

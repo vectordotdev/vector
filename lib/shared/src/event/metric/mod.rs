@@ -6,14 +6,12 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
 };
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
@@ -95,10 +93,9 @@ impl From<MetricValue> for remap_lang::Value {
             MetricValue::AggregatedHistogram { .. } => "aggregated histogram",
             MetricValue::AggregatedSummary { .. } => "aggregated summary",
         }
-            .into()
+        .into()
     }
 }
-
 
 impl TryFrom<remap_lang::Value> for MetricKind {
     type Error = String;
@@ -332,38 +329,40 @@ impl remap_lang::Object for Metric {
         }
 
         match path.segments() {
-            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)] if tags.as_str() == "tags" => {
+            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)]
+                if tags.as_str() == "tags" =>
+            {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.set_tag_value(
                     field.as_str().to_owned(),
                     String::from_utf8_lossy(&value).into_owned(),
                 );
                 Ok(())
-            },
+            }
             [remap_lang::Segment::Field(name)] if name.as_str() == "name" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.name = String::from_utf8_lossy(&value).into_owned();
                 Ok(())
-            },
+            }
             [remap_lang::Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.namespace = Some(String::from_utf8_lossy(&value).into_owned());
                 Ok(())
-            },
-                [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
+            }
+            [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 let value = value.try_timestamp().map_err(|e| e.to_string())?;
                 self.timestamp = Some(value);
                 Ok(())
-            },
-                [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => {
+            }
+            [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => {
                 self.kind = MetricKind::try_from(value)?;
                 Ok(())
-            },
+            }
             _ => Err(MetricPathError::InvalidPath {
                 path: &path.to_string(),
                 expected: VALID_METRIC_PATHS_SET,
             }
-                .to_string()),
+            .to_string()),
         }
     }
 
@@ -393,25 +392,31 @@ impl remap_lang::Object for Metric {
         }
 
         match path.segments() {
-            [remap_lang::Segment::Field(name)] if name.as_str() == "name" => Ok(Some(self.name.clone().into())),
+            [remap_lang::Segment::Field(name)] if name.as_str() == "name" => {
+                Ok(Some(self.name.clone().into()))
+            }
             [remap_lang::Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
                 Ok(self.namespace.clone().map(Into::into))
-            },
+            }
             [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 Ok(self.timestamp.map(Into::into))
-            },
-            [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
-            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)] if tags.as_str() == "tags" => {
+            }
+            [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => {
+                Ok(Some(self.kind.clone().into()))
+            }
+            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)]
+                if tags.as_str() == "tags" =>
+            {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
-            },
-                [remap_lang::Segment::Field(type_)] if type_.as_str() == "type" => {
+            }
+            [remap_lang::Segment::Field(type_)] if type_.as_str() == "type" => {
                 Ok(Some(self.value.clone().into()))
-            },
+            }
             _ => Err(MetricPathError::InvalidPath {
                 path: &path.to_string(),
                 expected: VALID_METRIC_PATHS_GET,
             }
-                .to_string()),
+            .to_string()),
         }
     }
 
@@ -427,7 +432,9 @@ impl remap_lang::Object for Metric {
         }
         if let Some(tags) = &self.tags {
             for name in tags.keys() {
-                result.push(remap_lang::Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
+                result.push(
+                    remap_lang::Path::from_str(&format!("tags.{}", name)).expect("invalid path"),
+                );
             }
         }
         result.push(remap_lang::Path::from_str("kind").expect("invalid path"));
@@ -450,7 +457,9 @@ impl remap_lang::Object for Metric {
                 self.timestamp = None;
                 Ok(())
             }
-            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)] if tags.as_str() == "tags" => {
+            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)]
+                if tags.as_str() == "tags" =>
+            {
                 self.delete_tag(field.as_str());
                 Ok(())
             }
@@ -458,7 +467,7 @@ impl remap_lang::Object for Metric {
                 path: &path.to_string(),
                 expected: VALID_METRIC_PATHS_SET,
             }
-                .to_string()),
+            .to_string()),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::{lookup::*};
+use crate::lookup::*;
 use pest::iterators::Pair;
 use remap_lang::parser::ParserRule;
 use std::{
@@ -57,7 +57,9 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup(segment: Pair<'a, ParserRule>) -> Result<VecDeque<Segment<'a>>, LookupError> {
+    pub fn from_lookup(
+        segment: Pair<'a, ParserRule>,
+    ) -> Result<VecDeque<Segment<'a>>, LookupError> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -108,7 +110,7 @@ impl<'a> Segment<'a> {
                             ParserRule::lookup_array,
                             ParserRule::lookup_field_quoted,
                             ParserRule::lookup_field,
-                            ParserRule::lookup_coalesce
+                            ParserRule::lookup_coalesce,
                         ],
                         got: inner_segment.as_rule(),
                     })
@@ -130,9 +132,7 @@ impl<'a> Segment<'a> {
                 ParserRule::lookup => sub_segments.push(Segment::from_lookup(inner_segment)?),
                 _ => {
                     return Err(LookupError::WrongRule {
-                        wants: &[
-                            ParserRule::lookup,
-                        ],
+                        wants: &[ParserRule::lookup],
                         got: inner_segment.as_rule(),
                     })
                 }
@@ -154,9 +154,7 @@ impl<'a> Segment<'a> {
             }
             _ => {
                 return Err(LookupError::WrongRule {
-                    wants: &[
-                        ParserRule::lookup_field,
-                    ],
+                    wants: &[ParserRule::lookup_field],
                     got: rule,
                 })
             }
@@ -166,7 +164,9 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup_field_quoted(segment: Pair<'a, ParserRule>) -> Result<Segment<'a>, LookupError> {
+    pub fn from_lookup_field_quoted(
+        segment: Pair<'a, ParserRule>,
+    ) -> Result<Segment<'a>, LookupError> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -211,9 +211,7 @@ impl<'a> Segment<'a> {
                 ParserRule::LOOKUP_OPEN_BRACKET | ParserRule::LOOKUP_CLOSE_BRACKET => continue,
                 _ => {
                     return Err(LookupError::WrongRule {
-                        wants: &[
-                            ParserRule::lookup_array_index,
-                        ],
+                        wants: &[ParserRule::lookup_array_index],
                         got: inner_segment.as_rule(),
                     })
                 }
@@ -224,21 +222,24 @@ impl<'a> Segment<'a> {
     }
 
     #[tracing::instrument(level = "trace", skip(segment))]
-    pub fn from_lookup_array_index(segment: Pair<'a, ParserRule>) -> Result<Segment<'a>, LookupError> {
+    pub fn from_lookup_array_index(
+        segment: Pair<'a, ParserRule>,
+    ) -> Result<Segment<'a>, LookupError> {
         let rule = segment.as_rule();
         let segment_str = segment.as_str();
         tracing::trace!(segment = %segment_str, ?rule, action = %"enter");
         let retval = match rule {
             ParserRule::lookup_array_index => {
-                let index = segment.as_str().parse().map_err(LookupError::IndexParsing)?;
+                let index = segment
+                    .as_str()
+                    .parse()
+                    .map_err(LookupError::IndexParsing)?;
                 tracing::trace!(segment = %index, ?rule, action = %"push");
                 Segment::index(index)
             }
             _ => {
                 return Err(LookupError::WrongRule {
-                    wants: &[
-                        ParserRule::lookup_array_index,
-                    ],
+                    wants: &[ParserRule::lookup_array_index],
                     got: rule,
                 })
             }

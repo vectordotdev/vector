@@ -94,10 +94,8 @@ impl FunctionTransform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::log_schema,
-    };
-    use shared::{log_event, event::*, lookup::*};
+    use crate::config::log_schema;
+    use shared::{event::*, log_event, lookup::*};
     use std::collections::BTreeMap;
 
     #[test]

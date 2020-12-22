@@ -1,18 +1,18 @@
+mod error;
 pub mod log_event;
 pub mod lua;
 pub mod metric;
 pub mod value;
 pub mod visitors;
-mod error;
 
+pub use error::EventError;
 pub use log_event::LogEvent;
 pub use metric::{Metric, MetricKind, MetricValue};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
-pub use value::{Value};
-pub use error::EventError;
+pub use value::Value;
 
 use crate::lookup::*;
 use std::str::FromStr;

@@ -1,6 +1,6 @@
 use super::*;
-use chrono::{TimeZone, DateTime, Utc};
-use crate::{map, event::*, lookup::*};
+use crate::{event::*, lookup::*, map};
+use chrono::{DateTime, TimeZone, Utc};
 
 fn ts() -> DateTime<Utc> {
     Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -314,8 +314,7 @@ fn display() {
 
 mod remap {
     use super::*;
-    use remap_lang::{Path, Object};
-
+    use remap_lang::{Object, Path};
 
     #[test_env_log::test]
     fn object_metric_all_fields() {
@@ -341,7 +340,8 @@ mod remap {
                      "tags": map!{"tig": "tog"},
                      "kind": "absolute",
                      "type": "counter"
-                }.into()
+                }
+                .into()
             )),
             metric.get(&Path::from_str(".").unwrap())
         );
@@ -390,10 +390,10 @@ mod remap {
 
         let cases = vec![
             (
-                "name",                    // Path
+                "name",                                // Path
                 Some(remap_lang::Value::from("name")), // Current value
                 remap_lang::Value::from("namefoo"),    // New value
-                false,                     // Test deletion
+                false,                                 // Test deletion
             ),
             ("namespace", None, "namespacefoo".into(), true),
             (
