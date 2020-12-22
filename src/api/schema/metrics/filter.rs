@@ -1,11 +1,9 @@
 use super::{ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::{
-    api::schema::components,
     event::{Event, Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
 };
 use async_stream::stream;
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::{
@@ -30,12 +28,12 @@ fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Met
     }))
 }
 
-pub trait MetricsFilter {
+pub trait MetricsFilter<'a> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
 }
 
-impl MetricsFilter for Vec<Metric> {
+impl<'a> MetricsFilter<'a> for Vec<Metric> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
         let sum = sum_metrics(
             self.iter()
@@ -55,7 +53,7 @@ impl MetricsFilter for Vec<Metric> {
     }
 }
 
-impl<'a> MetricsFilter for Vec<&'a Metric> {
+impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal> {
         let sum = sum_metrics(
             self.iter()
@@ -94,32 +92,19 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order.
-/// Metrics are collected into a `Vec<Metric>`, yielding at `inverval` milliseconds.
-pub fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
+pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
-    // Sort each interval of metrics by key
     stream! {
         loop {
             interval.tick().await;
-
             yield capture_metrics(&controller)
                 .filter_map(|m| match m {
-                    Event::Metric(m) => match m.tag_value("component_name") {
-                        Some(name) => Some(match components::state::component_by_name(&name) {
-                            components::Component::Source(_) => (m, 1),
-                            components::Component::Transform(_) => (m, 2),
-                            components::Component::Sink(_) => (m, 3),
-                        }),
-                        _ => None,
-                    },
+                    Event::Metric(m) => Some(m),
                     _ => None,
                 })
-                .sorted_by_key(|m| m.1)
-                .map(|(m, _)| m)
-                .collect();
+                .collect()
         }
     }
 }
@@ -147,7 +132,7 @@ pub fn component_counter_metrics(
 ) -> impl Stream<Item = Vec<Metric>> {
     let mut cache = BTreeMap::new();
 
-    metrics_sorted(interval).map(move |m| {
+    get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
             .filter_map(|m| match m.tag_value("component_name") {
@@ -210,7 +195,7 @@ pub fn component_counter_throughputs(
 ) -> impl Stream<Item = Vec<(Metric, f64)>> {
     let mut cache = BTreeMap::new();
 
-    metrics_sorted(interval)
+    get_all_metrics(interval)
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
