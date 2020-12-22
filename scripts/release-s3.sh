@@ -56,7 +56,7 @@ verify_artifact() {
 if [[ "$CHANNEL" == "nightly" ]]; then
   # Add nightly files with the $DATE for posterity
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$DATE"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
+  aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Add "latest" nightly files
@@ -69,8 +69,8 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/$DATE/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/nightly/$DATE/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
+    "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
     "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
     "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
@@ -93,7 +93,6 @@ elif [[ "$CHANNEL" == "latest" ]]; then
 
   echo "Uploading artifacts to s3://packages.timber.io/vector/latest/"
   aws s3 cp "$td_latest" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
-  done
   echo "Uploaded latest archives"
 
   # Verify that the files exist and can be downloaded
