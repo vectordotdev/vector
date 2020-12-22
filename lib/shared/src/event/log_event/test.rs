@@ -1,4 +1,4 @@
-use crate::{test::open_fixture, event::*, lookup::*};
+use crate::{test::open_fixture, map, event::*, lookup::*};
 use serde_json::json;
 use tracing::trace;
 
@@ -477,7 +477,7 @@ fn json_value_to_vector_log_event_to_json_value() {
 #[test_env_log::test]
 fn entry() {
     let fixture =
-        open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
+        open_fixture("tests/fixtures/log_event/motivatingly-complex.json").unwrap();
     let mut event = LogEvent::try_from(fixture).unwrap();
 
     let lookup = LookupBuf::from_str("non-existing").unwrap();
@@ -536,13 +536,12 @@ fn entry() {
 
 mod remap {
     use super::*;
-    use crate::test_util::open_fixture;
+    use crate::test::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
     use tracing::trace;
-    use nom::combinator::map;
     use std::collections::BTreeMap;
-    use remap_lang::{map, Object};
+    use remap_lang::{Object};
     use std::convert::{TryFrom, TryInto};
 
     #[test_env_log::test]
@@ -592,7 +591,7 @@ mod remap {
             let event = LogEvent::from(value);
             let path = remap_lang::Path::new_unchecked(segments);
 
-            assert_eq!(Object::get(&event, &path), expect)
+            assert_eq!(Object::get(&event, &path), expect, "Expected {:?} to return {:?} in {:?}", path, expect, event)
         }
     }
 
@@ -617,7 +616,7 @@ mod remap {
                 map!["foo": "bar"],
                 vec![
                     remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    Index(2),
+                    remap_lang::Segment::Index(2),
                     remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
                     remap_lang::Segment::Field(remap_lang::Field::Regular("a".to_owned())),
                     remap_lang::Segment::Field(remap_lang::Field::Regular("b".to_owned())),
@@ -635,7 +634,7 @@ mod remap {
             ),
             (
                 map!["foo": vec![0, 1, 2]],
-                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), Index(5)],
+                vec![remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())), remap_lang::Segment::Index(5)],
                 "baz".into(),
                 map![
                     "foo":
@@ -688,15 +687,15 @@ mod remap {
         ];
 
         for (object, segments, value, expect, result) in cases {
-            let object: BTreeMap<String, Value> = object;
+            let object: BTreeMap<String, Value> = object.into();
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
             let value: remap::Value = value;
-            let path = Path::new_unchecked(segments);
+            let path = remap_lang::Path::new_unchecked(segments);
 
-            assert_eq!(remap_lang::Object::insert(&mut event, &path, value.clone()), result);
+            assert_eq!(remap_lang::Object::insert(&mut event, &path, value.clone().into()), result);
             assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value.into())));
         }
     }
 
@@ -775,7 +774,7 @@ mod remap {
 
     #[test_env_log::test]
     fn object_paths() {
-        use remap::{Object, Path};
+        use remap_lang::{Object, Path};
         use std::str::FromStr;
 
         let cases = vec![

@@ -1,6 +1,6 @@
 use super::*;
 use chrono::{TimeZone, DateTime, Utc};
-use crate::{event::*, lookup::*};
+use crate::{map, event::*, lookup::*};
 
 fn ts() -> DateTime<Utc> {
     Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -314,7 +314,7 @@ fn display() {
 
 mod remap {
     use super::*;
-    use remap_lang::{Segment, Path, map, Object};
+    use remap_lang::{Segment, Path, Object};
 
 
     #[test_env_log::test]

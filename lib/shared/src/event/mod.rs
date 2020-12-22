@@ -10,7 +10,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
-pub use value::Value;
+pub use value::{Value};
 
 use crate::lookup::*;
 use std::str::FromStr;

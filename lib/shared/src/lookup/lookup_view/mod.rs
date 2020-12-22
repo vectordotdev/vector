@@ -176,10 +176,6 @@ impl<'a> Lookup<'a> {
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument(level = "trace")]
     pub fn is_valid(&self) -> crate::Result<()> {
-        if self.segments.is_empty() {
-            return Err("Lookups must have at least 1 segment to be valid.".into());
-        }
-
         Ok(())
     }
 

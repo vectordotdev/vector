@@ -7,6 +7,8 @@ mod lookup_buf;
 pub use lookup_buf::LookupBuf;
 mod segment;
 pub use segment::Segment;
+mod error;
+pub use error::LookupError;
 
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
