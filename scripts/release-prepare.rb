@@ -109,7 +109,7 @@ def create_log_file!(current_commits, new_version)
   release_log_path
 end
 
-def create_release_file!(new_version)
+def create_release_file!(new_version,dev_version)
   release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
   git_log = Vector::GitLogCommit.from_file!(release_log_path)
   commits = Vector::Commit.from_git_log!(git_log)
@@ -147,6 +147,7 @@ def create_release_file!(new_version)
           releases: #{new_version.to_json}: {
             date:     #{Date.today.to_json}
             codename: ""
+            dev_release: #{dev_version.to_json}
 
             whats_next: []
 
@@ -270,6 +271,16 @@ def get_new_version(last_version, current_commits)
   end
 end
 
+def get_dev_version(new_version)
+  dev_version =
+        if new_version.major == 0
+          "0.#{new_version.minor + 1}.0"
+        else
+          "#{new_version.major + 1}.0.0"
+        end
+  dev_version
+end
+
 def migrate_highlights(new_version)
   Dir.glob("#{HIGHLIGHTS_ROOT}/*.md").to_a.each do |highlight_path|
     content = File.read(highlight_path)
@@ -297,8 +308,9 @@ last_tag = `git describe --tags $(git rev-list --tags --max-count=1)`.chomp
 last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
 current_commits = get_commits_since(last_version)
 new_version = get_new_version(last_version, current_commits)
+dev_version = get_dev_version(new_version)
 log_file_path = create_log_file!(current_commits, new_version)
-create_release_file!(new_version)
+create_release_file!(new_version,dev_version)
 File.delete(log_file_path)
 
 #Util::Printer.title("Migrating all nightly associated highlights to #{new_version}...")
