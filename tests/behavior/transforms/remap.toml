@@ -78,6 +78,23 @@
       "result_e.equals" = 0.75
       "result_f.equals" = 0
 
+[transforms.remap_arithmetic_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a / .b
+  """
+[[tests]]
+  name = "remap_arithmetic_error"
+  no_outputs_from = ["remap_arithmetic_error"]
+  [tests.input]
+    insert_at = "remap_arithmetic_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = 10
+      b = 0
+
 [transforms.remap_boolean_arithmetic]
   inputs = []
   type = "remap"
