@@ -113,9 +113,7 @@ components: transforms: remap: {
 					.ceil_temp = ceil(.temperature)
 					"""
 			}
-			input: log: {
-				temperature: 105.1
-			}
+			input: log: temperature: 105.1
 			output: log: {
 				rounded_temp: 105
 				floor_temp:   105
@@ -123,18 +121,37 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Stripping ANSI characters"
+			configuration: {
+				source: """
+				.text = strip_ansi_escape_codes(.text)
+				"""
+			}
+			input: log: text: #"\e[46mfoo\e[0m bar"#
+			output: log: text: "foo bar"
+		},
+		{
 			title: "Parse JSON"
 			configuration: {
-				source: #"""
-					message = del(.message)
-					. = parse_json(message)
-					"""#
+				source: ".message = parse_json(.message)"
 			}
 			input: log: {
 				message: #"{"key": "val"}"#
 			}
 			output: log: {
-				key: "val"
+				message: key: "val"
+			}
+		},
+		{
+			title: "Encode JSON"
+			configuration: {
+				source: ".message = encode_json(.message)"
+			}
+			input: log: {
+				message: key: "val"
+			}
+			output: log: {
+				message: #"{"key": "val"}"#
 			}
 		},
 		{
@@ -160,6 +177,24 @@ components: transforms: remap: {
 				timestamp: "2020-10-01T02:22:11.223212Z"
 			}
 		},
+		{
+			title: "Parsing Syslog messages"
+			configuration: source: """
+				. = parse_syslog(.)
+				"""
+			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+			ouput: log: {
+				appname: "su"
+				facility: "ntp"
+				hostname: "vector-user.biz"
+				message: "Something went wrong"
+				msgid: "ID389"
+				procid: 2666
+				severity: "info"
+				timestamp: "2020-12-22 15:22:31.111 UTC"
+			}
+
+		}
 	]
 
 	how_it_works: {
