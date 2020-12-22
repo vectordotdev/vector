@@ -1,24 +1,24 @@
-# RFC 5664 - 2020-12-21 - Distribution of the `trl` CLI tool
+# RFC 5664 - 2020-12-21 - Distribution of the `vrl` CLI tool
 
-The `trl` CLI tool for the Timber Remap Language is an extremely useful accompaniment to the
+The `vrl` CLI tool for the Vector Remap Language is an extremely useful accompaniment to the
 language, but at the moment you can only use it inside of the Vector repo using `cargo run`. This
-RFC proposes distributing the `trl` tool via the same channels that we currently distribute Vector
+RFC proposes distributing the `vrl` tool via the same channels that we currently distribute Vector
 itself.
 
 ## Scope
 
-This RFC only covers distribution of the `trl` tool as well as some related issues. It does *not*
-cover TRL syntax, functions, semantics, and the like.
+This RFC only covers distribution of the `vrl` tool as well as some related issues. It does *not*
+cover VRL syntax, functions, semantics, and the like.
 
 ## Motivation
 
-TRL is likely to be widely used and a crucial part of Vector. Although TRL is relatively easy to use
-in conjunction with real Vector instances and topologies, e.g. via unit tests, the `trl` CLI tool
+VRL is likely to be widely used and a crucial part of Vector. Although VRL is relatively easy to use
+in conjunction with real Vector instances and topologies, e.g. via unit tests, the `vrl` CLI tool
 allows for much speedier trial and error and thus will be an essential part of development flows
 for Vector.
 
 Asking users to run the CLI tool by cloning the Vector repo, installing Rust/Cargo, and running
-the command manually could be a significant impediment to TRL adoption.
+the command manually could be a significant impediment to VRL adoption.
 
 ## Internal Proposal
 
@@ -26,31 +26,31 @@ the command manually could be a significant impediment to TRL adoption.
 
 Our build setup—`Makefile`, scripts, etc.—would need to be revised pretty significantly, as what we
 currently have revolves around a single artifact: Vector itself. We would need separate scripts and
-`make` commands for `trl` and to update our GitHub Actions CI setup, most notably
+`make` commands for `vrl` and to update our GitHub Actions CI setup, most notably
 [`release.yml`][release_yml].
 
 ### Release and versioning
 
-The `trl` tool should be versioned in lockstep with and released alongside Vector, in order to
-ensure full parity between the syntax, functions, and semantics available in `trl` and in the Vector
+The `vrl` tool should be versioned in lockstep with and released alongside Vector, in order to
+ensure full parity between the syntax, functions, and semantics available in `vrl` and in the Vector
 compilation and interpretation engine.
 
 ## Doc-level Proposal
 
 On the documentation side, we would need to provide installation docs analogous to those we have
 [for Vector itself][vector_install], though potentially collapsed into a single page for ease of
-lookup. In addition, the [TRL docs][trl_docs] should briefly describe the tool and link to the
+lookup. In addition, the [VRL docs][vrl_docs] should briefly describe the tool and link to the
 installation docs.
 
 ## Rationale
 
-Enabling users to easily install and run the `trl` tool could be a major driver of TRL adoption and
+Enabling users to easily install and run the `vrl` tool could be a major driver of VRL adoption and
 of immediate benefit to Vector users. Imagine this flow on macOS:
 
 ```bash
 brew tap timberio/brew
-brew install trl
-trl --example # This command doesn't exist but we could potentially provide something like this
+brew install vrl
+vrl --example # This command doesn't exist but we could potentially provide something like this
 ```
 
 Within just a few commands, a user can go from having nothing Vector related on their machine to
@@ -73,18 +73,18 @@ it's deemed otherwise.
 ## Alternatives
 
 The alternative would be to continue requiring would-be users to clone the repo, install Rust, and
-run `trl` manually. It's not clear that there's a desirable third alternative between the status quo
+run `vrl` manually. It's not clear that there's a desirable third alternative between the status quo
 and full distribution.
 
 ## Plan Of Attack
 
 - [ ] Update the `remap-cli` crate's version to match Vector itself (it's currently locked into `0.1.0`)
-- [ ] Update build scripts to accommodate the new `trl` artifact
+- [ ] Update build scripts to accommodate the new `vrl` artifact
 - [ ] Update `Makefile` to include handy commands for building locally
 - [ ] Update GitHub Actions workflows
 - [ ] Update documentation to include installation instructions
-- [ ] Write an announcement blog post for the initial `trl` release
+- [ ] Write an announcement blog post for the initial `vrl` release
 
 [release_yml]: https://github.com/timberio/vector/blob/master/.github/workflows/release.yml
-[trl_docs]: https://vector.dev/docs/reference/remap
+[vrl_docs]: https://vector.dev/docs/reference/remap
 [vector_install]: https://vector.dev/docs/setup/installation
