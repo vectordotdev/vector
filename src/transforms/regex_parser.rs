@@ -182,7 +182,7 @@ impl RegexParser {
             .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .map(LookupBuf::from_str)
-            .collect::<crate::Result<Vec<_>>>()?;
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let types = parse_check_conversion_map(
             &config

@@ -649,7 +649,7 @@ impl remap_lang::Object for LogEvent {
             let mut value = LogEvent::default();
             std::mem::swap(self, &mut value);
             // TODO: Why does this not return value?
-            return Ok(());
+            Ok(())
         } else {
             trace!(path = %path_string, "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
@@ -671,9 +671,9 @@ impl remap_lang::Object for LogEvent {
             if let Value::Map(mut v) = value {
                 std::mem::swap(&mut self.fields, &mut v);
                 // TODO: Why does this not return value?
-                return Ok(());
+                Ok(())
             } else {
-                return Err("Cannot insert as root of Event unless it is a map.".into());
+                Err("Cannot insert as root of Event unless it is a map.".into())
             }
         } else {
             trace!(path = %path_string, "Converting to LookupBuf.");

@@ -474,7 +474,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
                 pairs
                     .into_iter()
                     .map(|v| LookupBuf::from_str(&v))
-                    .collect::<crate::Result<Vec<_>>>()
+                    .collect::<std::result::Result<Vec<_>, _>>()
                     .map_err(|e| format!("{}", e))
             })?;
             Ok(Box::new(Deletion::new(paths)))
@@ -484,7 +484,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
                 pairs
                     .into_iter()
                     .map(|v| LookupBuf::from_str(&v))
-                    .collect::<crate::Result<Vec<_>>>()
+                    .collect::<std::result::Result<Vec<_>, _>>()
                     .map_err(|e| format!("{}", e))
             })?;
             Ok(Box::new(OnlyFields::new(paths)))

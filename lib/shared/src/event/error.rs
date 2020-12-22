@@ -1,7 +1,5 @@
 use crate::lookup::*;
 use std::fmt;
-use remap_lang::parser::ParserRule;
-use std::num::ParseIntError;
 pub use EventError::*;
 
 #[derive(Debug)]

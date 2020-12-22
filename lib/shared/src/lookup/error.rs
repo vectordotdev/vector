@@ -2,7 +2,6 @@ use std::fmt;
 use remap_lang::parser::ParserRule;
 use std::num::ParseIntError;
 pub use LookupError::*;
-use pest::error::Error;
 
 #[derive(Debug)]
 pub enum LookupError {
