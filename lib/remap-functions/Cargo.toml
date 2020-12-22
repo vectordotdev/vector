@@ -83,6 +83,7 @@ default = [
     "to_int",
     "to_syslog_level",
     "to_string",
+    "to_syslog_severity",
     "to_timestamp",
     "tokenize",
     "truncate",
@@ -136,6 +137,7 @@ strip_whitespace = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
+to_syslog_severity = []
 to_string = []
 to_syslog_level = []
 to_timestamp = ["chrono"]
