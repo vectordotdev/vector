@@ -457,8 +457,12 @@ mod tests {
                     .await
                     .expect("Didn't return results");
 
-                assert_eq!(data[0].name, "processed_events_total_batch_source");
-                assert_eq!(data[1].name, "processed_events_total_batch_sink");
+                for name in vec![
+                    "processed_events_total_batch_source",
+                    "processed_events_total_batch_sink",
+                ] {
+                    assert!(data.iter().any(|d| d.name == name));
+                }
             },
         )
     }
