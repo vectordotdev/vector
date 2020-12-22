@@ -89,7 +89,13 @@ elif [[ "$CHANNEL" == "latest" ]]; then
     echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
     aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
   done
-  echo "Uploaded versioned archives"
+
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
+    # Delete anything that isn't the current version
+    echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
+    aws s3 rm "s3://packages.timber.io/vector/$i/" --exclude "*$VERSION_EXACT*"
+    echo "Deleted old versioned artifacts"
+  done
 
   echo "Uploading artifacts to s3://packages.timber.io/vector/latest/"
   aws s3 cp "$td_latest" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
