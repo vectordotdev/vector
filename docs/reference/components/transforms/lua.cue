@@ -38,7 +38,7 @@ components: transforms: lua: {
 		notices: [
 			"""
 			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
-			this tranform. The [Timber Remap Language](\(urls.timber_remap_language_reference))
+			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
 			is designed for safe, performant, and easy data mapping. It is intended to cover the
 			vast majority of data mapping use cases leaving Lua for very advanced and edge-case
 			situations.

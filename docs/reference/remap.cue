@@ -7,22 +7,21 @@ remap: {
 
 	{
 		description: """
-			The Timber Remap Language (TRL) is a lean, single-purpose data transformation language
+			The Vector Remap Language (VRL) is a lean, single-purpose data transformation language
 			that enables you to easily map and reshape observability event data (logs and metrics)
-			without sacrificing performance or safety. TRL occupies a cozy middle ground between
+			without sacrificing performance or safety. VRL occupies a cozy middle ground between
 			stitching together fundamental [transforms](\(urls.vector_transforms)) and using a
-			full-blown runtime like [Lua](\(urls.lua)). Guiding principles behind TRL include:
+			full-blown runtime like [Lua](\(urls.lua)). Guiding principles behind VRL include:
 
-			1. **Performance** - Beyond extremely fast execution, TRL is designed to prevent Vector
+			1. **Performance** - Beyond extremely fast execution, VRL is designed to prevent Vector
 			   operators from writing slow scripts.
-			2. **Safety** - TRL is Rust native and performs compile-time checks at boot time to
-			   ensure safety. In addition, TRL's simplicity and lack of complex \"footguns\" are
+			2. **Safety** - VRL is Rust native and performs compile-time checks at boot time to
+			   ensure safety. In addition, VRL's simplicity and lack of complex \"footguns\" are
 			   ideal for collaboration.
-			3. **Self-documenting** - A TRL script's intentions are clear even at first glance because the
+			3. **Self-documenting** - A VRL script's intentions are clear even at first glance because the
 			   language is designed to have a very gentle learning curve.
 
-			TRL is designed and maintained by [Timber](\(urls.timber)) and built specifically for
-			processing data within Vector.
+			VRL is built specifically for processing data within Vector.
 			"""
 
 		errors: [Name=string]: {
@@ -66,7 +65,7 @@ remap: {
 		}
 	}
 
-	// TRL type system
+	// VRL type system
 	types: [TypeName=string]: {
 		#Use: "parameter" | "return"
 
@@ -78,8 +77,8 @@ remap: {
 	types: {
 		"array": {
 			description: """
-				A list of values. Items in an array can be of any TRL type, including other arrays
-				and `null` (which is a value in TRL). Values inside TRL arrays can be accessed via
+				A list of values. Items in an array can be of any VRL type, including other arrays
+				and `null` (which is a value in VRL). Values inside VRL arrays can be accessed via
 				index (beginning with 0). For the array `$primary = ["magenta", "yellow", "cyan"]`,
 				for example, `$primary[0` yields `"magenta"`.
 
@@ -95,7 +94,7 @@ remap: {
 				exist, the expression `.hobbies[2] = "Pogs"` sets the `hobbies` field to
 				`[null, null, "Pogs"]`.
 
-				Because all expressions in TRL return a value, you can put expressions in arrays:
+				Because all expressions in VRL return a value, you can put expressions in arrays:
 
 				```
 				.strange = [(false || "booper"), "foo", $bar, .baz]
@@ -130,7 +129,7 @@ remap: {
 		}
 		"map": {
 			description: """
-				A key-value map in which keys are strings and values can be of any TRL type,
+				A key-value map in which keys are strings and values can be of any VRL type,
 				including other maps. And as with arrays, you can use expressions to provide the
 				value for a key:
 
@@ -163,7 +162,7 @@ remap: {
 		}
 		"null": {
 			description: """
-				No value. In TRL, you can assign `null` to fields and variables:
+				No value. In VRL, you can assign `null` to fields and variables:
 
 				```
 				.hostname = null
@@ -189,7 +188,7 @@ remap: {
 		}
 		"regex": {
 			description: """
-				A **reg**ular **ex**pression. In TRL, regular expressions are delimited by `/` and
+				A **reg**ular **ex**pression. In VRL, regular expressions are delimited by `/` and
 				use [Rust regex syntax](\(urls.rust_regex_syntax)). Here's an example usage of a
 				regular expression:
 
@@ -199,7 +198,7 @@ remap: {
 
 				### Flags
 
-				TRL regular expressions allow three flags:
+				VRL regular expressions allow three flags:
 
 				Flag | Description
 				:----|:-----------
@@ -209,13 +208,13 @@ remap: {
 
 				Regex flags can be combined, as in `/pattern/xmi`, `/pattern/im`, etc.
 
-				To learn more about regular expressions in Rust—and by extension in TRL—we strongly
+				To learn more about regular expressions in Rust—and by extension in VRL—we strongly
 				recommend the in-browser [Rustexp expression editor and
 				tester](\(urls.regex_tester)).
 
 				### Limitations
 
-				There are a few things that you can't do with regexes in TRL:
+				There are a few things that you can't do with regexes in VRL:
 
 				* You can't assign a regex to an object path. Thus, `.pattern = /foo|bar/i` is not
 					allowed.
@@ -232,9 +231,9 @@ remap: {
 		}
 		"string": {
 			description: """
-				A sequence of characters. A few things to note about TRL strings:
+				A sequence of characters. A few things to note about VRL strings:
 
-				* TRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
+				* VRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
 					sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
 				* Strings can be escaped using a backslash (`/`), as in `\"The song is called
 					\"My name is Jonas\"\"`.
@@ -295,7 +294,7 @@ remap: {
 		}
 	}
 
-	// TRL syntax
+	// VRL syntax
 	#Operators: [_category=string]: [_op=string]: string
 
 	syntax: [RuleName=string]: {
@@ -318,9 +317,9 @@ remap: {
 			href: "paths"
 
 			description: """
-				In TRL, a dot (`.`) holds state across the script. At the beginning of the script,
+				In VRL, a dot (`.`) holds state across the script. At the beginning of the script,
 				it represents the object arriving into the transform; that object can be a log or a
-				metric. To give an example, imagine you're writing a TRL script to handle logs in
+				metric. To give an example, imagine you're writing a VRL script to handle logs in
 				[JSON](\(urls.json)) format. Here's an example event:
 
 				```json
@@ -348,7 +347,7 @@ remap: {
 
 				### Path coalescing
 
-				Path *coalescing* in TRL enables you to express "or" logic inside of paths. This
+				Path *coalescing* in VRL enables you to express "or" logic inside of paths. This
 				expression sets `user.first_name` to `"Feldman"` *if* that field exists; if not, the
 				`user.last_name` field is set to `"Feldman"` instead.
 
@@ -369,7 +368,7 @@ remap: {
 
 				### Indexing
 
-				Values inside TRL arrays can be accessed via index (beginning with 0). For the array
+				Values inside VRL arrays can be accessed via index (beginning with 0). For the array
 				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
 
 				You can also assign values to arrays by index:
@@ -412,7 +411,7 @@ remap: {
 			href: "expressions"
 
 			description: """
-				*All* expressions in TRL resolve to a value. Expressions come in four kinds, listed
+				*All* expressions in VRL resolve to a value. Expressions come in four kinds, listed
 				below, each of which resolves in a different way:
 
 				Expression type | Resolves to
@@ -440,7 +439,7 @@ remap: {
 			href: "lines"
 
 			description: #"""
-				TRL expressions can be split across multiple lines using a backslash (`\`):
+				VRL expressions can be split across multiple lines using a backslash (`\`):
 
 				```
 				del(.one, .two, .three, .four \
@@ -466,7 +465,7 @@ remap: {
 			href: "functions"
 
 			description: """
-				In TRL, functions can take inputs (or no input) and return either a value or, in the
+				In VRL, functions can take inputs (or no input) and return either a value or, in the
 				case of some functions, an error.
 				"""
 
@@ -482,7 +481,7 @@ remap: {
 			href: "control-flow"
 
 			description: """
-				TRL supports control flow operations using `if`, `else if`, and `else`. These can
+				VRL supports control flow operations using `if`, `else if`, and `else`. These can
 				be called on any expression that returns a Boolean. Here's a generic example of the
 				syntax:
 
@@ -529,7 +528,7 @@ remap: {
 				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
 
-				In TRL, `=` represents assignment, while `==` is a [comparison
+				In VRL, `=` represents assignment, while `==` is a [comparison
 				operator](#operators), as in many programming languages.
 
 				If you assign a value to an object field that doesn't already exist, the field is
@@ -548,7 +547,7 @@ remap: {
 			href: "variables"
 
 			description: """
-				You can assign values to variables in TRL. Variables in TRL are prefixed with a `$`
+				You can assign values to variables in VRL. Variables in VRL are prefixed with a `$`
 				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
 				`$my_var`, `$this_is_my_variable123`, etc. Here's an example usage of a variable:
 
@@ -559,7 +558,7 @@ remap: {
 
 				### Assignment using expressions
 
-				Because all TRL expressions return a value (by definition), you can assign using
+				Because all VRL expressions return a value (by definition), you can assign using
 				expressions as well:
 
 				```
@@ -584,7 +583,7 @@ remap: {
 			href: "blocks"
 
 			description: """
-				TRL supports organizing expressions into blocks using curly braces. Everything
+				VRL supports organizing expressions into blocks using curly braces. Everything
 				inside of a block is evaluated as a single expression. In this example, the value
 				assigned to the variable `$success` is `true` if the value of the `status_code`
 				field is `201`:
@@ -632,10 +631,10 @@ remap: {
 			href: "operators"
 
 			description: """
-				TRL offers a standard set of operators, listed in the table below, that should be
+				VRL offers a standard set of operators, listed in the table below, that should be
 				familiar from many other programming languages.
 
-				TRL supports the standard [order of operations](\(urls.order_of_ops)). Thus,
+				VRL supports the standard [order of operations](\(urls.order_of_ops)). Thus,
 				`(2 * 2) + 8` makes `12`, `10 / (2 + 3)` makes `2`, `true && (false || true)` makes
 				`true`, and so on.
 				"""
