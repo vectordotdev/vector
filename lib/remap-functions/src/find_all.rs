@@ -3,11 +3,11 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Find;
+pub struct FindAll;
 
-impl Function for Find {
+impl Function for FindAll {
     fn identifier(&self) -> &'static str {
-        "find"
+        "find_all"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -29,33 +29,27 @@ impl Function for Find {
         let value = arguments.required("value")?.boxed();
         let pattern = arguments.required_regex("pattern")?;
 
-        Ok(Box::new(FindFn { value, pattern }))
+        Ok(Box::new(FindAllFn { value, pattern }))
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FindFn {
+pub(crate) struct FindAllFn {
     value: Box<dyn Expression>,
     pattern: Regex,
 }
 
-impl FindFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, pattern: Regex) -> Self {
-        Self { value, pattern }
-    }
-}
-
-impl Expression for FindFn {
+impl Expression for FindAllFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         Ok(self
             .pattern
-            .captures(&value)
+            .captures_iter(&value)
             .map(|capture| {
-                self.pattern
+                let val: Value = self
+                    .pattern
                     .capture_names()
                     .filter_map(|name| {
                         // We only work with groups that have been given a name.
@@ -68,8 +62,11 @@ impl Expression for FindFn {
                         })
                     })
                     .collect::<BTreeMap<_, _>>()
+                    .into();
+
+                val
             })
-            .unwrap_or_else(BTreeMap::new)
+            .collect::<Vec<Value>>()
             .into())
     }
 
@@ -77,7 +74,7 @@ impl Expression for FindFn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
-            .with_constraint(value::Kind::Map)
+            .with_constraint(value::Kind::Array)
     }
 }
 
@@ -89,64 +86,50 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| FindFn {
+            expr: |_| FindAllFn {
                 value: Literal::from("foo").boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
+            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         value_non_string {
-            expr: |_| FindFn {
+            expr: |_| FindAllFn {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
         }
 
         value_optional {
-            expr: |_| FindFn {
+            expr: |_| FindAllFn {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
         }
     ];
 
     test_function![
-        find => Find;
+        find_all => FindAll;
 
         matches {
-            args: func_args! [
-                value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
-                pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                    .unwrap()
+            args: func_args![
+                value: "apples and carrots, peaches and peas",
+                pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
             ],
-            want: Ok(value!({"bytes_in": "5667",
-                             "host": "5.86.210.12",
-                             "user": "zieme4647",
-                             "timestamp": "19/06/2019:17:20:49 -0400",
-                             "method": "GET",
-                             "path": "/embrace/supply-chains/dynamic/vertical",
-                             "status": "201",
-                             "bytes_out": "20574"}))
+            want: Ok(value!([{"fruit": "apples",
+                              "veg": "carrots"},
+                             {"fruit": "peaches",
+                              "veg": "peas"}]))
         }
 
-        single_match {
-            args: func_args! [
-                value: "first group and second group",
-                pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
-            ],
-            want: Ok(value!({"number": "first"}))
-        }
-
-        no_match {
-            args: func_args! [
+        no_matches {
+            args: func_args![
                 value: "I don't match",
-                pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                            .unwrap()
+                pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
             ],
-            want: Ok(value!({})),
+            want: Ok(value!([]))
         }
     ];
 }

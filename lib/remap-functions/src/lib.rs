@@ -20,6 +20,8 @@ mod ends_with;
 mod exists;
 #[cfg(feature = "find")]
 mod find;
+#[cfg(feature = "find_all")]
+mod find_all;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "floor")]
@@ -139,6 +141,8 @@ pub use ends_with::EndsWith;
 pub use exists::Exists;
 #[cfg(feature = "find")]
 pub use find::Find;
+#[cfg(feature = "find_all")]
+pub use find_all::FindAll;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "floor")]
@@ -254,6 +258,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Exists),
         #[cfg(feature = "find")]
         Box::new(Find),
+        #[cfg(feature = "find_all")]
+        Box::new(FindAll),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "floor")]

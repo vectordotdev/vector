@@ -1437,3 +1437,24 @@
     "path.equals" = "/embrace/supply-chains/dynamic/vertical"
     "status.equals" = 201
     "bytes_out.equals" = 20574
+
+[transforms.remap_function_find_all]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = find_all(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
+  '''
+[[tests]]
+  name = "remap_function_find_all"
+  [tests.input]
+    insert_at = "remap_function_find_all"
+    type = "log"
+    [tests.input.log_fields]
+      message = "apples and carrots, peaches and peas"
+  [[tests.outputs]]
+    extract_from = "remap_function_find_all"
+    [[tests.outputs.conditions]]
+    "result[0].fruit.equals" = "apples"
+    "result[0].veg.equals" = "carrots"
+    "result[1].fruit.equals" = "peaches"
+    "result[1].veg.equals" = "peas"
