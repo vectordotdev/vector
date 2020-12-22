@@ -779,8 +779,8 @@ endif
 stop-integration-postgresql_metrics:
 	$(CONTAINER_TOOL) rm --force vector_postgresql_metrics 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-postgresql_metrics 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-postgresql_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-postgresql_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-postgresql_metrics 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-postgresql_metrics 2>/dev/null; true
 endif
