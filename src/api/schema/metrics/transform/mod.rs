@@ -19,10 +19,6 @@ pub trait IntoTransformMetrics {
 
 impl IntoTransformMetrics for Vec<Metric> {
     fn to_transform_metrics(self, component_type: &str) -> TransformMetrics {
-        match component_type {
-            _ => TransformMetrics::GenericTransformMetrics(generic::GenericTransformMetrics::new(
-                self,
-            )),
-        }
+        TransformMetrics::GenericTransformMetrics(generic::GenericTransformMetrics::new(self))
     }
 }

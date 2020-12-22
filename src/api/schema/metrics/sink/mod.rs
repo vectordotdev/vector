@@ -19,8 +19,6 @@ pub trait IntoSinkMetrics {
 
 impl IntoSinkMetrics for Vec<Metric> {
     fn to_sink_metrics(self, component_type: &str) -> SinkMetrics {
-        match component_type {
-            _ => SinkMetrics::GenericSinkMetrics(generic::GenericSinkMetrics::new(self)),
-        }
+        SinkMetrics::GenericSinkMetrics(generic::GenericSinkMetrics::new(self))
     }
 }
