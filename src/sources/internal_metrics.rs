@@ -9,23 +9,12 @@ use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
-#[serde(deny_unknown_fields)]
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+#[derivative(Default)]
+#[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[serde(default = "default_scrape_interval_secs")]
-    scrape_interval_secs: u64,
-}
-
-pub const fn default_scrape_interval_secs() -> u64 {
-    2
-}
-
-impl Default for InternalMetricsConfig {
-    fn default() -> Self {
-        Self {
-            scrape_interval_secs: default_scrape_interval_secs(),
-        }
-    }
+    #[derivative(Default(value = "2.0"))]
+    scrape_interval_secs: f64,
 }
 
 inventory::submit! {
@@ -44,12 +33,16 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(Box::pin(run(
-            get_controller()?,
-            self.scrape_interval_secs,
-            out,
-            shutdown,
-        )))
+        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
+        if interval < time::Duration::from_millis(500) {
+            return Err(format!(
+                "interval set too low ({} secs), use interval >= 0.5 secs",
+                interval.as_secs_f64()
+            )
+            .into());
+        }
+
+        Ok(Box::pin(run(get_controller()?, interval, out, shutdown)))
     }
 
     fn output_type(&self) -> DataType {
@@ -63,15 +56,14 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     controller: &Controller,
-    interval: u64,
+    interval: time::Duration,
     out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut out =
         out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
-    let duration = time::Duration::from_secs(interval);
-    let mut interval = time::interval(duration).take_until(shutdown);
+    let mut interval = time::interval(interval).take_until(shutdown);
     while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
         out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
