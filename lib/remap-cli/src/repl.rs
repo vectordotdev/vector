@@ -17,13 +17,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 
     println!(
         "
->               .__
-> ___  _________|  |
-> \  \/ /\_  __ \  |
->  \   /  |  | \/  |__
->   \_/   |__|  |____/
 >
-> VECTOR REMAP LANGUAGE
+> VRL: TIMBER REMAP LANGUAGE
 >
 > Welcome!
 >
