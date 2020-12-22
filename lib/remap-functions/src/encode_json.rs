@@ -31,9 +31,11 @@ struct EncodeJsonFn {
 impl Expression for EncodeJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
+
+        // With `remap::Value` it's should not be possible to get `Err`.
         match serde_json::to_string(&value) {
             Ok(value) => Ok(value.into()),
-            Err(error) => panic!("unable encode to json: {}", error),
+            Err(error) => unreachable!("unable encode to json: {}", error),
         }
     }
 
