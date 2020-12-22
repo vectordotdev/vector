@@ -126,7 +126,7 @@ fn walk(
                 transforms.insert(key, target);
             }
             Transform::Task(t) => {
-                error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
+                warn!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
                 use futures::compat::Stream01CompatExt;
                 let in_stream = futures01::stream::iter_ok(inputs.clone());
                 let out_stream = t.transform(Box::new(in_stream)).compat();
