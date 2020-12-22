@@ -72,15 +72,12 @@ macro_rules! test_function {
 #[macro_export]
 macro_rules! map {
     () => ({
-        let map = ::std::collections::BTreeMap::<String, $crate::Expr>::new();
-        $crate::expression::Map::new(map)
+        ::std::collections::BTreeMap::<String, $crate::Value>::new()
     });
     ($($k:tt: $v:expr),+ $(,)?) => ({
-        let map: ::std::collections::BTreeMap<String, $crate::Expr> = vec![$(($k.into(), $v.into())),+]
+        vec![$(($k.into(), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>();
-
-        $crate::expression::Map::new(map)
+            .collect::<::std::collections::BTreeMap<String, $crate::Value>>()
     });
 }
 
