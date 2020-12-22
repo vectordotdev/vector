@@ -103,7 +103,7 @@ impl SourceConfig for StatsdConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.clone() {
             Self::Tcp(tcp) => vec![tcp.address.into()],
-            Self::Udp(udp) => vec![udp.address.into()],
+            Self::Udp(udp) => vec![Resource::udp(udp.address)],
             #[cfg(unix)]
             Self::Unix(_) => vec![],
         }

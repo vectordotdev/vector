@@ -115,7 +115,7 @@ impl SinkConfig for PrometheusExporterConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![Resource::tcp(self.address)]
     }
 }
 

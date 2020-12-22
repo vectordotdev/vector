@@ -348,8 +348,8 @@ endif
 stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-aws 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name=vector-test-integration-aws 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-aws 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-aws 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-aws 2>/dev/null; true
 endif
@@ -380,8 +380,8 @@ endif
 stop-integration-clickhouse:
 	$(CONTAINER_TOOL) rm --force vector_clickhouse 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-clickhouse 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-clickhouse 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-clickhouse 2>/dev/null; true
 endif
@@ -434,7 +434,7 @@ endif
 stop-integration-elasticsearch:
 	$(CONTAINER_TOOL) rm --force vector_localstack_es vector_elasticsearch vector_elasticsearch-tls 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-elasticsearch 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-elasticsearch 2>/dev/null; true
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-elasticsearch 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-elasticsearch 2>/dev/null; true
@@ -468,8 +468,8 @@ endif
 stop-integration-gcp:
 	$(CONTAINER_TOOL) rm --force vector_cloud-pubsub 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-gcp 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-gcp 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-gcp 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-gcp 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-gcp 2>/dev/null; true
 endif
@@ -501,8 +501,8 @@ endif
 stop-integration-humio:
 	$(CONTAINER_TOOL) rm --force vector_humio 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-humio 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-humio 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-humio 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-humio 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-humio 2>/dev/null; true
 endif
@@ -547,8 +547,8 @@ endif
 stop-integration-influxdb:
 	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v1_tls vector_influxdb_v2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-influxdb 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-influxdb 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-influxdb 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-influxdb 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-influxdb 2>/dev/null; true
 endif
@@ -599,8 +599,8 @@ endif
 stop-integration-kafka:
 	$(CONTAINER_TOOL) rm --force vector_kafka vector_zookeeper 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-kafka 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-kafka 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-kafka 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-kafka 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-kafka 2>/dev/null; true
 endif
@@ -633,8 +633,8 @@ endif
 stop-integration-loki:
 	$(CONTAINER_TOOL) rm --force vector_loki 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-loki 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-loki 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-loki 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-loki 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-loki 2>/dev/null; true
 endif
@@ -675,8 +675,8 @@ stop-integration-mongodb_metrics:
 	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics1 2>/dev/null; true
 	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-mongodb_metrics 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-mongodb_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-mongodb_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-mongodb_metrics 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-mongodb_metrics 2>/dev/null; true
 endif
@@ -709,8 +709,8 @@ endif
 stop-integration-nats:
 	$(CONTAINER_TOOL) rm --force vector_nats 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-nats 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-nats 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-nats 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-nats 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-nats 2>/dev/null; true
 endif
@@ -743,8 +743,8 @@ endif
 stop-integration-nginx:
 	$(CONTAINER_TOOL) rm --force vector_nginx 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-nginx 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-nginx 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-nginx 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-nginx 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-nginx 2>/dev/null; true
 endif
@@ -800,8 +800,8 @@ endif
 stop-integration-pulsar:
 	$(CONTAINER_TOOL) rm --force vector_pulsar 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-pulsar 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-pulsar 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-pulsar 2>/dev/null; true
 endif
@@ -835,8 +835,8 @@ endif
 stop-integration-splunk:
 	$(CONTAINER_TOOL) rm --force splunk 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-splunk 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop vector-test-integration-splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force vector-test-integration-splunk 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-splunk 2>/dev/null; true
 endif

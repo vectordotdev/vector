@@ -94,6 +94,10 @@ mod to_float;
 mod to_int;
 #[cfg(feature = "to_string")]
 mod to_string;
+#[cfg(feature = "to_syslog_level")]
+mod to_syslog_level;
+#[cfg(feature = "to_syslog_severity")]
+mod to_syslog_severity;
 #[cfg(feature = "to_timestamp")]
 mod to_timestamp;
 #[cfg(feature = "tokenize")]
@@ -201,6 +205,10 @@ pub use to_float::ToFloat;
 pub use to_int::ToInt;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
+#[cfg(feature = "to_syslog_level")]
+pub use to_syslog_level::ToSyslogLevel;
+#[cfg(feature = "to_syslog_severity")]
+pub use to_syslog_severity::ToSyslogSeverity;
 #[cfg(feature = "to_timestamp")]
 pub use to_timestamp::ToTimestamp;
 #[cfg(feature = "tokenize")]
@@ -306,6 +314,10 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_syslog_level")]
+        Box::new(ToSyslogLevel),
+        #[cfg(feature = "to_syslog_severity")]
+        Box::new(ToSyslogSeverity),
         #[cfg(feature = "to_string")]
         Box::new(ToString),
         #[cfg(feature = "to_timestamp")]

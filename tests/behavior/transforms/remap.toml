@@ -908,7 +908,8 @@
   inputs = []
   type = "remap"
   source = """
-    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
+    .grokked2 = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty = true)
     """
 [[tests]]
   name = "remap_function_parse_grok"
@@ -923,6 +924,11 @@
     "grokked.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
     "grokked.level.equals" = "info"
     "grokked.message.equals" = "Hello world"
+    "grokked.email.equals" = ""
+    "grokked2.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
+    "grokked2.level.equals" = "info"
+    "grokked2.email.exists" = false
+    "grokked2.message.equals" = "Hello world"
 
 [transforms.remap_function_ip_subnet]
   inputs = []
