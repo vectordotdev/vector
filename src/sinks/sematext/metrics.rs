@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     http::HttpClient,
-    internal_events::SematextMetricsInvalidMetricReceived,
+    internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
         http::{HttpBatchService, HttpRetryLogic},
@@ -219,7 +219,7 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
             }
         };
 
-        influx_line_protocol(
+        if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
             namespace,
             metric_type,
@@ -227,7 +227,9 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
             Some(fields),
             ts,
             &mut output,
-        );
+        ) {
+            emit!(SematextMetricsEncodeEventFailed { error });
+        };
     }
 
     output.pop();
