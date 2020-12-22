@@ -25,7 +25,7 @@ td_nightly="$(mktemp -d)"
 cp -av "target/artifacts/." "$td_nightly"
 
 for f in "$td_nightly"/*; do
-    a="$(echo $f | sed -r -e "s/$VERSION/nightly/")"
+    a="$(echo "$f" | sed -r -e "s/$VERSION/nightly/")"
     mv "$f" "$a"
 done
 ls "$td_nightly"
@@ -34,7 +34,7 @@ td_latest="$(mktemp -d)"
 cp -av "target/artifacts/." "$td_latest"
 
 for f in "$td_latest"/*; do
-    a="$(echo $f | sed -r -e "s/$VERSION/latest/")"
+    a="$(echo "$f" | sed -r -e "s/$VERSION/latest/")"
     mv "$f" "$a"
 done
 ls "$td_latest"
@@ -91,10 +91,8 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   done
   echo "Uploaded versioned archives"
 
-  for i in latest; do
-    # Upload the specific version
-    echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
-    aws s3 cp "$td_latest" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
+  echo "Uploading artifacts to s3://packages.timber.io/vector/latest/"
+  aws s3 cp "$td_latest" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
   done
   echo "Uploaded latest archives"
 
