@@ -3,16 +3,7 @@ use crate::{
     event::Metric,
 };
 use async_graphql::Object;
-use nom::lib::std::collections::BTreeMap;
-
-#[derive(Debug, Clone)]
-pub struct FileSourceMetrics(Vec<Metric>);
-
-impl FileSourceMetrics {
-    pub fn new(metrics: Vec<Metric>) -> Self {
-        Self(metrics)
-    }
-}
+use std::collections::BTreeMap;
 
 pub struct FileSourceMetricFile<'a> {
     name: String,
@@ -44,6 +35,15 @@ impl FileSourceMetricFile<'_> {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FileSourceMetrics(Vec<Metric>);
+
+impl FileSourceMetrics {
+    pub fn new(metrics: Vec<Metric>) -> Self {
+        Self(metrics)
+    }
+}
+
 #[Object]
 impl FileSourceMetrics {
     /// File metrics
@@ -61,5 +61,15 @@ impl FileSourceMetrics {
             .into_iter()
             .map(FileSourceMetricFile::from_tuple)
             .collect()
+    }
+
+    /// Events processed for the current file source
+    pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
+        self.0.processed_events_total()
+    }
+
+    /// Bytes processed for the current file source
+    pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
+        self.0.processed_bytes_total()
     }
 }

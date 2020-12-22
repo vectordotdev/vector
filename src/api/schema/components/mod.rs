@@ -3,10 +3,7 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
-use crate::{
-    api::schema::metrics::{ProcessedBytesTotal, ProcessedEventsTotal},
-    config::Config,
-};
+use crate::config::Config;
 use async_graphql::{Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
@@ -15,9 +12,7 @@ use tokio::stream::{Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "name", type = "String"),
-    field(name = "component_type", type = "String"),
-    field(name = "processed_events_total", type = "Option<ProcessedEventsTotal>"),
-    field(name = "processed_bytes_total", type = "Option<ProcessedBytesTotal>")
+    field(name = "component_type", type = "String")
 )]
 pub enum Component {
     Source(source::Source),
