@@ -85,7 +85,7 @@ pub struct Lookup<'a> {
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for Lookup<'a> {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(pair: Pair<'a, ParserRule>) -> Result<Self, Self::Error> {
         let retval = Self {
@@ -175,15 +175,15 @@ impl<'a> Lookup<'a> {
 
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument(level = "trace")]
-    pub fn is_valid(&self) -> crate::Result<()> {
+    pub fn is_valid(&self) -> Result<(), LookupError> {
         Ok(())
     }
 
     /// Parse the lookup from a str.
     #[instrument(level = "trace")]
-    pub fn from_str(input: &'a str) -> Result<Self, crate::Error> {
+    pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
         let mut pairs = RemapParser::parse(ParserRule::lookup, input)?;
-        let pair = pairs.next().ok_or("No tokens found.")?;
+        let pair = pairs.next().ok_or(LookupError::NoTokens)?;
         Self::try_from(pair)
     }
 
@@ -260,7 +260,7 @@ impl<'a> From<&'a String> for Lookup<'a> {
 }
 
 impl<'a> TryFrom<VecDeque<Segment<'a>>> for Lookup<'a> {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(segments: VecDeque<Segment<'a>>) -> Result<Self, Self::Error> {
         let retval = Self { segments };
@@ -270,7 +270,7 @@ impl<'a> TryFrom<VecDeque<Segment<'a>>> for Lookup<'a> {
 }
 
 impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'item> {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(segments: &'collection [SegmentBuf]) -> Result<Self, Self::Error> {
         let retval = Self {
@@ -282,7 +282,7 @@ impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'i
 }
 
 impl<'collection: 'item, 'item> TryFrom<&'collection VecDeque<SegmentBuf>> for Lookup<'item> {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(segments: &'collection VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
         let retval = Self {

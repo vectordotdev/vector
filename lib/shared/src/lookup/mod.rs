@@ -38,9 +38,9 @@ trait Look<'a>:
 
     fn len(&self) -> usize;
 
-    fn is_valid(&self) -> crate::Result<()>;
+    fn is_valid(&self) -> Result<(), LookupError>;
 
-    fn from_str(input: &'a str) -> Result<Self, crate::Error>;
+    fn from_str(input: &'a str) -> Result<Self, LookupError>;
 
     fn extend(&mut self, other: Self);
 
@@ -70,10 +70,10 @@ impl<'a> Look<'a> for Lookup<'a> {
     fn len(&self) -> usize {
         self.len()
     }
-    fn is_valid(&self) -> crate::Result<()> {
+    fn is_valid(&self) -> Result<(), LookupError> {
         Lookup::is_valid(self)
     }
-    fn from_str(input: &'a str) -> Result<Self, crate::Error> {
+    fn from_str(input: &'a str) -> Result<Self, LookupError> {
         Lookup::from_str(input)
     }
     fn extend(&mut self, other: Self) {
@@ -107,10 +107,10 @@ impl Look<'static> for LookupBuf {
     fn len(&self) -> usize {
         self.len()
     }
-    fn is_valid(&self) -> crate::Result<()> {
+    fn is_valid(&self) -> Result<(), LookupError> {
         LookupBuf::is_valid(self)
     }
-    fn from_str(input: &'static str) -> Result<Self, crate::Error> {
+    fn from_str(input: &'static str) -> Result<Self, LookupError> {
         LookupBuf::from_str(input)
     }
     fn extend(&mut self, other: Self) {

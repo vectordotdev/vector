@@ -2,7 +2,7 @@ pub mod lua;
 #[cfg(test)]
 mod test;
 
-use crate::lookup::*;
+use crate::{lookup::*, event::*};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -393,7 +393,7 @@ impl Value {
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
         value: impl Into<Value> + Debug,
-    ) -> crate::Result<Option<Value>> {
+    ) -> Result<Option<Value>, EventError> {
         let mut working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
@@ -413,7 +413,7 @@ impl Value {
             | (_, Value::Timestamp(_))
             | (_, Value::Float(_))
             | (_, Value::Integer(_)) => {
-                Err("Cannot insert value nested inside a primitive field.".into())
+                Err(EventError::PrimitiveDescent { location: working_lookup })
             }
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
@@ -449,7 +449,7 @@ impl Value {
                         let mut cursor_set = set;
                         loop {
                             match cursor_set.get(0).and_then(|v| v.get(0)) {
-                                None => return Err("Met 0 length coalesce sub segment.".into()),
+                                None => return Err(EventError::EmptyCoalesceSubSegment),
                                 Some(SegmentBuf::Field { .. }) => {
                                     break {
                                         trace!("Preparing inner map.");
@@ -512,7 +512,7 @@ impl Value {
                                 loop {
                                     match cursor_set.get(0).and_then(|v| v.get(0)) {
                                         None => {
-                                            return Err("Met 0 length coalesce sub segment.".into())
+                                            return Err(EventError::EmptyCoalesceSubSegment)
                                         }
                                         Some(SegmentBuf::Field { .. }) => {
                                             break {
@@ -568,7 +568,7 @@ impl Value {
                         let mut cursor_set = &set;
                         loop {
                             match cursor_set.get(0).and_then(|v| v.get(0)) {
-                                None => return Err("Met 0 length coalesce sub segment.".into()),
+                                None => return Err(EventError::EmptyCoalesceSubSegment),
                                 Some(SegmentBuf::Field { .. }) => {
                                     break {
                                         let mut inner = Value::Map(Default::default());
@@ -624,7 +624,7 @@ impl Value {
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
-    ) -> crate::Result<Option<Value>> {
+    ) -> Result<Option<Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
@@ -644,7 +644,7 @@ impl Value {
             | (_, Value::Float(_))
             | (_, Value::Integer(_))
             | (_, Value::Null) => {
-                Err("Cannot remove value nested inside a primitive field.".into())
+                return Err(EventError::PrimitiveDescent { location: working_lookup.into_buf() })
             }
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
@@ -782,7 +782,7 @@ impl Value {
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
     #[instrument(level = "trace", skip(self, lookup))]
-    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> crate::Result<Option<&Value>> {
+    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Result<Option<&Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
@@ -882,7 +882,7 @@ impl Value {
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
-    ) -> crate::Result<Option<&mut Value>> {
+    ) -> Result<Option<&mut Value>, EventError> {
         let mut working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();

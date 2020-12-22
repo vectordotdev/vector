@@ -86,7 +86,7 @@ pub struct LookupBuf {
 }
 
 impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(pair: Pair<'a, ParserRule>) -> Result<Self, Self::Error> {
         let retval = LookupBuf {
@@ -102,8 +102,8 @@ impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
 
 // TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
 impl TryFrom<remap_lang::Path> for LookupBuf {
-    type Error = crate::Error;
-    fn try_from(target: remap_lang::Path) -> crate::Result<Self> {
+    type Error = LookupError;
+    fn try_from(target: remap_lang::Path) -> Result<Self, Self::Error> {
         let path_string = target.to_string();
         trace!(path = %path_string, "Converting to LookupBuf.");
         LookupBuf::from_str(&path_string)
@@ -112,8 +112,8 @@ impl TryFrom<remap_lang::Path> for LookupBuf {
 
 // TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
 impl TryFrom<&remap_lang::Path> for LookupBuf {
-    type Error = crate::Error;
-    fn try_from(target: &remap_lang::Path) -> crate::Result<Self> {
+    type Error = LookupError;
+    fn try_from(target: &remap_lang::Path) -> Result<Self, Self::Error> {
         let path_string = target.to_string();
         trace!(path = %path_string, "Converting to LookupBuf.");
         LookupBuf::from_str(&path_string)
@@ -121,7 +121,7 @@ impl TryFrom<&remap_lang::Path> for LookupBuf {
 }
 
 impl<'a> TryFrom<VecDeque<SegmentBuf>> for LookupBuf {
-    type Error = crate::Error;
+    type Error = LookupError;
 
     fn try_from(segments: VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
         let retval = LookupBuf { segments };
@@ -284,7 +284,7 @@ impl LookupBuf {
 
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument(level = "trace")]
-    pub fn is_valid(&self) -> crate::Result<()> {
+    pub fn is_valid(&self) -> Result<(), LookupError> {
         Ok(())
     }
 
@@ -294,7 +294,7 @@ impl LookupBuf {
     }
 
     #[instrument(level = "trace")]
-    pub fn from_str(value: &str) -> Result<LookupBuf, crate::Error> {
+    pub fn from_str(value: &str) -> Result<LookupBuf, LookupError> {
         Lookup::from_str(value).map(|l| l.into_buf())
     }
 
@@ -324,7 +324,7 @@ impl LookupBuf {
 }
 
 impl FromStr for LookupBuf {
-    type Err = crate::Error;
+    type Err = LookupError;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let lookup = Lookup::from_str(input)?;
@@ -432,7 +432,7 @@ impl<'a> From<Lookup<'a>> for LookupBuf {
             .into_iter()
             .map(|f| f.as_segment_buf())
             .collect::<VecDeque<_>>();
-        let retval: Result<LookupBuf, crate::Error> = LookupBuf::try_from(segments);
+        let retval: Result<LookupBuf, LookupError> = LookupBuf::try_from(segments);
         retval.expect(
             "A LookupBuf with 0 length was turned into a Lookup. Since a LookupBuf with 0 \
                   length is an invariant, any action on it is too.",
