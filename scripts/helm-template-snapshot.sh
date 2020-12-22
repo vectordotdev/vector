@@ -34,7 +34,8 @@ EOF
     --namespace vector \
     --create-namespace \
     --values "$VALUES_FILE" \
-    --version master
+    --version master \
+    --debug
 }
 
 list-config-files() {
