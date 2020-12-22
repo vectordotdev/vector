@@ -147,7 +147,7 @@ def create_release_file!(new_version,dev_version)
           releases: #{new_version.to_json}: {
             date:     #{Date.today.to_json}
             codename: ""
-            dev_release: #{dev_version.to_json}
+            dev_version: #{dev_version.to_json}
 
             whats_next: []
 
