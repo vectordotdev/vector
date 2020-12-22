@@ -31,15 +31,15 @@ struct EncodeJsonFn {
 impl Expression for EncodeJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
-        serde_json::to_string(&value)
-            .map(|v| v.into())
-            .map_err(|e| format!("unable encode to json: {}", e).into())
+        match serde_json::to_string(&value) {
+            Ok(value) => Ok(value.into()),
+            Err(error) => panic!("unable encode to json: {}", error),
+        }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .into_fallible(true) // Serialization error
             .with_constraint(value::Kind::Bytes)
     }
 }
@@ -108,47 +108,47 @@ mod tests {
     test_type_def![
         bytes {
             expr: |_| EncodeJsonFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         integer {
             expr: |_| EncodeJsonFn { value: Literal::from(42).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         float {
             expr: |_| EncodeJsonFn { value: Literal::from(42f64).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         boolean {
             expr: |_| EncodeJsonFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         map {
             expr: |_| EncodeJsonFn { value: map!{}.boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         array {
             expr: |_| EncodeJsonFn { value: array![].boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         timestamp {
             expr: |_| EncodeJsonFn { value: Literal::from(chrono::Utc::now()).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         regex {
             expr: |_| EncodeJsonFn { value: Literal::from(Regex::new("^a\\d+$").unwrap()).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         null {
             expr: |_| EncodeJsonFn { value: Literal::from(()).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
     ];
 }
