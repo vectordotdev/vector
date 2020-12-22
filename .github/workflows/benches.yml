@@ -60,7 +60,8 @@ jobs:
       - run: make slim-builds
       - name: Run benchmarks
         run: |
-          git checkout master
+          git fetch --depth 1 origin master
+          git checkout origin/master
           make bench
           git checkout $GITHUB_SHA
           make bench | tee target/criterion/out
