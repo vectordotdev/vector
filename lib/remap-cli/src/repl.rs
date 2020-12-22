@@ -17,25 +17,13 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 
     println!(
         "
-> TTTTTTTTTTTTTTTTTTTTTTTRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
-> T:::::::::::::::::::::TR::::::::::::::::R  L:::::::::L
-> T:::::::::::::::::::::TR::::::RRRRRR:::::R L:::::::::L
-> T:::::TT:::::::TT:::::TRR:::::R     R:::::RLL:::::::LL
-> TTTTTT  T:::::T  TTTTTT  R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::RRRRRR:::::R   L:::::L
->         T:::::T          R:::::::::::::RR    L:::::L
->         T:::::T          R::::RRRRRR:::::R   L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L         LLLLLL
->       TT:::::::TT      RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
->       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
->       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
->       TTTTTTTTTTT      RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
+>               .__
+> ___  _________|  |
+> \  \/ /\_  __ \  |
+>  \   /  |  | \/  |__
+>   \_/   |__|  |____/
 >
->                     TIMBER    REMAP    LANGUAGE
->
+> VECTOR REMAP LANGUAGE
 >
 > Welcome!
 >
@@ -48,7 +36,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
-> Any other value is resolved to a TRL expression.
+> Any other value is resolved to a VRL expression.
 >
 > Try it out now by typing `.` and hitting [enter] to see the result.\n"
     );
