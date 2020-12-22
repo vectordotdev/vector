@@ -37,8 +37,16 @@ EOF
     --version master
 }
 
+list-config-files() {
+  CONFIG_FILES=()
+  while IFS=  read -r -d $'\0'; do
+    CONFIG_FILES+=("$REPLY")
+  done < <(find "$CONFIGURATIONS_DIR" -name "config.sh" -print0)
+}
+
 update() {
-  for CONFIG_FILE in "$CONFIGURATIONS_DIR"/*/config.sh; do
+  list-config-files
+  for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
     VALUES_FILE="$(dirname "$CONFIG_FILE")/values.yaml"
     TARGET_FILE="$(dirname "$CONFIG_FILE")/snapshot.yaml"
     (
@@ -50,7 +58,8 @@ update() {
 }
 
 check() {
-  for CONFIG_FILE in "$CONFIGURATIONS_DIR"/*/config.sh; do
+  list-config-files
+  for CONFIG_FILE in "${CONFIG_FILES[@]}"; do
     VALUES_FILE="$(dirname "$CONFIG_FILE")/values.yaml"
     TARGET_FILE="$(dirname "$CONFIG_FILE")/snapshot.yaml"
     (
@@ -61,6 +70,7 @@ check() {
 
       if [[ "$GENERATED" != "$FILE" ]]; then
         echo "Error: snapshot ($TARGET_FILE) does not match the generated version" >&2
+        diff "$TARGET_FILE" - <<<"$GENERATED"
         exit 1
       fi
     )
