@@ -97,6 +97,7 @@ installation: _interfaces: "helm3": {
 					command: commands.install
 				},
 			]
+			variables: config: sinks: out: inputs: ["kubernetes_logs"]
 		}
 
 		// aggregator: {
