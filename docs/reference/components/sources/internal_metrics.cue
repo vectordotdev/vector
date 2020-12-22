@@ -386,7 +386,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		missing_keys_total: {
-			description:       "The total number of events dropped due to keys missing from the event."
+			description:       "The total number of failed template renders due to missed keys from the event."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags

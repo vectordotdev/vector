@@ -37,40 +37,23 @@ impl InternalEvent for SplunkEventEncodeError {
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceTypeMissingKeys<'a> {
+pub struct SplunkMissingKeys<'a> {
+    pub field: &'static str,
     pub keys: &'a [String],
 }
 
-impl<'a> InternalEvent for SplunkSourceTypeMissingKeys<'a> {
+impl<'a> InternalEvent for SplunkMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "Failed to render template for sourcetype, leaving empty.",
+            message = "Failed to render template for {}, leaving empty.",
+            self.field,
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
     }
 
     fn emit_metrics(&self) {
-        counter!("sourcetype_missing_keys_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct SplunkSourceMissingKeys<'a> {
-    pub keys: &'a [String],
-}
-
-impl<'a> InternalEvent for SplunkSourceMissingKeys<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Failed to render template for source, leaving empty.",
-            missing_keys = ?self.keys,
-            rate_limit_secs = 30,
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("source_missing_keys_total", 1);
+        counter!("missing_keys_total", 1);
     }
 }
 

@@ -159,7 +159,9 @@ components: sinks: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		http_requests_total:       components.sources.internal_metrics.output.metrics.http_requests_total
+		encode_errors_total:    components.sources.internal_metrics.output.metrics.encode_errors_total
+		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

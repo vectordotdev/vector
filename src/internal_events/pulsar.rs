@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use metrics::counter;
 
 #[derive(Debug)]
 pub struct PulsarEncodeEventFailed<'a> {
@@ -7,6 +8,14 @@ pub struct PulsarEncodeEventFailed<'a> {
 
 impl<'a> InternalEvent for PulsarEncodeEventFailed<'a> {
     fn emit_logs(&self) {
-        debug!(message = "Event encode failed.", error = ?self.error);
+        error!(
+            message = "Event encode failed; dropping event.",
+            error = %self.error,
+            rate_limit_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("encode_errors_total", 1);
     }
 }
