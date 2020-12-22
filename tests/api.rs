@@ -464,7 +464,7 @@ mod tests {
                     "processed_events_total_batch_source",
                     "processed_events_total_batch_sink",
                 ] {
-                    assert!(data.iter().any(|d| d.name == name));
+                    assert!(data.iter().any(|d| d.name == *name));
                 }
             },
         )
