@@ -1371,3 +1371,24 @@
       "namespace.equals" = "zork"
       "host.equals" = "ook"
       "type.equals" = "counter"
+
+[transforms.remap_function_encode_json]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = encode_json(parse_json(.a))
+    .b = encode_json(parse_json(.b))
+  """
+[[tests]]
+  name = "remap_function_encode_json"
+  [tests.input]
+    insert_at = "remap_function_encode_json"
+    type = "log"
+    [tests.input.log_fields]
+      a = "[1, 2, 3]"
+      b = """{"field1": {"field2": 1, "field3": null}}"""
+  [[tests.outputs]]
+    extract_from = "remap_function_encode_json"
+    [[tests.outputs.conditions]]
+      "a.equals" = "[1,2,3]"
+      "b.equals" = """{"field1":{"field2":1,"field3":null}}"""
