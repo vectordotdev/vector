@@ -18,6 +18,6 @@ cp target/artifacts/vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc.zip targe
 pushd target/msi-x64
 # shellcheck disable=SC2016
 powershell '$progressPreference = "silentlyContinue"; Expand-Archive vector-'"$ARCHIVE_VERSION"'-x86_64-pc-windows-msvc.zip'
-./build.sh
+./build.sh "${ARCHIVE_VERSION}"
 popd
 cp target/msi-x64/vector.msi target/artifacts/vector-"${ARCHIVE_VERSION}"-x64.msi
