@@ -460,7 +460,7 @@ mod tests {
                     .await
                     .expect("Didn't return results");
 
-                for name in vec![
+                for name in &[
                     "processed_events_total_batch_source",
                     "processed_events_total_batch_sink",
                 ] {
