@@ -1,0 +1,17 @@
+query FileSourceMetricsQuery {
+    sources {
+        __typename
+        metrics {
+            __typename
+            ...on FileSourceMetrics {
+                __typename
+                files {
+                    name
+                    processedEventsTotal {
+                        processedEventsTotal
+                    }
+                }
+            }
+        }
+    }
+}

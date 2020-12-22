@@ -9,11 +9,14 @@ mod tests {
     use crate::support::{fork_test, sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
+    use std::fs::File;
+    use std::io::Write;
     use std::{
         collections::HashMap,
         net::SocketAddr,
         time::{Duration, Instant},
     };
+    use tempfile::tempdir;
     use tokio::sync::oneshot;
     use url::Url;
     use vector::{
@@ -680,6 +683,61 @@ mod tests {
 
             // Await the join handle
             handle.await.unwrap();
+        })
+    }
+
+    #[test]
+    fn api_graphql_files_source_metrics() {
+        metrics_test("tests::api_graphql_files_source_metrics", async {
+            // Create a temporary file, and fill it with lines
+            let dir = tempdir().unwrap();
+            let checkpoints = tempdir().unwrap();
+            let path = dir.path().join("file");
+            let mut file = File::create(&path).unwrap();
+            let lines = vec!["test1", "test2", "test3"];
+
+            for line in &lines {
+                writeln!(&mut file, "{}", line).unwrap();
+            }
+
+            let conf = format!(
+                r#"
+                [api]
+                  enabled = true
+
+                [sources.file]
+                  type = "file"
+                  data_dir = "{}"
+                  include = ["{}"]
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["file"]
+                  print_amount = 100000
+            "#,
+                checkpoints.path().to_str().unwrap(),
+                path.to_str().unwrap()
+            );
+
+            let topology = from_str_config(&conf).await;
+            let server = api::Server::start(topology.config());
+
+            // Short delay to ensure logs are picked up
+            tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+
+            // Run the query; files name + metrics should match
+            let client = make_client(server.addr());
+            let res = client.file_source_metrics_query().await;
+
+            match &res.unwrap().data.unwrap().sources[0].metrics.on {
+                file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOn::FileSourceMetrics(
+                    file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOnFileSourceMetrics { files, .. },
+                ) => {
+                    assert_eq!(files[0].name, path.to_str().unwrap());
+                    assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                }
+                _ => panic!("not a file source"),
+            }
         })
     }
 }
