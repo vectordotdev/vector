@@ -240,6 +240,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		encode_errors_total: {
+			description:       "The total number of errors encountered when encoding an event."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"

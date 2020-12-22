@@ -25,3 +25,22 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct SematextMetricsEncodeEventFailed {
+    pub error: &'static str,
+}
+
+impl InternalEvent for SematextMetricsEncodeEventFailed {
+    fn emit_logs(&self) {
+        warn!(
+             message = "Failed to encode event; dropping event.",
+             error = %self.error,
+             rate_limit_secs = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("encode_errors_total", 1);
+    }
+}
