@@ -445,7 +445,7 @@ fn keys_and_pairs() -> crate::Result<()> {
 // Basically: This test makes sure we aren't mutilating any content users might be sending.
 #[test_env_log::test]
 fn json_value_to_vector_log_event_to_json_value() {
-    const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
+    const FIXTURE_ROOT: &str = "tests/fixtures/log_event";
 
     trace!(?FIXTURE_ROOT, "Opening.");
     std::fs::read_dir(FIXTURE_ROOT)
@@ -693,7 +693,7 @@ mod remap {
             let value: remap::Value = value;
             let path = remap_lang::Path::new_unchecked(segments);
 
-            assert_eq!(remap_lang::Object::insert(&mut event, &path, value.clone().into()), result);
+            assert_eq!(remap_lang::Object::insert(&mut event, &path, value.clone().into()), result, "Result of {:?}::insert({:?},{:?}) was not {:?}.", event, path, value, result);
             assert_eq!(event, expect);
             assert_eq!(remap::Object::get(&event, &path), Ok(Some(value.into())));
         }

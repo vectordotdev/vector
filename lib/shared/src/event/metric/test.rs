@@ -314,7 +314,7 @@ fn display() {
 
 mod remap {
     use super::*;
-    use remap_lang::{Segment, Path, Object};
+    use remap_lang::{Path, Object};
 
 
     #[test_env_log::test]

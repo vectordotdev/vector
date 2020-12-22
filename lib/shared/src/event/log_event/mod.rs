@@ -612,7 +612,7 @@ impl LogEvent {
     /// assert_eq!(event.inner(), &std::collections::BTreeMap::default());
     /// ```
     #[instrument(level = "trace", skip(self))]
-    pub fn inner(&mut self) -> &BTreeMap<String, Value> {
+    pub fn inner(&self) -> &BTreeMap<String, Value> {
         &self.fields
     }
 
@@ -631,31 +631,62 @@ impl LogEvent {
 
 impl remap_lang::Object for LogEvent {
     fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
-        let val = self.get(&LookupBuf::try_from(path).map_err(|e| format!("{}", e))?);
-        // TODO: This does not need to clone.
-        Ok(val.map(Clone::clone).map(Into::into))
+        let path_string = path.to_string();
+        if path_string == "." {
+            Ok(Some(Value::from(self.inner().clone()).into()))
+        } else {
+            trace!(path = %path_string, "Converting to LookupBuf.");
+            let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
+            let val = self.get(&lookup);
+            // TODO: This does not need to clone.
+            Ok(val.map(Clone::clone).map(Into::into))
+        }
     }
 
     fn remove(&mut self, path: &remap_lang::Path, compact: bool) -> Result<(), String> {
-        let _val = self.remove(
-            &LookupBuf::try_from(path)
-                // TODO: We should not degrade the error to a string here.
-                .map_err(|e| format!("{}", e))?,
-            compact,
-        );
-        // TODO: Why does this not return?
-        Ok(())
+        let path_string = path.to_string();
+        if path_string == "." {
+            let mut value = LogEvent::default();
+            std::mem::swap(self, &mut value);
+            // TODO: Why does this not return value?
+            return Ok(());
+        } else {
+            trace!(path = %path_string, "Converting to LookupBuf.");
+            let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
+            let _val = self.remove(
+                &lookup,
+                compact,
+            );
+            // TODO: Why does this not return?
+            Ok(())
+        }
+
+
     }
 
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
-        let _val = self.insert(
-            LookupBuf::try_from(path)
-                // TODO: We should not degrade the error to a string here.
-                .map_err(|e| format!("{}", e))?,
-            value,
-        );
-        // TODO: Why does this not return?
-        Ok(())
+        let path_string = path.to_string();
+        let value = Value::from(value);
+        if path_string == "." {
+            if let Value::Map(mut v) = value {
+                std::mem::swap(&mut self.fields, &mut v);
+                // TODO: Why does this not return value?
+                return Ok(());
+            } else {
+                return Err("Cannot insert as root of Event unless it is a map.".into());
+            }
+        } else {
+            trace!(path = %path_string, "Converting to LookupBuf.");
+            // TODO: We should not degrade the error to a string here.
+            let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
+            let _val = self.insert(
+                lookup,
+                value,
+            );
+            // TODO: Why does this not return?
+            Ok(())
+        }
+
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
