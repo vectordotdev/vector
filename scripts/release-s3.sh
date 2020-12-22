@@ -21,6 +21,17 @@ td="$(mktemp -d)"
 cp -av "target/artifacts/." "$td"
 ls "$td"
 
+td_latest="$(mktemp -d)"
+cp -av "target/artifacts/." "$td_latest"
+
+for f in "$td_latest"/*; do
+    a="$(echo $f | sed -r -e "s/$VERSION/nightly/")"
+    echo $a
+    #mv "$f" "$a"
+done
+
+exit 1
+
 #
 # A helper function for verifying a published artifact.
 #
