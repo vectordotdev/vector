@@ -1,6 +1,6 @@
-# TRL Functions
+# Vector Remap Language (VRL) Functions
 
-This crate contains all TRL functions written for Vector and its supporting
+This crate contains all VRL functions written for Vector and its supporting
 libraries.
 
 ## Usage
