@@ -71,20 +71,55 @@ components: transforms: remap: {
 
 	examples: [
 		{
-			title: "Add, Rename, & Remove Fields"
+			title: "Add, rename, and remove fields"
 			configuration: {
 				source: #"""
 					.new_field = "new value"
-					.new_name = .old_name
+					.new_field_name = .old_field_name
 					del(.old_name)
 					"""#
 			}
 			input: log: {
-				old_name: "old value"
+				old_field_name: "old value"
 			}
 			output: log: {
-				new_field: "new value"
-				new_name:  "old value"
+				new_field:      "new value"
+				new_field_name: "old value"
+			}
+		},
+		{
+			title: "Allowlisting fields"
+			configuration: {
+				source: """
+					only_fields(.field1, .field2)
+					"""
+			}
+			input: log: {
+				field1: "value1"
+				field2: "value2"
+				field3: "value3"
+			}
+			output: log: {
+				field1: "value1"
+				field2: "value2"
+			}
+		},
+		{
+			title: "Working with numbers"
+			configuration: {
+				source: """
+					.rounded_temp = round(.temperature)
+					.floor_temp = floor(.temperature)
+					.ceil_temp = ceil(.temperature)
+					"""
+			}
+			input: log: {
+				temperature: 105.1
+			}
+			output: log: {
+				rounded_temp: 105
+				floor_temp:   105
+				ceil_temp:    106
 			}
 		},
 		{
