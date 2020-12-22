@@ -253,7 +253,7 @@ jobs:
       - name: Check helm lint
         if: needs.changes.outputs.helm == 'true'
         run: make check-helm-lint
-      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
+      - name: Check that generated Kubernetes YAMLs don't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
       - name: Check events
