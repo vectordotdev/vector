@@ -105,6 +105,26 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Working with strings"
+			configuration: source: """
+				.message = strip_whitespace(.message)
+				.upper = upcase(.message)
+				.lower = downcase(.message)
+				.has_hello = contains(.lower, "hello")
+				.truncated = truncate(.lower, 5, ellipsis = true)
+				.ends_with_booper = ends_with(.lower, "booper")
+				del(.message)
+				"""
+			input: log: message: "  hEllo WoRlD   "
+			output: log: {
+				upper:            "HELLO WORLD"
+				lower:            "hello world"
+				has_hello:        true
+				truncated:        "hello..."
+				ends_with_booper: false
+			}
+		},
+		{
 			title: "Working with numbers"
 			configuration: {
 				source: """
@@ -124,10 +144,10 @@ components: transforms: remap: {
 			title: "Stripping ANSI characters"
 			configuration: {
 				source: """
-				.text = strip_ansi_escape_codes(.text)
-				"""
+					.text = strip_ansi_escape_codes(.text)
+					"""
 			}
-			input: log: text: #"\e[46mfoo\e[0m bar"#
+			input: log: text:  #"\e[46mfoo\e[0m bar"#
 			output: log: text: "foo bar"
 		},
 		{
@@ -155,7 +175,7 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Coerce Values"
+			title: "Coerce values"
 			configuration: {
 				source: #"""
 					.bool = to_bool(.bool)
@@ -184,17 +204,31 @@ components: transforms: remap: {
 				"""
 			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
 			ouput: log: {
-				appname: "su"
-				facility: "ntp"
-				hostname: "vector-user.biz"
-				message: "Something went wrong"
-				msgid: "ID389"
-				procid: 2666
-				severity: "info"
+				appname:   "su"
+				facility:  "ntp"
+				hostname:  "vector-user.biz"
+				message:   "Something went wrong"
+				msgid:     "ID389"
+				procid:    2666
+				severity:  "info"
 				timestamp: "2020-12-22 15:22:31.111 UTC"
 			}
-
-		}
+		},
+		{
+			title: "Syslog severity and level"
+			configuration: source: """
+				.level = to_syslog_level(.level)
+				.severity = to_syslog_severity(.severity)
+				"""
+			input: log: {
+				level:    1
+				severity: "error"
+			}
+			output: log: {
+				level:    "alert"
+				severity: 3
+			}
+		},
 	]
 
 	how_it_works: {
