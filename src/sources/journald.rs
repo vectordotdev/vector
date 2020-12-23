@@ -421,10 +421,8 @@ fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
     // journalctl will output non-ASCII values using an array
     // of integers. Look for those values and re-parse them.
     if let Some(record) = record.as_object_mut() {
-        for (_, value) in record.iter_mut() {
-            if let Some(decoded) = value.as_array().and_then(|v| decode_array(&v)) {
-                *value = decoded;
-            }
+        for (_, value) in record.iter_mut().filter(|(_, v)| v.is_array()) {
+            *value = decode_array(value.as_array().expect("already validated"));
         }
     }
     if remap {
@@ -433,7 +431,14 @@ fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> JsonValue {
+    decode_array_as_bytes(array).unwrap_or_else(|| {
+        let ser = serde_json::to_string(array).expect("already deserialized");
+        JsonValue::String(ser)
+    })
+}
+
+fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
@@ -588,6 +593,7 @@ mod tests {
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
 {"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
+{"_SYSTEMD_UNIT":"NetworkManager.service","MESSAGE":"<info>  [1608278027.6016] dhcp-init: Using DHCP client 'dhclient'","__CURSOR":"6","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"6","SYSLOG_FACILITY":["DHCP4","DHCP6"]}
 "#;
 
     struct FakeJournal {
@@ -742,6 +748,16 @@ mod tests {
         assert_eq!(
             received[0].as_log()["SYSLOG_RAW"],
             Value::Bytes("¿World?".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn parses_string_sequences() {
+        let received = run_journal(&["NetworkManager.service"], &[], None).await;
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()["SYSLOG_FACILITY"],
+            Value::Bytes(r#"["DHCP4","DHCP6"]"#.into())
         );
     }
 
