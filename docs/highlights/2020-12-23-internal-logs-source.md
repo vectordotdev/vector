@@ -27,6 +27,7 @@ message:
   "timestamp": "2020-10-10T17:07:36+00:00"
 }
 ```
+
 `internal_logs` is a helpful accompaniment to the
 [`internal_metrics`][internal_metrics] source, which exports Vector's own
 metrics and modify and ship them however you wish.
