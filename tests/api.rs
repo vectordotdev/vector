@@ -692,7 +692,12 @@ mod tests {
 
             let checkpoints = tempdir().unwrap();
             let mut named_file = tempfile::NamedTempFile::new().unwrap();
-            let path = named_file.path().to_str().unwrap().to_string();
+            let path = named_file
+                .path()
+                .to_str()
+                .unwrap()
+                .to_string()
+                .replace(r"\", r"\\");
             let mut file = named_file.as_file_mut();
 
             for line in &lines {
