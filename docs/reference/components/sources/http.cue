@@ -187,4 +187,14 @@ components: sources: http: {
 	telemetry: metrics: {
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
 	}
+
+	how_it_works: {
+		compression: {
+			title: "Compression"
+			body: """
+				Received body is decompressed according to `Content-Encoding` header.
+				Supported compression algorithms are `gzip` and `deflate`.
+				"""
+		}
+	}
 }
