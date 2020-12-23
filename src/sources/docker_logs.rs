@@ -56,6 +56,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    host_key: Option<String>,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
@@ -79,6 +80,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            host_key: None,
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -343,6 +345,12 @@ impl DockerLogsSource {
 
         let backoff_secs = config.retry_backoff_secs;
 
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
+        let hostname = crate::get_hostname().ok();
+
         // Only logs created at, or after this moment are logged.
         let core = DockerLogsSourceCore::new(config)?;
 
@@ -363,6 +371,8 @@ impl DockerLogsSource {
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
+            host_key,
+            hostname,
             core: Arc::new(core),
             out,
             main_send,
@@ -554,6 +564,8 @@ impl DockerLogsSource {
 /// Used to construct and start event stream futures
 #[derive(Clone)]
 struct EventStreamBuilder {
+    host_key: String,
+    hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
     out: Pipeline,
@@ -673,7 +685,13 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        let result = events_stream.map(Ok).forward(self.out.clone()).await;
+        let host_key = self.host_key.clone();
+        let hostname = self.hostname.clone();
+        let result = events_stream
+            .map(move |event| add_hostname(event, &host_key, &hostname))
+            .map(Ok)
+            .forward(self.out.clone())
+            .await;
 
         // End of stream
         emit!(DockerLogsContainerUnwatch {
@@ -689,6 +707,14 @@ impl EventStreamBuilder {
             error!(message = "Unable to return ContainerLogInfo to main.", %error);
         }
     }
+}
+
+fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> Event {
+    if let Some(hostname) = hostname {
+        event.as_mut_log().insert(host_key, hostname.clone());
+    }
+
+    event
 }
 
 /// Container ID as assigned by Docker.
