@@ -246,6 +246,29 @@ components: transforms: remap: {
 				username: ""
 			}
 		},
+		{
+			title: "Working with IP addresses"
+			configuration: source: """
+				.contains_ipv4_address = ip_cidr_contains(.ipv4_address, "192.168.0.0/16")
+				.ipv4_subnet = ip_subnet(.ipv4_address, "255.255.255.0")
+				.contains_ipv6_address = ip_cidr_contains(.ipv6_address, "2001:4f8:4:ba::")
+				.ipv6_subnet = ip_subnet(.ipv6_address, "/32")
+				.ipv4_converted = ipv6_to_ipv4("::ffff:192.168.0.1")
+				.ipv6_converted = ip_to_ipv6("localhost")
+				"""
+			input: log: {
+				ipv4_address: "192.168.10.32"
+				ipv6_address: "2404:6800:4003:c02::64"
+			}
+			output: log: {
+				contains_ipv4_address: true
+				ipv4_subnet:           "192.168.10.0"
+				contains_ipv6_address: false
+				ipv6_subnet:           "2001:4f8::"
+				ipv4_converted:        "192.168.0.1"
+				ipv6_converted:        "::ffff:192.169.0.1"
+			}
+		},
 	]
 
 	how_it_works: {
