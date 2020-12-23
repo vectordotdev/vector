@@ -143,13 +143,8 @@ impl Metric {
         }
     }
 
-    /// Add the data from the other metric to this one. The `other` must
-    /// be relative and contain the same value type as this one.
-    pub fn add(&mut self, other: &Self) {
-        if other.kind.is_absolute() {
-            return;
-        }
-
+    /// Mutate MetricValue, by adding the value from another Metric.
+    pub fn update_value(&mut self, other: &Self) {
         match (&mut self.value, &other.value) {
             (MetricValue::Counter { ref mut value }, MetricValue::Counter { value: value2 }) => {
                 *value += value2;
@@ -199,6 +194,16 @@ impl Metric {
             }
             _ => {}
         }
+    }
+
+    /// Add the data from the other metric to this one. The `other` must
+    /// be relative and contain the same value type as this one.
+    pub fn add(&mut self, other: &Self) {
+        if other.kind.is_absolute() {
+            return;
+        }
+
+        self.update_value(other)
     }
 
     /// Set all the values of this metric to zero without emptying
