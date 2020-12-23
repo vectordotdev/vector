@@ -145,6 +145,7 @@ impl fmt::Display for Rule {
             LOOKUP_OPEN_BRACKET,
             LOOKUP_CLOSE_BRACKET,
             LOOKUP_PERIOD,
+            LOOKUP_ESCAPE,
         ]
     }
 }

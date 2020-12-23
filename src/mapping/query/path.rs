@@ -102,6 +102,7 @@ mod tests {
 
     #[test]
     fn check_path_query() {
+        crate::test_util::trace_init();
         let cases = vec![
             (
                 log_event! {
@@ -127,14 +128,11 @@ mod tests {
             ),
             (
                 {
-                    let mut event = log_event! {
+                    let event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
                         crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                        LookupBuf::from_str("foo\\.bar.baz").unwrap() => 20,
                     };
-                    event.as_mut_log().insert(
-                        LookupBuf::from_str("\"foo.bar\".baz").unwrap(),
-                        Value::Integer(20),
-                    );
                     event
                 },
                 Ok(Value::Integer(20)),
@@ -147,7 +145,7 @@ mod tests {
                         crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
                     };
                     event.as_mut_log().insert(
-                        LookupBuf::from_str("foo bar.baz").unwrap(),
+                        LookupBuf::from_str("\"foo bar\".baz").unwrap(),
                         Value::Integer(20),
                     );
                     event
@@ -157,14 +155,11 @@ mod tests {
             ),
             (
                 {
-                    let mut event = log_event! {
+                    let event = log_event! {
                         crate::config::log_schema().message_key().clone() => "".to_string(),
                         crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                        LookupBuf::from_str(r#""foo.bar[0]".baz"#).unwrap() => Value::Integer(20),
                     };
-                    event.as_mut_log().insert(
-                        LookupBuf::from_str("foo.bar[0].baz").unwrap(),
-                        Value::Integer(20),
-                    );
                     event
                 },
                 Ok(Value::Integer(20)),

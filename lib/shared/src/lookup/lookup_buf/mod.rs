@@ -80,7 +80,7 @@ mod test;
 /// ```
 ///
 /// For more, investigate `Lookup`.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Debug, PartialEq, Default, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct LookupBuf {
     pub segments: VecDeque<SegmentBuf>,
 }

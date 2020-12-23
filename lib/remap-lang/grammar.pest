@@ -101,7 +101,7 @@ WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }
 EOE = _{ NEWLINE | ";" }
 
 // Lookups -----------------------------------------------------------------------
-// Used by `src/event/lookup.rs`.
+// Used by `lib/shared/lookup/*.rs`.
 // Changing this will have far reaching impacts on Vector's core event API.
 lookup         = ${
   // Paths originating from the Remap-lang have a root `.` in front, so we support this.
@@ -111,12 +111,13 @@ lookup         = ${
 }
 lookup_segment = ${ ((lookup_field | lookup_field_quoted | lookup_array) ~ lookup_array*) | lookup_coalesce }
 lookup_coalesce = !{ "(" ~ lookup ~ ("|" ~ lookup)+ ~ ")" }
-lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"")+ }
+lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"" | (LOOKUP_ESCAPE ~ ".") | (LOOKUP_ESCAPE ~ "[") | (LOOKUP_ESCAPE ~ "]"))+ }
 lookup_field_quoted = @{ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
-lookup_field_quoted_content  = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | " " | "." | "\\\"")+ }
+lookup_field_quoted_content  = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | " " | "." | "\\\"" | "[" | "]" | (LOOKUP_ESCAPE ~ "."))+ }
 lookup_array = @{ LOOKUP_OPEN_BRACKET ~ lookup_array_index ~ LOOKUP_CLOSE_BRACKET }
 lookup_array_index =  ${ ASCII_DIGIT+ }
 LOOKUP_QUOTE = _{ "\""}
 LOOKUP_OPEN_BRACKET = _{ "[" }
 LOOKUP_CLOSE_BRACKET = _{ "]" }
 LOOKUP_PERIOD = _{ "." }
+LOOKUP_ESCAPE = _{ "\\" }

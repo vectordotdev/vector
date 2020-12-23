@@ -76,10 +76,10 @@ use tracing::instrument;
 /// # Warnings
 ///
 /// * You **can not** deserialize lookups (that is, views, the buffers are fine) out of str slices
-///   with escapes in serde_Json. [serde_json does not allow it.](https://github.com/serde-rs/json/blob/master/src/read.rs#L424-L476)
+///   with escapes in serde_json. [serde_json does not allow it.](https://github.com/serde-rs/json/blob/master/src/read.rs#L424-L476)
 ///   You **must** use strings. This means it is **almost always not a good idea to deserialize a
 ///   string into a `Lookup`. **Use a `LookupBuf` instead.**
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Default, PartialOrd, Ord, Clone, Hash)]
 pub struct Lookup<'a> {
     pub segments: VecDeque<Segment<'a>>,
 }

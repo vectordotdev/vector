@@ -711,7 +711,11 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        self.keys(true)
+        // The LogEvent API itself is not able to consistently return `pairs()` and `keys()` including
+        // the root, so it's done here, instead.
+        let this = Some(Lookup::default());
+        let rest = self.keys(true);
+        this.into_iter().chain(rest)
             .map(|v| {
                 remap_lang::Path::from_str(v.to_string().as_str())
                     // TODO: We should not degrade the error to a string here.
