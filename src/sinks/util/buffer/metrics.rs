@@ -20,6 +20,7 @@ impl Hash for MetricEntry {
         let metric = &self.0;
         std::mem::discriminant(&metric.value).hash(state);
         metric.name.hash(state);
+        metric.namespace.hash(state);
         metric.kind.hash(state);
 
         if let Some(tags) = &metric.tags {
