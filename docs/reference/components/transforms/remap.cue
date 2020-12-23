@@ -110,7 +110,7 @@ components: transforms: remap: {
 				.has_name = exists(.name)
 				del(.name)
 				"""
-			input: log: name: "Vector Vic"
+			input: log: name:      "Vector Vic"
 			output: log: has_name: true
 		},
 		{
@@ -154,7 +154,7 @@ components: transforms: remap: {
 			configuration: source: """
 				.credit_card = redact(.credit_card, filters = ["pattern"], redactor = "full", patterns = [/[0-9]{16}/])
 				"""
-			input: log: credit_card: "1234567812345678"
+			input: log: credit_card:  "1234567812345678"
 			output: log: credit_card: "****"
 		},
 		{
@@ -166,6 +166,19 @@ components: transforms: remap: {
 			}
 			input: log: text:  #"\e[46mfoo\e[0m bar"#
 			output: log: text: "foo bar"
+		},
+		{
+			title: "Parsing strings using Grok"
+			configuration: source: """
+				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+				del(.message)
+				"""
+			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
+			output: log: {
+				level:     "info"
+				message:   "Hello world"
+				timestamp: "2020-10-02T23:22:12.223222Z"
+			}
 		},
 		{
 			title: "Parsing JSON"
