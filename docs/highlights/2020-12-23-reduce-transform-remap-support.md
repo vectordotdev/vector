@@ -19,7 +19,8 @@ a single event).
 
 Previously, the `reduce` transform required you to specify conditions using
 `check_fields`. But now you can use Vector Remap Language expressions in the
-[`remap`][remap] transform to specify those conditions.
+[`remap`][remap] transform to specify those conditions. This should make using
+`reduce` more natural and expressive.
 
 ## Example
 
