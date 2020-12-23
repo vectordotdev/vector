@@ -6,6 +6,7 @@ use crate::{
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    tls::TlsOptions,
 };
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +35,8 @@ pub struct HumioLogsConfig {
 
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig,
+
+    pub(in crate::sinks::humio) tls: Option<TlsOptions>,
 }
 
 inventory::submit! {
@@ -52,6 +55,7 @@ impl GenerateConfig for HumioLogsConfig {
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
+            tls: None,
         })
         .unwrap()
     }
@@ -89,7 +93,7 @@ impl HumioLogsConfig {
             compression: self.compression,
             batch: self.batch,
             request: self.request,
-            tls: None,
+            tls: self.tls.clone(),
         }
     }
 }
@@ -302,6 +306,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
+            tls: None,
         }
     }
 

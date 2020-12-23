@@ -153,7 +153,7 @@ impl SourceConfig for SocketConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp(tcp) => vec![tcp.address.into()],
-            Mode::Udp(udp) => vec![udp.address.into()],
+            Mode::Udp(udp) => vec![Resource::udp(udp.address)],
             #[cfg(unix)]
             Mode::UnixDatagram(_) => vec![],
             #[cfg(unix)]

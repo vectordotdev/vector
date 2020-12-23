@@ -226,121 +226,79 @@ fn encode_events(
         );
         let ts = encode_timestamp(event.timestamp);
         let tags = merge_tags(&event, tags);
-        match event.value {
-            MetricValue::Counter { value } => {
-                let fields = to_fields(value);
+        let (metric_type, fields) = get_type_and_fields(event.value, &quantiles);
 
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "counter",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                )
-            }
-            MetricValue::Gauge { value } => {
-                let fields = to_fields(value);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "gauge",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::Set { values } => {
-                let fields = to_fields(values.len() as f64);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "set",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::AggregatedHistogram {
-                buckets,
-                counts,
-                count,
-                sum,
-            } => {
-                let mut fields: HashMap<String, Field> = buckets
-                    .iter()
-                    .zip(counts.iter())
-                    .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1)))
-                    .collect();
-                fields.insert("count".to_owned(), Field::UnsignedInt(count));
-                fields.insert("sum".to_owned(), Field::Float(sum));
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "histogram",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::AggregatedSummary {
-                quantiles,
-                values,
-                count,
-                sum,
-            } => {
-                let mut fields: HashMap<String, Field> = quantiles
-                    .iter()
-                    .zip(values.iter())
-                    .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1)))
-                    .collect();
-                fields.insert("count".to_owned(), Field::UnsignedInt(count));
-                fields.insert("sum".to_owned(), Field::Float(sum));
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "summary",
-                    tags,
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
-                let quantiles = match statistic {
-                    StatisticKind::Histogram => &[0.95] as &[_],
-                    StatisticKind::Summary => quantiles,
-                };
-                let fields = encode_distribution(&values, &sample_rates, quantiles);
-
-                influx_line_protocol(
-                    protocol_version,
-                    fullname,
-                    "distribution",
-                    tags,
-                    fields,
-                    ts,
-                    &mut output,
-                );
-            }
-        }
+        if let Err(error) = influx_line_protocol(
+            protocol_version,
+            fullname,
+            metric_type,
+            tags,
+            fields,
+            ts,
+            &mut output,
+        ) {
+            warn!(message = "Failed to encode event; dropping event.", %error, rate_limit_secs = 30);
+        };
     }
 
     // remove last '\n'
     output.pop();
     output
+}
+
+fn get_type_and_fields(
+    value: MetricValue,
+    quantiles: &[f64],
+) -> (&'static str, Option<HashMap<String, Field>>) {
+    match value {
+        MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
+        MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
+        MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
+        MetricValue::AggregatedHistogram {
+            buckets,
+            counts,
+            count,
+            sum,
+        } => {
+            let mut fields: HashMap<String, Field> = buckets
+                .iter()
+                .zip(counts.iter())
+                .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1)))
+                .collect();
+            fields.insert("count".to_owned(), Field::UnsignedInt(count));
+            fields.insert("sum".to_owned(), Field::Float(sum));
+
+            ("histogram", Some(fields))
+        }
+        MetricValue::AggregatedSummary {
+            quantiles,
+            values,
+            count,
+            sum,
+        } => {
+            let mut fields: HashMap<String, Field> = quantiles
+                .iter()
+                .zip(values.iter())
+                .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1)))
+                .collect();
+            fields.insert("count".to_owned(), Field::UnsignedInt(count));
+            fields.insert("sum".to_owned(), Field::Float(sum));
+
+            ("summary", Some(fields))
+        }
+        MetricValue::Distribution {
+            values,
+            sample_rates,
+            statistic,
+        } => {
+            let quantiles = match statistic {
+                StatisticKind::Histogram => &[0.95] as &[_],
+                StatisticKind::Summary => quantiles,
+            };
+            let fields = encode_distribution(&values, &sample_rates, quantiles);
+            ("distribution", fields)
+        }
+    }
 }
 
 fn encode_distribution(
@@ -894,6 +852,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn insert_metrics_over_https() {
+        crate::test_util::trace_init();
         let database = onboarding_v1("https://localhost:8087").await;
 
         let cx = SinkContext::new_test();
@@ -961,6 +920,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb2_metrics_put_data() {
+        crate::test_util::trace_init();
         onboarding_v2().await;
 
         let cx = SinkContext::new_test();

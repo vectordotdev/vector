@@ -19,7 +19,7 @@ criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
 criterion_main!(benches);
 
 bench_function! {
-    upcase => vector::remap::Upcase;
+    upcase => remap_functions::Upcase;
 
     literal_value {
         args: func_args![value: "foo"],
@@ -28,7 +28,7 @@ bench_function! {
 }
 
 bench_function! {
-    downcase => vector::remap::Downcase;
+    downcase => remap_functions::Downcase;
 
     literal_value {
         args: func_args![value: "FOO"],
@@ -37,11 +37,11 @@ bench_function! {
 }
 
 bench_function! {
-    parse_json => vector::remap::ParseJson;
+    parse_json => remap_functions::ParseJson;
 
     literal_value {
         args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(map!["key": "value"]),
+        want: Ok(value!({"key": "value"})),
     }
 
     invalid_json_with_default {
@@ -49,7 +49,7 @@ bench_function! {
             value: r#"{"key": INVALID}"#,
             default: r#"{"key": "default"}"#,
         ],
-        want: Ok(map!["key": "default"]),
+        want: Ok(value!({"key": "default"})),
     }
 }
 

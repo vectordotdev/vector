@@ -14,6 +14,13 @@ remap: functions: parse_grok: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "remove_empty"
+			description: "If set to true, any patterns that resolve to an empty value will be removed from the result."
+			required:    false
+			default:     true
+			type: ["boolean"]
+		},
 	]
 	return: ["map"]
 	category: "parse"

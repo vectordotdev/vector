@@ -5,6 +5,7 @@ use crate::{
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures::{stream, SinkExt, StreamExt};
@@ -35,6 +36,8 @@ pub struct HumioMetricsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+
+    tls: Option<TlsOptions>,
     // The obove settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -75,6 +78,7 @@ impl SinkConfig for HumioMetricsConfig {
             compression: self.compression,
             request: self.request,
             batch: self.batch,
+            tls: self.tls.clone(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
