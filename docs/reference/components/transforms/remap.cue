@@ -235,7 +235,7 @@ components: transforms: remap: {
 			input: log: {
 				url: "https//vector.dev"
 			}
-			output: log: {
+			output: log: url: {
 				fragment: null
 				host:     "vector.dev"
 				password: ""
