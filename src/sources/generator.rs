@@ -333,7 +333,6 @@ mod tests {
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(serde_json::from_str::<serde_json::Value>(&message).is_ok());
-
         }
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
