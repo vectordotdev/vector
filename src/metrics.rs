@@ -1,9 +1,11 @@
 use crate::{event::Metric, Event};
+use dashmap::DashMap;
 use metrics::{GaugeValue, Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
-use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
+use metrics_util::{CompositeKey, Handle, MetricKind};
 use once_cell::sync::OnceCell;
+use std::hash::Hash;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -38,7 +40,9 @@ pub fn init() -> crate::Result<()> {
     }
 
     // Prepare the registry.
-    let registry = Registry::new();
+    let registry = VectorRegistry {
+        map: DashMap::new(),
+    };
     let registry = Arc::new(registry);
 
     // Init the cardinality counter.
@@ -73,10 +77,41 @@ pub fn init() -> crate::Result<()> {
     Ok(())
 }
 
+/// [`VectorRegistry`] is a vendored version of [`metrics_util::Registry`].
+#[derive(Debug)]
+struct VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    pub map: DashMap<K, H>,
+}
+
+impl<K, H> VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    /// Perform an operation on a given key.
+    ///
+    /// The `op` function will be called for the handle under the given `key`.
+    ///
+    /// If the `key` is not already mapped, the `init` function will be
+    /// called, and the resulting handle will be stored in the registry.
+    pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
+    where
+        I: FnOnce() -> H,
+        O: FnOnce(&H) -> V,
+    {
+        let valref = self.map.entry(key).or_insert_with(init);
+        op(valref.value())
+    }
+}
+
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
 struct VectorRecorder {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
     cardinality_counter: Arc<AtomicU64>,
 }
 
@@ -159,7 +194,7 @@ impl LabelFilter for VectorLabelFilter {
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
@@ -170,13 +205,11 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 }
 
 fn snapshot(controller: &Controller) -> Vec<Event> {
-    let handles = controller.registry.get_handles();
-    handles
-        .into_iter()
-        .map(|(ck, (_generation, m))| {
-            let (_, k) = ck.into_parts();
-            Metric::from_metric_kv(k, m).into()
-        })
+    controller
+        .registry
+        .map
+        .iter()
+        .map(|valref| Metric::from_metric_kv(valref.key().key(), valref.value()).into())
         .collect()
 }
 
