@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequest, HTTPEventsReceived},
+    internal_events::{HTTPBadRequest, HTTPDecodeError, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -148,7 +148,10 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
 fn decode_read(mut decoder: impl Read, coding: &str) -> Result<Bytes, ErrorMessage> {
     let mut decoded = Vec::new();
     decoder.read_to_end(&mut decoded).map_err(|error| {
-        warn!(message = "Failed decoding payload.", %coding, %error);
+        emit!(HTTPDecodeError {
+            coding,
+            error: &error
+        });
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
             format!("Failed decoding payload with {} decoder.", coding),
