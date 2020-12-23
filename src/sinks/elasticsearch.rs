@@ -22,6 +22,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
@@ -37,7 +38,7 @@ pub struct RequestConfig {
     #[serde(flatten)]
     pub tower: TowerRequestConfig,
     #[serde(default)]
-    pub headers: HashMap<String, String>,
+    pub headers: IndexMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -65,7 +66,7 @@ pub struct ElasticSearchConfig {
     pub auth: Option<ElasticSearchAuth>,
 
     // Deprecated, moved to request.
-    pub headers: Option<HashMap<String, String>>,
+    pub headers: Option<IndexMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub aws: Option<RegionOrEndpoint>,
