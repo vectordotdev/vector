@@ -150,6 +150,14 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Redacting sensitive information"
+			configuration: source: """
+				.credit_card = redact(.credit_card, filters = ["pattern"], redactor = "full", patterns = [/[0-9]{16}/])
+				"""
+			input: log: credit_card: "1234567812345678"
+			output: log: credit_card: "****"
+		},
+		{
 			title: "Stripping ANSI characters"
 			configuration: {
 				source: """
