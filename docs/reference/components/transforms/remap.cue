@@ -205,10 +205,10 @@ components: transforms: remap: {
 				"""
 			input: log: timestamp: "2020-12-23 01:43:54.951696 UTC"
 			output: log: {
-				unix_time: "1608687834"
+				unix_time:        "1608687834"
 				iso_8601_with_tz: "2020-12-23T01:43:54Z"
-				iso_8601_no_tz: "2020-12-23T01:43:54"
-				year: 2020
+				iso_8601_no_tz:   "2020-12-23T01:43:54"
+				year:             2020
 			}
 		},
 		{
