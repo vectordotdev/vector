@@ -575,6 +575,8 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+# Separate benching process for metrics due to the nature of the bootstrap procedures.
+metrics-benches = ["sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
@@ -591,6 +593,16 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "metrics_on"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_off"
+harness = false
+required-features = ["metrics-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"
