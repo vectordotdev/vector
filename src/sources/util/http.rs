@@ -135,7 +135,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                        format!("Unsupported encoding {:?}", encoding),
+                        format!("Unsupported encoding {}", encoding),
                     ))
                 }
             }
@@ -208,8 +208,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                self.build_event(body.clone(), headers, query_parameters)
-                                    .map(|events| (events, body.len()))
+                                let body_len=body.len();
+                                self.build_event(body, headers, query_parameters)
+                                    .map(|events| (events, body_len))
                             });
 
                         async move {
