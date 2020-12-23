@@ -22,7 +22,21 @@ static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KE
 static CARDINALITY_KEY: CompositeKey =
     CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
+fn metrics_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
+}
+
 pub fn init() -> crate::Result<()> {
+    // An escape hatch to allow disabing internal metrics core.
+    // May be used for performance reasons.
+    // This is a hidden and undocumented functionality.
+    if !metrics_enabled() {
+        metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
+            .map_err(|_| "recorder already initialized")?;
+        info!(message = "Internal metrics core is disabled.");
+        return Ok(());
+    }
+
     // Prepare the registry.
     let registry = Registry::new();
     let registry = Arc::new(registry);
