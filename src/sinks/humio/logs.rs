@@ -289,6 +289,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
+            tls: None,
         }
     }
 
