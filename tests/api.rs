@@ -686,15 +686,16 @@ mod tests {
         })
     }
 
+    #[cfg(unix)]
     #[test]
     fn api_graphql_files_source_metrics() {
         metrics_test("tests::api_graphql_files_source_metrics", async {
-            // Create a temporary file, and fill it with lines
+            let lines = vec!["test1", "test2", "test3"];
+
             let dir = tempdir().unwrap();
             let checkpoints = tempdir().unwrap();
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
-            let lines = vec!["test1", "test2", "test3"];
 
             for line in &lines {
                 writeln!(&mut file, "{}", line).unwrap();
@@ -725,7 +726,6 @@ mod tests {
             // Short delay to ensure logs are picked up
             tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
 
-            // Run the query; files name + metrics should match
             let client = make_client(server.addr());
             let res = client.file_source_metrics_query().await;
 
