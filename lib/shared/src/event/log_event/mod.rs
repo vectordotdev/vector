@@ -329,16 +329,18 @@ impl LogEvent {
                     }
                 };
                 trace!(field = %name, "Seeking into map.");
-                let entry = self.fields
-                    .entry(name.clone())
-                    .or_insert_with(|| {
-                        trace!(field = %name, "Inserting at leaf.");
-                        next_value
-                    });
+                let entry = self.fields.entry(name.clone()).or_insert_with(|| {
+                    trace!(field = %name, "Inserting at leaf.");
+                    next_value
+                });
                 let outcome = entry.insert(working_lookup.clone(), value);
                 match outcome {
                     Ok(v) => v,
-                    Err(EventError::PrimitiveDescent { primitive_at, original_target, original_value: Some(original_value) }) => {
+                    Err(EventError::PrimitiveDescent {
+                        primitive_at,
+                        original_target,
+                        original_value: Some(original_value),
+                    }) => {
                         trace!(%primitive_at, %original_target, "Encountered descent into a primitive.");
                         // When we find a primitive descent, we overwrite it.
                         match entry.remove(&primitive_at, true) {
@@ -348,13 +350,15 @@ impl LogEvent {
                                 let mut target = LookupBuf::from(name);
                                 target.extend(original_target);
                                 self.insert(target, original_value)
-                            },
-                            _ => entry.insert(original_target, original_value).map_err(|error| {
-                                debug!("{:?}", error);
-                                error
-                            }).unwrap_or(Option::<Value>::None),
+                            }
+                            _ => entry
+                                .insert(original_target, original_value)
+                                .map_err(|error| {
+                                    debug!("{:?}", error);
+                                    error
+                                })
+                                .unwrap_or(Option::<Value>::None),
                         }
-
                     }
                     Err(error) => {
                         debug!("{:?}", error);

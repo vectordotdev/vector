@@ -1,4 +1,4 @@
-use crate::{log_event, event::*, lookup::*, map, test::open_fixture};
+use crate::{event::*, log_event, lookup::*, map, test::open_fixture};
 use serde_json::json;
 use tracing::trace;
 
@@ -380,7 +380,8 @@ mod corner_cases {
     fn insert_clobbers_existing_parents() -> crate::Result<()> {
         let mut event = log_event! {
             "root" => true,
-        }.into_log();
+        }
+        .into_log();
         // These lookups iteratively overwrite the previously inserted value.
         // All these should succeed and not return a value (They're overwriting stuff).
         let lookups = vec![
@@ -568,8 +569,6 @@ mod remap {
     use super::*;
     use remap_lang::Object;
     use std::collections::BTreeMap;
-    use std::convert::{TryFrom, TryInto};
-    use std::str::FromStr;
 
     #[test_env_log::test]
     fn object_get() {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::{event::*, lookup::*, map};
+use crate::map;
 use chrono::{DateTime, TimeZone, Utc};
 
 fn ts() -> DateTime<Utc> {

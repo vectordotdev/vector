@@ -1,10 +1,14 @@
-use crate::{lookup::*, event::*};
+use crate::{event::*, lookup::*};
 use std::fmt;
 pub use EventError::*;
 
 #[derive(Debug)]
 pub enum EventError {
-    PrimitiveDescent { primitive_at: LookupBuf, original_target: LookupBuf, original_value: Option<Value>, },
+    PrimitiveDescent {
+        primitive_at: LookupBuf,
+        original_target: LookupBuf,
+        original_value: Option<Value>,
+    },
     LookupError(crate::lookup::LookupError),
     EmptyCoalesceSubSegment,
     RemovingSelf,
