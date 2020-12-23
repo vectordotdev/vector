@@ -193,6 +193,25 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Formatting timestamps"
+			configuration: source: """
+				.timestamp = to_timestamp(.timestamp)
+				.unix_time = format_timestamp(.timestamp, format = "%s")
+				.iso_8601_with_tz = format_timestamp(.timestamp, format = "%FT%TZ")
+				.iso_8601_no_tz = format_timestamp(.timestamp, format = "%FT%T")
+				.year = to_int(format_timestamp(.timestamp, format = "%Y"))
+
+				del(.timestamp)
+				"""
+			input: log: timestamp: "2020-12-23 01:43:54.951696 UTC"
+			output: log: {
+				unix_time: "1608687834"
+				iso_8601_with_tz: "2020-12-23T01:43:54Z"
+				iso_8601_no_tz: "2020-12-23T01:43:54"
+				year: 2020
+			}
+		},
+		{
 			title: "Encoding JSON"
 			configuration: {
 				source: ".message = encode_json(.)"
