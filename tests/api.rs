@@ -11,7 +11,6 @@ mod tests {
     use futures::StreamExt;
     use std::{
         collections::HashMap,
-        io::Write,
         net::SocketAddr,
         time::{Duration, Instant},
     };
@@ -687,6 +686,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn api_graphql_files_source_metrics() {
+        use std::io::Write;
         use tempfile::{tempdir, NamedTempFile};
 
         metrics_test("tests::api_graphql_files_source_metrics", async {
@@ -694,12 +694,7 @@ mod tests {
 
             let checkpoints = tempdir().unwrap();
             let mut named_file = NamedTempFile::new().unwrap();
-            let path = named_file
-                .path()
-                .to_str()
-                .unwrap()
-                .to_string()
-                .replace(r"\", r"\\");
+            let path = named_file.path().to_str().unwrap().to_string();
             let mut file = named_file.as_file_mut();
 
             for line in &lines {
