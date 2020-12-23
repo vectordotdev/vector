@@ -105,6 +105,15 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Checking for the existence of values"
+			configuration: source: """
+				.has_name = exists(.name)
+				del(.name)
+				"""
+			input: log: name: "Vector Vic"
+			output: log: has_name: true
+		},
+		{
 			title: "Working with strings"
 			configuration: source: """
 				.message = strip_whitespace(.message)
