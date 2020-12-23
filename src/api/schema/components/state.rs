@@ -57,13 +57,8 @@ pub fn get_component_names() -> HashSet<String> {
 }
 
 /// Gets a component by name
-pub fn component_by_name(name: &str) -> Component {
-    COMPONENTS
-        .read()
-        .expect(INVARIANT)
-        .get(name)
-        .expect("Couldn't get component by name")
-        .clone()
+pub fn component_by_name(name: &str) -> Option<Component> {
+    Some(COMPONENTS.read().expect(INVARIANT).get(name)?.clone())
 }
 
 /// Overwrites component state with new components.
