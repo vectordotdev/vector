@@ -190,11 +190,11 @@ components: sources: http: {
 	}
 
 	how_it_works: {
-		compression: {
-			title: "Compression"
+		decompression: {
+			title: "Decompression"
 			body: """
 				Received body is decompressed according to `Content-Encoding` header.
-				Supported compression algorithms are `gzip`, `deflate`, and `snappy`.
+				Supported algorithms are `gzip`, `deflate`, and `snappy`.
 				"""
 		}
 	}
