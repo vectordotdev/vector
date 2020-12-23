@@ -281,7 +281,7 @@ test: ## Run the unit test suite
 test-components: ## Test with all components enabled
 # TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -902,14 +902,21 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
-.PHONY: bench-all
-bench-all: ### Run default and WASM benches
-bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches wasm-benches"
+.PHONY: bench-remap
+bench-remap: ## Run benchmarks in /benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: bench-all
+bench-all: ### Run default and WASM benches
+bench-all: $(WASM_MODULE_OUTPUTS)
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches"
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
 
