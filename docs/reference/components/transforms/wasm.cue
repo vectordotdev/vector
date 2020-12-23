@@ -36,14 +36,14 @@ components: transforms: wasm: {
 
 		requirements: [
 			#"""
-				Vector must be build with the `wasm` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
+				Vector must be built with the `wasm` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
 				"""#,
 		]
 		warnings: []
 		notices: [
 			"""
 			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
-			this tranform. The [Timber Remap Language](\(urls.timber_remap_language_reference))
+			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
 			is designed for safe, performant, and easy data mapping. It is intended to cover the
 			vast majority of data mapping use cases leaving WASM for very advanced and edge-case
 			situations.

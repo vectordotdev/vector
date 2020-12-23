@@ -55,6 +55,9 @@ export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
+# Set version
+export VERSION ?= $(shell scripts/version.sh)
+
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
@@ -966,7 +969,7 @@ check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
 
 .PHONY: check-kubernetes-yaml
-check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
+check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
@@ -975,9 +978,9 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ti
 ##@ Packaging
 
 # archives
-target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
-target/artifacts/vector-%.tar.gz: override PROFILE =release
-target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
+target/artifacts/vector-${VERSION}-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-${VERSION}-%.tar.gz=%)
+target/artifacts/vector-${VERSION}-%.tar.gz: override PROFILE =release
+target/artifacts/vector-${VERSION}-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
 	@cp -v \
@@ -992,7 +995,7 @@ package: build ## Build the Vector archive
 package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
 
 .PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl package-rpm-x86_64-unknown-linux-musl package-deb-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
+package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
@@ -1001,27 +1004,27 @@ package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl packa
 package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
+package-x86_64-unknown-linux-musl: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
+package-aarch64-unknown-linux-musl: target/artifacts/vector-${VERSION}-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-armv7-unknown-linux-gnueabihf
-package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
+package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-armv7-unknown-linux-musleabihf
-package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
+package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}."
 
 # debs
@@ -1154,7 +1157,7 @@ update-helm-dependencies: ## Recursively update the dependencies of the Helm cha
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
 
 .PHONY: update-kubernetes-yaml
-update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
+update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
