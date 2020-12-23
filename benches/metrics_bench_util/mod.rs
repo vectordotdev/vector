@@ -1,6 +1,6 @@
 //! This mod contains the benchmarks for metrics.
 //! Due to how metrics are set up, we need isolated process environments to
-//! test with metrics core on and off, so the implemntation is shared but has
+//! test with metrics core on and off, so the implementation is shared but has
 //! two separate entrypoits.
 //!
 //! # Usage
@@ -12,7 +12,7 @@
 //!
 //! These will run benches with metrics core system on and off respectively.
 
-use criterion::{BatchSize, Criterion, SamplingMode, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use metrics::counter;
 use tracing::{span, Level};
@@ -60,15 +60,13 @@ pub fn benchmark(c: &mut Criterion, metrics_enabled: bool) {
 }
 
 /// Based on the topology benchmarks.
-/// I'm pretty sure criterion used incorrectly here - the bench loops generates
-/// it's own input, and taps into random source and networking - this must not
-/// be working right, as criterion assumptions about the benchmark loop
-/// iteration payload are broken here.
+/// I'm pretty sure criterion used incorrectly here - the bench loop taps into
+/// networking - this must not be working right, as criterion assumptions about
+/// the benchmark loop iteration payload are broken here.
 #[inline]
 fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
     let num_lines: usize = 10_000;
     let line_size: usize = 100;
-    let num_writers = 2;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
@@ -76,55 +74,78 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
     let mut group = c.benchmark_group(format!("{}/{}", bench_name, "topology"));
     group.sampling_mode(SamplingMode::Flat);
 
-    group.throughput(Throughput::Bytes(
-        (num_lines * line_size * num_writers) as u64,
-    ));
-    group.bench_function("tcp_socket", |b| {
-        b.iter_batched(
-            || {
-                let mut config = config::Config::builder();
-                config.add_source(
-                    "in",
-                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+    for &num_writers in [1, 2, 4, 8, 16].iter() {
+        group.throughput(Throughput::Bytes(
+            (num_lines * line_size * num_writers) as u64,
+        ));
+        group.bench_with_input(
+            BenchmarkId::new(
+                "tcp_socket",
+                format!(
+                    "{:02}_{}",
+                    num_writers,
+                    if num_writers == 1 {
+                        "writer"
+                    } else {
+                        "writers"
+                    }
+                ),
+            ),
+            &num_writers,
+            |b, &num_writers| {
+                b.iter_batched(
+                    || {
+                        let input_lines: Vec<Vec<String>> = (0..num_writers)
+                            .into_iter()
+                            .map(|_| random_lines(line_size).take(num_lines).collect())
+                            .collect();
+
+                        let mut config = config::Config::builder();
+                        config.add_source(
+                            "in",
+                            sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+                        );
+                        config.add_sink(
+                            "out",
+                            &["in"],
+                            sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                                out_addr.to_string(),
+                            ),
+                        );
+
+                        let mut rt = runtime();
+                        let (output_lines, topology) = rt.block_on(async move {
+                            let output_lines = CountReceiver::receive_lines(out_addr);
+                            let (topology, _crash) =
+                                start_topology(config.build().unwrap(), false).await;
+                            wait_for_tcp(in_addr).await;
+                            (output_lines, topology)
+                        });
+
+                        (input_lines, rt, topology, output_lines)
+                    },
+                    |(input_lines, mut rt, topology, output_lines)| {
+                        rt.block_on(async move {
+                            let sends = stream::iter(input_lines)
+                                .map(|lines| send_lines(in_addr, lines))
+                                .collect::<Vec<_>>()
+                                .await;
+                            future::try_join_all(sends).await.unwrap();
+
+                            topology.stop().compat().await.unwrap();
+
+                            let output_lines = output_lines.await;
+
+                            debug_assert_eq!(num_lines * num_writers, output_lines.len());
+
+                            output_lines
+                        });
+                    },
+                    BatchSize::PerIteration,
                 );
-                config.add_sink(
-                    "out",
-                    &["in"],
-                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-                );
-
-                let mut rt = runtime();
-                let (output_lines, topology) = rt.block_on(async move {
-                    let output_lines = CountReceiver::receive_lines(out_addr);
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-                    wait_for_tcp(in_addr).await;
-                    (output_lines, topology)
-                });
-                (rt, topology, output_lines)
             },
-            |(mut rt, topology, output_lines)| {
-                rt.block_on(async move {
-                    let sends = stream::iter(0..num_writers)
-                        .map(|_| {
-                            let lines = random_lines(line_size).take(num_lines);
-                            send_lines(in_addr, lines)
-                        })
-                        .collect::<Vec<_>>()
-                        .await;
-                    future::try_join_all(sends).await.unwrap();
-
-                    topology.stop().compat().await.unwrap();
-
-                    let output_lines = output_lines.await;
-
-                    debug_assert_eq!(num_lines * num_writers, output_lines.len());
-
-                    output_lines
-                });
-            },
-            BatchSize::PerIteration,
         );
-    });
+    }
 
     group.finish();
 }
