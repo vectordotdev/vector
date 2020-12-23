@@ -41,7 +41,7 @@ bench_function! {
 
     literal_value {
         args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(map!["key": "value"]),
+        want: Ok(value!({"key": "value"})),
     }
 
     invalid_json_with_default {
@@ -49,7 +49,7 @@ bench_function! {
             value: r#"{"key": INVALID}"#,
             default: r#"{"key": "default"}"#,
         ],
-        want: Ok(map!["key": "default"]),
+        want: Ok(value!({"key": "default"})),
     }
 }
 
