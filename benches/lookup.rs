@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
 use vector::event::LookupBuf;
 
-const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
+const FIXTURE_ROOT: &str = "lib/shared/tests/fixtures/lookup";
 
 fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
     let mut test_file = match fs::File::open(path) {
