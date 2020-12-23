@@ -9,6 +9,7 @@ license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
+autobenches = false # our benchmarks are not runnable on their own either way
 
 [[bin]]
 name = "graphql-schema"
