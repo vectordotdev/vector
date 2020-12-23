@@ -4,7 +4,7 @@ components: transforms: remap: {
 	title: "Remap"
 
 	description: """
-		Transforms events using the [Timber Remap Language](\(urls.timber_remap_language_reference)),
+		Transforms events using the [Vector Remap Language](\(urls.vector_remap_language_reference)),
 		a fast, safe, self-documenting data mapping language.
 		"""
 
@@ -17,8 +17,8 @@ components: transforms: remap: {
 	features: {
 		program: {
 			runtime: {
-				name:    "Timber Remap Language (TRL)"
-				url:     urls.trl
+				name:    "Vector Remap Language (VRL)"
+				url:     urls.vrl
 				version: null
 			}
 		}

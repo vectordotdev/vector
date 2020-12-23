@@ -41,6 +41,7 @@ default = [
     "contains",
     "del",
     "downcase",
+    "encode_json",
     "ends_with",
     "exists",
     "flatten",
@@ -97,6 +98,7 @@ compact = []
 contains = []
 del = []
 downcase = []
+encode_json = ["serde_json"]
 ends_with = []
 exists = []
 flatten = []
