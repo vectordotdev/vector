@@ -10,7 +10,7 @@ hide_on_release_notes: false
 tags: ["type: enhancement", "transform: swimlanes"]
 ---
 
-The [`swimlanes`][reduce] transform for Vector enables you to route events into
+The [`swimlanes`][swimlanes] transform for Vector enables you to route events into
 multiple named channels, or *lanes*, based on supplied conditions. This can be
 useful for use cases like sending a subset of events to one sink and a different
 subset to another.
@@ -22,8 +22,8 @@ Previously, the `swimlanes` transform required you to specify conditions using
 
 ## Example
 
-The example configuration below shows the same `reduce` transform using the old
-system (`check_fields`) and the new system (`remap`):
+The example configuration below shows the same `swimlanes` transform using the
+old system (`check_fields`) and the new system (`remap`):
 
 ```toml
 [transforms.split_events]
@@ -40,5 +40,5 @@ lanes.success.type = "remap"
 lanes.success.source = '.status_code == 200 && .severity == "info"'
 ```
 
-[reduce]: https://vector.dev/docs/reference/transforms/reduce
+[swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes
 [remap]: https://vector.dev/docs/reference/transforms/remap
