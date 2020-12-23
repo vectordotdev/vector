@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
-        http::{HttpMethod, HttpSinkConfig},
+        http::{HttpMethod, HttpSinkConfig, RequestConfig},
         util::{
             encoding::EncodingConfig, BatchConfig, Compression, Concurrency, TowerRequestConfig,
         },
@@ -136,7 +136,7 @@ impl NewRelicLogsConfig {
             ..batch
         };
 
-        let request = TowerRequestConfig {
+        let tower = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
             concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
@@ -144,11 +144,13 @@ impl NewRelicLogsConfig {
             ..self.request
         };
 
+        let request = RequestConfig { tower, headers };
+
         Ok(HttpSinkConfig {
             uri: uri.into(),
             method: Some(HttpMethod::Post),
             auth: None,
-            headers: Some(headers),
+            headers: None,
             compression: self.compression,
             encoding: self.encoding.clone().into_encoding(),
 

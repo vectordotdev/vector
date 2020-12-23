@@ -1,7 +1,7 @@
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::elasticsearch::{ElasticSearchConfig, Encoding, RequestConfig},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
@@ -69,7 +69,10 @@ impl SinkConfig for SematextLogsConfig {
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
             batch: self.batch,
-            request: self.request,
+            request: RequestConfig {
+                tower: self.request,
+                ..Default::default()
+            },
             encoding: self.encoding.clone(),
             ..Default::default()
         }
