@@ -9,10 +9,9 @@ mod tests {
     use crate::support::{fork_test, sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
-    use std::fs::File;
-    use std::io::Write;
     use std::{
         collections::HashMap,
+        io::Write,
         net::SocketAddr,
         time::{Duration, Instant},
     };
@@ -686,16 +685,15 @@ mod tests {
         })
     }
 
-    #[cfg(unix)]
     #[test]
     fn api_graphql_files_source_metrics() {
         metrics_test("tests::api_graphql_files_source_metrics", async {
             let lines = vec!["test1", "test2", "test3"];
 
-            let dir = tempdir().unwrap();
             let checkpoints = tempdir().unwrap();
-            let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let mut named_file = tempfile::NamedTempFile::new().unwrap();
+            let path = named_file.path().to_str().unwrap().to_string();
+            let mut file = named_file.as_file_mut();
 
             for line in &lines {
                 writeln!(&mut file, "{}", line).unwrap();
@@ -717,7 +715,7 @@ mod tests {
                   print_amount = 100000
             "#,
                 checkpoints.path().to_str().unwrap(),
-                path.to_str().unwrap()
+                path
             );
 
             let topology = from_str_config(&conf).await;
@@ -733,7 +731,7 @@ mod tests {
                 file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOn::FileSourceMetrics(
                     file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOnFileSourceMetrics { files, .. },
                 ) => {
-                    assert_eq!(files[0].name, path.to_str().unwrap());
+                    assert_eq!(files[0].name, path);
                     assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
