@@ -5,8 +5,9 @@ use crate::{
 };
 use std::{
     cmp::Ordering,
-    collections::{hash_map::DefaultHasher, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
+    mem::discriminant,
     ops::Deref,
 };
 
@@ -18,7 +19,7 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(&metric.value).hash(state);
+        discriminant(&metric.value).hash(state);
         metric.name.hash(state);
         metric.namespace.hash(state);
         metric.kind.hash(state);
@@ -49,15 +50,32 @@ impl Hash for MetricEntry {
 
 impl PartialEq for MetricEntry {
     fn eq(&self, other: &Self) -> bool {
-        let mut state = DefaultHasher::new();
-        self.hash(&mut state);
-        let hash1 = state.finish();
-
-        let mut state = DefaultHasher::new();
-        other.hash(&mut state);
-        let hash2 = state.finish();
-
-        hash1 == hash2
+        self.name == other.name
+            && self.namespace == other.namespace
+            && self.kind == other.kind
+            && self.tags == other.tags
+            && discriminant(&self.value) == discriminant(&other.value)
+            && match (&self.value, &other.value) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => buckets1 == buckets2,
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => quantiles1 == quantiles2,
+                _ => true,
+            }
     }
 }
 
