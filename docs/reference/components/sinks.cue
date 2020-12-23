@@ -312,7 +312,7 @@ components: sinks: [Name=string]: {
 								}
 							}
 
-							if sinks[Name].features.send.request.headers{
+							if sinks[Name].features.send.request.headers {
 								headers: {
 									common:      false
 									description: "Options for custom headers."
@@ -328,7 +328,7 @@ components: sinks: [Name=string]: {
 										options: {}
 									}
 								}
-							}							
+							}
 						}
 					}
 				}
