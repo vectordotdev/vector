@@ -50,6 +50,9 @@ impl Hash for MetricEntry {
 
 impl PartialEq for MetricEntry {
     fn eq(&self, other: &Self) -> bool {
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
         self.name == other.name
             && self.namespace == other.namespace
             && self.kind == other.kind
