@@ -80,7 +80,7 @@ pub fn syslog_3164_log_line() -> String {
         "<{}>{} {} {}[{}]: {}",
         priority(),
         timestamp_syslog_3164(),
-        username(),
+        domain(),
         application(),
         pid(),
         error_message()
