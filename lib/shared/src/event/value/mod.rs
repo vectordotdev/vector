@@ -395,6 +395,7 @@ impl Value {
         value: impl Into<Value> + Debug,
     ) -> Result<Option<Value>, EventError> {
         let mut working_lookup: LookupBuf = lookup.into();
+        let value = value.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
 
@@ -404,17 +405,26 @@ impl Value {
             (None, item) => {
                 let mut value = value.into();
                 core::mem::swap(&mut value, item);
-                trace!("Inserted");
+                trace!("Swapped with existing value.");
                 Ok(Some(value))
             }
             // This is just not allowed!
-            (_, Value::Boolean(_))
-            | (_, Value::Bytes(_))
-            | (_, Value::Timestamp(_))
-            | (_, Value::Float(_))
-            | (_, Value::Integer(_)) => Err(EventError::PrimitiveDescent {
-                location: working_lookup,
-            }),
+            (Some(segment), Value::Boolean(_))
+            | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Timestamp(_))
+            | (Some(segment), Value::Float(_))
+            | (Some(segment), Value::Integer(_)) => {
+                trace!("Encountered descent into a primitive.");
+                Err(EventError::PrimitiveDescent {
+                    primitive_at: LookupBuf::from(segment.clone()),
+                    original_target: {
+                        let mut l = LookupBuf::from(segment.clone());
+                        l.extend(working_lookup);
+                        l
+                    },
+                    original_value: Some(value),
+                })
+            },
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -438,7 +448,7 @@ impl Value {
                 }
             }
             // Descend into a map
-            (Some(SegmentBuf::Field { ref name, .. }), Value::Map(map)) => {
+            (Some(SegmentBuf::Field { ref name, ref requires_quoting }), Value::Map(map)) => {
                 trace!(field = %name, "Seeking into map.");
                 let next_value = match working_lookup.get(0) {
                     Some(SegmentBuf::Index(next_len)) => {
@@ -477,6 +487,17 @@ impl Value {
                         next_value
                     })
                     .insert(working_lookup, value)
+                    .map_err(|mut e| {
+                        match &mut e {
+                            EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                let segment = SegmentBuf::Field { name: name.clone(), requires_quoting: requires_quoting.clone() };
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment);
+                            },
+                            e => (),
+                        };
+                        e
+                    })
             }
             (Some(SegmentBuf::Index(_)), Value::Map(_)) => {
                 trace!("Mismatched index trying to access map.");
@@ -487,7 +508,17 @@ impl Value {
                 match array.get_mut(i) {
                     Some(inner) => {
                         trace!(index = ?i, "Seeking into array.");
-                        inner.insert(working_lookup, value)
+                        inner.insert(working_lookup, value).map_err(|mut e| {
+                            match &mut e {
+                                EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                    let segment = SegmentBuf::Index(i);
+                                    original_target.push_front(segment.clone());
+                                    primitive_at.push_front(segment);
+                                },
+                                e => (),
+                            };
+                            e
+                        })
                     }
                     None => {
                         trace!(lenth = ?i, "Array too small, resizing array to fit.");
@@ -498,13 +529,35 @@ impl Value {
                             Some(SegmentBuf::Index(next_len)) => {
                                 let mut inner = Value::Array(Vec::with_capacity(*next_len));
                                 trace!("Preparing inner array.");
-                                retval = inner.insert(working_lookup, value);
+                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                    match &mut e {
+                                        EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                            let segment = SegmentBuf::Index(i);
+                                            original_target.push_front(segment.clone());
+                                            primitive_at.push_front(segment);
+                                        },
+                                        e => (),
+                                    };
+                                    e
+                                });
                                 inner
                             }
-                            Some(SegmentBuf::Field { .. }) => {
+                            Some(SegmentBuf::Field { name, requires_quoting }) => {
                                 let mut inner = Value::Map(Default::default());
+                                let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
+                                let requires_quoting = requires_quoting.clone(); // This is for navigating an ownership issue in the error stack reporting.
                                 trace!("Preparing inner map.");
-                                retval = inner.insert(working_lookup, value);
+                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                    match &mut e {
+                                        EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                            let segment = SegmentBuf::Field { name, requires_quoting };
+                                            original_target.push_front(segment.clone());
+                                            primitive_at.push_front(segment);
+                                        },
+                                        e => (),
+                                    };
+                                    e
+                                });
                                 inner
                             }
                             Some(SegmentBuf::Coalesce(set)) => {
@@ -516,15 +569,35 @@ impl Value {
                                             break {
                                                 let mut inner = Value::Map(Default::default());
                                                 trace!("Preparing inner map.");
-                                                retval = inner.insert(working_lookup, value);
+                                                let set = SegmentBuf::Coalesce(set.clone());
+                                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                                    match &mut e {
+                                                        EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                                            original_target.push_front(set.clone());
+                                                            primitive_at.push_front(set.clone());
+                                                        },
+                                                        e => (),
+                                                    };
+                                                    e
+                                                });
                                                 inner
                                             }
                                         }
-                                        Some(SegmentBuf::Index(_)) => {
+                                        Some(SegmentBuf::Index(i)) => {
                                             break {
                                                 let mut inner = Value::Array(Vec::with_capacity(0));
                                                 trace!("Preparing inner array.");
-                                                retval = inner.insert(working_lookup, value);
+                                                let segment = SegmentBuf::Index(*i); // This is for navigating an ownership issue in the error stack reporting.
+                                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                                    match &mut e {
+                                                        EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                                            original_target.push_front(segment.clone());
+                                                            primitive_at.push_front(segment.clone());
+                                                        },
+                                                        e => (),
+                                                    };
+                                                    e
+                                                });
                                                 inner
                                             }
                                         }
@@ -551,15 +624,33 @@ impl Value {
                     SegmentBuf::Index(_) => {
                         let mut inner = Value::Array(Vec::with_capacity(0));
                         trace!("Preparing inner array.");
-                        working_lookup.push_front(segment);
-                        retval = inner.insert(working_lookup, value);
+                        working_lookup.push_front(segment.clone());
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            match &mut e {
+                                EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                    original_target.push_front(segment.clone());
+                                    primitive_at.push_front(segment.clone());
+                                },
+                                e => (),
+                            };
+                            e
+                        });
                         inner
                     }
                     SegmentBuf::Field { .. } => {
                         let mut inner = Value::Map(Default::default());
                         trace!("Preparing inner map.");
-                        working_lookup.push_front(segment);
-                        retval = inner.insert(working_lookup, value);
+                        working_lookup.push_front(segment.clone());
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            match &mut e {
+                                EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                    original_target.push_front(segment.clone());
+                                    primitive_at.push_front(segment.clone());
+                                },
+                                e => (),
+                            };
+                            e
+                        });
                         inner
                     }
                     SegmentBuf::Coalesce(set) => {
@@ -571,7 +662,17 @@ impl Value {
                                     break {
                                         let mut inner = Value::Map(Default::default());
                                         trace!("Preparing inner map.");
-                                        retval = inner.insert(working_lookup, value);
+                                        let set = SegmentBuf::Coalesce(set.clone());
+                                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                            match &mut e {
+                                                EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                                    original_target.push_front(set.clone());
+                                                    primitive_at.push_front(set.clone());
+                                                },
+                                                e => (),
+                                            };
+                                            e
+                                        });
                                         inner
                                     }
                                 }
@@ -579,7 +680,17 @@ impl Value {
                                     break {
                                         let mut inner = Value::Array(Vec::with_capacity(0));
                                         trace!("Preparing inner array.");
-                                        retval = inner.insert(working_lookup, value);
+                                        let set = SegmentBuf::Coalesce(set.clone());
+                                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                            match &mut e {
+                                                EventError::PrimitiveDescent {  original_target, primitive_at, original_value } => {
+                                                    original_target.push_front(set.clone());
+                                                    primitive_at.push_front(set.clone());
+                                                },
+                                                e => (),
+                                            };
+                                            e
+                                        });
                                         inner
                                     }
                                 }
@@ -617,14 +728,13 @@ impl Value {
     /// assert_eq!(map.remove(lookup_key, true).unwrap(), Some(Value::from(1)));
     /// assert!(!map.contains("star"));
     /// ```
-    #[instrument(level = "trace", skip(self, lookup))]
     pub fn remove<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Result<Option<Value>, EventError> {
         let mut working_lookup = lookup.into();
-        let span = trace_span!("insert", lookup = %working_lookup);
+        let span = trace_span!("remove", lookup = %working_lookup, %prune);
         let _guard = span.enter();
 
         let this_segment = working_lookup.pop_front();
@@ -636,15 +746,27 @@ impl Value {
                 Ok(None)
             }
             // This is just not allowed!
-            (_, Value::Boolean(_))
-            | (_, Value::Bytes(_))
-            | (_, Value::Timestamp(_))
-            | (_, Value::Float(_))
-            | (_, Value::Integer(_))
-            | (_, Value::Null) => {
-                return Err(EventError::PrimitiveDescent {
-                    location: working_lookup.into_buf(),
-                })
+            (Some(segment), Value::Boolean(_))
+            | (Some(segment), Value::Bytes(_))
+            | (Some(segment), Value::Timestamp(_))
+            | (Some(segment), Value::Float(_))
+            | (Some(segment), Value::Integer(_))
+            | (Some(segment), Value::Null) => {
+                if working_lookup.len() > 0 {
+                    trace!("Encountered descent into a primitive.");
+                    Err(EventError::PrimitiveDescent {
+                        primitive_at: LookupBuf::from(segment.clone().into_buf()),
+                        original_target: {
+                            let mut l = LookupBuf::from(segment.clone().into_buf());
+                            l.extend(working_lookup.into_buf());
+                            l
+                        },
+                        original_value: None,
+                    })
+                } else {
+                    trace!("Cannot remove self. Caller must remove.");
+                    Err(EventError::RemovingSelf)
+                }
             }
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
@@ -781,7 +903,6 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
-    #[instrument(level = "trace", skip(self, lookup))]
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -931,10 +1052,15 @@ impl Value {
             }
             // Descend into a map
             (Some(Segment::Field { ref name, .. }), Value::Map(map)) => {
-                trace!(field = %name, "Seeking into map.");
                 match map.get_mut(*name) {
-                    Some(inner) => inner.get_mut(working_lookup.clone()),
-                    None => Ok(None),
+                    Some(inner) => {
+                        trace!(field = %name, "Seeking into map.");
+                        inner.get_mut(working_lookup.clone())
+                    },
+                    None => {
+                        trace!(field = %name, "Discovered no value to see into.");
+                        Ok(None)
+                    },
                 }
             }
             (Some(Segment::Index(_)), Value::Map(_)) => {

@@ -268,6 +268,12 @@ impl<'a> Segment<'a> {
             ),
         }
     }
+
+    /// Become a `SegmentBuf` (by allocating).
+    #[instrument(level = "trace")]
+    pub fn into_buf(self) -> SegmentBuf {
+        SegmentBuf::from(self)
+    }
 }
 
 impl<'a> Display for Segment<'a> {

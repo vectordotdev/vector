@@ -1,4 +1,4 @@
-use crate::{event::*, lookup::*, map, test::open_fixture};
+use crate::{log_event, event::*, lookup::*, map, test::open_fixture};
 use serde_json::json;
 use tracing::trace;
 
@@ -366,6 +366,39 @@ mod corner_cases {
                 pairs.contains(&lookup),
                 "Failed while looking for {}",
                 lookup
+            );
+        }
+        Ok(())
+    }
+
+    // Here we ensure that inserts always get inserted, even if there is an existing parent
+    // which is not able to accept the value.
+    //
+    // This primarily exists because `LogEvent::insert()` returns an option which can't communicate
+    // failure, so inserts must always work, or fail in unsurprising ways.
+    #[test_env_log::test]
+    fn insert_clobbers_existing_parents() -> crate::Result<()> {
+        let mut event = log_event! {
+            "root" => true,
+        }.into_log();
+        // These lookups iteratively overwrite the previously inserted value.
+        // All these should succeed and not return a value (They're overwriting stuff).
+        let lookups = vec![
+            LookupBuf::from_str("root.one")?,
+            LookupBuf::from_str("root.one.two")?,
+            LookupBuf::from_str("root.one.two[3]")?,
+            LookupBuf::from_str("root.one.two[3].four")?,
+        ];
+        let value = Value::Boolean(true);
+        for lookup in lookups.clone() {
+            event.insert(lookup.clone(), value.clone());
+            let fetched = event.get(&lookup);
+            assert_eq!(
+                fetched,
+                Some(&value),
+                "Insert into {} did not yield value of parent ({:?})",
+                lookup,
+                value,
             );
         }
         Ok(())

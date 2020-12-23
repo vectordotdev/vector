@@ -351,6 +351,15 @@ impl From<String> for LookupBuf {
     }
 }
 
+impl From<SegmentBuf> for LookupBuf {
+    fn from(input: SegmentBuf) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(input);
+        LookupBuf { segments }
+        // We know this must be at least one segment.
+    }
+}
+
 impl From<usize> for LookupBuf {
     fn from(input: usize) -> Self {
         let mut segments = VecDeque::with_capacity(1);
