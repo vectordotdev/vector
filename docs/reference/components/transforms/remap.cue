@@ -175,19 +175,35 @@ components: transforms: remap: {
 			}
 		},
 		{
+			title: "Working with durations"
+			configuration: source: """
+				.seconds = parse_duration(.time, "s")
+				.minutes = parse_duration(.time, "m")
+				.milliseconds = parse_duration(.time, "ms")
+
+				del(.time)
+				"""
+			input: log: time: "480"
+			output: log: {
+				seconds:      480
+				minutes:      8
+				milliseconds: 480000
+			}
+		},
+		{
 			title: "Coercing values"
 			configuration: {
-				source: #"""
+				source: """
 					.bool = to_bool(.bool)
 					.float = to_float(.float)
 					.int = to_int(.int)
 					.timestamp = to_timestamp(.timestamp)
-					"""#
+					"""
 			}
 			input: log: {
-				bool:      "true"
-				float:     "1.234"
-				int:       "1"
+				bool:      true
+				float:     1.234
+				int:       1
 				timestamp: "2020-10-01T02:22:11.223212Z"
 			}
 			output: log: {
