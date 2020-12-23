@@ -333,7 +333,7 @@ impl LogEvent {
                     trace!(field = %name, "Inserting at leaf.");
                     next_value
                 });
-                let outcome = entry.insert(working_lookup.clone(), value);
+                let outcome = entry.insert(working_lookup, value);
                 match outcome {
                     Ok(v) => v,
                     Err(EventError::PrimitiveDescent {

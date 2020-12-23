@@ -403,7 +403,7 @@ impl Value {
         match (this_segment, self) {
             // We've met an end and found our value.
             (None, item) => {
-                let mut value = value.into();
+                let mut value = value;
                 core::mem::swap(&mut value, item);
                 trace!("Swapped with existing value.");
                 Ok(Some(value))
@@ -418,7 +418,7 @@ impl Value {
                 Err(EventError::PrimitiveDescent {
                     primitive_at: LookupBuf::from(segment.clone()),
                     original_target: {
-                        let mut l = LookupBuf::from(segment.clone());
+                        let mut l = LookupBuf::from(segment);
                         l.extend(working_lookup);
                         l
                     },
@@ -484,7 +484,7 @@ impl Value {
                     }
                     None => {
                         trace!(field = %name, "Inserted.");
-                        return Ok(map.insert(name.clone(), value.into()));
+                        return Ok(map.insert(name.clone(), value));
                     }
                 };
                 map.entry(name.clone())
@@ -494,20 +494,17 @@ impl Value {
                     })
                     .insert(working_lookup, value)
                     .map_err(|mut e| {
-                        match &mut e {
-                            EventError::PrimitiveDescent {
-                                original_target,
-                                primitive_at,
-                                original_value: _,
-                            } => {
-                                let segment = SegmentBuf::Field {
-                                    name: name.clone(),
-                                    requires_quoting: requires_quoting.clone(),
-                                };
-                                original_target.push_front(segment.clone());
-                                primitive_at.push_front(segment);
-                            }
-                            _ => (),
+                        if let EventError::PrimitiveDescent {
+                            original_target,
+                            primitive_at,
+                            original_value: _,
+                        } = &mut e {
+                            let segment = SegmentBuf::Field {
+                                name: name.clone(),
+                                requires_quoting: *requires_quoting,
+                            };
+                            original_target.push_front(segment.clone());
+                            primitive_at.push_front(segment);
                         };
                         e
                     })
@@ -522,17 +519,14 @@ impl Value {
                     Some(inner) => {
                         trace!(index = ?i, "Seeking into array.");
                         inner.insert(working_lookup, value).map_err(|mut e| {
-                            match &mut e {
-                                EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } => {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e {
                                     let segment = SegmentBuf::Index(i);
                                     original_target.push_front(segment.clone());
                                     primitive_at.push_front(segment);
-                                }
-                                _ => (),
                             };
                             e
                         })
@@ -547,17 +541,14 @@ impl Value {
                                 let mut inner = Value::Array(Vec::with_capacity(*next_len));
                                 trace!("Preparing inner array.");
                                 retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                    match &mut e {
-                                        EventError::PrimitiveDescent {
-                                            original_target,
-                                            primitive_at,
-                                            original_value: _,
-                                        } => {
+                                    if let EventError::PrimitiveDescent {
+                                        original_target,
+                                        primitive_at,
+                                        original_value: _,
+                                    } = &mut e {
                                             let segment = SegmentBuf::Index(i);
                                             original_target.push_front(segment.clone());
                                             primitive_at.push_front(segment);
-                                        }
-                                        _ => (),
                                     };
                                     e
                                 });
@@ -569,23 +560,20 @@ impl Value {
                             }) => {
                                 let mut inner = Value::Map(Default::default());
                                 let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
-                                let requires_quoting = requires_quoting.clone(); // This is for navigating an ownership issue in the error stack reporting.
+                                let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
                                 trace!("Preparing inner map.");
                                 retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                    match &mut e {
-                                        EventError::PrimitiveDescent {
-                                            original_target,
-                                            primitive_at,
-                                            original_value: _,
-                                        } => {
+                                    if let EventError::PrimitiveDescent {
+                                        original_target,
+                                        primitive_at,
+                                        original_value: _,
+                                    } = &mut e {
                                             let segment = SegmentBuf::Field {
                                                 name,
                                                 requires_quoting,
                                             };
                                             original_target.push_front(segment.clone());
                                             primitive_at.push_front(segment);
-                                        }
-                                        _ => (),
                                     };
                                     e
                                 });
@@ -604,18 +592,15 @@ impl Value {
                                                 retval = inner
                                                     .insert(working_lookup, value)
                                                     .map_err(|mut e| {
-                                                        match &mut e {
-                                                            EventError::PrimitiveDescent {
-                                                                original_target,
-                                                                primitive_at,
-                                                                original_value: _,
-                                                            } => {
+                                                        if let EventError::PrimitiveDescent {
+                                                            original_target,
+                                                            primitive_at,
+                                                            original_value: _,
+                                                        } = &mut e {
                                                                 original_target
                                                                     .push_front(set.clone());
                                                                 primitive_at
                                                                     .push_front(set.clone());
-                                                            }
-                                                            _ => (),
                                                         };
                                                         e
                                                     });
@@ -630,18 +615,15 @@ impl Value {
                                                 retval = inner
                                                     .insert(working_lookup, value)
                                                     .map_err(|mut e| {
-                                                        match &mut e {
-                                                            EventError::PrimitiveDescent {
-                                                                original_target,
-                                                                primitive_at,
-                                                                original_value: _,
-                                                            } => {
+                                                        if let EventError::PrimitiveDescent {
+                                                            original_target,
+                                                            primitive_at,
+                                                            original_value: _,
+                                                        } = &mut e {
                                                                 original_target
                                                                     .push_front(segment.clone());
                                                                 primitive_at
                                                                     .push_front(segment.clone());
-                                                            }
-                                                            _ => (),
                                                         };
                                                         e
                                                     });
@@ -652,7 +634,7 @@ impl Value {
                                     }
                                 }
                             }
-                            None => value.into(),
+                            None => value,
                         };
                         trace!(?next_val, "Setting index to value.");
                         array.push(next_val);
@@ -673,16 +655,13 @@ impl Value {
                         trace!("Preparing inner array.");
                         working_lookup.push_front(segment.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            match &mut e {
-                                EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } => {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e {
                                     original_target.push_front(segment.clone());
                                     primitive_at.push_front(segment.clone());
-                                }
-                                _ => (),
                             };
                             e
                         });
@@ -693,16 +672,13 @@ impl Value {
                         trace!("Preparing inner map.");
                         working_lookup.push_front(segment.clone());
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            match &mut e {
-                                EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } => {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e {
                                     original_target.push_front(segment.clone());
                                     primitive_at.push_front(segment.clone());
-                                }
-                                _ => (),
                             };
                             e
                         });
@@ -720,16 +696,13 @@ impl Value {
                                         let set = SegmentBuf::Coalesce(set.clone());
                                         retval =
                                             inner.insert(working_lookup, value).map_err(|mut e| {
-                                                match &mut e {
-                                                    EventError::PrimitiveDescent {
-                                                        original_target,
-                                                        primitive_at,
-                                                        original_value: _,
-                                                    } => {
+                                                if let EventError::PrimitiveDescent {
+                                                    original_target,
+                                                    primitive_at,
+                                                    original_value: _,
+                                                } = &mut e {
                                                         original_target.push_front(set.clone());
                                                         primitive_at.push_front(set.clone());
-                                                    }
-                                                    _ => (),
                                                 };
                                                 e
                                             });
@@ -743,16 +716,13 @@ impl Value {
                                         let set = SegmentBuf::Coalesce(set.clone());
                                         retval =
                                             inner.insert(working_lookup, value).map_err(|mut e| {
-                                                match &mut e {
-                                                    EventError::PrimitiveDescent {
-                                                        original_target,
-                                                        primitive_at,
-                                                        original_value: _,
-                                                    } => {
+                                                if let EventError::PrimitiveDescent {
+                                                    original_target,
+                                                    primitive_at,
+                                                    original_value: _,
+                                                } = &mut e {
                                                         original_target.push_front(set.clone());
                                                         primitive_at.push_front(set.clone());
-                                                    }
-                                                    _ => (),
                                                 };
                                                 e
                                             });
