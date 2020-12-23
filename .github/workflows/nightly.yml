@@ -207,12 +207,12 @@ jobs:
         uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: |
-        apt-get update && \
-        apt-get install -y \
-        ca-certificates \
-        curl \
-        git \
-        systemd
+          apt-get update && \
+          apt-get install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
@@ -234,13 +234,13 @@ jobs:
         uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: |
-        yum update -y && \
-        yum install -y \
-        ca-certificates \
-        curl \
-        git \
-        systemd \
-        tar
+          yum update -y && \
+          yum install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          tar
       - uses: actions/download-artifact@v2
         with:
           name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
