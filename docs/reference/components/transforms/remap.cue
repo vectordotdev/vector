@@ -183,22 +183,22 @@ components: transforms: remap: {
 		{
 			title: "Parsing JSON"
 			configuration: {
-				source: ".message = parse_json(.message)"
+				source: ". = parse_json(.message)"
 			}
 			input: log: {
 				message: #"{"key": "val"}"#
 			}
 			output: log: {
-				message: key: "val"
+				key: "val"
 			}
 		},
 		{
 			title: "Encoding JSON"
 			configuration: {
-				source: ".message = encode_json(.message)"
+				source: ".message = encode_json(.)"
 			}
 			input: log: {
-				message: key: "val"
+				key: "val"
 			}
 			output: log: {
 				message: #"{"key": "val"}"#
@@ -249,7 +249,7 @@ components: transforms: remap: {
 				. = parse_syslog(.)
 				"""
 			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
-			ouput: log: {
+			output: log: {
 				appname:   "su"
 				facility:  "ntp"
 				hostname:  "vector-user.biz"
