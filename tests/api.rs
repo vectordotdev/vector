@@ -15,7 +15,6 @@ mod tests {
         net::SocketAddr,
         time::{Duration, Instant},
     };
-    use tempfile::tempdir;
     use tokio::sync::oneshot;
     use url::Url;
     use vector::{
@@ -685,13 +684,16 @@ mod tests {
         })
     }
 
+    #[cfg(unix)]
     #[test]
     fn api_graphql_files_source_metrics() {
+        use tempfile::{tempdir, NamedTempFile};
+
         metrics_test("tests::api_graphql_files_source_metrics", async {
             let lines = vec!["test1", "test2", "test3"];
 
             let checkpoints = tempdir().unwrap();
-            let mut named_file = tempfile::NamedTempFile::new().unwrap();
+            let mut named_file = NamedTempFile::new().unwrap();
             let path = named_file
                 .path()
                 .to_str()
