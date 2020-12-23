@@ -451,8 +451,13 @@ impl LogEvent {
                         }),
                         None => None,
                     };
-                    if prune && self.fields.get(name) == Some(&Value::Null) {
-                        self.fields.remove(name);
+                    if let Some(val) = self.fields.get_mut(name) {
+                        if val.is_empty() && prune {
+                            trace!(is_empty = val.is_empty(), %prune, field = %name, "Pruning.");
+                            self.fields.remove(name);
+                        } else {
+                            trace!(is_empty = val.is_empty(), %prune, field = %name, "Not pruning.");
+                        }
                     }
                     retval
                 }

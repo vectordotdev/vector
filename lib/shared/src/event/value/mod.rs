@@ -329,8 +329,8 @@ impl Value {
             | Value::Bytes(_)
             | Value::Timestamp(_)
             | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => false,
+            | Value::Integer(_) => false,
+            Value::Null => true,
             Value::Map(v) => v.is_empty(),
             Value::Array(v) => v.is_empty(),
         }
