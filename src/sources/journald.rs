@@ -684,7 +684,7 @@ mod tests {
     #[tokio::test]
     async fn reads_journal() {
         let received = run_journal(&[], &[], None).await;
-        assert_eq!(received.len(), 6);
+        assert_eq!(received.len(), 7);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -711,7 +711,7 @@ mod tests {
     #[tokio::test]
     async fn excludes_units() {
         let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
-        assert_eq!(received.len(), 4);
+        assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -729,7 +729,7 @@ mod tests {
     #[tokio::test]
     async fn handles_checkpoint() {
         let received = run_journal(&[], &[], Some("1")).await;
-        assert_eq!(received.len(), 5);
+        assert_eq!(received.len(), 6);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
