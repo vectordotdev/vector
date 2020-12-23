@@ -498,7 +498,8 @@ impl Value {
                             original_target,
                             primitive_at,
                             original_value: _,
-                        } = &mut e {
+                        } = &mut e
+                        {
                             let segment = SegmentBuf::Field {
                                 name: name.clone(),
                                 requires_quoting: *requires_quoting,
@@ -523,10 +524,11 @@ impl Value {
                                 original_target,
                                 primitive_at,
                                 original_value: _,
-                            } = &mut e {
-                                    let segment = SegmentBuf::Index(i);
-                                    original_target.push_front(segment.clone());
-                                    primitive_at.push_front(segment);
+                            } = &mut e
+                            {
+                                let segment = SegmentBuf::Index(i);
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment);
                             };
                             e
                         })
@@ -545,10 +547,11 @@ impl Value {
                                         original_target,
                                         primitive_at,
                                         original_value: _,
-                                    } = &mut e {
-                                            let segment = SegmentBuf::Index(i);
-                                            original_target.push_front(segment.clone());
-                                            primitive_at.push_front(segment);
+                                    } = &mut e
+                                    {
+                                        let segment = SegmentBuf::Index(i);
+                                        original_target.push_front(segment.clone());
+                                        primitive_at.push_front(segment);
                                     };
                                     e
                                 });
@@ -567,13 +570,14 @@ impl Value {
                                         original_target,
                                         primitive_at,
                                         original_value: _,
-                                    } = &mut e {
-                                            let segment = SegmentBuf::Field {
-                                                name,
-                                                requires_quoting,
-                                            };
-                                            original_target.push_front(segment.clone());
-                                            primitive_at.push_front(segment);
+                                    } = &mut e
+                                    {
+                                        let segment = SegmentBuf::Field {
+                                            name,
+                                            requires_quoting,
+                                        };
+                                        original_target.push_front(segment.clone());
+                                        primitive_at.push_front(segment);
                                     };
                                     e
                                 });
@@ -596,11 +600,10 @@ impl Value {
                                                             original_target,
                                                             primitive_at,
                                                             original_value: _,
-                                                        } = &mut e {
-                                                                original_target
-                                                                    .push_front(set.clone());
-                                                                primitive_at
-                                                                    .push_front(set.clone());
+                                                        } = &mut e
+                                                        {
+                                                            original_target.push_front(set.clone());
+                                                            primitive_at.push_front(set.clone());
                                                         };
                                                         e
                                                     });
@@ -619,11 +622,12 @@ impl Value {
                                                             original_target,
                                                             primitive_at,
                                                             original_value: _,
-                                                        } = &mut e {
-                                                                original_target
-                                                                    .push_front(segment.clone());
-                                                                primitive_at
-                                                                    .push_front(segment.clone());
+                                                        } = &mut e
+                                                        {
+                                                            original_target
+                                                                .push_front(segment.clone());
+                                                            primitive_at
+                                                                .push_front(segment.clone());
                                                         };
                                                         e
                                                     });
@@ -659,9 +663,10 @@ impl Value {
                                 original_target,
                                 primitive_at,
                                 original_value: _,
-                            } = &mut e {
-                                    original_target.push_front(segment.clone());
-                                    primitive_at.push_front(segment.clone());
+                            } = &mut e
+                            {
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment.clone());
                             };
                             e
                         });
@@ -676,9 +681,10 @@ impl Value {
                                 original_target,
                                 primitive_at,
                                 original_value: _,
-                            } = &mut e {
-                                    original_target.push_front(segment.clone());
-                                    primitive_at.push_front(segment.clone());
+                            } = &mut e
+                            {
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment.clone());
                             };
                             e
                         });
@@ -700,9 +706,10 @@ impl Value {
                                                     original_target,
                                                     primitive_at,
                                                     original_value: _,
-                                                } = &mut e {
-                                                        original_target.push_front(set.clone());
-                                                        primitive_at.push_front(set.clone());
+                                                } = &mut e
+                                                {
+                                                    original_target.push_front(set.clone());
+                                                    primitive_at.push_front(set.clone());
                                                 };
                                                 e
                                             });
@@ -720,9 +727,10 @@ impl Value {
                                                     original_target,
                                                     primitive_at,
                                                     original_value: _,
-                                                } = &mut e {
-                                                        original_target.push_front(set.clone());
-                                                        primitive_at.push_front(set.clone());
+                                                } = &mut e
+                                                {
+                                                    original_target.push_front(set.clone());
+                                                    primitive_at.push_front(set.clone());
                                                 };
                                                 e
                                             });
