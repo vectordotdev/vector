@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequest, HTTPDecodeError, HTTPEventsReceived},
+    internal_events::{HTTPBadRequest, HTTPDecompressError, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -11,6 +11,7 @@ use flate2::read::{DeflateDecoder, GzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
+use snap::raw::Decoder as SnappyDecoder;
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
@@ -130,8 +131,24 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
         for encoding in encodings.rsplit(',').map(str::trim) {
             body = match encoding {
                 "identity" => body,
-                "gzip" => decode_read(GzDecoder::new(body.reader()), "gzip")?,
-                "deflate" => decode_read(DeflateDecoder::new(body.reader()), "deflate")?,
+                "gzip" => {
+                    let mut decoded = Vec::new();
+                    GzDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "deflate" => {
+                    let mut decoded = Vec::new();
+                    DeflateDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "snappy" => SnappyDecoder::new()
+                    .decompress_vec(&body)
+                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .into(),
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
@@ -145,19 +162,15 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
     Ok(body)
 }
 
-fn decode_read(mut decoder: impl Read, coding: &str) -> Result<Bytes, ErrorMessage> {
-    let mut decoded = Vec::new();
-    decoder.read_to_end(&mut decoded).map_err(|error| {
-        emit!(HTTPDecodeError {
-            coding,
-            error: &error
-        });
-        ErrorMessage::new(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Failed decoding payload with {} decoder.", coding),
-        )
-    })?;
-    Ok(decoded.into())
+fn handle_decode_error(coding: &str, error: impl std::error::Error) -> ErrorMessage {
+    emit!(HTTPDecompressError {
+        coding,
+        error: &error
+    });
+    ErrorMessage::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        format!("Failed decompressing payload with {} decoder.", coding),
+    )
 }
 
 #[async_trait]

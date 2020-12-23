@@ -77,15 +77,15 @@ impl InternalEvent for HTTPEventEncoded {
 }
 
 #[derive(Debug)]
-pub struct HTTPDecodeError<'a> {
+pub struct HTTPDecompressError<'a> {
     pub error: &'a dyn Error,
     pub coding: &'a str,
 }
 
-impl<'a> InternalEvent for HTTPDecodeError<'a> {
+impl<'a> InternalEvent for HTTPDecompressError<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "Failed decoding payload.",
+            message = "Failed decompressing payload.",
             coding= %self.coding,
             error = %self.error,
             rate_limit_secs = 10
@@ -93,6 +93,6 @@ impl<'a> InternalEvent for HTTPDecodeError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_decode_errors_total", 1, "error_kind" => self.error.to_string());
+        counter!("parse_errors_total", 1);
     }
 }

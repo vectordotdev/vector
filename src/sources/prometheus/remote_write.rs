@@ -3,7 +3,6 @@ use crate::{
     event::{Metric, MetricKind, MetricValue},
     internal_events::{
         PrometheusNoNameError, PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived,
-        PrometheusRemoteWriteSnapError,
     },
     prometheus::{proto, METRIC_NAME_LABEL},
     shutdown::ShutdownSignal,
@@ -60,9 +59,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        let source = RemoteWriteSource {
-            decompressor: snap::raw::Decoder::new(),
-        };
+        let source = RemoteWriteSource;
         source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
 
@@ -76,37 +73,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 }
 
 #[derive(Clone)]
-struct RemoteWriteSource {
-    decompressor: snap::raw::Decoder,
-}
-
-impl RemoteWriteSource {
-    fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-        let body = self
-            .decompressor
-            .clone()
-            .decompress_vec(&body)
-            .map_err(|error| {
-                emit!(PrometheusRemoteWriteSnapError {
-                    error: error.clone()
-                });
-                ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    format!("Could not decompress write request: {}", error),
-                )
-            })?;
-        let request = proto::WriteRequest::decode(Bytes::from(body)).map_err(|error| {
-            emit!(PrometheusRemoteWriteParseError {
-                error: error.clone()
-            });
-            ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
-            )
-        })?;
-        Ok(decode_request(request))
-    }
-}
+struct RemoteWriteSource;
 
 impl HttpSource for RemoteWriteSource {
     fn build_event(
@@ -115,11 +82,24 @@ impl HttpSource for RemoteWriteSource {
         _header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let result = self.decode_body(body)?;
+        let result = decode_body(body)?;
         let count = result.len();
         emit!(PrometheusRemoteWriteReceived { count });
         Ok(result)
     }
+}
+
+fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+    let request = proto::WriteRequest::decode(body).map_err(|error| {
+        emit!(PrometheusRemoteWriteParseError {
+            error: error.clone()
+        });
+        ErrorMessage::new(
+            StatusCode::BAD_REQUEST,
+            format!("Could not decode write request: {}", error),
+        )
+    })?;
+    Ok(decode_request(request))
 }
 
 fn decode_request(request: proto::WriteRequest) -> Vec<Event> {
