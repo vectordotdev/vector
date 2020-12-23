@@ -71,7 +71,7 @@ components: transforms: remap: {
 
 	examples: [
 		{
-			title: "Add, rename, and remove fields"
+			title: "Adding, renaming, and removing fields"
 			configuration: {
 				source: #"""
 					.new_field = "new value"
@@ -151,7 +151,7 @@ components: transforms: remap: {
 			output: log: text: "foo bar"
 		},
 		{
-			title: "Parse JSON"
+			title: "Parsing JSON"
 			configuration: {
 				source: ".message = parse_json(.message)"
 			}
@@ -163,7 +163,7 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Encode JSON"
+			title: "Encoding JSON"
 			configuration: {
 				source: ".message = encode_json(.message)"
 			}
@@ -175,7 +175,7 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Coerce values"
+			title: "Coercing values"
 			configuration: {
 				source: #"""
 					.bool = to_bool(.bool)
@@ -215,7 +215,7 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Syslog severity and level"
+			title: "Parsing Syslog severity and level"
 			configuration: source: """
 				.level = to_syslog_level(.level)
 				.severity = to_syslog_severity(.severity)
@@ -227,6 +227,23 @@ components: transforms: remap: {
 			output: log: {
 				level:    "alert"
 				severity: 3
+			}
+		},
+		{
+			title: "Working with URLs"
+			configuration: source: ".url = parse_url(.url)"
+			input: log: {
+				url: "https//vector.dev"
+			}
+			output: log: {
+				fragment: null
+				host:     "vector.dev"
+				password: ""
+				path:     "/"
+				port:     null
+				query: {}
+				schema:   "https"
+				username: ""
 			}
 		},
 	]
