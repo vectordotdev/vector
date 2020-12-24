@@ -26,6 +26,10 @@ use vector::{
 #[inline]
 fn disable_metrics() {
     std::env::set_var("DISABLE_INTERNAL_METRICS_CORE", "true");
+}
+
+#[inline]
+fn disable_metrics_tracing_layer() {
     std::env::set_var("DISABLE_INTERNAL_METRICS_TRACING_LAYER", "true");
 }
 
@@ -35,25 +39,47 @@ fn boot() {
     vector::metrics::init().expect("metrics initialization failed");
 }
 
+#[allow(dead_code)] // condition compilation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    MetricsOff,
+    MetricsNoTracingLayer,
+    MetricsOn,
+}
+
+impl Mode {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Mode::MetricsOff => "metrics_off",
+            Mode::MetricsNoTracingLayer => "metrics_no_tracing_layer",
+            Mode::MetricsOn => "metrics_on",
+        }
+    }
+}
+
 /// Due to the nature of how metrics and tracing systems are set up, we need
 /// separate process spaces to measure with and without them being enabled.
 #[inline]
-pub fn benchmark(c: &mut Criterion, metrics_enabled: bool) {
-    if !metrics_enabled {
-        disable_metrics();
+pub fn benchmark(c: &mut Criterion, mode: Mode) {
+    match mode {
+        Mode::MetricsOff => {
+            disable_metrics();
+            disable_metrics_tracing_layer();
+        }
+        Mode::MetricsNoTracingLayer => {
+            disable_metrics_tracing_layer();
+        }
+        Mode::MetricsOn => {}
     }
     boot();
+    let metrics_core_enabled = mode != Mode::MetricsOff;
     assert_eq!(
         vector::metrics::get_controller().is_ok(),
-        metrics_enabled,
-        "the presence of a controller must correspond to whether metrics are on or off"
+        metrics_core_enabled,
+        "the presence of a controller must correspond to whether metrics core is on or off"
     );
 
-    let bench_name = if metrics_enabled {
-        "metrics_on"
-    } else {
-        "metrics_off"
-    };
+    let bench_name = mode.as_str();
 
     bench_topology(c, bench_name);
     bench_micro(c, bench_name);

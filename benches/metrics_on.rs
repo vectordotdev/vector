@@ -3,7 +3,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 mod metrics_bench_util;
 
 fn benchmark(c: &mut Criterion) {
-    metrics_bench_util::benchmark(c, true)
+    metrics_bench_util::benchmark(c, metrics_bench_util::Mode::MetricsOn)
 }
 
 criterion_group!(benches, benchmark);
