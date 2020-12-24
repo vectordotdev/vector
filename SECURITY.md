@@ -16,45 +16,47 @@ possible on our security efforts.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Project Structure](#project-structure)
-   1. [Transparency](#transparency)
-      1. [Open Source](#open-source)
-      1. [Workflow](#workflow)
-   1. [Version Control](#version-control)
-      1. [Git](#git)
-      1. [Signed Commits](#signed-commits)
-      1. [Protected Branches](#protected-branches)
-1. [Personnel](#personnel)
-   1. [Education](#education)
-   1. [Policies](#policies)
-   1. [Two-factor Authentication](#two-factor-authentication)
-   1. [Privilege Model](#privilege-model)
-   1. [Third-Parties](#third-parties)
-1. [Development & Code](#development--code)
-   1. [Design & Architecture](#design--architecture)
-      1. [Rust](#rust)
-      1. [Unsafe Code](#unsafe-code)
-      1. [User Privileges](#user-privileges)
-   1. [Dependencies](#dependencies)
-   1. [Change Control](#change-control)
-      1. [Pull Requests](#pull-requests)
-      1. [Reviews & Approvals](#reviews--approvals)
-      1. [Merge Policies](#merge-policies)
-   1. [Automated Checks](#automated-checks)
-      1. [Vulnerability Scans & Security Advisories](#vulnerability-scans--security-advisories)
-      1. [Fuzz Testing](#fuzz-testing)
-1. [Infrastructure](#infrastructure)
-   1. [CI/CD](#cicd)
-      1. [Runtime Isolation](#runtime-isolation)
-   1. [Network Security](#network-security)
-      1. [Penetration Testing](#penetration-testing)
-      1. [Protocols](#protocols)
-   1. [Release Artifacts & Channels](#release-artifacts--channels)
-      1. [Asset Audit Logging](#asset-audit-logging)
-      1. [Asset Signatures & Checksums](#asset-signatures--checksums)
-1. [Meta](#meta)
-   1. [Review Schedule](#review-schedule)
-   1. [Vulnerability Reporting](#vulnerability-reporting)
+- [Security Policy](#security-policy)
+  - [Project Structure](#project-structure)
+    - [Transparency](#transparency)
+      - [Open Source](#open-source)
+      - [Workflow](#workflow)
+    - [Version Control](#version-control)
+      - [Git](#git)
+      - [Signed Commits](#signed-commits)
+      - [Protected Branches](#protected-branches)
+  - [Personnel](#personnel)
+    - [Education](#education)
+    - [Policies](#policies)
+    - [Two-factor Authentication](#two-factor-authentication)
+    - [Privilege Model](#privilege-model)
+    - [Third-Parties](#third-parties)
+  - [Development & Code](#development--code)
+    - [Design & Architecture](#design--architecture)
+      - [Rust](#rust)
+      - [Unsafe Code](#unsafe-code)
+      - [User Privileges](#user-privileges)
+    - [Dependencies](#dependencies)
+    - [Change Control](#change-control)
+      - [Pull Requests](#pull-requests)
+      - [Reviews & Approvals](#reviews--approvals)
+      - [Merge Policies](#merge-policies)
+    - [Automated Checks](#automated-checks)
+      - [Vulnerability Scans & Security Advisories](#vulnerability-scans--security-advisories)
+      - [Vulnerability Remediation](#vulnerability-remediation)
+      - [Fuzz Testing](#fuzz-testing)
+  - [Infrastructure](#infrastructure)
+    - [CI/CD](#cicd)
+      - [Runtime Isolation](#runtime-isolation)
+    - [Network Security](#network-security)
+      - [Penetration Testing](#penetration-testing)
+      - [Protocols](#protocols)
+    - [Release Artifacts & Channels](#release-artifacts--channels)
+      - [Asset Audit Logging](#asset-audit-logging)
+      - [Asset Signatures & Checksums](#asset-signatures--checksums)
+  - [Meta](#meta)
+    - [Review Schedule](#review-schedule)
+    - [Vulnerability Reporting](#vulnerability-reporting)
 
 <!-- /MarkdownTOC -->
 
@@ -104,11 +106,11 @@ required since changes must go through a [review process](#reviews--approvals).
 Vector cuts releases from the `master` and `v*` branches _only_. These branches
 are [protected][urls.github_protected_branches]. The exact requirements are:
 
-* Cannot be deleted.
-* Force pushes are not allowed.
-* A linear history is required.
-* Signed commits are required.
-* Administrators are included in these checks.
+- Cannot be deleted.
+- Force pushes are not allowed.
+- A linear history is required.
+- Signed commits are required.
+- Administrators are included in these checks.
 
 ## Personnel
 
@@ -194,11 +196,26 @@ When possible, we'll create automated checks to enforce security policies.
 
 #### Vulnerability Scans & Security Advisories
 
-* Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
-  is part of the [Rust Security advisory database][urls.rust_sec].
-* Vector implements [Dependabot][urls.dependabot] which performs automated
+- Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
+  is part of the [Rust Security advisory database][urls.rust_sec]. The configuration, and a
+  list of currently accepted advisories, are maintained in the
+  [Cargo Deny configuration][urls.cargo_deny_configuration]. The check is run
+  [on every incoming PR][urls.cargo_deny_schedule] to the Vector project.
+- Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
   dependency-related security vulernerabilities.
+- We verify the security of our Docker images using [Synk's][urls.snyk] vulnerability
+  scanning.
+
+#### Vulnerability Remediation
+
+If the advisory check fails then the PR will not be merged. We review each advisory to
+determine what action to take. If possible, we update the dependency to a version
+where the vulnerability has been addressed. If this isn't possible we either record
+the acceptance of the vulnerability or replace the dependency. If we accept the
+vulnerability we open a ticket to track its remediation, generally awaiting a fix
+upstream. If the risk is deemed unacceptable we revisit the code and dependency
+to find a more secure alternative.
 
 #### Fuzz Testing
 
@@ -258,17 +275,18 @@ For non-critical matters, we prefer users [open an issue][urls.new_security_repo
 For us to best investigate your request, please include any of the
 following when reporting:
 
-* Proof of concept
-* Any tools, including versions used
-* Any relevant output
+- Proof of concept
+- Any tools, including versions used
+- Any relevant output
 
 We take all disclosures very seriously and will do our best to rapidly respond
 and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
-
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
+[urls.cargo_deny_configuration]: https://github.com/timberio/vector/blob/master/deny.toml
+[urls.cargo_deny_schedule]: https://github.com/timberio/vector/blob/master/.github/workflows/test.yml#L267
 [urls.dependabot]: https://github.com/marketplace/dependabot-preview
 [urls.dependabot_alerts]: https://github.com/timberio/vector/network/alerts
 [urls.git]: https://git-scm.com/
@@ -277,6 +295,7 @@ it, we will periodically update you with the status of the fix.
 [urls.new_security_report]: https://github.com/timberio/vector/issues/new?labels=domain%3A+security
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_sec]: https://rustsec.org/
+[urls.snyk]: https://www.snyk.io
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_issues]: https://github.com/timberio/vector/issues
 [urls.vector_pull_requests]: https://github.com/timberio/vector/pulls
