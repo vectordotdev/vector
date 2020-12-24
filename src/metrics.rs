@@ -213,6 +213,11 @@ fn snapshot(controller: &Controller) -> Vec<Event> {
         .collect()
 }
 
+/// Clear all metrics from the registry.
+pub fn reset(controller: &Controller) {
+    controller.registry.map.clear()
+}
+
 /// Take a snapshot of all gathered metrics and expose them as metric
 /// [`Event`]s.
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
