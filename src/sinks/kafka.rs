@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
@@ -9,6 +8,7 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateError},
+    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -250,7 +250,15 @@ impl Sink<Event> for KafkaSink {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
             error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
-        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
+
+        let timestamp_ms = match &item {
+            Event::Log(log) => log
+                .get(log_schema().timestamp_key())
+                .and_then(|v| v.as_timestamp()),
+            Event::Metric(metric) => metric.timestamp.as_ref(),
+        }
+        .map(|ts| ts.timestamp_millis());
+        let (key, body) = encode_event(item, &self.key_field, &self.encoding);
 
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -259,10 +267,8 @@ impl Sink<Event> for KafkaSink {
         let flush_signal = Arc::clone(&self.flush_signal);
         self.delivery_fut.push(Box::pin(async move {
             let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
-            if let Some(Value::Timestamp(timestamp)) =
-                item.as_log().get(log_schema().timestamp_key())
-            {
-                record = record.timestamp(timestamp.timestamp_millis());
+            if let Some(timestamp) = timestamp_ms {
+                record = record.timestamp(timestamp);
             }
 
             debug!(message = "Sending event.", count = 1);
