@@ -128,7 +128,6 @@ scopes:
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
-  - prometheus source # Anything `prometheus` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
   - socket source # Anything `socket` source related
@@ -198,7 +197,6 @@ scopes:
   - nats sink # Anything `nats` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - papertrail sink # Anything `papertrail` sink related
-  - prometheus sink # Anything `prometheus` sink related
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
   - pulsar sink # Anything `pulsar` sink related
