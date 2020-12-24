@@ -9,7 +9,7 @@ components: transforms: tokenizer: {
 
 	classes: {
 		commonly_used: true
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
