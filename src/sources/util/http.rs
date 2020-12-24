@@ -162,14 +162,14 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
     Ok(body)
 }
 
-fn handle_decode_error(coding: &str, error: impl std::error::Error) -> ErrorMessage {
+fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
     emit!(HTTPDecompressError {
-        coding,
+        encoding,
         error: &error
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", coding),
+        format!("Failed decompressing payload with {} decoder.", encoding),
     )
 }
 

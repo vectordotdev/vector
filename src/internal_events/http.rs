@@ -79,14 +79,14 @@ impl InternalEvent for HTTPEventEncoded {
 #[derive(Debug)]
 pub struct HTTPDecompressError<'a> {
     pub error: &'a dyn Error,
-    pub coding: &'a str,
+    pub encoding: &'a str,
 }
 
 impl<'a> InternalEvent for HTTPDecompressError<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed decompressing payload.",
-            coding= %self.coding,
+            encoding= %self.encoding,
             error = %self.error,
             rate_limit_secs = 10
         );
