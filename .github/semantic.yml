@@ -112,6 +112,7 @@ scopes:
 
   # sources
   - apache_metrics source # Anything `apache_metrics` source related
+  - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
   - docker_logs source # Anything `docker_logs` source related
@@ -120,14 +121,16 @@ scopes:
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
+  - internal_logs source # Anything `internal_logs` source related
   - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related
-  - logplex source # Anything `logplex` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
   - prometheus source # Anything `prometheus` source related
+  - prometheus_remote_write source # Anything `prometheus_remote_write` source related
+  - prometheus_scrape source # Anything `prometheus_scrape` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
   - statsd source # Anything `statsd` source related
@@ -151,6 +154,7 @@ scopes:
   - logfmt_parser transform # Anything `logfmt_parser` transform related
   - lua transform # Anything `lua` transform related
   - merge transform # Anything `merge` transform related
+  - metric_to_log transform # Anything `metric_to_log` transform related
   - reduce transform # Anything `reduce` transform related
   - regex_parser transform # Anything `regex_parser` transform related
   - remap transform # Anything `remap` transform related
@@ -195,6 +199,8 @@ scopes:
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus sink # Anything `prometheus` sink related
+  - prometheus_exporter sink # Anything `prometheus_exporter` sink related
+  - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
   - pulsar sink # Anything `pulsar` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
   - sematext_metrics sink # Anything `sematext_metrics` sink related
