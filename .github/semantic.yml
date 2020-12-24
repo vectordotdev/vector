@@ -117,6 +117,7 @@ scopes:
   - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
+  - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
   - internal_metrics source # Anything `internal_metrics` source related
