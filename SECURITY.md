@@ -106,11 +106,11 @@ required since changes must go through a [review process](#reviews--approvals).
 Vector cuts releases from the `master` and `v*` branches _only_. These branches
 are [protected][urls.github_protected_branches]. The exact requirements are:
 
-* Cannot be deleted.
-* Force pushes are not allowed.
-* A linear history is required.
-* Signed commits are required.
-* Administrators are included in these checks.
+- Cannot be deleted.
+- Force pushes are not allowed.
+- A linear history is required.
+- Signed commits are required.
+- Administrators are included in these checks.
 
 ## Personnel
 
@@ -196,15 +196,15 @@ When possible, we'll create automated checks to enforce security policies.
 
 #### Vulnerability Scans & Security Advisories
 
-* Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
+- Vector implements an automated [`cargo deny` check][urls.cargo_deny]. This
   is part of the [Rust Security advisory database][urls.rust_sec]. The configuration, and a
   list of currently accepted advisories, are maintained in the
   [Cargo Deny configuration][urls.cargo_deny_configuration]. The check is run
   [on every incoming PR][urls.cargo_deny_schedule] to the Vector project.
-* Vector implements [Dependabot][urls.dependabot] which performs automated
+- Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
   dependency-related security vulernerabilities.
-* We verify the security of our Docker images using [Synk's][urls.snyk] vulnerability
+- We verify the security of our Docker images using [Synk's][urls.snyk] vulnerability
   scanning.
 
 #### Vulnerability Remediation
@@ -275,15 +275,14 @@ For non-critical matters, we prefer users [open an issue][urls.new_security_repo
 For us to best investigate your request, please include any of the
 following when reporting:
 
-* Proof of concept
-* Any tools, including versions used
-* Any relevant output
+- Proof of concept
+- Any tools, including versions used
+- Any relevant output
 
 We take all disclosures very seriously and will do our best to rapidly respond
 and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
-
 
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
 [urls.cargo_deny_configuration]: https://github.com/timberio/vector/blob/master/deny.toml
