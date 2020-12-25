@@ -598,7 +598,48 @@ mod tests {
 
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
-    // use super::*;
+    use super::*;
+    use crate::{test_util::trace_init, Pipeline};
 
-    //
+    async fn test_postgresql_metrics(endpoint: &'static str) {
+        trace_init();
+
+        let (sender, mut recv) = Pipeline::new_test();
+
+        tokio::spawn(async move {
+            PostgresqlMetricsConfig {
+                endpoints: vec![endpoint.to_owned()],
+                ..Default::default()
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+
+        let event = time::timeout(time::Duration::from_secs(3), recv.next())
+            .await
+            .expect("fetch metrics timeout")
+            .expect("failed to get metrics from a stream");
+        let mut events = vec![event];
+        loop {
+            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+        assert!(events.len() > 1);
+    }
+
+    #[tokio::test]
+    async fn test_password_based_auth() {
+        test_postgresql_metrics("postgresql://postgres:vector@localhost/postgres").await
+    }
 }
