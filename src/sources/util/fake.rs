@@ -38,6 +38,7 @@ const ERROR_MESSAGES: [&str; 9] = [
 
 const APACHE_COMMON_TIME_FORMAT: &str = "%d/%b/%Y:%T %z";
 const APACHE_ERROR_TIME_FORMAT: &str = "%a %b %d %T %Y";
+const JSON_TIME_FORMAT: &str = "%d/%b/%Y:%T";
 
 pub fn apache_common_log_line() -> String {
     // Example log line:
@@ -86,6 +87,26 @@ pub fn syslog_5424_log_line() -> String {
     )
 }
 
+pub fn json_log_line() -> String {
+    // Borrowed from Flog: https://github.com/mingrammer/flog/blob/master/log.go#L24
+    // Example log line:
+    // {"host":"208.171.64.160", "user-identifier":"hoppe7055", "datetime":" -0800", "method": \
+    //   "PATCH", "request": "/web+services/cross-media/strategize", "protocol":"HTTP/1.1", \
+    //   "status":403, "bytes":25926, "referer": "https://www.leadworld-class.org/revolutionize/applications"}
+    format!(
+        "{{\"host\":\"{}\",\"user-identifier\":\"{}\",\"datetime\":\"{}\",\"method\":\"{}\",\"request\":\"{}\",\"protocol\":\"{}\",\"status\":\"{}\",\"bytes\":{},\"referer\":\"{}\"}}",
+        ipv4_address(),
+        username(),
+        timestamp_json(),
+        http_method(),
+        http_endpoint(),
+        http_version(),
+        http_code(),
+        random_in_range(1000, 50000),
+        referer(),
+    )
+}
+
 // Formatted timestamps
 fn timestamp_apache_common() -> String {
     Local::now().format(&APACHE_COMMON_TIME_FORMAT).to_string()
@@ -97,6 +118,10 @@ fn timestamp_apache_error() -> String {
 
 fn timestamp_syslog() -> String {
     Local::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+fn timestamp_json() -> String {
+    Local::now().format(&JSON_TIME_FORMAT).to_string()
 }
 
 // Other random strings
@@ -146,6 +171,10 @@ fn port() -> String {
 
 fn prival() -> String {
     random_in_range(0, 191)
+}
+
+fn referer() -> String {
+    format!("https://{}{}", domain(), http_endpoint())
 }
 
 fn username() -> String {
