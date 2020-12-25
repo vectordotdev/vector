@@ -347,7 +347,6 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
             let event = rx.try_recv().unwrap();
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
