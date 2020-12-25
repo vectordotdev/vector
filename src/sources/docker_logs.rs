@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, LogSchema, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -56,7 +56,8 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    host_key: Option<String>,
+    #[serde(default = "LogSchema::default_host_key")]
+    host_key: String,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
@@ -80,7 +81,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: None,
+            host_key: LogSchema::default_host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -345,10 +346,7 @@ impl DockerLogsSource {
 
         let backoff_secs = config.retry_backoff_secs;
 
-        let host_key = config
-            .host_key
-            .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
+        let host_key = config.host_key.clone();
         let hostname = crate::get_hostname().ok();
 
         // Only logs created at, or after this moment are logged.
