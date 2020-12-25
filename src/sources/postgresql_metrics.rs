@@ -69,28 +69,28 @@ pub enum CollectError {
     QueryError { source: PgError },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(default, deny_unknown_fields)]
 struct PostgresqlMetricsConfig {
     endpoints: Vec<String>,
     // TODO: use included/excluded
-    #[serde(default)]
     included_databases: Vec<String>,
-    #[serde(default)]
     excluded_databases: Vec<String>,
-    #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
-    #[serde(default = "default_namespace")]
     namespace: String,
     // TODO: SSL
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
-    15
-}
-
-pub fn default_namespace() -> String {
-    "postgresql".to_string()
+impl Default for PostgresqlMetricsConfig {
+    fn default() -> Self {
+        Self {
+            endpoints: vec![],
+            included_databases: vec![],
+            excluded_databases: vec![],
+            scrape_interval_secs: 15,
+            namespace: "postgresql".to_owned(),
+        }
+    }
 }
 
 inventory::submit! {
