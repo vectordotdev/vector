@@ -82,8 +82,24 @@ components: sources: postgresql_metrics: {
 			required:    false
 			type: string: default: "postgresql"
 		}
-		// included_databases
-		// excluded_databases
+		included_databases: {
+			description: "A list of databases to match against `datname` column for which you want to collect logs from."
+			common: false,
+			required: false,
+			type: array: {
+				default: null
+				items: type: string: examples: ["postgres", "vector"]
+			}
+		}
+		excluded_databases: {
+			description: "A list of databases to match against `datname` column for which you don't want to collect logs from."
+			common: false,
+			required: false,
+			type: array: {
+				default: null
+				items: type: string: examples: ["postgres", "vector"]
+			}
+		}
 		// tls: configuration._tls_connect & {_args: {
 		//  can_enable:             true
 		//  can_verify_certificate: true

@@ -12,7 +12,11 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, future::ready, time::Instant};
+use std::{
+    collections::{BTreeMap, HashSet},
+    future::ready,
+    time::Instant,
+};
 use tokio::time;
 use tokio_postgres::{
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},
@@ -73,9 +77,8 @@ pub enum CollectError {
 #[serde(default, deny_unknown_fields)]
 struct PostgresqlMetricsConfig {
     endpoints: Vec<String>,
-    // TODO: use included/excluded
-    included_databases: Vec<String>,
-    excluded_databases: Vec<String>,
+    included_databases: Option<Vec<String>>,
+    excluded_databases: Option<Vec<String>>,
     scrape_interval_secs: u64,
     namespace: String,
     // TODO: SSL
@@ -85,8 +88,8 @@ impl Default for PostgresqlMetricsConfig {
     fn default() -> Self {
         Self {
             endpoints: vec![],
-            included_databases: vec![],
-            excluded_databases: vec![],
+            included_databases: None,
+            excluded_databases: None,
             scrape_interval_secs: 15,
             namespace: "postgresql".to_owned(),
         }
@@ -109,13 +112,15 @@ impl SourceConfig for PostgresqlMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        let datname_filter = DatnameFilter::new(
+            self.included_databases.clone().unwrap_or_default(),
+            self.excluded_databases.clone().unwrap_or_default(),
+        );
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
-        let sources = try_join_all(
-            self.endpoints
-                .iter()
-                .map(|endpoint| PostgresqlMetrics::new(endpoint.clone(), namespace.clone())),
-        )
+        let sources = try_join_all(self.endpoints.iter().map(|endpoint| {
+            PostgresqlMetrics::new(endpoint.clone(), datname_filter.clone(), namespace.clone())
+        }))
         .await?;
 
         let mut out =
@@ -149,15 +154,122 @@ impl SourceConfig for PostgresqlMetricsConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+enum DatnameFilter {
+    Include {
+        need_null: bool,
+        databases: Vec<String>,
+    },
+    Exclude {
+        need_null: bool,
+        databases: Vec<String>,
+    },
+    None,
+}
+
+impl DatnameFilter {
+    fn new(include: Vec<String>, exclude: Vec<String>) -> Self {
+        let exclude = exclude.into_iter().collect::<HashSet<_>>();
+        let include = include
+            .into_iter()
+            .filter(|name| !exclude.contains(name))
+            .collect::<HashSet<_>>();
+
+        if !include.is_empty() {
+            let (need_null, databases) = Self::remove_empty(include);
+            return Self::Include {
+                need_null,
+                databases,
+            };
+        }
+
+        if !exclude.is_empty() {
+            let (need_null, databases) = Self::remove_empty(exclude);
+            return Self::Exclude {
+                need_null,
+                databases,
+            };
+        }
+
+        Self::None
+    }
+
+    fn remove_empty(mut names: HashSet<String>) -> (bool, Vec<String>) {
+        let empty = "".to_owned();
+        let null = names.contains(&empty);
+        if null {
+            names.remove(&empty);
+        }
+        (null, names.into_iter().collect())
+    }
+
+    async fn pg_stat_database(&self, client: &Client) -> Result<Vec<Row>, PgError> {
+        let mut conditions = "SELECT * FROM pg_stat_database".to_owned();
+        match self {
+            Self::Include {
+                need_null,
+                databases,
+            } => {
+                conditions += " WHERE datname = ANY($1)";
+                if *need_null {
+                    conditions += " OR datname IS NULL";
+                }
+                client
+                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .await
+            }
+            Self::Exclude {
+                need_null,
+                databases,
+            } => {
+                conditions += " WHERE datname != ANY($1)";
+                if *need_null {
+                    conditions += " AND datname IS NOT NULL";
+                } else {
+                    conditions += " OR datname IS NULL";
+                }
+                client
+                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .await
+            }
+            Self::None => client.query(conditions.as_str(), &[]).await,
+        }
+    }
+
+    async fn pg_stat_database_conflicts(&self, client: &Client) -> Result<Vec<Row>, PgError> {
+        let mut conditions = "SELECT * FROM pg_stat_database_conflicts".to_owned();
+        match self {
+            Self::Include { databases, .. } => {
+                conditions += " WHERE datname = ANY($1)";
+                client
+                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .await
+            }
+            Self::Exclude { databases, .. } => {
+                conditions += " WHERE datname != ANY($1)";
+                client
+                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .await
+            }
+            Self::None => client.query(conditions.as_str(), &[]).await,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct PostgresqlMetrics {
     client: Client,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
+    datname_filter: DatnameFilter,
 }
 
 impl PostgresqlMetrics {
-    async fn new(endpoint: String, namespace: Option<String>) -> Result<Self, BuildError> {
+    async fn new(
+        endpoint: String,
+        datname_filter: DatnameFilter,
+        namespace: Option<String>,
+    ) -> Result<Self, BuildError> {
         let config: Config = endpoint.parse().context(InvalidEndpoint)?;
         if config.get_hosts().len() > 1 {
             return Err(BuildError::MultipleHostsNotSupported {
@@ -204,6 +316,7 @@ impl PostgresqlMetrics {
             client,
             namespace,
             tags,
+            datname_filter,
         })
     }
 
@@ -251,8 +364,8 @@ impl PostgresqlMetrics {
 
     async fn collect_pg_stat_database(&self) -> Result<Vec<Metric>, CollectError> {
         let rows = self
-            .client
-            .query("SELECT * FROM pg_stat_database", &[])
+            .datname_filter
+            .pg_stat_database(&self.client)
             .await
             .context(QueryError)?;
 
@@ -374,8 +487,8 @@ impl PostgresqlMetrics {
 
     async fn collect_pg_stat_database_conflicts(&self) -> Result<Vec<Metric>, CollectError> {
         let rows = self
-            .client
-            .query("SELECT * FROM pg_stat_database_conflicts", &[])
+            .datname_filter
+            .pg_stat_database_conflicts(&self.client)
             .await
             .context(QueryError)?;
 
