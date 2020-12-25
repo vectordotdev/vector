@@ -17,7 +17,7 @@ remap: functions: round: {
 		},
 	]
 	return: ["timestamp"]
-	category: "numeric"
+	category: "Numeric"
 	description: #"""
 		Rounds the given number to the given number of decimal places. Rounds up or down
 		depending on which is nearest. Numbers that are half way (5) are rounded up.

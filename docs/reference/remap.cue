@@ -49,7 +49,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "coerce" | "numeric" | "object" | "parse" | "text" | "hash" | "event" | "networking" | "encode"
+			category:    "Coerce" | "Encode" | "Enumerable" | "Event" | "Hash" | "IP" | "Map" | "Numeric" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name

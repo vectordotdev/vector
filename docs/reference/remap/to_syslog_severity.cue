@@ -11,7 +11,7 @@ remap: functions: to_syslog_severity: {
 	]
 
 	return: ["integer"]
-	category:    "parse"
+	category:    "Coerce"
 	description: """
 		Converts a Syslog [log level keyword](\(urls.syslog_levels)) into an integer severity level
 		(0 to 7). Throws an error if the level isn't recognized. The now-deprecated keywords

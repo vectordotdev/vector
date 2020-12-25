@@ -45,7 +45,7 @@ remap: functions: compact: {
 		},
 	]
 	return: ["array", "map"]
-	category: "text"
+	category: "Enumerable"
 	description: #"""
 		Compacts an `Array` or `Map` by removing empty values. What is considered an
 		empty value can be specified with the parameters, `null`, `string`, `map`, and

@@ -16,7 +16,7 @@ remap: functions: includes: {
 		},
 	]
 	return: ["boolean"]
-	category: "parse"
+	category: "Enumerable"
 	description: """
 		Determines whether an item is contained in an array. The item can be of any type and arrays
 		can be of mixed types.

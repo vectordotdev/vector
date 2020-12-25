@@ -17,7 +17,7 @@ remap: functions: ceil: {
 		},
 	]
 	return: ["timestamp"]
-	category: "numeric"
+	category: "Numeric"
 	description: #"""
 		Rounds the given number up to the given precision of decimal places.
 		"""#

@@ -23,7 +23,7 @@ remap: functions: parse_grok: {
 		},
 	]
 	return: ["map"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a string using the Rust [`grok` library](https://github.com/daschl/grok). All patterns
 		[listed here](https://github.com/daschl/grok/tree/master/patterns) are supported. It is recommended

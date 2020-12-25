@@ -30,7 +30,7 @@ remap: functions: format_number: {
 		},
 	]
 	return: ["string"]
-	category: "coerce"
+	category: "Numeric"
 	description: #"""
 		Returns a string representation of the given number.
 		"""#
