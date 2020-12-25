@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    internal_events::PostgresqlMetricsCollectCompleted,
+    internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
@@ -60,9 +60,11 @@ enum BuildError {
 }
 
 #[derive(Debug, Snafu)]
-enum CollectError {
+pub enum CollectError {
     #[snafu(display("failed to get value by key: {} (reason: {})", key, source))]
     PostgresGetValue { source: PgError, key: &'static str },
+    #[snafu(display("query failed: {}", source))]
+    QueryError { source: PgError },
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
@@ -209,8 +211,10 @@ impl PostgresqlMetrics {
         let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                // TODO: emit! event about error
-                println!("{:?}", error);
+                emit!(PostgresqlMetricsCollectFailed {
+                    error,
+                    endpoint: self.tags.get("endpoint").expect("should be defined"),
+                });
                 (0.0, stream::empty().boxed())
             }
         };
@@ -220,8 +224,6 @@ impl PostgresqlMetrics {
     }
 
     async fn collect_metrics(&self) -> Result<impl Iterator<Item = Metric>, CollectError> {
-        println!("collect metrics");
-
         try_join_all(vec![
             self.collect_pg_stat_database().boxed(),
             self.collect_pg_stat_database_conflicts().boxed(),
@@ -236,7 +238,7 @@ impl PostgresqlMetrics {
             .client
             .query("SELECT * FROM pg_stat_database", &[])
             .await
-            .expect("TODO");
+            .context(QueryError)?;
 
         let mut metrics = Vec::with_capacity(20 * rows.len());
         for row in rows.iter() {
@@ -359,7 +361,7 @@ impl PostgresqlMetrics {
             .client
             .query("SELECT * FROM pg_stat_database_conflicts", &[])
             .await
-            .expect("TODO");
+            .context(QueryError)?;
 
         let mut metrics = Vec::with_capacity(5 * rows.len());
         for row in rows.iter() {
@@ -401,7 +403,7 @@ impl PostgresqlMetrics {
             .client
             .query_one("SELECT * FROM pg_stat_bgwriter", &[])
             .await
-            .expect("TODO");
+            .context(QueryError)?;
 
         Ok(vec![
             self.create_metric(
