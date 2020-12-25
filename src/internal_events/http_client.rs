@@ -14,7 +14,6 @@ pub struct AboutToSendHTTPRequest<'a, T> {
 
 fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
     let mut headers = headers.clone();
-    let redacted = HeaderValue::from_static("<redacted>");
     for name in &[
         header::AUTHORIZATION,
         header::PROXY_AUTHORIZATION,
@@ -22,7 +21,7 @@ fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> 
         header::SET_COOKIE,
     ] {
         if let Some(value) = headers.get_mut(name) {
-            *value = redacted.clone();
+            value.set_sensitive(true);
         }
     }
     headers
