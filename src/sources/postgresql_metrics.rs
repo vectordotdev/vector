@@ -151,7 +151,6 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
 #[derive(Debug)]
 struct PostgresqlMetrics {
-    endpoint: String,
     client: Client,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
@@ -188,18 +187,7 @@ impl PostgresqlMetrics {
             result.unwrap();
         });
 
-        let version_row = client
-            .query_one("SELECT version()", &[])
-            .await
-            .with_context(|| VersionFailed {
-                endpoint: config_to_endpoint(&config),
-            })?;
-        let version = version_row
-            .try_get::<&str, &str>("version")
-            .with_context(|| VersionFailed {
-                endpoint: config_to_endpoint(&config),
-            })?;
-        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&config), server_version = %version);
+        Self::check_server_version(&client, &config).await?;
 
         let mut tags = BTreeMap::new();
         tags.insert("endpoint".into(), config_to_endpoint(&config));
@@ -213,11 +201,26 @@ impl PostgresqlMetrics {
         );
 
         Ok(Self {
-            endpoint,
             client,
             namespace,
             tags,
         })
+    }
+
+    async fn check_server_version(client: &Client, config: &Config) -> Result<(), BuildError> {
+        let version_row = client
+            .query_one("SELECT version()", &[])
+            .await
+            .with_context(|| VersionFailed {
+                endpoint: config_to_endpoint(&config),
+            })?;
+        let version = version_row
+            .try_get::<&str, &str>("version")
+            .with_context(|| VersionFailed {
+                endpoint: config_to_endpoint(&config),
+            })?;
+        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&config), server_version = %version);
+        Ok(())
     }
 
     async fn collect(&self) -> stream::BoxStream<'static, Metric> {
