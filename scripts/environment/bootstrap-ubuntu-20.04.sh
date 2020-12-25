@@ -85,7 +85,7 @@ if ! [ -x "$(command -v docker)" ]; then
     # Docker
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository \
-        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu \
         xenial \
         stable"
     # Install those new things
