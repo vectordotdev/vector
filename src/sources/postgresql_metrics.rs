@@ -56,7 +56,9 @@ enum BuildError {
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
     #[snafu(display("failed to connect ({}): {:?}", endpoint, source))]
-    ConnectionFailed { endpoint: String, source: PgError },
+    ConnectionFailed { source: PgError, endpoint: String },
+    #[snafu(display("failed to get PostgreSQL version ({}): {:?}", endpoint, source))]
+    VersionFailed { source: PgError, endpoint: String },
 }
 
 #[derive(Debug, Snafu)]
@@ -186,7 +188,18 @@ impl PostgresqlMetrics {
             result.unwrap();
         });
 
-        // TODO: debug! with server version, etc.
+        let version_row = client
+            .query_one("SELECT version()", &[])
+            .await
+            .with_context(|| VersionFailed {
+                endpoint: config_to_endpoint(&config),
+            })?;
+        let version = version_row
+            .try_get::<&str, &str>("version")
+            .with_context(|| VersionFailed {
+                endpoint: config_to_endpoint(&config),
+            })?;
+        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&config), server_version = %version);
 
         let mut tags = BTreeMap::new();
         tags.insert("endpoint".into(), config_to_endpoint(&config));
