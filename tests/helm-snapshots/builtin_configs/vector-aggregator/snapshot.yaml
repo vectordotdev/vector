@@ -34,7 +34,6 @@ data:
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
     
-    # Data dir is location controlled at the `DaemonSet`.
     data_dir = "/vector-data-dir"
     
     [log_schema]
