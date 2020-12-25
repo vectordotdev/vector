@@ -17,24 +17,24 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 
     println!(
         "
-> TTTTTTTTTTTTTTTTTTTTTTTRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
-> T:::::::::::::::::::::TR::::::::::::::::R  L:::::::::L
-> T:::::::::::::::::::::TR::::::RRRRRR:::::R L:::::::::L
-> T:::::TT:::::::TT:::::TRR:::::R     R:::::RLL:::::::LL
-> TTTTTT  T:::::T  TTTTTT  R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::RRRRRR:::::R   L:::::L
->         T:::::T          R:::::::::::::RR    L:::::L
->         T:::::T          R::::RRRRRR:::::R   L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L
->         T:::::T          R::::R     R:::::R  L:::::L         LLLLLL
->       TT:::::::TT      RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
->       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
->       T:::::::::T      R::::::R     R:::::RL::::::::::::::::::::::L
->       TTTTTTTTTTT      RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
+> VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
+> V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
+> V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
+> V::::::V           V::::::VRR:::::R     R:::::RLL:::::::LL
+>  V:::::V           V:::::V   R::::R     R:::::R  L:::::L
+>   V:::::V         V:::::V    R::::R     R:::::R  L:::::L
+>    V:::::V       V:::::V     R::::RRRRRR:::::R   L:::::L
+>     V:::::V     V:::::V      R:::::::::::::RR    L:::::L
+>      V:::::V   V:::::V       R::::RRRRRR:::::R   L:::::L
+>       V:::::V V:::::V        R::::R     R:::::R  L:::::L
+>        V:::::V:::::V         R::::R     R:::::R  L:::::L
+>         V:::::::::V          R::::R     R:::::R  L:::::L         LLLLLL
+>          V:::::::V         RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
+>           V:::::V          R::::::R     R:::::RL::::::::::::::::::::::L
+>            V:::V           R::::::R     R:::::RL::::::::::::::::::::::L
+>             VVV            RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
 >
->                     TIMBER    REMAP    LANGUAGE
+>                     VECTOR    REMAP    LANGUAGE
 >
 >
 > Welcome!

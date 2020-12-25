@@ -43,7 +43,6 @@ enum BuildError {
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
-    pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
     pub headers: Option<IndexMap<String, String>>,
     #[serde(default)]
@@ -61,7 +60,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
     HttpSinkConfig {
         uri: Default::default(),
         method: Default::default(),
-        healthcheck_uri: Default::default(),
         auth: Default::default(),
         headers: Default::default(),
         compression: Default::default(),
@@ -122,7 +120,7 @@ impl SinkConfig for HttpSinkConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
-        let healthcheck = match self.healthcheck_uri.clone() {
+        let healthcheck = match cx.healthcheck.uri.clone() {
             Some(healthcheck_uri) => {
                 healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
             }
