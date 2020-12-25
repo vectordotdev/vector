@@ -84,7 +84,6 @@ The common header for Vector ConfigMaps.
 # Configuration for vector.
 # Docs: https://vector.dev/docs/
 
-# Data dir is location controlled at the `DaemonSet`.
 data_dir = "{{ .Values.globalOptions.dataDir }}"
 {{- printf "\n" -}}
 
