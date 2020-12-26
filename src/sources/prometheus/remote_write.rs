@@ -8,7 +8,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         self,
-        util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
     Event, Pipeline,
@@ -78,10 +78,22 @@ struct RemoteWriteSource;
 impl HttpSource for RemoteWriteSource {
     fn build_event(
         &self,
-        body: Bytes,
-        _header_map: HeaderMap,
+        mut body: Bytes,
+        header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
+        if header_map
+            .get("Content-Encoding")
+            .map(|header| header.as_ref())
+            != Some(b"snappy")
+        {
+            warn!(
+                r"`Content-Encoding` header isn't `snappy`, so we are assuming it is `snappy`.
+                If you encounter this warning please report it here, 
+                so we know not to remove this fix in the future."
+            );
+            body = decode(&Some("snappy".to_string()), body)?;
+        }
         let result = decode_body(body)?;
         let count = result.len();
         emit!(PrometheusRemoteWriteReceived { count });

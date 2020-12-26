@@ -13,7 +13,7 @@ mod unix_stream;
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-utils-http")]
-pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub(crate) use self::http::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
