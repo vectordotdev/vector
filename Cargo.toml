@@ -132,14 +132,14 @@ bytes = { version = "0.5.6", features = ["serde"] }
 stream-cancel = "0.6.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
-openssl = "0.10.30"
+openssl = "0.10.32"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
-async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
+async-compression = { version = "0.3.7", features = ["tokio-02", "gzip", "zstd"] }
 structopt = "0.3.21"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
-typetag = "0.1"
+typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
 syslog_loose = { version = "0.7.0" }
@@ -170,7 +170,7 @@ base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.9.0", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1.10"
-maxminddb = { version = "0.15.0", optional = true }
+maxminddb = { version = "0.17.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0"}
 colored = "2.0"
 warp = { version = "0.2.5", default-features = false, optional = true }
@@ -196,7 +196,7 @@ heim = { version = "0.1.0-rc.1", optional = true, features = ["full"] }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
 anyhow = { version = "1.0.36" }
-snap = { version = "1.0.2", optional = true }
+snap = { version = "1.0.3", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
@@ -223,7 +223,7 @@ nix = "0.19.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
-built = { version = "0.4", features = ["git2", "chrono"] }
+built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
