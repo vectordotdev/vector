@@ -82,16 +82,13 @@ impl HttpSource for RemoteWriteSource {
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
+        // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
+        // se we need to.
         if header_map
             .get("Content-Encoding")
             .map(|header| header.as_ref())
             != Some(b"snappy")
         {
-            warn!(
-                r"`Content-Encoding` header isn't `snappy`, so we are assuming it is `snappy`.
-                If you encounter this warning please report it here, 
-                so we know not to remove this fix in the future."
-            );
             body = decode(&Some("snappy".to_string()), body)?;
         }
         let result = decode_body(body)?;
@@ -250,5 +247,41 @@ mod test {
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(all(test, feature = "prometheus-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{shutdown, test_util, Pipeline};
+    use tokio::time::Duration;
+
+    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+
+    #[tokio::test]
+    async fn receive_something() {
+        let config = PrometheusRemoteWriteConfig {
+            address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
+            auth: None,
+            tls: None,
+        };
+
+        let (tx, rx) = Pipeline::new_test();
+        let source = config
+            .build(
+                "prometheus_remote_write",
+                &GlobalOptions::default(),
+                shutdown::ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap();
+
+        tokio::spawn(source);
+
+        tokio::time::delay_for(Duration::from_secs(2)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
     }
 }
