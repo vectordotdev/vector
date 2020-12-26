@@ -3530,9 +3530,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.13.0-alpha.11"
+version = "0.13.0-alpha.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d3b214b3ae0a21937be886af1fea4aff35dc02c9906a3ae0d8eea00f949bd32"
+checksum = "efcf562c6940683fdd0dad97c99a0cef222d3738283d3396a735e8d21190e685"
 dependencies = [
  "metrics-macros",
  "proc-macro-hack",
@@ -3540,9 +3540,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3472609fadf7c97f8ea4c0dd5ab671b1c33824ef9fd2da117311fa093e46c2c6"
+checksum = "0197e48db63aa8c28f9fbae021585b8f1b299a0b21640cf98853211ac39eb294"
 dependencies = [
  "lazy_static",
  "proc-macro-hack",
@@ -3554,9 +3554,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.1.0-alpha.5"
+version = "0.1.0-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9327c834909faa65a9c1588421b62db6b6a8dca555e1891459c3905b6f1008c7"
+checksum = "b0b8dc2ecc84c1a248ee1d7f08e8bc537b406aab1c74c1a85d78634517ecddac"
 dependencies = [
  "itoa",
  "metrics",
@@ -3568,10 +3568,11 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.4.0-alpha.8"
+version = "0.4.0-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e176b573aa63b9dd030df3a01eb49a382de35e37c459fc131cf342f978f4a8fa"
+checksum = "ee65f4f3f55b356086562ebfe47e76b61de5ed305ae86f1b65fb7f068f8b1546"
 dependencies = [
+ "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch 0.9.1",
  "crossbeam-utils 0.8.1",
@@ -3580,6 +3581,7 @@ dependencies = [
  "metrics",
  "parking_lot 0.11.1",
  "quanta",
+ "sketches-ddsketch",
 ]
 
 [[package]]
@@ -4234,7 +4236,7 @@ checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
 dependencies = [
  "instant",
  "lock_api 0.4.2",
- "parking_lot_core 0.8.1",
+ "parking_lot_core 0.8.2",
 ]
 
 [[package]]
@@ -4253,9 +4255,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c6d9b8427445284a09c55be860a15855ab580a417ccad9da88f5a06787ced0"
+checksum = "9ccb628cad4f84851442432c60ad8e1f607e29752d0bf072cbd0baf28aa34272"
 dependencies = [
  "cfg-if 1.0.0",
  "instant",
@@ -5967,6 +5969,12 @@ name = "simpl"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a30f10c911c0355f80f1c2faa8096efc4a58cdf8590b954d5b395efa071c711"
+
+[[package]]
+name = "sketches-ddsketch"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76a77a8fd93886010f05e7ea0720e569d6d16c65329dbe3ec033bbbccccb017b"
 
 [[package]]
 name = "slab"
