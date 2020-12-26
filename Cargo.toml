@@ -132,7 +132,7 @@ bytes = { version = "0.5.6", features = ["serde"] }
 stream-cancel = "0.6.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
-openssl = "0.10.30"
+openssl = "0.10.32"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
 async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
