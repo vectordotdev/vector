@@ -143,7 +143,7 @@ typetag = "0.1"
 toml = "0.5.8"
 syslog = "5"
 syslog_loose = { version = "0.7.0" }
-derive_is_enum_variant = "0.1.1"
+derive_is_enum_variant = { version = "0.1.1", git = "https://github.com/timberio/derive_is_enum_variant", rev = "e4550f8ca1366823b8366f0126a7d00ee8ffb080" }
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
