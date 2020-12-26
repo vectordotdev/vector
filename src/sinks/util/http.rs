@@ -417,7 +417,7 @@ pub struct RequestConfig {
 impl RequestConfig {
     pub fn add_old_option(&mut self, headers: Option<IndexMap<String, String>>) {
         if let Some(headers) = headers {
-            warn!("`headers` option has been deprecated. Use `request.headers` instead.");
+            warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
             self.headers.extend(headers);
         }
     }
