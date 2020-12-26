@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
-        http::{HttpMethod, HttpSinkConfig, RequestConfig},
+        http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            encoding::EncodingConfig, http::RequestConfig, BatchConfig, Compression, Concurrency,
+            TowerRequestConfig,
         },
     },
 };
@@ -209,8 +210,11 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(100));
-        assert_eq!(http_config.request.rate_limit_num, Some(100));
+        assert_eq!(
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(100)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(100));
         assert_eq!(
             http_config.headers.unwrap()["X-License-Key"],
             "foo".to_owned()
@@ -237,8 +241,11 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(12));
-        assert_eq!(http_config.request.rate_limit_num, Some(24));
+        assert_eq!(
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(12)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()
@@ -272,8 +279,11 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(838860));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(12));
-        assert_eq!(http_config.request.rate_limit_num, Some(24));
+        assert_eq!(
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(12)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
             "foo".to_owned()

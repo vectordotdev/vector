@@ -7,7 +7,7 @@ use crate::{
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -32,14 +32,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct RequestConfig {
-    #[serde(flatten)]
-    pub tower: TowerRequestConfig,
-    #[serde(default)]
-    pub headers: IndexMap<String, String>,
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -431,10 +423,7 @@ impl ElasticSearchCommon {
         let tls_settings = TlsSettings::from_options(&config.tls)?;
         let mut config = config.clone();
 
-        config.headers.take().map(|headers| {
-            warn!("`headers` option has been deprecated. Use `request.headers` instead.");
-            config.request.headers.extend(headers);
-        });
+        config.request.add_old_option(config.headers.take());
 
         Ok(Self {
             base_url,

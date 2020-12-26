@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
@@ -36,15 +36,6 @@ enum BuildError {
         value: String,
         source: header::InvalidHeaderValue,
     },
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct RequestConfig {
-    #[serde(flatten)]
-    pub tower: TowerRequestConfig,
-    #[serde(default)]
-    pub headers: IndexMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -143,10 +134,7 @@ impl SinkConfig for HttpSinkConfig {
             ..self.clone()
         };
 
-        config.headers.take().map(|headers| {
-            warn!("`headers` option has been deprecated. Use `request.headers` instead.");
-            config.request.headers.extend(headers);
-        });
+        config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
