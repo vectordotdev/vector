@@ -51,6 +51,7 @@ components: sources: generator: {
 					"apache_common": "Randomly generated logs in [Apache common](\(urls.apache_common)) format."
 					"apache_error":  "Randomly generated logs in [Apache error](\(urls.apache_error)) format."
 					"syslog":        "Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424)))."
+					"bsd_syslog":    "Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164)))."
 					"json":          "Randomly generated HTTP server logs in [JSON](\(urls.json)) format."
 				}
 			}

@@ -2,6 +2,10 @@ use chrono::{prelude::Local, SecondsFormat};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 
+const APPLICATION_NAMES: [&str; 10] = [
+    "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
+];
+
 const ERROR_LEVELS: [&str; 9] = [
     "alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",
 ];
@@ -38,6 +42,7 @@ const ERROR_MESSAGES: [&str; 9] = [
 
 const APACHE_COMMON_TIME_FORMAT: &str = "%d/%b/%Y:%T %z";
 const APACHE_ERROR_TIME_FORMAT: &str = "%a %b %d %T %Y";
+const SYSLOG_3164_FORMAT: &str = "%b %d %T";
 const JSON_TIME_FORMAT: &str = "%d/%b/%Y:%T";
 
 pub fn apache_common_log_line() -> String {
@@ -71,14 +76,26 @@ pub fn apache_error_log_line() -> String {
     )
 }
 
+pub fn syslog_3164_log_line() -> String {
+    format!(
+        "<{}>{} {} {}[{}]: {}",
+        priority(),
+        timestamp_syslog_3164(),
+        domain(),
+        application(),
+        pid(),
+        error_message()
+    )
+}
+
 pub fn syslog_5424_log_line() -> String {
     // Example log line:
     // <65>2 2020-11-05T18:11:43.975Z chiefubiquitous.io totam 6899 ID44 - Something bad happened
     format!(
         "<{}>{} {} {} {} {} ID{} - {}",
-        prival(),
+        priority(),
         syslog_version(),
-        timestamp_syslog(),
+        timestamp_syslog_5424(),
         domain(),
         username(),
         random_in_range(100, 9999),
@@ -116,7 +133,11 @@ fn timestamp_apache_error() -> String {
     Local::now().format(&APACHE_ERROR_TIME_FORMAT).to_string()
 }
 
-fn timestamp_syslog() -> String {
+fn timestamp_syslog_3164() -> String {
+    Local::now().format(&SYSLOG_3164_FORMAT).to_string()
+}
+
+fn timestamp_syslog_5424() -> String {
     Local::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
@@ -125,6 +146,10 @@ fn timestamp_json() -> String {
 }
 
 // Other random strings
+fn application() -> String {
+    random_from_array(&APPLICATION_NAMES).to_string()
+}
+
 fn domain() -> String {
     gen_domain()
 }
@@ -169,7 +194,7 @@ fn port() -> String {
     random_in_range(1024, 65535)
 }
 
-fn prival() -> String {
+fn priority() -> String {
     random_in_range(0, 191)
 }
 
