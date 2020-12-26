@@ -216,7 +216,7 @@ mod tests {
         );
         assert_eq!(http_config.request.tower.rate_limit_num, Some(100));
         assert_eq!(
-            http_config.headers.unwrap()["X-License-Key"],
+            http_config.request.headers["X-License-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
@@ -247,7 +247,7 @@ mod tests {
         );
         assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
         assert_eq!(
-            http_config.headers.unwrap()["X-Insert-Key"],
+            http_config.request.headers["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
@@ -285,7 +285,7 @@ mod tests {
         );
         assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
         assert_eq!(
-            http_config.headers.unwrap()["X-Insert-Key"],
+            http_config.request.headers["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
