@@ -17,7 +17,7 @@ remap: functions: floor: {
 		},
 	]
 	return: ["timestamp"]
-	category: "numeric"
+	category: "Numeric"
 	description: #"""
 		Rounds the given number down to the given precision of decimal places.
 		"""#

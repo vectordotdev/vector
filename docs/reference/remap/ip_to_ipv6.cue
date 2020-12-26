@@ -10,7 +10,7 @@ remap: functions: ip_to_ipv6: {
 		},
 	]
 	return: ["string"]
-	category: "networking"
+	category: "IP"
 	description: #"""
 		Converts an address to an IPv6 address.
 		If the parameter is already an IPv6 address it is passed through

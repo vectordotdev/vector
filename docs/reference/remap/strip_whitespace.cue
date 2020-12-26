@@ -10,7 +10,7 @@ remap: functions: strip_whitespace: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Trims the whitespace from the start and end of the string. [Whitespace](https://en.wikipedia.org/wiki/Unicode_character_property#Whitespace) is any unicode character with the property `"WSpace=yes"`.
 		"""#

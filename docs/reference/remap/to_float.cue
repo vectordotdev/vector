@@ -8,7 +8,7 @@ remap: functions: to_float: {
 		},
 	]
 	return: ["float"]
-	category: "coerce"
+	category: "Coerce"
 	description: #"""
 		Returns a `float` whose text representation is `string`.
 		"""#

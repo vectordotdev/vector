@@ -10,7 +10,7 @@ remap: functions: flatten: {
 		},
 	]
 	return: ["array", "map"]
-	category: "object"
+	category: "Enumerable"
 	description: #"""
 		Returns a nested array or map that has been flattened to a single level.
 		"""#
