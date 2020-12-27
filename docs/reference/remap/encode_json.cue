@@ -1,14 +1,12 @@
 package metadata
 
 remap: functions: encode_json: {
-	_all_types: ["boolean", "integer", "float", "string", "timestamp", "regex", "null"]
-
 	arguments: [
 		{
 			name:        "value"
 			description: "The value to return a json representation of."
 			required:    true
-			type:        _all_types
+			type: ["any"]
 		},
 	]
 	return: ["string"]

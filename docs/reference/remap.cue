@@ -1,9 +1,9 @@
 package metadata
 
 remap: {
-	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "null" | "any"
+	#RemapParameterTypes: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "path" | "string" | "regex" | "timestamp"
 
-	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
+	#RemapReturnTypes: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "string" | "timestamp"
 
 	{
 		description: """
@@ -49,7 +49,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "Coerce" | "Encode" | "Enumerable" | "Event" | "Hash" | "IP" | "Map" | "Numeric" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
+			category:    "Coerce" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
