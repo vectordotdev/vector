@@ -193,7 +193,7 @@ impl<S: Sink> Sink for DropWhenFull<S> {
             Ok(AsyncSink::NotReady(_)) => {
                 debug!(
                     message = "Shedding load; dropping event.",
-                    rate_limit_secs = 10
+                    internal_log_rate_secs = 10
                 );
                 Ok(AsyncSink::Ready)
             }

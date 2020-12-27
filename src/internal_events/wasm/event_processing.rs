@@ -59,7 +59,7 @@ impl InternalEvent for EventProcessingProgress {
                 role = self.role.as_const_str(),
                 error = ?self.error.as_ref().unwrap_or(&String::from("")),
                 elapsed_micros = self.elapsed.as_micros() as u64,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
                 "Event processing error.",
             ),
         }

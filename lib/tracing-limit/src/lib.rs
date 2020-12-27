@@ -15,7 +15,7 @@ use tracing_core::{
 };
 use tracing_subscriber::layer::{Context, Layer};
 
-const RATE_LIMIT_FIELD: &str = "rate_limit_secs";
+const RATE_LIMIT_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
 const DEFAULT_LIMIT: u64 = 5;
 

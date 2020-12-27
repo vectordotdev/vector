@@ -105,7 +105,7 @@ mod source {
                 message = "Failed in deleting file.",
                 path = ?self.path,
                 error = ?self.error,
-                rate_limit_secs = 1
+                internal_log_rate_secs = 1
             );
         }
 
