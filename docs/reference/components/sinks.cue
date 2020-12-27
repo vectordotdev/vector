@@ -311,6 +311,24 @@ components: sinks: [Name=string]: {
 									unit:    "seconds"
 								}
 							}
+
+							if sinks[Name].features.send.request.headers {
+								headers: {
+									common:      false
+									description: "Options for custom headers."
+									required:    false
+									warnings: []
+									type: object: {
+										examples: [
+											{
+												"Authorization": "${HTTP_TOKEN}"
+												"X-Powered-By":  "Vector"
+											},
+										]
+										options: {}
+									}
+								}
+							}
 						}
 					}
 				}
