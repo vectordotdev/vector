@@ -768,11 +768,13 @@ start-integration-postgresql_metrics:
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-postgresql_metrics -p 5432:5432
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics --name vector_postgresql_metrics \
-	-e POSTGRES_PASSWORD=vector postgres:13.1
+	--volume $(PWD)/tests/data/postgresql-local-socket/:/var/run/postgresql/ \
+	--env POSTGRES_PASSWORD=vector postgres:13.1
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-postgresql_metrics
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics -p 5432:5432 --name vector_postgresql_metrics \
-	-e POSTGRES_PASSWORD=vector postgres:13.1
+	--volume $(PWD)/tests/data/postgresql-local-socket/:/var/run/postgresql/ \
+	--env POSTGRES_PASSWORD=vector postgres:13.1
 endif
 
 .PHONY: stop-integration-postgresql_metrics

@@ -717,14 +717,14 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
 
-    async fn test_postgresql_metrics(endpoint: &'static str) {
+    async fn test_postgresql_metrics(endpoint: String) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
             PostgresqlMetricsConfig {
-                endpoints: vec![endpoint.to_owned()],
+                endpoints: vec![endpoint],
                 ..Default::default()
             }
             .build(
@@ -756,6 +756,17 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_password_based_auth() {
-        test_postgresql_metrics("postgresql://postgres:vector@localhost/postgres").await
+        test_postgresql_metrics("postgresql://postgres:vector@localhost/postgres".to_owned()).await
+    }
+
+    #[tokio::test]
+    async fn test_socket() {
+        let current_dir = std::env::current_dir().unwrap();
+        let socket = current_dir.join("tests/data/postgresql-local-socket");
+        let endpoint = format!(
+            "postgresql:///postgres?host={}&user=postgres",
+            socket.to_str().unwrap()
+        );
+        test_postgresql_metrics(endpoint).await
     }
 }
