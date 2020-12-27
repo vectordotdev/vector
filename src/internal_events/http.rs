@@ -88,7 +88,7 @@ impl<'a> InternalEvent for HTTPDecompressError<'a> {
             message = "Failed decompressing payload.",
             encoding= %self.encoding,
             error = %self.error,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
