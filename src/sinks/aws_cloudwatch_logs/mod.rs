@@ -464,7 +464,9 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", %error, internal_log_rate_secs = 5))
+        .map_err(
+            |error| error!(message = "Could not encode event.", %error, internal_log_rate_secs = 5),
+        )
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
