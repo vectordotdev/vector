@@ -766,17 +766,37 @@ endif
 .PHONY: start-integration-postgresql_metrics
 start-integration-postgresql_metrics:
 ifeq ($(CONTAINER_TOOL),podman)
+	cp $(PWD)/tests/data/localhost.crt $(PWD)/tests/data/postgresql-local-socket-initdb/
+	cp $(PWD)/tests/data/localhost.key $(PWD)/tests/data/postgresql-local-socket-initdb/
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-postgresql_metrics -p 5432:5432
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics --name vector_postgresql_metrics \
 	--volume $(PWD)/tests/data/postgresql-local-socket/:/var/run/postgresql/ \
 	--volume $(PWD)/tests/data/postgresql-local-socket-initdb/:/docker-entrypoint-initdb.d/ \
-	--env POSTGRES_USER=vector --env POSTGRES_PASSWORD=vector postgres:13.1
+	--env POSTGRES_USER=vector --env POSTGRES_PASSWORD=vector postgres:13.1 bash -c "\
+	cp /docker-entrypoint-initdb.d/localhost.key /localhost.key && \
+	chown postgres:postgres /localhost.key && \
+	chmod 600 /localhost.key && \
+	/docker-entrypoint.sh postgres \
+	-c ssl=on \
+	-c ssl_key_file=/localhost.key \
+	-c ssl_cert_file=/docker-entrypoint-initdb.d/localhost.crt \
+	-c ssl_ca_file=/docker-entrypoint-initdb.d/localhost.crt"
 else
+	cp $(PWD)/tests/data/localhost.crt $(PWD)/tests/data/postgresql-local-socket-initdb/
+	cp $(PWD)/tests/data/localhost.key $(PWD)/tests/data/postgresql-local-socket-initdb/
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-postgresql_metrics
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics -p 5432:5432 --name vector_postgresql_metrics \
 	--volume $(PWD)/tests/data/postgresql-local-socket/:/var/run/postgresql/ \
 	--volume $(PWD)/tests/data/postgresql-local-socket-initdb/:/docker-entrypoint-initdb.d/ \
-	--env POSTGRES_USER=vector --env POSTGRES_PASSWORD=vector postgres:13.1
+	--env POSTGRES_USER=vector --env POSTGRES_PASSWORD=vector postgres:13.1 bash -c "\
+	cp /docker-entrypoint-initdb.d/localhost.key /localhost.key && \
+	chown postgres:postgres /localhost.key && \
+	chmod 600 /localhost.key && \
+	/docker-entrypoint.sh postgres \
+	-c ssl=on \
+	-c ssl_key_file=/localhost.key \
+	-c ssl_cert_file=/docker-entrypoint-initdb.d/localhost.crt \
+	-c ssl_ca_file=/docker-entrypoint-initdb.d/localhost.crt"
 endif
 
 .PHONY: stop-integration-postgresql_metrics

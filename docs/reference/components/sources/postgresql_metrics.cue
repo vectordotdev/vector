@@ -100,12 +100,24 @@ components: sources: postgresql_metrics: {
 				items: type: string: examples: ["postgres", "vector"]
 			}
 		}
-		// tls: configuration._tls_connect & {_args: {
-		//  can_enable:             true
-		//  can_verify_certificate: true
-		//  can_verify_hostname:    true
-		//  enabled_default:        false
-		// }}
+		tls: {
+			common: false
+			description: "TLS options to connect to the PostgreSQL Server."
+			required: false
+			type: object: {
+				examples: []
+				options: {
+					ca_file: {
+						description: "Path to CA certificate file."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["certs/ca.pem"]
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// how_it_works: {}

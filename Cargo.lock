@@ -4492,6 +4492,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres-openssl"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f10ea2d77c744e1846d03b58362679e51c6647acf0e6a65a1f1e5f0d5e99387"
+dependencies = [
+ "bytes 0.5.6",
+ "futures 0.3.8",
+ "openssl",
+ "tokio",
+ "tokio-openssl",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "postgres-protocol"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7367,6 +7381,7 @@ dependencies = [
  "pest_derive",
  "pin-project 1.0.2",
  "portpicker",
+ "postgres-openssl",
  "pretty_assertions",
  "prometheus-parser",
  "prost",

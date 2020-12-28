@@ -10,11 +10,17 @@ use futures::{
     future::{join_all, try_join_all},
     stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
+use openssl::{
+    error::ErrorStack,
+    ssl::{SslConnector, SslMethod},
+};
+use postgres_openssl::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, HashSet},
     future::ready,
+    path::PathBuf,
     time::Instant,
 };
 use tokio::time;
@@ -59,6 +65,8 @@ enum BuildError {
     InvalidEndpoint { source: PgError },
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
+    #[snafu(display("failed to create tls connector: {}", source))]
+    TlsFailed { source: ErrorStack },
     #[snafu(display("failed to connect ({}): {:?}", endpoint, source))]
     ConnectionFailed { source: PgError, endpoint: String },
     #[snafu(display("failed to get PostgreSQL version ({}): {:?}", endpoint, source))]
@@ -74,6 +82,12 @@ pub enum CollectError {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
+struct PostgresqlMetricsTlsConfig {
+    ca_file: PathBuf,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 struct PostgresqlMetricsConfig {
     endpoints: Vec<String>,
@@ -81,7 +95,7 @@ struct PostgresqlMetricsConfig {
     excluded_databases: Option<Vec<String>>,
     scrape_interval_secs: u64,
     namespace: String,
-    // TODO: SSL
+    tls: Option<PostgresqlMetricsTlsConfig>,
 }
 
 impl Default for PostgresqlMetricsConfig {
@@ -92,6 +106,7 @@ impl Default for PostgresqlMetricsConfig {
             excluded_databases: None,
             scrape_interval_secs: 15,
             namespace: "postgresql".to_owned(),
+            tls: None,
         }
     }
 }
@@ -119,7 +134,12 @@ impl SourceConfig for PostgresqlMetricsConfig {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(self.endpoints.iter().map(|endpoint| {
-            PostgresqlMetrics::new(endpoint.clone(), datname_filter.clone(), namespace.clone())
+            PostgresqlMetrics::new(
+                endpoint.clone(),
+                datname_filter.clone(),
+                namespace.clone(),
+                self.tls.clone(),
+            )
         }))
         .await?;
 
@@ -269,6 +289,7 @@ impl PostgresqlMetrics {
         endpoint: String,
         datname_filter: DatnameFilter,
         namespace: Option<String>,
+        tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
         let config: Config = endpoint.parse().context(InvalidEndpoint)?;
         if config.get_hosts().len() > 1 {
@@ -277,27 +298,7 @@ impl PostgresqlMetrics {
             });
         }
 
-        // TODO: Tls support
-        let (client, connection) =
-            config
-                .connect(NoTls)
-                .await
-                .with_context(|| ConnectionFailed {
-                    endpoint: config_to_endpoint(&config),
-                })?;
-
-        // TODO:
-        // 1) need shutdown?
-        // 2) remove unwrap()
-        // 3) reconnect
-        tokio::spawn(async move {
-            // if let Err(e) = connection.await {
-            //     eprintln!("connection error: {}", e);
-            // }
-            let result = connection.await;
-            println!("connection finished");
-            result.unwrap();
-        });
+        let client = Self::build_client(&config, tls_config).await?;
 
         Self::check_server_version(&client, &config).await?;
 
@@ -317,6 +318,59 @@ impl PostgresqlMetrics {
             namespace,
             tags,
             datname_filter,
+        })
+    }
+
+    async fn build_client(
+        config: &Config,
+        tls_config: Option<PostgresqlMetricsTlsConfig>,
+    ) -> Result<Client, BuildError> {
+        Ok(match tls_config {
+            Some(tls_config) => {
+                let mut builder =
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
+                builder.set_ca_file(tls_config.ca_file).context(TlsFailed)?;
+                let connector = MakeTlsConnector::new(builder.build());
+
+                let (client, connection) =
+                    config
+                        .connect(connector)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&config),
+                        })?;
+
+                // TODO:
+                // 1) need shutdown?
+                // 2) remove unwrap()
+                // 3) reconnect
+                tokio::spawn(async move {
+                    // if let Err(e) = connection.await {
+                    //     eprintln!("connection error: {}", e);
+                    // }
+                    let result = connection.await;
+                    println!("connection finished");
+                    result.unwrap();
+                });
+
+                client
+            }
+            None => {
+                let (client, connection) =
+                    config
+                        .connect(NoTls)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&config),
+                        })?;
+
+                // Same
+                tokio::spawn(async move {
+                    connection.await.unwrap();
+                });
+
+                client
+            }
         })
     }
 
@@ -630,9 +684,9 @@ fn config_to_endpoint(config: &Config) -> String {
 
     // ssl_mode, ignore default value (SslMode::Prefer)
     match config.get_ssl_mode() {
-        SslMode::Disable => params.push(("ssl_mode", "disable".to_string())),
+        SslMode::Disable => params.push(("sslmode", "disable".to_string())),
         SslMode::Prefer => {} // default, ignore
-        SslMode::Require => params.push(("ssl_mode", "require".to_string())),
+        SslMode::Require => params.push(("sslmode", "require".to_string())),
         _ => {} // non_exhaustive
     };
 
@@ -717,7 +771,7 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
 
-    async fn test_postgresql_metrics(endpoint: String) {
+    async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
@@ -725,6 +779,7 @@ mod integration_tests {
         tokio::spawn(async move {
             PostgresqlMetricsConfig {
                 endpoints: vec![endpoint],
+                tls,
                 ..Default::default()
             }
             .build(
@@ -755,18 +810,33 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn test_password_based_auth() {
-        test_postgresql_metrics("postgresql://vector:vector@localhost/postgres".to_owned()).await
+    async fn test_host() {
+        test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+        )
+        .await
     }
 
     #[tokio::test]
-    async fn test_socket() {
+    async fn test_local() {
         let current_dir = std::env::current_dir().unwrap();
         let socket = current_dir.join("tests/data/postgresql-local-socket");
         let endpoint = format!(
             "postgresql:///postgres?host={}&user=vector&password=vector",
             socket.to_str().unwrap()
         );
-        test_postgresql_metrics(endpoint).await
+        test_postgresql_metrics(endpoint, None).await
+    }
+
+    #[tokio::test]
+    async fn test_host_ssl() {
+        test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres?sslmode=require".to_owned(),
+            Some(PostgresqlMetricsTlsConfig {
+                ca_file: "tests/data/Vector_CA.crt".into(),
+            }),
+        )
+        .await
     }
 }

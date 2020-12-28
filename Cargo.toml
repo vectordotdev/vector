@@ -201,6 +201,7 @@ dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 dirs-next = { version = "1", optional = true }
+postgres-openssl = { version = "0.3.0", optional = true }
 tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "with-chrono-0_4"] }
 
 # For WASM
@@ -347,7 +348,7 @@ sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_p
 sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
-sources-postgresql_metrics = ["tokio-postgres"]
+sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
