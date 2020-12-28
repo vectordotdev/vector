@@ -24,26 +24,6 @@ where
     fun(num * multiplier as f64) / multiplier
 }
 
-#[cfg(any(
-    feature = "parse_json",
-    feature = "parse_timestamp",
-    feature = "to_timestamp",
-    feature = "to_string",
-    feature = "to_float",
-    feature = "to_int",
-    feature = "to_bool"
-))]
-#[inline]
-pub(crate) fn convert_value_or_default(
-    value: Result<Value>,
-    default: Option<Result<Value>>,
-    convert: impl Fn(Value) -> Result<Value> + Clone,
-) -> Result<Value> {
-    value
-        .and_then(convert.clone())
-        .or_else(|err| default.ok_or(err)?.and_then(|value| convert(value)))
-}
-
 #[macro_export]
 macro_rules! map {
     () => (
