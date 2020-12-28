@@ -2,6 +2,8 @@ use regex::Regex;
 use remap::prelude::*;
 use std::collections::BTreeMap;
 
+use crate::util;
+
 #[derive(Clone, Copy, Debug)]
 pub struct ParseRegex;
 
@@ -47,26 +49,7 @@ impl Expression for ParseRegexFn {
         Ok(self
             .pattern
             .captures(&value)
-            .map(|capture| {
-                let mut res = BTreeMap::new();
-
-                for (idx, c) in capture.iter().enumerate() {
-                    if let Some(c) = c {
-                        res.insert(idx.to_string(), c.as_str().into());
-                    }
-                }
-
-                self.pattern.capture_names().for_each(|name| {
-                    if let Some(name) = name {
-                        res.insert(
-                            name.to_owned(),
-                            capture.name(name).map(|s| s.as_str()).into(),
-                        );
-                    }
-                });
-
-                res
-            })
+            .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
             .unwrap_or_else(BTreeMap::new)
             .into())
     }
