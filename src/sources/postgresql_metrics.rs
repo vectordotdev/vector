@@ -756,7 +756,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_password_based_auth() {
-        test_postgresql_metrics("postgresql://postgres:vector@localhost/postgres".to_owned()).await
+        test_postgresql_metrics("postgresql://vector:vector@localhost/postgres".to_owned()).await
     }
 
     #[tokio::test]
@@ -764,7 +764,7 @@ mod integration_tests {
         let current_dir = std::env::current_dir().unwrap();
         let socket = current_dir.join("tests/data/postgresql-local-socket");
         let endpoint = format!(
-            "postgresql:///postgres?host={}&user=postgres",
+            "postgresql:///postgres?host={}&user=vector&password=vector",
             socket.to_str().unwrap()
         );
         test_postgresql_metrics(endpoint).await
