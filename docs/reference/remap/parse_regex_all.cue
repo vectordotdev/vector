@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: find: {
+remap: functions: parse_regex_all: {
 	arguments: [
 		{
 			name:        "value"
@@ -19,8 +19,8 @@ remap: functions: find: {
 	category: "text"
 	description: """
 		Searches within the text for capture groups specified by the provided regular expression. It will
-		return the capture groups corresponding to the leftmost matches in the text. If no match is found
-		an empty map is returned.
+		return an array the capture groups corresponding to all matches in the text. If no match is found
+		an empty array is returned.
 		"""
 	examples: [
 		{
@@ -28,9 +28,16 @@ remap: functions: find: {
 			input: {
 				message: "first group and second group."
 			}
-			source: ". = match(.message, /(?P<number>.*?) group/)"
+			source: ".result = parse_regex_all(.message, /(?P<number>.*?) group/)"
 			output: {
-				number: "first"
+				result: [ {number: "first"
+							"0": "first group"
+							"1": "first"
+				},
+					{number: "second"
+							"0": "second group"
+							"1": "second"
+					}]
 			}
 		},
 	]

@@ -3,11 +3,11 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
-pub struct FindAll;
+pub struct ParseRegexAll;
 
-impl Function for FindAll {
+impl Function for ParseRegexAll {
     fn identifier(&self) -> &'static str {
-        "find_all"
+        "parse_regex_all"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -29,17 +29,17 @@ impl Function for FindAll {
         let value = arguments.required("value")?.boxed();
         let pattern = arguments.required_regex("pattern")?;
 
-        Ok(Box::new(FindAllFn { value, pattern }))
+        Ok(Box::new(ParseRegexAllFn { value, pattern }))
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FindAllFn {
+pub(crate) struct ParseRegexAllFn {
     value: Box<dyn Expression>,
     pattern: Regex,
 }
 
-impl Expression for FindAllFn {
+impl Expression for ParseRegexAllFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
@@ -48,23 +48,24 @@ impl Expression for FindAllFn {
             .pattern
             .captures_iter(&value)
             .map(|capture| {
-                let val: Value = self
-                    .pattern
-                    .capture_names()
-                    .filter_map(|name| {
-                        // We only work with groups that have been given a name.
-                        // `name` will be None if it has no name and thus filtered out.
-                        name.map(|name| {
-                            (
-                                name.to_owned(),
-                                capture.name(name).map(|s| s.as_str()).into(),
-                            )
-                        })
-                    })
-                    .collect::<BTreeMap<_, _>>()
-                    .into();
+                let mut res = BTreeMap::new();
 
-                val
+                for (idx, c) in capture.iter().enumerate() {
+                    if let Some(c) = c {
+                        res.insert(idx.to_string(), c.as_str().into());
+                    }
+                }
+
+                self.pattern.capture_names().for_each(|name| {
+                    if let Some(name) = name {
+                        res.insert(
+                            name.to_owned(),
+                            capture.name(name).map(|s| s.as_str()).into(),
+                        );
+                    }
+                });
+
+                res.into()
             })
             .collect::<Vec<Value>>()
             .into())
@@ -86,7 +87,7 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| FindAllFn {
+            expr: |_| ParseRegexAllFn {
                 value: Literal::from("foo").boxed(),
                 pattern: Regex::new("").unwrap(),
             },
@@ -94,7 +95,7 @@ mod tests {
         }
 
         value_non_string {
-            expr: |_| FindAllFn {
+            expr: |_| ParseRegexAllFn {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
@@ -102,7 +103,7 @@ mod tests {
         }
 
         value_optional {
-            expr: |_| FindAllFn {
+            expr: |_| ParseRegexAllFn {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
@@ -111,7 +112,7 @@ mod tests {
     ];
 
     test_function![
-        find_all => FindAll;
+        find_all => ParseRegexAll;
 
         matches {
             args: func_args![
@@ -119,9 +120,15 @@ mod tests {
                 pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
             ],
             want: Ok(value!([{"fruit": "apples",
-                              "veg": "carrots"},
+                              "veg": "carrots",
+                              "0": "apples and carrots",
+                              "1": "apples",
+                              "2": "carrots"},
                              {"fruit": "peaches",
-                              "veg": "peas"}]))
+                              "veg": "peas",
+                              "0": "peaches and peas",
+                              "1": "peaches",
+                              "2": "peas"}]))
         }
 
         no_matches {

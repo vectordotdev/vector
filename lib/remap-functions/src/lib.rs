@@ -18,10 +18,6 @@ mod encode_json;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
-#[cfg(feature = "find")]
-mod find;
-#[cfg(feature = "find_all")]
-mod find_all;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "floor")]
@@ -64,6 +60,10 @@ mod parse_duration;
 mod parse_grok;
 #[cfg(feature = "parse_json")]
 mod parse_json;
+#[cfg(feature = "parse_regex")]
+mod parse_regex;
+#[cfg(feature = "parse_regex_all")]
+mod parse_regex_all;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -139,10 +139,6 @@ pub use encode_json::EncodeJson;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
-#[cfg(feature = "find")]
-pub use find::Find;
-#[cfg(feature = "find_all")]
-pub use find_all::FindAll;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "floor")]
@@ -181,6 +177,10 @@ pub use parse_duration::ParseDuration;
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
+#[cfg(feature = "parse_regex")]
+pub use parse_regex::ParseRegex;
+#[cfg(feature = "parse_regex_all")]
+pub use parse_regex_all::ParseRegexAll;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -256,10 +256,10 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
-        #[cfg(feature = "find")]
-        Box::new(Find),
-        #[cfg(feature = "find_all")]
-        Box::new(FindAll),
+        #[cfg(feature = "parse_regex")]
+        Box::new(ParseRegex),
+        #[cfg(feature = "parse_regex_all")]
+        Box::new(ParseRegexAll),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "floor")]

@@ -3,11 +3,11 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Find;
+pub struct ParseRegex;
 
-impl Function for Find {
+impl Function for ParseRegex {
     fn identifier(&self) -> &'static str {
-        "find"
+        "parse_regex"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -29,24 +29,17 @@ impl Function for Find {
         let value = arguments.required("value")?.boxed();
         let pattern = arguments.required_regex("pattern")?;
 
-        Ok(Box::new(FindFn { value, pattern }))
+        Ok(Box::new(ParseRegexFn { value, pattern }))
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FindFn {
+pub(crate) struct ParseRegexFn {
     value: Box<dyn Expression>,
     pattern: Regex,
 }
 
-impl FindFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, pattern: Regex) -> Self {
-        Self { value, pattern }
-    }
-}
-
-impl Expression for FindFn {
+impl Expression for ParseRegexFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
@@ -55,19 +48,24 @@ impl Expression for FindFn {
             .pattern
             .captures(&value)
             .map(|capture| {
-                self.pattern
-                    .capture_names()
-                    .filter_map(|name| {
-                        // We only work with groups that have been given a name.
-                        // `name` will be None if it has no name and thus filtered out.
-                        name.map(|name| {
-                            (
-                                name.to_owned(),
-                                capture.name(name).map(|s| s.as_str()).into(),
-                            )
-                        })
-                    })
-                    .collect::<BTreeMap<_, _>>()
+                let mut res = BTreeMap::new();
+
+                for (idx, c) in capture.iter().enumerate() {
+                    if let Some(c) = c {
+                        res.insert(idx.to_string(), c.as_str().into());
+                    }
+                }
+
+                self.pattern.capture_names().for_each(|name| {
+                    if let Some(name) = name {
+                        res.insert(
+                            name.to_owned(),
+                            capture.name(name).map(|s| s.as_str()).into(),
+                        );
+                    }
+                });
+
+                res
             })
             .unwrap_or_else(BTreeMap::new)
             .into())
@@ -89,7 +87,7 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| FindFn {
+            expr: |_| ParseRegexFn {
                 value: Literal::from("foo").boxed(),
                 pattern: Regex::new("").unwrap(),
             },
@@ -97,7 +95,7 @@ mod tests {
         }
 
         value_non_string {
-            expr: |_| FindFn {
+            expr: |_| ParseRegexFn {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
@@ -105,7 +103,7 @@ mod tests {
         }
 
         value_optional {
-            expr: |_| FindFn {
+            expr: |_| ParseRegexFn {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
@@ -114,7 +112,7 @@ mod tests {
     ];
 
     test_function![
-        find => Find;
+        find => ParseRegex;
 
         matches {
             args: func_args! [
@@ -129,7 +127,17 @@ mod tests {
                              "method": "GET",
                              "path": "/embrace/supply-chains/dynamic/vertical",
                              "status": "201",
-                             "bytes_out": "20574"}))
+                             "bytes_out": "20574",
+                             "0": "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
+                             "1": "5.86.210.12",
+                             "2": "zieme4647",
+                             "3": "5667",
+                             "4": "19/06/2019:17:20:49 -0400",
+                             "5": "GET",
+                             "6": "/embrace/supply-chains/dynamic/vertical",
+                             "7": "201",
+                             "8": "20574",
+            }))
         }
 
         single_match {
@@ -137,7 +145,10 @@ mod tests {
                 value: "first group and second group",
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
-            want: Ok(value!({"number": "first"}))
+            want: Ok(value!({"number": "first",
+                             "0": "first group",
+                             "1": "first"
+            }))
         }
 
         no_match {
