@@ -56,10 +56,10 @@ apt install --yes \
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha5/cue_0.3.0-alpha5_Linux_x86_64.tar.gz \
-    -o "${TEMP}/cue_0.3.0-alpha5_Linux_x86_64.tar.gz"
+    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha6/cue_0.3.0-alpha6_Linux_x86_64.tar.gz \
+    -o "${TEMP}/cue_0.3.0-alpha6_Linux_x86_64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_0.3.0-alpha5_Linux_x86_64.tar.gz" \
+    -xvf "${TEMP}/cue_0.3.0-alpha6_Linux_x86_64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 
@@ -85,7 +85,7 @@ if ! [ -x "$(command -v docker)" ]; then
     # Docker
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository \
-        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu \
         xenial \
         stable"
     # Install those new things

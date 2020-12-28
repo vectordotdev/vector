@@ -1467,9 +1467,6 @@ mod tests {
         );
     }
 
-    // TODO: Renable test for Mac after https://github.com/timberio/vector/issues/4196 has been resolved
-    // TODO: and check if the original issue has been resolved https://github.com/timberio/vector/issues/3780.
-    #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn remove_file() {
         let n = 5;

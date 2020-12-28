@@ -3,6 +3,11 @@ package metadata
 components: transforms: reduce: {
 	title: "Reduce"
 
+	description: """
+		Reduces multiple log events into a single log event based on a set of
+		conditions and merge strategies.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"

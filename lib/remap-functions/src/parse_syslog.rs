@@ -183,6 +183,18 @@ mod tests {
                     r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
                 ))),
             ),
+            (
+                map![],
+                Ok(map![
+                        "message": "I am missing a pri.",
+                        "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                        "appname": "haproxy",
+                        "procid": 73411
+                ]),
+                ParseSyslogFn::new(Box::new(Literal::from(
+                    r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#,
+                ))),
+            ),
         ];
 
         let mut state = state::Program::default();

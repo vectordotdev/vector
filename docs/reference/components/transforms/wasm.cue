@@ -3,6 +3,11 @@ package metadata
 components: transforms: wasm: {
 	title: "WASM"
 
+	description: """
+		Process events using the [WASM](\(urls.wasm)) virtual machine, allowing
+		you to process Vector events with Typescript, Ruby, Java, and [more](\(urls.wasm_languages)).
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "beta"
@@ -31,11 +36,20 @@ components: transforms: wasm: {
 
 		requirements: [
 			#"""
-				Vector must be build with the `wasm` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
+				Vector must be built with the `wasm` feature. *This is not enabled by default.
+				Review [Building Vector][urls.contributing]*.
 				"""#,
 		]
 		warnings: []
-		notices: []
+		notices: [
+			"""
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
+			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
+			is designed for safe, performant, and easy data mapping. It is intended to cover the
+			vast majority of data mapping use cases leaving WASM for very advanced and edge-case
+			situations.
+			""",
+		]
 	}
 
 	configuration: {

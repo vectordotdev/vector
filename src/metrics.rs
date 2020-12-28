@@ -1,5 +1,5 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, KeyData, Label, Recorder, SharedString, Unit};
+use metrics::{GaugeValue, Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
@@ -15,7 +15,7 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // cardinality.
 // Useful for the end users to help understand the characteristics of their
 // environment and how vectors acts in it.
-const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
     [SharedString::const_str(&CARDINALITY_KEY_NAME)];
 static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
@@ -115,7 +115,7 @@ impl Recorder for VectorRecorder {
             || self.bump_cardinality_counter_and(Handle::counter),
         )
     }
-    fn update_gauge(&self, key: Key, value: f64) {
+    fn update_gauge(&self, key: Key, value: GaugeValue) {
         let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
@@ -123,7 +123,7 @@ impl Recorder for VectorRecorder {
             || self.bump_cardinality_counter_and(Handle::gauge),
         )
     }
-    fn record_histogram(&self, key: Key, value: u64) {
+    fn record_histogram(&self, key: Key, value: f64) {
         let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
