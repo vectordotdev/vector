@@ -3,9 +3,9 @@ package metadata
 remap: functions: append: {
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The array"
-			required: true
+			required:    true
 			type: ["array"]
 		},
 		{
@@ -34,6 +34,6 @@ remap: functions: append: {
 			output: {
 				kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
 			}
-		}
+		},
 	]
 }
