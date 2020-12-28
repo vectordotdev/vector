@@ -29,8 +29,8 @@ fn disable_metrics() {
 }
 
 #[inline]
-fn disable_metrics_tracing_layer() {
-    std::env::set_var("DISABLE_INTERNAL_METRICS_TRACING_LAYER", "true");
+fn disable_metrics_tracing_integration() {
+    std::env::set_var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION", "true");
 }
 
 #[inline]
@@ -43,7 +43,7 @@ fn boot() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     MetricsOff,
-    MetricsNoTracingLayer,
+    MetricsNoTracingIntegration,
     MetricsOn,
 }
 
@@ -51,7 +51,7 @@ impl Mode {
     fn as_str(&self) -> &'static str {
         match self {
             Mode::MetricsOff => "metrics_off",
-            Mode::MetricsNoTracingLayer => "metrics_no_tracing_layer",
+            Mode::MetricsNoTracingIntegration => "metrics_no_tracing_integration",
             Mode::MetricsOn => "metrics_on",
         }
     }
@@ -64,10 +64,10 @@ pub fn benchmark(c: &mut Criterion, mode: Mode) {
     match mode {
         Mode::MetricsOff => {
             disable_metrics();
-            disable_metrics_tracing_layer();
+            disable_metrics_tracing_integration();
         }
-        Mode::MetricsNoTracingLayer => {
-            disable_metrics_tracing_layer();
+        Mode::MetricsNoTracingIntegration => {
+            disable_metrics_tracing_integration();
         }
         Mode::MetricsOn => {}
     }

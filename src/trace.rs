@@ -33,7 +33,7 @@ pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
 fn metrics_layer_enabled() -> bool {
-    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_LAYER"), Ok(x) if x == "true")
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
 pub fn init(color: bool, json: bool, levels: &str) {

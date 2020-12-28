@@ -28,6 +28,10 @@ fn metrics_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
 }
 
+fn tracing_context_layer_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
+}
+
 pub fn init() -> crate::Result<()> {
     // An escape hatch to allow disabing internal metrics core.
     // May be used for performance reasons.
@@ -68,10 +72,16 @@ pub fn init() -> crate::Result<()> {
         registry: Arc::clone(&registry),
         cardinality_counter: Arc::clone(&cardinality_counter),
     };
-    // Apply a layer to capture tracing span fields as labels.
-    let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
+
+    // If enabled, apply a layer to capture tracing span fields as labels.
+    let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
+        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
+    } else {
+        Box::new(recorder)
+    };
+
     // Register the recorder globally.
-    metrics::set_boxed_recorder(Box::new(recorder)).map_err(|_| "recorder already initialized")?;
+    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
 
     // Done.
     Ok(())

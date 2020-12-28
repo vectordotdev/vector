@@ -602,7 +602,7 @@ harness = false
 required-features = ["metrics-benches"]
 
 [[bench]]
-name = "metrics_no_tracing_layer"
+name = "metrics_no_tracing_integration"
 harness = false
 required-features = ["metrics-benches"]
 
