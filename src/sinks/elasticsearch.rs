@@ -7,7 +7,7 @@ use crate::{
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -22,6 +22,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
@@ -53,10 +54,11 @@ pub struct ElasticSearchConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
     pub auth: Option<ElasticSearchAuth>,
 
-    pub headers: Option<HashMap<String, String>>,
+    // Deprecated, moved to request.
+    pub headers: Option<IndexMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub aws: Option<RegionOrEndpoint>,
@@ -135,7 +137,7 @@ impl SinkConfig for ElasticSearchConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
@@ -246,10 +248,8 @@ impl HttpSink for ElasticSearchCommon {
                 request.add_header("Content-Encoding", ce);
             }
 
-            if let Some(headers) = &self.config.headers {
-                for (header, value) in headers {
-                    request.add_header(header, value);
-                }
+            for (header, value) in &self.config.request.headers {
+                request.add_header(header, value);
             }
 
             request.set_payload(Some(events));
@@ -273,10 +273,8 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Content-Encoding", ce);
             }
 
-            if let Some(headers) = &self.config.headers {
-                for (header, value) in headers {
-                    builder = builder.header(&header[..], &value[..]);
-                }
+            for (header, value) in &self.config.request.headers {
+                builder = builder.header(&header[..], &value[..]);
             }
 
             if let Some(auth) = &self.authorization {
@@ -406,7 +404,7 @@ impl ElasticSearchCommon {
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
         let bulk_action = config.bulk_action.clone();
 
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
@@ -423,7 +421,9 @@ impl ElasticSearchCommon {
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
-        let config = config.clone();
+        let mut config = config.clone();
+
+        config.request.add_old_option(config.headers.take());
 
         Ok(Self {
             base_url,

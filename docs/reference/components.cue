@@ -339,6 +339,7 @@ components: {
 				retry_initial_backoff_secs: uint8
 				retry_max_duration_secs:    uint8
 				timeout_secs:               uint8
+				headers:                    bool
 			}
 		}
 

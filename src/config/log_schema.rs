@@ -41,16 +41,16 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    fn default_message_key() -> LookupBuf {
+    pub fn default_message_key() -> LookupBuf {
         LookupBuf::from("message")
     }
-    fn default_timestamp_key() -> LookupBuf {
+    pub fn default_timestamp_key() -> LookupBuf {
         LookupBuf::from("timestamp")
     }
-    fn default_host_key() -> LookupBuf {
+    pub fn default_host_key() -> LookupBuf {
         LookupBuf::from("host")
     }
-    fn default_source_type_key() -> LookupBuf {
+    pub fn default_source_type_key() -> LookupBuf {
         LookupBuf::from("source_type")
     }
 

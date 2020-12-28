@@ -193,6 +193,63 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
 
+  deb-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - run: |
+          apt-get update && \
+          apt-get install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          make
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          path: target/artifacts
+      - run: |
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+
+  rpm-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - run: |
+          yum update -y && \
+          yum install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          tar \
+          make
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          path: target/artifacts
+      - run: |
+          rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+
   release-docker:
     runs-on: ubuntu-latest
     needs:
@@ -236,6 +293,8 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
+      - rpm-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -306,6 +365,8 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
+      - rpm-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -443,6 +504,8 @@ jobs:
       - release-s3
       - release-cloudsmith
       - release-helm
+      - deb-verify
+      - rpm-verify
     runs-on: ubuntu-latest
     steps:
     - name: Discord notification

@@ -24,7 +24,7 @@ impl InternalEvent for AdaptiveConcurrencyLimit {
     }
 
     fn emit_metrics(&self) {
-        histogram!("adaptive_concurrency_limit", self.concurrency);
+        histogram!("adaptive_concurrency_limit", self.concurrency as f64);
     }
 }
 
@@ -35,7 +35,7 @@ pub struct AdaptiveConcurrencyInFlight {
 
 impl InternalEvent for AdaptiveConcurrencyInFlight {
     fn emit_metrics(&self) {
-        histogram!("adaptive_concurrency_in_flight", self.in_flight);
+        histogram!("adaptive_concurrency_in_flight", self.in_flight as f64);
     }
 }
 

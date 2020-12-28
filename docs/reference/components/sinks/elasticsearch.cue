@@ -40,6 +40,7 @@ components: sinks: elasticsearch: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    true
 			}
 			tls: {
 				enabled:                true
@@ -180,21 +181,6 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
-			}
-		}
-		headers: {
-			common:      false
-			description: "Options for custom headers."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [
-					{
-						"Authorization": "${ELASTICSEARCH_TOKEN}"
-						"X-Powered-By":  "Vector"
-					},
-				]
-				options: {}
 			}
 		}
 		id_key: {

@@ -3,7 +3,8 @@ use crate::{
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            encoding::EncodingConfig, http::RequestConfig, BatchConfig, Compression, Concurrency,
+            TowerRequestConfig,
         },
     },
 };
@@ -136,7 +137,7 @@ impl NewRelicLogsConfig {
             ..batch
         };
 
-        let request = TowerRequestConfig {
+        let tower = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
             concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
@@ -144,11 +145,13 @@ impl NewRelicLogsConfig {
             ..self.request
         };
 
+        let request = RequestConfig { tower, headers };
+
         Ok(HttpSinkConfig {
             uri: uri.into(),
             method: Some(HttpMethod::Post),
             auth: None,
-            headers: Some(headers),
+            headers: None,
             compression: self.compression,
             encoding: self.encoding.clone().into_encoding(),
 
@@ -207,10 +210,13 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(100));
-        assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
-            http_config.headers.unwrap()["X-License-Key"],
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(100)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(100));
+        assert_eq!(
+            http_config.request.headers["X-License-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
@@ -235,10 +241,13 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(12));
-        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
-            http_config.headers.unwrap()["X-Insert-Key"],
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(12)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
+        assert_eq!(
+            http_config.request.headers["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());
@@ -270,10 +279,13 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(838860));
-        assert_eq!(http_config.request.concurrency, Concurrency::Fixed(12));
-        assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
-            http_config.headers.unwrap()["X-Insert-Key"],
+            http_config.request.tower.concurrency,
+            Concurrency::Fixed(12)
+        );
+        assert_eq!(http_config.request.tower.rate_limit_num, Some(24));
+        assert_eq!(
+            http_config.request.headers["X-Insert-Key"],
             "foo".to_owned()
         );
         assert!(http_config.tls.is_none());

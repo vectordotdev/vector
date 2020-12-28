@@ -9,7 +9,7 @@ components: transforms: merge: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
