@@ -1,16 +1,18 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequest, HTTPEventsReceived},
+    internal_events::{HTTPBadRequest, HTTPDecompressError, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{buf::BufExt, Bytes};
+use flate2::read::{DeflateDecoder, GzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, net::SocketAddr};
+use snap::raw::Decoder as SnappyDecoder;
+use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
     filters::BoxedFilter,
@@ -124,6 +126,53 @@ impl HttpSourceAuth {
     }
 }
 
+pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+    if let Some(encodings) = header {
+        for encoding in encodings.rsplit(',').map(str::trim) {
+            body = match encoding {
+                "identity" => body,
+                "gzip" => {
+                    let mut decoded = Vec::new();
+                    GzDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "deflate" => {
+                    let mut decoded = Vec::new();
+                    DeflateDecoder::new(body.reader())
+                        .read_to_end(&mut decoded)
+                        .map_err(|error| handle_decode_error(encoding, error))?;
+                    decoded.into()
+                }
+                "snappy" => SnappyDecoder::new()
+                    .decompress_vec(&body)
+                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .into(),
+                encoding => {
+                    return Err(ErrorMessage::new(
+                        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                        format!("Unsupported encoding {}", encoding),
+                    ))
+                }
+            }
+        }
+    }
+
+    Ok(body)
+}
+
+fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
+    emit!(HTTPDecompressError {
+        encoding,
+        error: &error
+    });
+    ErrorMessage::new(
+        StatusCode::UNPROCESSABLE_ENTITY,
+        format!("Failed decompressing payload with {} decoder.", encoding),
+    )
+}
+
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(
@@ -156,27 +205,33 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let svc = filter
                 .and(warp::path::end())
                 .and(warp::header::optional::<String>("authorization"))
+                .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
                 .and_then(
                     move |auth_header,
+                          encoding_header,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
+                        let _guard=span.enter();
                         info!(message = "Handling HTTP request.", headers = ?headers, rate_limit_secs = 30);
 
                         let mut out = out.clone();
 
-                        let body_size = body.len();
-                        let events = match auth.is_valid(&auth_header) {
-                            Ok(()) => self.build_event(body, headers, query_parameters),
-                            Err(err) => Err(err),
-                        };
+                        let events = auth
+                            .is_valid(&auth_header)
+                            .and_then(|()| decode(&encoding_header, body))
+                            .and_then(|body| {
+                                let body_len=body.len();
+                                self.build_event(body, headers, query_parameters)
+                                    .map(|events| (events, body_len))
+                            });
 
                         async move {
                             match events {
-                                Ok(events) => {
+                                Ok((events,body_size)) => {
                                     emit!(HTTPEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,

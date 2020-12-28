@@ -4,7 +4,7 @@ components: transforms: remap: {
 	title: "Remap"
 
 	description: """
-		Transforms events using the [Vector Remap Language](\(urls.vector_remap_language_reference)),
+		Transforms events using the [Vector Remap Language](\(urls.vector_remap_language_reference)) (VRL),
 		a fast, safe, self-documenting data mapping language.
 		"""
 
@@ -41,16 +41,22 @@ components: transforms: remap: {
 
 	configuration: {
 		source: {
-			description: "The remap source/instruction set to execute for each event"
+			description: """
+				The [Vector Remap Language](\(urls.vector_remap_language_reference)) (VRL)
+				expression to execute for each event. Please refer to the
+				[Vector Remap Language reference](\(urls.vector_remap_language_reference))
+				for a list of operations and functions.
+				"""
 			required:    true
 			type: string: {
 				examples: [
 					"""
 						. = parse_json(.message)
+						.new_field = "new value"
 						.status = to_int(.status)
 						.duration = parse_duration(.duration, "s")
-						.new_field = .old_field
-						del(.old_field)
+						.new_name = .old_name
+						del(.old_name)
 						""",
 				]
 			}
@@ -338,18 +344,18 @@ components: transforms: remap: {
 
 	how_it_works: {
 		remap_language: {
-			title: "Remap Language"
+			title: "Vector Remap Language"
 			body: #"""
-				The remap language is a restrictive, fast, and safe language we
-				designed specifically for mapping data. It avoids the need to chain
-				together many fundamental transforms to accomplish rudimentary
+				The Vector Remap Language (VRL) is a restrictive, fast, and safe language we
+				designed specifically for mapping observability data. It avoids the need to
+				chain together many fundamental Vector transforms to accomplish rudimentary
 				reshaping of data.
 
-				The intent is to offer the same robustness of full language runtime
+				The intent is to offer the same robustness of full language runtime (ex: Lua)
 				without paying the performance or safety penalty.
 
-				Learn more about Vector's remap syntax in
-				[the docs](/docs/reference/remap).
+				Learn more about Vector's Remap Language in the
+				[Vector Remap Language reference](\(urls.vector_remap_language_reference)).
 				"""#
 		}
 	}

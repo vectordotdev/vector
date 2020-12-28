@@ -9,7 +9,7 @@ components: transforms: logfmt_parser: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -34,14 +34,14 @@ components: transforms: logfmt_parser: {
 		}
 
 		requirements: []
-		warnings: []
-		notices: [
+		warnings: [
 			"""
-					It is likely that the [`key_value` transform][docs.transforms.key_value_parser] will replace the `logfmt` transform in the future
-					since it offers a more flexible super-set of this transform. However, the `key_value` transform does not yet account for syslog
-					prefix or value quoting.
-				""",
+			This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
+			function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
+		notices: []
 	}
 
 	configuration: {

@@ -1,5 +1,8 @@
 use super::InternalEvent;
-use http::{Request, Response};
+use http::{
+    header::{self, HeaderMap, HeaderValue},
+    Request, Response,
+};
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use std::time::Duration;
@@ -9,6 +12,21 @@ pub struct AboutToSendHTTPRequest<'a, T> {
     pub request: &'a Request<T>,
 }
 
+fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> {
+    let mut headers = headers.clone();
+    for name in &[
+        header::AUTHORIZATION,
+        header::PROXY_AUTHORIZATION,
+        header::COOKIE,
+        header::SET_COOKIE,
+    ] {
+        if let Some(value) = headers.get_mut(name) {
+            value.set_sensitive(true);
+        }
+    }
+    headers
+}
+
 impl<'a, T: HttpBody> InternalEvent for AboutToSendHTTPRequest<'a, T> {
     fn emit_logs(&self) {
         debug!(
@@ -16,7 +34,7 @@ impl<'a, T: HttpBody> InternalEvent for AboutToSendHTTPRequest<'a, T> {
             uri = %self.request.uri(),
             method = %self.request.method(),
             version = ?self.request.version(),
-            headers = ?self.request.headers(),
+            headers = ?remove_sensitive(self.request.headers()),
             body = %FormatBody(self.request.body()),
         );
     }
@@ -38,7 +56,7 @@ impl<'a, T: HttpBody> InternalEvent for GotHTTPResponse<'a, T> {
             message = "HTTP response.",
             status = %self.response.status(),
             version = ?self.response.version(),
-            headers = ?self.response.headers(),
+            headers = ?remove_sensitive(self.response.headers()),
             body = %FormatBody(self.response.body()),
         );
     }

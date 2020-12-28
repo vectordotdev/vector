@@ -34,16 +34,15 @@ components: transforms: lua: {
 		}
 
 		requirements: []
-		warnings: []
-		notices: [
+		warnings: [
 			"""
-			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
-			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
-			is designed for safe, performant, and easy data mapping. It is intended to cover the
-			vast majority of data mapping use cases leaving Lua for very advanced and edge-case
-			situations.
+			The `lua` transform is ~60% slower than the [`remap` transform](\(urls.vector_remap_transform)).
+			Therefore, it is recommended to use the `remap` transform when possible. The `lua` transform is
+			designed for edge cases not covered by the `remap` transform. If the `remap` transform
+			does not cover your use case, please [open an issue](\(urls.new_feature_request)) and let us know.
 			""",
 		]
+		notices: []
 	}
 
 	configuration: {

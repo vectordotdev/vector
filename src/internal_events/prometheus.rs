@@ -113,21 +113,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug)]
-pub struct PrometheusRemoteWriteSnapError {
-    pub error: snap::Error,
-}
-
-impl InternalEvent for PrometheusRemoteWriteSnapError {
-    fn emit_logs(&self) {
-        error!(message = "Could not decompress request body.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct PrometheusRemoteWriteReceived {
     pub count: usize,
 }

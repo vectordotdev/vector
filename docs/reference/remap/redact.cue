@@ -37,7 +37,7 @@ remap: functions: redact: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: """
 		Obscures sensitive data, such as personal identification numbers or credit card numbers, in
 		Vector event data.

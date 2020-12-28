@@ -8,7 +8,7 @@ remap: functions: parse_syslog: {
 		},
 	]
 	return: ["map"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a syslog message. The function makes a best effort to parse the various Syslog formats out in the wild.
 		This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164], and other

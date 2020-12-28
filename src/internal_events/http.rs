@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use std::error::Error;
 
 #[derive(Debug)]
 pub struct HTTPEventsReceived {
@@ -72,5 +73,26 @@ impl InternalEvent for HTTPEventEncoded {
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct HTTPDecompressError<'a> {
+    pub error: &'a dyn Error,
+    pub encoding: &'a str,
+}
+
+impl<'a> InternalEvent for HTTPDecompressError<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Failed decompressing payload.",
+            encoding= %self.encoding,
+            error = %self.error,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("parse_errors_total", 1);
     }
 }

@@ -16,7 +16,7 @@ remap: functions: assert: {
 		},
 	]
 	return: ["null"]
-	category: "event"
+	category: "Test"
 	description: #"""
 			Checks a given condition. If that condition evaluates to false the event is aborted with
 			an error message provided.
