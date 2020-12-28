@@ -63,6 +63,9 @@ data:
       type = "vector"
       inputs = ["kubernetes_logs"]
       address = "vector-aggregator:9000"
+    # Capture the metrics from the host.
+    [sources.host_metrics]
+      type = "host_metrics"
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
@@ -70,7 +73,7 @@ data:
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       type = "prometheus"
-      inputs = ["internal_metrics"]
+      inputs = ["internal_metrics","host_metrics"]
       address = "0.0.0.0:9090"
 ---
 # Source: vector/charts/vector-aggregator/templates/configmap.yaml
@@ -214,7 +217,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 4f9264d4d898bb5c5b1070e48a32fc42a233596993e7b9622cc673bd42df9466
+        
+        checksum/config: fa3deb906e02ab211d86aa37249d2f7d73dce9e771d68ed0679c7a0cab9eb54c
         
       labels:
         app.kubernetes.io/name: vector-agent
@@ -246,6 +250,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: PROCFS_ROOT
+              value: /host/proc
+            - name: SYSFS_ROOT
+              value: /host/sys
             
             - name: "LOG"
               value: "info"
@@ -270,6 +278,14 @@ spec:
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
+              readOnly: true
+            # Host procsfs mount.
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            # Host sysfs mount.
+            - name: sysfs
+              mountPath: /host/sys
               readOnly: true
       terminationGracePeriodSeconds: 60
       tolerations:
@@ -300,6 +316,14 @@ spec:
               - secret:
                   name: vector-agent-config
                   optional: true
+        # Host procsfs.
+        - name: procfs
+          hostPath:
+            path: /proc
+        # Host sysfs.
+        - name: sysfs
+          hostPath:
+            path: /sys
 ---
 # Source: vector/charts/vector-aggregator/templates/statefulset.yaml
 apiVersion: apps/v1
@@ -323,7 +347,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: f21e03060de6e60eeda4b7d6cbc3121890b76a4b3618f30fded3a8a4eb226c24
+        
+        checksum/config: a67c40b917e758700bf0df9b0719a84da8ee3828ec3a5d651baf78dcb02fb68a
         
       labels:
         app.kubernetes.io/name: vector-aggregator

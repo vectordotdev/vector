@@ -1,14 +1,4 @@
 use super::InternalEvent;
-use metrics::counter;
-
-#[derive(Debug)]
-pub struct RenameFieldsEventProcessed;
-
-impl InternalEvent for RenameFieldsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
 
 #[derive(Debug)]
 pub struct RenameFieldsFieldOverwritten<'a> {

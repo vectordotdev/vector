@@ -3,7 +3,8 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
+        encoding::EncodingConfigWithDefault, http::RequestConfig, BatchConfig, Compression,
+        TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     Event,
@@ -69,7 +70,10 @@ impl SinkConfig for SematextLogsConfig {
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
             batch: self.batch,
-            request: self.request,
+            request: RequestConfig {
+                tower: self.request,
+                ..Default::default()
+            },
             encoding: self.encoding.clone(),
             ..Default::default()
         }

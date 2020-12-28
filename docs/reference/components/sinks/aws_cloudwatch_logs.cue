@@ -45,6 +45,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
@@ -115,6 +116,34 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "logs"
+
+			policies: [
+				{
+					_action:       "CreateLogGroup"
+					required_when: "[`create_missing_group`](#create_missing_group) is set to `true`"
+				},
+				{
+					_action:       "CreateLogStream"
+					required_when: "[`create_missing_stream`](#create_missing_stream) is set to `true`"
+				},
+				{
+					_action: "DescribeLogGroups"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "DescribeLogStreams"
+				},
+				{
+					_action: "PutLogEvents"
+				},
+			]
+		},
+	]
 
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total

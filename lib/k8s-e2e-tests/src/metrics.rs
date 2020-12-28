@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 /// This helper function issues an HTTP request to the Prometheus-exposition
 /// format metrics endpoint, validates that it completes successfully and
 /// returns the response body.
@@ -87,6 +89,28 @@ pub async fn wait_for_vector_started(
                 .as_secs_f64(),
         );
         tokio::time::delay_for(next_attempt_delay).await;
+    }
+    Ok(())
+}
+
+/// This helper function performs an HTTP request to the specified URL and
+/// validates the presence of the host metrics.
+pub async fn assert_host_metrics_present(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let metrics = load(url).await?;
+    let mut required_metrics: HashSet<_> = vec![
+        "host_load1",
+        "host_load5",
+        "host_cpu_seconds_total",
+        "host_filesystem_total_bytes",
+    ]
+    .into_iter()
+    .collect();
+    for captures in metrics_regex().captures_iter(&metrics) {
+        let metric_name = &captures["name"];
+        required_metrics.remove(metric_name);
+    }
+    if !required_metrics.is_empty() {
+        return Err(format!("Some host metrics were not found:\n{:?}", required_metrics).into());
     }
     Ok(())
 }

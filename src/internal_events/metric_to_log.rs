@@ -3,19 +3,6 @@ use metrics::counter;
 use serde_json::Error;
 
 #[derive(Debug)]
-pub(crate) struct MetricToLogEventProcessed;
-
-impl InternalEvent for MetricToLogEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct MetricToLogFailedSerialize {
     pub error: Error,
 }

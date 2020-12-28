@@ -23,7 +23,7 @@ remap: functions: starts_with: {
 		},
 	]
 	return: ["boolean"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Determines if a given string begins with a given `substring`.
 		The search can be optionally case insensitive.

@@ -1,12 +1,12 @@
 package metadata
 
 components: transforms: add_fields: {
-	title: "Add Fields"
+	title:       "Add Fields"
+	description: "Adds fields to log events."
 
 	classes: {
 		commonly_used: false
-		development:   "stable"
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -25,7 +25,14 @@ components: transforms: add_fields: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new
+			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
+			transform provides a simple syntax for robust data transformation.
+			Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

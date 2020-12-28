@@ -45,7 +45,21 @@ data:
       {{- end }}
     {{- end }}
 
-    {{- include "libvector.metricsConfigPartial" . | nindent 4  }}
+    {{- $prometheusInputs := (list) -}}
+    {{- with .Values.hostMetricsSource -}}
+    {{- if .enabled }}
+    {{- $prometheusInputs = prepend $prometheusInputs .sourceId }}
+    # Capture the metrics from the host.
+    [sources.{{ .sourceId }}]
+      type = "host_metrics"
+
+      {{- with .rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- merge . (dict "prometheusInputs" $prometheusInputs) | include "libvector.metricsConfigPartial" | nindent 4  }}
 
     {{- range $sourceId, $source := .Values.sources }}
     [sources.{{ $sourceId }}]

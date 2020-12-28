@@ -6,3 +6,9 @@ scrape_configs:
   - job_name: 'integration-test-1'
     static_configs:
     - targets: ['127.0.0.1:9101']
+
+remote_write:
+  # sources::prometheus::remote_write::integration_tests
+  - url: 'http://127.0.0.1:9093'
+    remote_timeout: 1s
+    name: 'integration-test-2'

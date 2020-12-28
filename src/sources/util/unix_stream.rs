@@ -8,8 +8,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{compat::Sink01CompatExt, FutureExt, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{FutureExt, SinkExt, StreamExt};
 use std::{future::ready, path::PathBuf};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
@@ -84,7 +83,7 @@ where
             });
 
             let connection_open = connection_open.clone();
-            let mut out = out.clone().sink_compat();
+            let mut out = out.clone();
             tokio::spawn(
                 async move {
                     let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));

@@ -186,7 +186,7 @@ mod test {
 
         delay_for(Duration::from_millis(50)).await;
 
-        let output = collect_ready(rx).await.unwrap();
+        let output = collect_ready(rx).await;
         assert_eq!(events, output);
     }
 

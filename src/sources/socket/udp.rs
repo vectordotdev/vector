@@ -7,8 +7,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::compat::Future01CompatExt;
-use futures01::Sink;
+use futures::SinkExt;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -84,9 +83,10 @@ pub fn udp(
                         emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
                         tokio::select!{
-                            result = out.send(event).compat() => {
-                                out = result?;
-                            }
+                            result = out.send(event) => {match result {
+                                Ok(()) => { },
+                                Err(()) => return Ok(()),
+                            }}
                             _ = &mut shutdown => return Ok(()),
                         }
                     }

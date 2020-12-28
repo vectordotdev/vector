@@ -26,11 +26,22 @@ impl ConditionConfig for RemapConfig {
             type_def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Boolean,
+                ..Default::default()
             },
         };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, Some(constraint))
-            .map_err(|e| e.to_string())?;
+        // Filter out functions that directly mutate the event.
+        //
+        // TODO(jean): expose this as a method on the `Function` trait, so we
+        // don't need to do this manually.
+        let functions = remap_functions::all()
+            .into_iter()
+            .filter(|f| f.identifier() != "del")
+            .filter(|f| f.identifier() != "only_fields")
+            .collect::<Vec<_>>();
+
+        let program =
+            Program::new(&self.source, &functions, Some(constraint)).map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -57,7 +68,10 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        Runtime::default().execute(&mut event.clone(), &self.program)
+        match event {
+            Event::Log(event) => Runtime::default().execute(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().execute(&mut event.clone(), &self.program),
+        }
     }
 }
 
@@ -89,8 +103,10 @@ impl Condition for Remap {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
     use super::*;
-    use crate::log_event;
+    use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};
 
     #[test]
     fn generate_config() {
@@ -136,6 +152,23 @@ mod test {
                 Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
+            (
+                Event::Metric(Metric {
+                    name: "zork".into(),
+                    namespace: Some("zerk".into()),
+                    timestamp: None,
+                    tags: Some({
+                        let mut tags = BTreeMap::new();
+                        tags.insert("host".into(), "zoobub".into());
+                        tags
+                    }),
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.0 },
+                }),
+                r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
+                Ok(()),
+                Ok(()),
+            )
         ];
 
         for (event, source, build, check) in checks {

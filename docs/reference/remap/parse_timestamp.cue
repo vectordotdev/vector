@@ -23,13 +23,13 @@ remap: functions: parse_timestamp: {
 
 	]
 	return: ["timestamp"]
-	category: "coerce"
+	category: "Parse"
 	description: #"""
 		Parses a string representing a timestamp using a provided format string. If the string is unable to be parsed, and a `default` is specified,
 		use this. `default` can be either a `string` or a `timestamp`. If a `string`, it is parsed and the result returned. If a `timestamp`, this
 		is returned.
 
-		The format string used is specified by the [Chrono library](https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html).
+		The format string used is specified by the [Chrono library](\(urls.chrono_time_formats)).
 		"""#
 	examples: [
 		{

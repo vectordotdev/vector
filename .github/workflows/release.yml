@@ -22,21 +22,10 @@ jobs:
       - env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
-      - run: |
-          mv ./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb"
 
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
@@ -47,9 +36,6 @@ jobs:
       - env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
-      - run: |
-          mv ./target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
@@ -73,9 +59,6 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
         run: make package-aarch64-unknown-linux-musl-all
-      - run: |
-          mv ./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
@@ -98,9 +81,6 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
-      - run: |
-          mv ./target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
@@ -123,9 +103,6 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
-      - run: |
-          mv ./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
@@ -149,8 +126,6 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
-      - run: |
-          mv ./target/artifacts/vector-x86_64-apple-darwin.tar.gz ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
@@ -166,11 +141,9 @@ jobs:
       - name: "Download Perl"
         shell: bash
         env:
-          VERSION: "5.30.0.1"
-          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+          VERSION: "5.32.0.1"
         run: |
-          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -212,13 +185,6 @@ jobs:
         run: |
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
-      - run: |
-          mv ./target/artifacts/vector-x86_64-pc-windows-msvc.zip \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-        shell: bash
-      - run:
-          mv ./target/artifacts/vector-x64.msi ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi
-        shell: bash
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
@@ -324,14 +290,6 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -402,14 +360,6 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -471,14 +421,6 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -537,32 +479,6 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
-      - name: Push x86_64 musl RPM
-        id: push-rpm-x86_64-musl
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: "vector"
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
-      - name: Push amd64 musl deb
-        id: push-deb-amd64-musl
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: "vector"
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-musl-amd64.deb"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
         uses: cloudsmith-io/action@master

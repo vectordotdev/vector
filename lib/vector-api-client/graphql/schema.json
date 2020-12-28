@@ -114,30 +114,6 @@
                   "ofType": null
                 }
               }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "processedEventsTotal",
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "processedBytesTotal",
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
-              }
             }
           ],
           "inputFields": null,
@@ -535,6 +511,122 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "File name",
+              "isDeprecated": false,
+              "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating events processed for the current file",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating bytes processed for the current file",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "FileSourceMetricFile",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "File metrics",
+              "isDeprecated": false,
+              "name": "files",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "FileSourceMetricFile",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Events processed for the current file source",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Bytes processed for the current file source",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "SourceMetrics",
+              "ofType": null
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "FileSourceMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Free bytes",
               "isDeprecated": false,
               "name": "freeBytes",
@@ -595,6 +687,129 @@
           "interfaces": null,
           "kind": "SCALAR",
           "name": "Float",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Events processed for the current sink",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Bytes processed for the current sink",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "SinkMetrics",
+              "ofType": null
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "GenericSinkMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Events processed for the current source",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Bytes processed for the current source",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "SourceMetrics",
+              "ofType": null
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "GenericSourceMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Events processed for the current transform",
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Bytes processed for the current transform",
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "TransformMetrics",
+              "ofType": null
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "GenericTransformMetrics",
           "possibleTypes": null
         },
         {
@@ -1490,25 +1705,17 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current sink",
+              "description": "Sink metrics",
               "isDeprecated": false,
-              "name": "processedEventsTotal",
+              "name": "metrics",
               "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Metric indicating bytes processed for the current sink",
-              "isDeprecated": false,
-              "name": "processedBytesTotal",
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "SinkMetrics",
+                  "ofType": null
+                }
               }
             }
           ],
@@ -1523,6 +1730,47 @@
           "kind": "OBJECT",
           "name": "Sink",
           "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "INTERFACE",
+          "name": "SinkMetrics",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "GenericSinkMetrics",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,
@@ -1627,25 +1875,17 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current source",
+              "description": "Source metrics",
               "isDeprecated": false,
-              "name": "processedEventsTotal",
+              "name": "metrics",
               "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Metric indicating bytes processed for the current source",
-              "isDeprecated": false,
-              "name": "processedBytesTotal",
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "SourceMetrics",
+                  "ofType": null
+                }
               }
             }
           ],
@@ -1660,6 +1900,52 @@
           "kind": "OBJECT",
           "name": "Source",
           "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "INTERFACE",
+          "name": "SourceMetrics",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "GenericSourceMetrics",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "FileSourceMetrics",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,
@@ -2380,25 +2666,17 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current transform",
+              "description": "Transform metrics",
               "isDeprecated": false,
-              "name": "processedEventsTotal",
+              "name": "metrics",
               "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedEventsTotal",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Metric indicating bytes processed for the current transform",
-              "isDeprecated": false,
-              "name": "processedBytesTotal",
-              "type": {
-                "kind": "OBJECT",
-                "name": "ProcessedBytesTotal",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "TransformMetrics",
+                  "ofType": null
+                }
               }
             }
           ],
@@ -2413,6 +2691,47 @@
           "kind": "OBJECT",
           "name": "Transform",
           "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedEventsTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedEventsTotal",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "processedBytesTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "ProcessedBytesTotal",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "INTERFACE",
+          "name": "TransformMetrics",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "GenericTransformMetrics",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": null,

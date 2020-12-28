@@ -103,6 +103,7 @@ impl Program {
             let program_def = type_defs.pop().unwrap_or(TypeDef {
                 fallible: true,
                 kind: value::Kind::Null,
+                ..Default::default()
             });
 
             if !constraint.type_def.contains(&program_def)
@@ -145,6 +146,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: true,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: true,
                 }),
@@ -157,6 +159,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: true,
                 }),
@@ -169,6 +172,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: true,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),
@@ -204,6 +208,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Bytes,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),
@@ -215,6 +220,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Bytes | Kind::Float,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),

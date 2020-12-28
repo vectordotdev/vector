@@ -109,4 +109,19 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			summary:      false
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "cloudwatch"
+			_docs_tag: "AmazonCloudWatch"
+
+			policies: [
+				{
+					_action: "PutMetricData"
+					required_for: ["healthcheck", "write"]
+				},
+			]
+		},
+	]
 }

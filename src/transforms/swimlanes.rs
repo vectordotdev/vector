@@ -2,7 +2,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
+    internal_events::SwimlanesEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
@@ -53,7 +53,6 @@ impl Swimlane {
 impl FunctionTransform for Swimlane {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
-            emit!(SwimlanesEventProcessed);
             output.push(event);
         } else {
             emit!(SwimlanesEventDiscarded);

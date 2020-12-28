@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    event::Event,
-    internal_events::{CoercerConversionFailed, CoercerEventProcessed},
+    event::{Event, Value},
+    internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -56,7 +56,7 @@ pub struct Coercer {
 impl FunctionTransform for Coercer {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut log = event.into_log();
-        emit!(CoercerEventProcessed);
+
         if self.drop_unspecified {
             // This uses a different algorithm from the default path
             // below, as it will be fewer steps to fully recreate the
@@ -66,7 +66,7 @@ impl FunctionTransform for Coercer {
             let new_log = new_event.as_mut_log();
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert(value) {
+                    match conv.convert::<Value>(value.into_bytes()) {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
@@ -79,7 +79,7 @@ impl FunctionTransform for Coercer {
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
-                    match conv.convert(value) {
+                    match conv.convert::<Value>(value.into_bytes()) {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
