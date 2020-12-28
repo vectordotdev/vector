@@ -25,41 +25,25 @@ impl Function for ToTimestamp {
                 },
                 required: true,
             },
-            Parameter {
-                keyword: "default",
-                accepts: |v| {
-                    matches!(
-                        v,
-                        Value::Integer(_) |
-                        Value::Float(_) |
-                        Value::Bytes(_) |
-                        Value::Timestamp(_)
-                    )
-                },
-                required: false,
-            },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
-        let default = arguments.optional("default").map(Expr::boxed);
 
-        Ok(Box::new(ToTimestampFn { value, default }))
+        Ok(Box::new(ToTimestampFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct ToTimestampFn {
     value: Box<dyn Expression>,
-    default: Option<Box<dyn Expression>>,
 }
 
 impl ToTimestampFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, default: Option<Value>) -> Self {
-        let default = default.map(|v| Box::new(Literal::from(v)) as _);
-        Self { value, default }
+    fn new(value: Box<dyn Expression>) -> Self {
+        Self { value }
     }
 }
 
@@ -67,7 +51,9 @@ impl Expression for ToTimestampFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
-        let to_timestamp = |value| match value {
+        let value = self.value.execute(state, object)?;
+
+        match value {
             Timestamp(_) => Ok(value),
             Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
             Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
@@ -77,13 +63,7 @@ impl Expression for ToTimestampFn {
             Boolean(_) | Array(_) | Map(_) | Regex(_) | Null => {
                 Err("unable to convert value to timestamp".into())
             }
-        };
-
-        crate::util::convert_value_or_default(
-            self.value.execute(state, object),
-            self.default.as_ref().map(|v| v.execute(state, object)),
-            to_timestamp,
-        )
+        }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -92,11 +72,6 @@ impl Expression for ToTimestampFn {
         self.value
             .type_def(state)
             .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
-            .merge_with_default_optional(self.default.as_ref().map(|default| {
-                default
-                    .type_def(state)
-                    .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
-            }))
             .with_constraint(Kind::Timestamp)
     }
 }
@@ -108,22 +83,22 @@ mod tests {
 
     remap::test_type_def![
         timestamp_infallible {
-            expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed() },
             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         integer_infallible {
-            expr: |_| ToTimestampFn { value: Literal::from(1).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from(1).boxed() },
             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed() },
             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         null_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from(()).boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -132,7 +107,7 @@ mod tests {
         }
 
         string_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from("foo").boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -141,7 +116,7 @@ mod tests {
         }
 
         map_fallible {
-            expr: |_| ToTimestampFn { value: map!{}.boxed(), default: None},
+            expr: |_| ToTimestampFn { value: map!{}.boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -150,7 +125,7 @@ mod tests {
         }
 
         array_fallible {
-            expr: |_| ToTimestampFn { value: array![].boxed(), default: None},
+            expr: |_| ToTimestampFn { value: array![].boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -159,66 +134,9 @@ mod tests {
         }
 
         boolean_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Literal::from(true).boxed() },
             def: TypeDef {
                 fallible: true,
-                kind: Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-        fallible_value_without_default {
-            expr: |_| ToTimestampFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None},
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-       fallible_value_with_fallible_default {
-            expr: |_| ToTimestampFn {
-                value: lit!(null).boxed(),
-                default: Some(lit!(null).boxed()),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-       fallible_value_with_infallible_default {
-            expr: |_| ToTimestampFn {
-                value: lit!(null).boxed(),
-                default: Some(lit!(1).boxed()),
-            },
-            def: TypeDef {
-                fallible: false,
-                kind: Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-        infallible_value_with_fallible_default {
-            expr: |_| ToTimestampFn {
-                value: lit!(1).boxed(),
-                default: Some(lit!(null).boxed()),
-            },
-            def: TypeDef {
-                fallible: false,
-                kind: Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-        infallible_value_with_infallible_default {
-            expr: |_| ToTimestampFn {
-                value: Literal::from(1).boxed(),
-                default: Some(Literal::from(1).boxed()),
-            },
-            def: TypeDef {
-                fallible: false,
                 kind: Kind::Timestamp,
                 ..Default::default()
             },
@@ -231,27 +149,9 @@ mod tests {
 
         let cases = vec![
             (
-                map![],
-                Ok(Utc.timestamp(10, 0).into()),
-                ToTimestampFn::new(Box::new(Path::from("foo")), Some(10.into())),
-            ),
-            (
-                map![],
-                Ok(Utc.timestamp(10, 0).into()),
-                ToTimestampFn::new(
-                    Box::new(Path::from("foo")),
-                    Some(Utc.timestamp(10, 0).into()),
-                ),
-            ),
-            (
-                map![],
-                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
-                ToTimestampFn::new(Box::new(Path::from("foo")), Some("10".into())),
-            ),
-            (
                 map!["foo": Utc.timestamp(10, 0)],
                 Ok(Value::Timestamp(Utc.timestamp(10, 0))),
-                ToTimestampFn::new(Box::new(Path::from("foo")), None),
+                ToTimestampFn::new(Box::new(Path::from("foo"))),
             ),
         ];
 
