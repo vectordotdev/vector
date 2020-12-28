@@ -1,5 +1,5 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, KeyData, Label, Recorder, SharedString, Unit};
+use metrics::{GaugeValue, Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
@@ -115,7 +115,7 @@ impl Recorder for VectorRecorder {
             || self.bump_cardinality_counter_and(Handle::counter),
         )
     }
-    fn update_gauge(&self, key: Key, value: f64) {
+    fn update_gauge(&self, key: Key, value: GaugeValue) {
         let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
@@ -123,7 +123,7 @@ impl Recorder for VectorRecorder {
             || self.bump_cardinality_counter_and(Handle::gauge),
         )
     }
-    fn record_histogram(&self, key: Key, value: u64) {
+    fn record_histogram(&self, key: Key, value: f64) {
         let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
