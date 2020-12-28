@@ -851,4 +851,40 @@ mod tests {
             }
         })
     }
+
+    #[test]
+    fn api_graphql_component_by_name() {
+        metrics_test("tests::api_graphql_component_by_name", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.gen1]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  interval = 0.1
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["gen1"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(&conf).await;
+            let server = api::Server::start(topology.config());
+            let client = make_client(server.addr());
+
+            // Retrieving a component that doesn't exist should return None
+            let res = client.component_by_name_query("xxx").await;
+            assert!(res.unwrap().data.unwrap().component_by_name.is_none());
+
+            // The `gen1` name should exist
+            let res = client.component_by_name_query("gen1").await;
+            assert_eq!(
+                res.unwrap().data.unwrap().component_by_name.unwrap().name,
+                "gen1"
+            );
+        })
+    }
 }

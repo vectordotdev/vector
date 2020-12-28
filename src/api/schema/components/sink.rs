@@ -30,7 +30,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(|name| match state::component_by_name(name) {
-                Component::Source(s) => Some(s),
+                Some(Component::Source(s)) => Some(s),
                 _ => None,
             })
             .collect()
@@ -42,7 +42,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(|name| match state::component_by_name(name) {
-                Component::Transform(t) => Some(t),
+                Some(Component::Transform(t)) => Some(t),
                 _ => None,
             })
             .collect()
