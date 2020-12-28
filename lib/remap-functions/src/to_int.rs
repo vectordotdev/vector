@@ -51,9 +51,7 @@ impl Expression for ToIntFn {
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             Timestamp(v) => Ok(v.timestamp().into()),
-            Array(_) | Map(_) | Regex(_) => {
-                Err("unable to convert value to integer".into())
-            }
+            Array(_) | Map(_) | Regex(_) => Err("unable to convert value to integer".into()),
         }
     }
 
@@ -62,7 +60,9 @@ impl Expression for ToIntFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Timestamp | Kind::Null)
+            .fallible_unless(
+                Kind::Integer | Kind::Float | Kind::Boolean | Kind::Timestamp | Kind::Null,
+            )
             .with_constraint(Kind::Integer)
     }
 }
@@ -70,8 +70,8 @@ impl Expression for ToIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
     use chrono::{DateTime, Utc};
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
@@ -138,7 +138,7 @@ mod tests {
                 ],
                 Ok(Value::Integer(1571227200)),
                 ToIntFn::new(Box::new(Path::from("foo"))),
-            )
+            ),
         ];
 
         let mut state = state::Program::default();
