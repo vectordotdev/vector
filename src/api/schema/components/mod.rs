@@ -3,6 +3,7 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
+use crate::api::schema::relay;
 use crate::config::Config;
 use async_graphql::{Interface, Object, Subscription};
 use lazy_static::lazy_static;
@@ -26,8 +27,19 @@ pub struct ComponentsQuery;
 #[Object]
 impl ComponentsQuery {
     /// Configured components (sources/transforms/sinks)
-    async fn components(&self) -> Vec<Component> {
-        state::filter_components(|(_name, components)| Some(components.clone()))
+    async fn components(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<Component> {
+        relay::query(
+            state::filter_components(|(_name, components)| Some(components.clone())).into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured sources
