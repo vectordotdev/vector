@@ -1,5 +1,7 @@
 mod util;
 
+#[cfg(feature = "append")]
+mod append;
 #[cfg(feature = "assert")]
 mod assert;
 #[cfg(feature = "ceil")]
@@ -113,10 +115,8 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "md5")]
-pub use crate::md5::Md5;
-#[cfg(feature = "sha1")]
-pub use crate::sha1::Sha1;
+#[cfg(feature = "append")]
+pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "ceil")]
@@ -155,6 +155,8 @@ pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "md5")]
+pub use crate::md5::Md5;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -187,6 +189,8 @@ pub use redact::Redact;
 pub use replace::Replace;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "sha1")]
+pub use crate::sha1::Sha1;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -226,10 +230,8 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
-        #[cfg(feature = "md5")]
-        Box::new(Md5),
-        #[cfg(feature = "sha1")]
-        Box::new(Sha1),
+        #[cfg(feature = "append")]
+        Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -268,6 +270,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Ipv6ToIpV4),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
         #[cfg(feature = "now")]
@@ -300,6 +304,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Replace),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
         #[cfg(feature = "sha2")]
         Box::new(Sha2),
         #[cfg(feature = "sha3")]
