@@ -246,7 +246,7 @@ components: sinks: [Name=string]: {
 							concurrency: {
 								common: true
 								if sinks[Name].features.send.request.adaptive_concurrency {
-									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
+									description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
 								}
 								if !sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time."
