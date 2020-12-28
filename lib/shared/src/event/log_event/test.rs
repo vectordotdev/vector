@@ -858,7 +858,10 @@ mod remap {
 
         let cases = vec![
             (map! {}, Ok(vec!["."])),
-            (map! { "\"foo bar baz\"": "bar" }, Ok(vec![r#"."foo bar baz""#])),
+            (
+                map! { "\"foo bar baz\"": "bar" },
+                Ok(vec![r#"."foo bar baz""#]),
+            ),
             (
                 map! { "foo": "bar", "baz": "qux" },
                 Ok(vec![".baz", ".foo"]),
