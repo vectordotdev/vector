@@ -16,7 +16,7 @@ remap: functions: parse_regex: {
 		},
 	]
 	return: ["map"]
-	category: "text"
+	category: "Parse"
 	description: """
 		Searches within the text for capture groups specified by the provided regular expression. It will
 		return the capture groups corresponding to the leftmost matches in the text. If no match is found
