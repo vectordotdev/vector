@@ -28,10 +28,7 @@ impl Function for ParseTimestamp {
         let value = arguments.required("value")?.boxed();
         let format = arguments.required("format")?.boxed();
 
-        Ok(Box::new(ParseTimestampFn {
-            value,
-            format,
-        }))
+        Ok(Box::new(ParseTimestampFn { value, format }))
     }
 }
 
@@ -46,10 +43,7 @@ impl ParseTimestampFn {
     fn new(format: &str, value: Box<dyn Expression>) -> Self {
         let format = Box::new(Literal::from(format));
 
-        Self {
-            value,
-            format,
-        }
+        Self { value, format }
     }
 }
 
@@ -60,7 +54,6 @@ impl Expression for ParseTimestampFn {
 
         match value {
             Value::Bytes(v) => format
-                .clone()
                 .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?
                 .parse::<Conversion>()
                 .map_err(|e| format!("{}", e))?

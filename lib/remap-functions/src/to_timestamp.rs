@@ -11,21 +11,19 @@ impl Function for ToTimestamp {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: |v| {
-                    matches!(
-                        v,
-                        Value::Integer(_) |
-                        Value::Float(_) |
-                        Value::Bytes(_) |
-                        Value::Timestamp(_)
-                    )
-                },
-                required: true,
+        &[Parameter {
+            keyword: "value",
+            accepts: |v| {
+                matches!(
+                    v,
+                    Value::Integer(_) |
+                    Value::Float(_) |
+                    Value::Bytes(_) |
+                    Value::Timestamp(_)
+                )
             },
-        ]
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
@@ -147,13 +145,11 @@ mod tests {
     fn to_timestamp() {
         use crate::map;
 
-        let cases = vec![
-            (
-                map!["foo": Utc.timestamp(10, 0)],
-                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
-                ToTimestampFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": Utc.timestamp(10, 0)],
+            Ok(Value::Timestamp(Utc.timestamp(10, 0))),
+            ToTimestampFn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 

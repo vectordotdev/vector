@@ -10,13 +10,11 @@ impl Function for ToBool {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: crate::util::is_scalar_value,
-                required: true,
-            }
-        ]
+        &[Parameter {
+            keyword: "value",
+            accepts: crate::util::is_scalar_value,
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {

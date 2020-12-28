@@ -9,13 +9,11 @@ impl Function for ParseJson {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
-                required: true,
-            },
-        ]
+        &[Parameter {
+            keyword: "value",
+            accepts: |v| matches!(v, Value::Bytes(_)),
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
@@ -34,10 +32,10 @@ impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
         let bytes = value.unwrap_bytes();
-            let value = serde_json::from_slice::<'_, Value>(&bytes)
-                .map_err(|e| format!("unable to parse json: {}", e))?;
+        let value = serde_json::from_slice::<'_, Value>(&bytes)
+            .map_err(|e| format!("unable to parse json: {}", e))?;
 
-            Ok(value)
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -96,16 +94,20 @@ mod tests {
         }
     ];
 
-    test_type_def![
-        value_string {
-            expr: |_| ParseJsonFn {
-                value: Literal::from("foo").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
-                ..Default::default()
-            },
-        }
-    ];
+    test_type_def![value_string {
+        expr: |_| ParseJsonFn {
+            value: Literal::from("foo").boxed(),
+        },
+        def: TypeDef {
+            fallible: true,
+            kind: Kind::Bytes
+                | Kind::Boolean
+                | Kind::Integer
+                | Kind::Float
+                | Kind::Array
+                | Kind::Map
+                | Kind::Null,
+            ..Default::default()
+        },
+    }];
 }

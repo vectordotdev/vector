@@ -1,4 +1,4 @@
-use remap::{Result, Value};
+use remap::Value;
 
 #[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
 #[inline]

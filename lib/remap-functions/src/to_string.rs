@@ -9,13 +9,11 @@ impl Function for ToString {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: |_| true,
-                required: true,
-            },
-        ]
+        &[Parameter {
+            keyword: "value",
+            accepts: |_| true,
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
