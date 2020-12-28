@@ -9,6 +9,7 @@ mod tests {
     use crate::support::{fork_test, sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
+    use metrics::counter;
     use std::{
         collections::HashMap,
         net::SocketAddr,
@@ -681,6 +682,116 @@ mod tests {
             // Await the join handle
             handle.await.unwrap();
         })
+    }
+
+    #[test]
+    fn api_graphql_errors_total() {
+        metrics_test("tests::api_graphql_errors_total", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.error_gen]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  batch_interval = 0.1
+
+                [sinks.blackhole]
+                  # General
+                  type = "blackhole"
+                  inputs = ["error_gen"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = new_subscription_client(server.addr()).await;
+
+            // Spawn a handler for listening to changes
+            let handle = tokio::spawn(async move {
+                let subscription = client.errors_total_subscription(50);
+
+                tokio::pin! {
+                    let stream = subscription.stream();
+                }
+
+                // If we get results, it means the error has been picked up. Check the count is > 0
+                assert!(
+                    stream
+                        .next()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .data
+                        .unwrap()
+                        .errors_total
+                        .errors_total
+                        > 0.00
+                );
+            });
+
+            // Emit an error metric
+            counter!("processing_errors_total", 1);
+
+            handle.await.unwrap()
+        });
+    }
+
+    #[test]
+    fn api_grahql_component_errors_total() {
+        metrics_test("tests::api_grahql_component_errors_total", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.error_gen]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  batch_interval = 0.1
+
+                [sinks.blackhole]
+                  # General
+                  type = "blackhole"
+                  inputs = ["error_gen"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = new_subscription_client(server.addr()).await;
+
+            // Spawn a handler for listening to changes
+            let handle = tokio::spawn(async move {
+                let subscription = client.errors_total_subscription(50);
+
+                tokio::pin! {
+                    let stream = subscription.stream();
+                }
+
+                // If we get results, it means the error has been picked up. Check the count is > 0
+                assert!(
+                    stream
+                        .next()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .data
+                        .unwrap()
+                        .errors_total
+                        .errors_total
+                        > 0.00
+                );
+            });
+
+            // Emit an error metric
+            counter!("processing_errors_total", 1);
+
+            handle.await.unwrap()
+        });
     }
 
     #[cfg(unix)]
