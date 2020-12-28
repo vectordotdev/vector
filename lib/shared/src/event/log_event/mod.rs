@@ -661,11 +661,10 @@ impl LogEvent {
 
 impl remap_lang::Object for LogEvent {
     fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
-        let path_string = path.to_string();
-        if path_string == "." {
+        if path.is_root() {
             Ok(Some(Value::from(self.inner().clone()).into()))
         } else {
-            trace!(path = %path_string, "Converting to LookupBuf.");
+            trace!(path = %path.to_string(), "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
             let val = self.get(&lookup);
             // TODO: This does not need to clone.
@@ -674,14 +673,13 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn remove(&mut self, path: &remap_lang::Path, compact: bool) -> Result<(), String> {
-        let path_string = path.to_string();
-        if path_string == "." {
+        if path.is_root() {
             let mut value = LogEvent::default();
             std::mem::swap(self, &mut value);
             // TODO: Why does this not return value?
             Ok(())
         } else {
-            trace!(path = %path_string, "Converting to LookupBuf.");
+            trace!(path = %path.to_string(), "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
             let _val = self.remove(&lookup, compact);
             // TODO: Why does this not return?
@@ -690,9 +688,8 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
-        let path_string = path.to_string();
         let value = Value::from(value);
-        if path_string == "." {
+        if path.is_root() {
             if let Value::Map(mut v) = value {
                 std::mem::swap(&mut self.fields, &mut v);
                 // TODO: Why does this not return value?
@@ -701,7 +698,7 @@ impl remap_lang::Object for LogEvent {
                 Err("Cannot insert as root of Event unless it is a map.".into())
             }
         } else {
-            trace!(path = %path_string, "Converting to LookupBuf.");
+            trace!(path = %path.to_string(), "Converting to LookupBuf.");
             // TODO: We should not degrade the error to a string here.
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
             let _val = self.insert(lookup, value);
