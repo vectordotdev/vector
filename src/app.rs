@@ -2,7 +2,7 @@ use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubComm
 use crate::signal::SignalTo;
 use crate::topology::RunningTopology;
 use crate::{
-    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate, vrl,
+    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
 use std::cmp::max;
 use std::collections::HashMap;
@@ -20,6 +20,8 @@ use crate::sources::host_metrics;
 use crate::top;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
+#[cfg(feature = "vrl-cli")]
+use crate::vrl;
 
 #[cfg(windows)]
 use crate::service;
@@ -121,6 +123,7 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
                         SubCommand::VRL(s) => vrl::run(&s),
                     };
 

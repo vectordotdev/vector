@@ -1,8 +1,11 @@
-#[cfg(feature = "api-client")]
-use crate::top;
-use crate::{config, generate, get_version, list, unit_test, validate, vrl};
+use crate::{config, generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
+
+#[cfg(feature = "api-client")]
+use crate::top;
+#[cfg(feature = "vrl-cli")]
+use crate::vrl;
 
 #[cfg(windows)]
 use crate::service;
