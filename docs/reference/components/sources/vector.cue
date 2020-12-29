@@ -93,7 +93,12 @@ components: sources: vector: {
 				}
 			}
 		}
-		metrics: true
+		metrics: {
+			counter:      output._passthrough_counter
+			distribution: output._passthrough_distribution
+			gauge:        output._passthrough_gauge
+			set:          output._passthrough_set
+		}
 	}
 
 	how_it_works: {
