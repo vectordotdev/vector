@@ -267,7 +267,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::LookupBuf,
         log_event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
@@ -315,13 +314,11 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let input_event = log_event! {
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "example.com",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(ready(input_event.clone())))
             .await
@@ -370,12 +367,10 @@ mod integration_tests {
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "example.com",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -434,12 +429,10 @@ timestamp_format = "unix""#,
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "example.com",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -492,13 +485,11 @@ timestamp_format = "unix""#,
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let input_event = log_event! {
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "example.com",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "example.com");
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
@@ -541,13 +532,11 @@ timestamp_format = "unix""#,
         };
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let input_event = log_event! {
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "example.com",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "example.com");
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.

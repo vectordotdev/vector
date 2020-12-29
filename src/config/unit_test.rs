@@ -1,9 +1,9 @@
 use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
 use crate::{
     conditions::{Condition, ConditionConfig},
+    config::{self, log_schema, TransformConfig, LOG_SCHEMA},
     event::{Event, LookupBuf, Value},
     transforms::Transform,
-    config::{self, TransformConfig, LOG_SCHEMA, log_schema}
 };
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
@@ -15,9 +15,7 @@ pub async fn build_unit_tests_main(
     let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
 
     // Ignore failures on calls other than the first
-    LOG_SCHEMA
-        .set(config.global.log_schema.clone())
-        .ok();
+    LOG_SCHEMA.set(config.global.log_schema.clone()).ok();
 
     build_unit_tests(config).await
 }

@@ -574,8 +574,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        assert_downcast_matches,
-        log_event,
+        assert_downcast_matches, log_event,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};

@@ -344,7 +344,6 @@ impl StreamSink for FileSink {
 mod tests {
     use super::*;
     use crate::{
-        event::LookupBuf,
         log_event,
         test_util::{
             lines_from_file, lines_from_gzip_file, random_events_with_stream,
@@ -377,8 +376,8 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(|v| {
             log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => v,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }
         })));
         sink.run(events).await.unwrap();
@@ -407,8 +406,8 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(|v| {
             log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => v,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }
         })));
         sink.run(events).await.unwrap();
@@ -440,54 +439,22 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
 
         let (mut input, _events) = random_events_with_stream(32, 8);
-        input[0]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-26-07");
-        input[0]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "warning");
-        input[1]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-26-07");
-        input[1]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "error");
-        input[2]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-26-07");
-        input[2]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "warning");
-        input[3]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-27-07");
-        input[3]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "error");
-        input[4]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-27-07");
-        input[4]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "warning");
-        input[5]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-27-07");
-        input[5]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "warning");
-        input[6]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-28-07");
-        input[6]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "warning");
-        input[7]
-            .as_mut_log()
-            .insert(LookupBuf::from("date"), "2019-29-07");
-        input[7]
-            .as_mut_log()
-            .insert(LookupBuf::from("level"), "error");
+        input[0].as_mut_log().insert("date", "2019-26-07");
+        input[0].as_mut_log().insert("level", "warning");
+        input[1].as_mut_log().insert("date", "2019-26-07");
+        input[1].as_mut_log().insert("level", "error");
+        input[2].as_mut_log().insert("date", "2019-26-07");
+        input[2].as_mut_log().insert("level", "warning");
+        input[3].as_mut_log().insert("date", "2019-27-07");
+        input[3].as_mut_log().insert("level", "error");
+        input[4].as_mut_log().insert("date", "2019-27-07");
+        input[4].as_mut_log().insert("level", "warning");
+        input[5].as_mut_log().insert("date", "2019-27-07");
+        input[5].as_mut_log().insert("level", "warning");
+        input[6].as_mut_log().insert("date", "2019-28-07");
+        input[6].as_mut_log().insert("level", "warning");
+        input[7].as_mut_log().insert("date", "2019-29-07");
+        input[7].as_mut_log().insert("level", "error");
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
         sink.run(events).await.unwrap();
@@ -560,8 +527,8 @@ mod tests {
         // send initial payload
         for line in input.clone() {
             tx.send(log_event! {
-                crate::config::log_schema().message_key().clone() => line,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => line,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             })
             .await
             .unwrap();
@@ -573,8 +540,8 @@ mod tests {
         // trigger another write
         let last_line = "i should go at the end";
         tx.send(log_event! {
-            crate::config::log_schema().message_key().clone() => last_line,
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => last_line,
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         })
         .await
         .unwrap();

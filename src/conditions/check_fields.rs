@@ -600,7 +600,7 @@ impl Condition for CheckFields {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{log_event, config::log_schema};
+    use crate::{config::log_schema, log_event};
 
     #[test]
     fn generate_config() {
@@ -682,18 +682,14 @@ mod test {
             )
         );
 
-        event
-            .as_mut_log()
-            .insert("message", "foo".to_string());
+        event.as_mut_log().insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("other_thing", "bar".to_string());
+        event.as_mut_log().insert("other_thing", "bar".to_string());
         event
             .as_mut_log()
             .insert("third_thing", "hello".to_string());
@@ -706,9 +702,7 @@ mod test {
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event
-            .as_mut_log()
-            .insert("message", "not foo".to_string());
+        event.as_mut_log().insert("message", "not foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -782,9 +776,7 @@ mod test {
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event
-            .as_mut_log()
-            .insert("message", "not fo0".to_string());
+        event.as_mut_log().insert("message", "not fo0".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1055,21 +1047,15 @@ mod test {
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
-        event
-            .as_mut_log()
-            .insert("third_thing", "safe".to_string());
-        event
-            .as_mut_log()
-            .insert("other_thing", "bar".to_string());
+        event.as_mut_log().insert("third_thing", "safe".to_string());
+        event.as_mut_log().insert("other_thing", "bar".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("message", "foo".to_string());
+        event.as_mut_log().insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1119,9 +1105,7 @@ mod test {
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("message", "foo".to_string());
+        event.as_mut_log().insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1156,9 +1140,7 @@ mod test {
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
         );
 
-        event
-            .as_mut_log()
-            .insert("foo", "10.1.2.3".to_string());
+        event.as_mut_log().insert("foo", "10.1.2.3".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1168,9 +1150,7 @@ mod test {
             ),
         );
 
-        event
-            .as_mut_log()
-            .insert("bar", "2000::".to_string());
+        event.as_mut_log().insert("bar", "2000::".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
@@ -1189,9 +1169,7 @@ mod test {
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
 
-        event
-            .as_mut_log()
-            .insert("foo", "not an ip".to_string());
+        event.as_mut_log().insert("foo", "not an ip".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1217,9 +1195,7 @@ mod test {
             Err("predicates failed: [ foo.exists: true ]".to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("foo", "not ignored".to_string());
+        event.as_mut_log().insert("foo", "not ignored".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
@@ -1251,18 +1227,14 @@ mod test {
             Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("foo", "helloworld".to_string());
+        event.as_mut_log().insert("foo", "helloworld".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
         );
 
-        event
-            .as_mut_log()
-            .insert("bar", vec![0, 1, 2, 3]);
+        event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
     }
@@ -1283,9 +1255,7 @@ mod test {
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event
-            .as_mut_log()
-            .insert("foo", "not ignored".to_string());
+        event.as_mut_log().insert("foo", "not ignored".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),

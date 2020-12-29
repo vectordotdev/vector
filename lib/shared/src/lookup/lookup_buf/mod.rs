@@ -9,14 +9,14 @@ use std::{
     str::FromStr,
 };
 
+use crate::{event::*, lookup::*};
 use indexmap::map::IndexMap;
 use pest::iterators::Pair;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use remap_lang::parser::ParserRule;
 use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use toml::Value as TomlValue;
 use tracing::{instrument, trace};
-use remap_lang::parser::ParserRule;
-use crate::{event::*, lookup::*};
 
 #[cfg(test)]
 mod test;

@@ -1,5 +1,6 @@
 use crate::{
     buffers::Acker,
+    config::log_schema,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
@@ -101,7 +102,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 })
                 .ok(),
             Encoding::Text => {
-                let field = crate::config::log_schema().message_key();
+                let field = log_schema().message_key();
                 match log.get(field) {
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
@@ -157,7 +158,8 @@ impl StreamSink for WriterSink {
 mod test {
     use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
     use crate::{
-        event::{Event, LookupBuf, Value},
+        config::log_schema,
+        event::{Event, Value},
         log_event,
     };
     use chrono::{offset::TimeZone, Utc};
@@ -171,8 +173,8 @@ mod test {
     #[test]
     fn encodes_raw_logs() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "foo",
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "foo",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(
             "foo",
@@ -184,9 +186,9 @@ mod test {
     fn encodes_log_events() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert(LookupBuf::from("x"), Value::from("23"));
-        log.insert(LookupBuf::from("z"), Value::from(25));
-        log.insert(LookupBuf::from("a"), Value::from("0"));
+        log.insert("x", Value::from("23"));
+        log.insert("z", Value::from(25));
+        log.insert("a", Value::from("0"));
 
         let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
         let expected = r#"{"a":"0","x":"23","z":25}"#;

@@ -48,9 +48,9 @@ impl Condition for IsMetric {
 mod test {
     use super::*;
     use crate::{
+        config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue},
         log_event, Event,
-        config::log_schema,
     };
 
     #[test]

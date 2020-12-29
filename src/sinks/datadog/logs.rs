@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, LookupBuf},
+    event::Event,
     http::HttpClient,
     sinks::{
         util::{
@@ -212,15 +212,15 @@ impl HttpSink for DatadogLogsJsonService {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key(), false) {
-            log.insert(LookupBuf::from("message"), message);
+            log.insert("message", message);
         }
 
         if let Some(timestamp) = log.remove(log_schema().timestamp_key(), false) {
-            log.insert(LookupBuf::from("date"), timestamp);
+            log.insert("date", timestamp);
         }
 
         if let Some(host) = log.remove(log_schema().host_key(), false) {
-            log.insert(LookupBuf::from("host"), host);
+            log.insert("host", host);
         }
 
         self.config.encoding.apply_rules(&mut event);

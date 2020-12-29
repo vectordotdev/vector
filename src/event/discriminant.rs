@@ -172,10 +172,7 @@ mod tests {
         event_1.insert("hostname", "localhost");
         event_1.insert("irrelevant", "not even used");
         let mut event_2 = event_1.clone();
-        event_2.insert(
-            "irrelevant",
-            "does not matter if it's different",
-        );
+        event_2.insert("irrelevant", "does not matter if it's different");
 
         let discriminant_fields =
             vec![LookupBuf::from("hostname"), LookupBuf::from("container_id")];

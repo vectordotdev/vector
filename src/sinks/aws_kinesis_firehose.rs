@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -292,10 +292,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(
-            map[&log_schema().message_key().to_string()],
-            message
-        );
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 }

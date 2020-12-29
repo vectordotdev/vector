@@ -463,7 +463,7 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::log_schema, event::LookupBuf, log_event};
+    use crate::{config::log_schema, log_event};
 
     #[test]
     fn generate_config() {
@@ -492,11 +492,11 @@ mod tests {
     #[test]
     fn gcs_encode_event_ndjson() {
         let message = "hello world".to_string();
-        let mut event = log_event! {
+        let event = log_event! {
             log_schema().message_key().clone() => message.clone(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
@@ -516,11 +516,11 @@ mod tests {
         crate::test_util::trace_init();
 
         let message = "hello world".to_string();
-        let mut event = log_event! {
+        let event = log_event! {
             log_schema().message_key().clone() => message,
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let key_format = Template::try_from("key: {{ key }}").unwrap();
         let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();

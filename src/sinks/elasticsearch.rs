@@ -517,7 +517,7 @@ fn maybe_set_id(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Lookup, log_event, sinks::util::retries::RetryAction};
+    use crate::{config::log_schema, event::Lookup, log_event, sinks::util::retries::RetryAction};
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -531,10 +531,10 @@ mod tests {
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some(LookupBuf::from("foo"));
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "butts".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(&id_key, &mut action, &mut event);
@@ -547,10 +547,10 @@ mod tests {
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some(LookupBuf::from("foo"));
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "butts".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        event.as_mut_log().insert(LookupBuf::from("not_foo"), "bar");
+        event.as_mut_log().insert("not_foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(&id_key, &mut action, &mut event);
@@ -562,10 +562,10 @@ mod tests {
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<LookupBuf> = None;
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "butts".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "butts".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
+        event.as_mut_log().insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(&id_key, &mut action, &mut event);
@@ -575,7 +575,6 @@ mod tests {
 
     #[test]
     fn sets_create_action_when_configured() {
-        use crate::config::log_schema;
         use chrono::{TimeZone, Utc};
 
         let config = ElasticSearchConfig {
@@ -631,16 +630,12 @@ mod tests {
         };
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello there".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello there".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => "bar",
+            "idx" => "purple",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("foo").unwrap(), "bar");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("idx").unwrap(), "purple");
 
         let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
@@ -655,7 +650,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{log_schema, SinkConfig, SinkContext},
         http::HttpClient,
         log_event,
         test_util::{random_events_with_stream, random_string, trace_init},
@@ -700,16 +695,12 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
-        let mut input_event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let input_event = log_event! {
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "my_id" => "42",
+            "foo" => "bar",
         };
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("my_id"), "42");
-        input_event
-            .as_mut_log()
-            .insert(LookupBuf::from("foo"), "bar");
 
         sink.run(stream::once(ready(input_event.clone())))
             .await
@@ -750,7 +741,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[log_schema().timestamp_key()],
         });
         assert_eq!(&expected, value);
     }
@@ -858,7 +849,7 @@ mod integration_tests {
             let mut doit = false;
             sink.run(events.map(move |mut event| {
                 if doit {
-                    event.as_mut_log().insert(LookupBuf::from("_type"), 1);
+                    event.as_mut_log().insert("_type", 1);
                 }
                 doit = true;
                 event

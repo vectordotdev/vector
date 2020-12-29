@@ -283,7 +283,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{log_event, config::log_schema};
+    use crate::{config::log_schema, log_event};
     use std::collections::BTreeMap;
 
     #[test]
