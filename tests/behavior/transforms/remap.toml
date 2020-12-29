@@ -1433,10 +1433,9 @@
       b = " "
       c = "     "
       d = "-"
-      e = "null"
-      f = "\n"
-      g = "i am a teapot"
-      h = 127
+      e = "\n"
+      f = "i am a teapot"
+      g = 127
   [[tests.outputs]]
     extract_from = "remap_function_is_blank"
     [[tests.outputs.conditions]]
@@ -1445,9 +1444,8 @@
       "c.equals" = true
       "d.equals" = true
       "e.equals" = true
-      "f.equals" = true
+      "f.equals" = false
       "g.equals" = false
-      "h.equals" = false
 
 [transforms.remap_function_parse_regex]
   inputs = []
