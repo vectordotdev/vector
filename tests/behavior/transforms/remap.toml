@@ -1409,3 +1409,36 @@
     [[tests.outputs.conditions]]
       "a.equals" = "[1,2,3]"
       "b.equals" = """{"field1":{"field2":1,"field3":null}}"""
+
+[transforms.remap_function_is_blank]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = is_blank(.a)
+    .b = is_blank(.b)
+    .c = is_blank(.c)
+    .d = is_blank(.d)
+    .e = is_blank(.e)
+    .f = is_blank(.f)
+  """
+[[tests]]
+  name = "remap_function_is_blank"
+  [tests.input]
+    insert_at = "remap_function_is_blank"
+    type = "log"
+    [tests.input.log_fields]
+      a = ""
+      b = " "
+      c = "-"
+      d = "null"
+      e = "i am a teapot"
+      f = 127
+  [[tests.outputs]]
+    extract_from = "remap_function_is_blank"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = true
+      "d.equals" = true
+      "e.equals" = false
+      "f.equals" = false
