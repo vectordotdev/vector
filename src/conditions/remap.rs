@@ -106,7 +106,6 @@ mod test {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::event::LookupBuf;
     use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};
 
     #[test]
@@ -125,8 +124,8 @@ mod test {
             ),
             (
                 log_event! {
-                    LookupBuf::from("foo") => true,
-                    LookupBuf::from("bar") => false
+                    "foo" => true,
+                    "bar" => false
                 },
                 "to_bool(.bar || .foo)",
                 Ok(()),
@@ -146,7 +145,7 @@ mod test {
             ),
             (
                 log_event! {
-                    LookupBuf::from("foo") => "string".to_string(),
+                    "foo" => "string".to_string(),
                 },
                 ".foo",
                 Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),

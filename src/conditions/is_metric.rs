@@ -50,6 +50,7 @@ mod test {
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         log_event, Event,
+        config::log_schema,
     };
 
     #[test]
@@ -63,8 +64,8 @@ mod test {
 
         assert_eq!(
             cond.check(&log_event! {
-                crate::config::log_schema().message_key().clone() => "just a log".to_string(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => "just a log".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }),
             false
         );

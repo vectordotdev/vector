@@ -1,9 +1,9 @@
 use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, TransformConfig};
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, LookupBuf, Value},
     transforms::Transform,
+    config::{self, TransformConfig, LOG_SCHEMA, log_schema}
 };
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
@@ -15,7 +15,7 @@ pub async fn build_unit_tests_main(
     let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
 
     // Ignore failures on calls other than the first
-    crate::config::LOG_SCHEMA
+    LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .ok();
 
@@ -330,8 +330,8 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
             Some(v) => Ok((
                 target,
                 shared::log_event! {
-                    crate::config::log_schema().message_key().clone() => v.clone(),
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => v.clone(),
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 },
             )),
             None => Err("input type 'raw' requires the field 'value'".into()),
@@ -339,8 +339,8 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
         "log" => {
             if let Some(log_fields) = &input.log_fields {
                 let mut event = shared::log_event! {
-                    crate::config::log_schema().message_key().clone() => String::from(""),
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => String::from(""),
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 };
                 for (path, value) in log_fields {
                     let value: Value = match value {
@@ -594,7 +594,6 @@ async fn build_unit_test(
 ))]
 mod tests {
     use super::*;
-    use crate::config::ConfigBuilder;
 
     #[tokio::test]
     async fn parse_no_input() {
