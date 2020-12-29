@@ -44,7 +44,6 @@ members = [
   "lib/prometheus-parser",
   "lib/vector-api-client",
   "lib/remap-lang",
-  "lib/remap-cli",
   "lib/remap-functions",
 ]
 

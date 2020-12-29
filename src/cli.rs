@@ -1,6 +1,6 @@
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, generate, get_version, list, unit_test, validate};
+use crate::{config, generate, get_version, list, unit_test, validate, vrl};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
@@ -149,6 +149,10 @@ pub enum SubCommand {
     /// Manage the vector service.
     #[cfg(windows)]
     Service(service::Opts),
+
+    /// Vector Remap Language CLI
+    #[cfg(feature = "vrl-cli")]
+    VRL(vrl::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

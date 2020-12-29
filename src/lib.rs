@@ -75,6 +75,8 @@ pub mod unit_test;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
+#[cfg(feature = "vrl-cli")]
+pub mod vrl;
 
 pub use event::{Event, Value};
 pub use pipeline::Pipeline;

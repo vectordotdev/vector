@@ -2,7 +2,7 @@ use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubComm
 use crate::signal::SignalTo;
 use crate::topology::RunningTopology;
 use crate::{
-    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
+    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate, vrl,
 };
 use std::cmp::max;
 use std::collections::HashMap;
@@ -121,6 +121,7 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        SubCommand::VRL(s) => vrl::run(&s),
                     };
 
                     return Err(code);
