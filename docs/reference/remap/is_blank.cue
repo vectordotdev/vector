@@ -10,7 +10,7 @@ remap: functions: is_blank: {
 		},
 	]
 	return: ["boolean"]
-	category: "Parse"
+	category: "Check"
 	description: #"""
 		Determines whether the provided value should be considered blank, where blank is defined as
 		one of the following:
