@@ -1,4 +1,10 @@
+use lazy_static::lazy_static;
 use remap::prelude::*;
+use regex::Regex;
+
+lazy_static! {
+    static ref ALL_WHITESPACE_PATTERN: Regex = Regex::new(r"^(\s*)$").unwrap();
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsBlank;
@@ -31,10 +37,18 @@ struct IsBlankFn {
 impl Expression for IsBlankFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         match self.value.execute(state, object)? {
-            Value::Bytes(v) => match &String::from_utf8_lossy(&v)[..] {
-                "" | " " | "\n" | "-" => Ok(true.into()),
-                _ => Ok(false.into()),
-            },
+            Value::Bytes(v) => {
+                let s = &String::from_utf8_lossy(&v)[..];
+
+                if ALL_WHITESPACE_PATTERN.is_match(s) {
+                    Ok(true.into())
+                } else {
+                    match s {
+                        "\n" | "-" => Ok(true.into()),
+                        _ => Ok(false.into()),
+                    }
+                }
+            }
             Value::Null => Ok(true.into()),
             _ => Err("input must be a string or null".into()),
         }
@@ -111,6 +125,11 @@ mod tests {
 
         single_space_string {
             args: func_args![value: value!(" ")],
+            want: Ok(value!(true)),
+        }
+
+        multi_space_string {
+            args: func_args![value: value!("     ")],
             want: Ok(value!(true)),
         }
 
