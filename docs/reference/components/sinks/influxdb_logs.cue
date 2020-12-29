@@ -35,6 +35,7 @@ components: sinks: influxdb_logs: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: sinks._influxdb.features.send.tls
 			to:  sinks._influxdb.features.send.to

@@ -24,7 +24,7 @@ remap: functions: sha3: {
 		},
 	]
 	return: ["string"]
-	category: "hash"
+	category: "Hash"
 	description: #"""
 		Calculates a sha3 hash of a given string.
 		"""#

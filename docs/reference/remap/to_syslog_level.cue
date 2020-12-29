@@ -10,7 +10,7 @@ remap: functions: to_syslog_level: {
 		},
 	]
 	return: ["string"]
-	category:    "parse"
+	category:    "Coerce"
 	description: """
 		Converts a Syslog [severity level](\(urls.syslog_levels)) into its corresponding keyword,
 		i.e. 0 into `"emerg"`, 1 into `"alert", etc.

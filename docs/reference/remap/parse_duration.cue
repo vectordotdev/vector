@@ -16,7 +16,7 @@ remap: functions: parse_duration: {
 		},
 	]
 	return: ["float"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a string representing a duration and returns a number of this duration in another specified unit.
 
