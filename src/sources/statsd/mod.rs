@@ -3,12 +3,13 @@ use crate::{
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
@@ -39,6 +40,7 @@ pub struct UdpConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TcpConfig {
     address: SocketListenAddr,
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -78,6 +80,7 @@ impl SourceConfig for StatsdConfig {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
                     config.address,
+                    config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
                     shutdown,
@@ -100,7 +103,7 @@ impl SourceConfig for StatsdConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.clone() {
             Self::Tcp(tcp) => vec![tcp.address.into()],
-            Self::Udp(udp) => vec![udp.address.into()],
+            Self::Udp(udp) => vec![Resource::udp(udp.address)],
             #[cfg(unix)]
             Self::Unix(_) => vec![],
         }
@@ -122,7 +125,11 @@ pub(self) fn parse_event(line: &str) -> Option<Event> {
     }
 }
 
-async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
+async fn statsd_udp(
+    config: UdpConfig,
+    shutdown: ShutdownSignal,
+    mut out: Pipeline,
+) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
@@ -134,7 +141,6 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
     );
 
     let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
-    let mut out = out.sink_compat();
     while let Some(frame) = stream.next().await {
         match frame {
             Ok((bytes, _sock)) => {
@@ -226,6 +232,7 @@ mod test {
         let in_addr = next_addr();
         let config = StatsdConfig::Tcp(TcpConfig {
             address: in_addr.into(),
+            keepalive: None,
             tls: None,
             shutdown_timeout_secs: 30,
         });

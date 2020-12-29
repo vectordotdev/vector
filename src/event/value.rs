@@ -214,6 +214,7 @@ impl From<remap::Value> for Value {
             Map(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
             Timestamp(v) => Value::Timestamp(v),
+            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
             Null => Value::Null,
         }
     }

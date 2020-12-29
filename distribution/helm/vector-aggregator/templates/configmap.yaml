@@ -1,0 +1,68 @@
+{{- if (empty .Values.existingConfigMap) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "libvector.configMapName" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+data:
+  # We leave `vector.toml` file name available to let externally managed config
+  # maps to provide it.
+  managed.toml: |
+    # Configuration for vector.
+    # Docs: https://vector.dev/docs/
+
+    # Data dir is location controlled at the `StatefulSet`.
+    data_dir = "{{ .Values.globalOptions.dataDir }}"
+
+    {{- with .Values.logSchema }}
+    [log_schema]
+      host_key = "{{ .hostKey }}"
+      message_key = "{{ .messageKey }}"
+      source_type_key = "{{ .sourceTypeKey }}"
+      timestamp_key = "{{ .timestampKey }}"
+    {{- end }}
+
+    {{- if .Values.vectorSource.enabled }}
+    # Accept logs from Vector agents.
+    [sources.{{ .Values.vectorSource.sourceId }}]
+      type = "vector"
+      address = "{{ .Values.vectorSource.listenAddress }}:{{ .Values.vectorSource.listenPort }}"
+
+      {{- with .Values.vectorSource.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- include "libvector.metricsConfigPartial" . | nindent 4  }}
+
+    {{- range $sourceId, $source := .Values.sources }}
+    [sources.{{ $sourceId }}]
+      type = "{{ $source.type }}"
+
+      {{- with $source.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- range $transformId, $transform := .Values.transforms }}
+    [transforms.{{ $transformId }}]
+      type = "{{ $transform.type }}"
+      inputs = {{ $transform.inputs | toJson }}
+
+      {{- with $transform.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- range $sinkId, $sink := .Values.sinks }}
+    [sinks.{{ $sinkId }}]
+      type = "{{ $sink.type }}"
+      inputs = {{ $sink.inputs | toJson }}
+
+      {{- with $sink.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+{{- end }}

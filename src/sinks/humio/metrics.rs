@@ -1,11 +1,10 @@
 use super::{default_host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
-    sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
-    },
+    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures::{stream, SinkExt, StreamExt};
@@ -21,11 +20,7 @@ pub struct HumioMetricsConfig {
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
 
     event_type: Option<Template>,
 
@@ -40,6 +35,8 @@ pub struct HumioMetricsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+
+    tls: Option<TlsOptions>,
     // The obove settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -80,6 +77,7 @@ impl SinkConfig for HumioMetricsConfig {
             compression: self.compression,
             request: self.request,
             batch: self.batch,
+            tls: self.tls.clone(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -127,6 +125,7 @@ mod tests {
             token = "atoken"
             batch.max_events = 1
             endpoint = "https://localhost:9200/"
+            encoding = "json"
             "#,
         )
         .unwrap();
@@ -137,6 +136,7 @@ mod tests {
             token = "atoken"
             batch.max_events = 1
             host = "https://localhost:9200/"
+            encoding = "json"
             "#,
         )
         .unwrap();
@@ -150,6 +150,7 @@ mod tests {
             r#"
             token = "atoken"
             batch.max_events = 1
+            encoding = "json"
             "#,
         )
         .unwrap();

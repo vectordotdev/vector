@@ -32,6 +32,7 @@
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
 /docs/reference/components/sources/host_metrics.cue @bruceg
+/docs/reference/components/sources/internal_logs.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
 /docs/reference/components/sources/kubernetes_logs.cue @vector-kubernetes
 /docs/reference/components/sources/mongodb_metrics.cue @fanatid
@@ -62,6 +63,21 @@
 /docs/reference/components/transforms/split.cue @lukesteensen
 /docs/reference/components/transforms/tokenzier.cue @lukesteensen
 
+/docs/reference/remap/ @JeanMertz
+/docs/reference/remap/assert.cue @FungusHumungus
+/docs/reference/remap/compact.cue @FungusHumungus
+/docs/reference/remap/exists.cue @FungusHumungus
+/docs/reference/remap/flatten.cue @FungusHumungus
+/docs/reference/remap/ip_cidr_contains.cue @FungusHumungus
+/docs/reference/remap/ip_subnet.cue @FungusHumungus
+/docs/reference/remap/ip_to_ipv6.cue @FungusHumungus
+/docs/reference/remap/ipv6_to_ipv4.cue @FungusHumungus
+/docs/reference/remap/log.cue @FungusHumungus
+/docs/reference/remap/merge.cue @FungusHumungus
+/docs/reference/remap/parse_grok.cue @FungusHumungus
+/docs/reference/remap/parse_aws_alb_log.cue @fanatid
+/docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
+
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @vector-kubernetes
 /distribution/helm/ @vector-kubernetes
@@ -73,6 +89,23 @@
 /lib/k8s-e2e-tests/ @vector-kubernetes
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
+
+/lib/remap-lang/ @JeanMertz @FungusHumungus
+/lib/remap-cli/ @JeanMertz
+/lib/remap-functions/ @JeanMertz
+/lib/remap-functions/src/assert.rs @FungusHumungus
+/lib/remap-functions/src/compact.rs @FungusHumungus
+/lib/remap-functions/src/exists.rs @FungusHumungus
+/lib/remap-functions/src/flatten.rs @FungusHumungus
+/lib/remap-functions/src/ip_cidr_contains.rs @FungusHumungus
+/lib/remap-functions/src/ip_subnet.rs @FungusHumungus
+/lib/remap-functions/src/ip_to_ipv6.rs @FungusHumungus
+/lib/remap-functions/src/ipv6_to_ipv4.rs @FungusHumungus
+/lib/remap-functions/src/log.rs @FungusHumungus
+/lib/remap-functions/src/merge.rs @FungusHumungus
+/lib/remap/functions/src/parse_aws_alb_log.rs @fanatid
+/lib/remap/functions/src/parse_aws_vpc_flow_log.rs @fanatid
+/lib/remap-functions/src/parse_grok.rs @FungusHumungus
 
 /proto/ @lukesteensen
 
@@ -142,6 +175,7 @@
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
+/src/sources/internal_logs.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/mongodb_metrics/ @fanatid
 /src/sources/nginx/ @fanatid
@@ -174,6 +208,8 @@
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
+
+/src/remap/ @JeanMertz
 
 /src/wasm/ @hoverbear @JeanMertz
 

@@ -3,6 +3,11 @@ package metadata
 components: transforms: swimlanes: {
 	title: "Swimlanes"
 
+	description: """
+		Splits a stream of events into multiple sub-streams based on a set of
+		conditions.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"

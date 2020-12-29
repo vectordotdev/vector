@@ -21,8 +21,7 @@ impl Runtime {
             .expressions
             .iter()
             .map(|expression| expression.execute(&mut self.state, object))
-            .collect::<crate::Result<Vec<Value>>>()
-            .map_err(RemapError)?;
+            .collect::<crate::Result<Vec<Value>>>()?;
 
         Ok(values.pop().unwrap_or(Value::Null))
     }

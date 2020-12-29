@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
-    TransformDescription,
+    component::ExampleError, GlobalOptions, SinkDescription, SinkHealthcheckOptions,
+    SourceDescription, TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -58,10 +58,10 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
+    pub healthcheck: SinkHealthcheckOptions,
     pub buffer: crate::buffers::BufferConfig,
 }
 
@@ -264,7 +264,7 @@ fn generate_example(
                         })
                         .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
-                    healthcheck: true,
+                    healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
             );
@@ -368,10 +368,6 @@ fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::PathBuf;
-
-    use tempfile::tempdir;
 
     #[test]
     fn generate_all() {
@@ -407,8 +403,16 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-json_parser",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_configfile() {
+        use std::fs;
+        use tempfile::tempdir;
+
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
         let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
@@ -416,12 +420,8 @@ mod tests {
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
         .expect("Could not read config file");
-        cleanup_configfile(&filepath);
-        assert_eq!(cfg.unwrap(), filecontents)
-    }
-
-    fn cleanup_configfile(filepath: &PathBuf) {
         fs::remove_file(filepath).expect("Could not cleanup config file!");
+        assert_eq!(cfg.unwrap(), filecontents)
     }
 
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
@@ -442,13 +442,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -473,13 +475,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -498,13 +502,15 @@ max_length = 102400
 type = "stdin"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["source0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -519,13 +525,15 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["component-name"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"

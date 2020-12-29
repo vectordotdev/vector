@@ -1,18 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 
-pub(crate) struct TagCardinalityLimitEventProcessed;
-
-impl InternalEvent for TagCardinalityLimitEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
 pub(crate) struct TagCardinalityLimitRejectingEvent<'a> {
     pub tag_key: &'a str,
     pub tag_value: &'a str,

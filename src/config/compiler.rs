@@ -6,6 +6,7 @@ pub fn compile(raw: ConfigBuilder, deny_warnings: bool) -> Result<Config, Vec<St
         global: raw.global,
         #[cfg(feature = "api")]
         api: raw.api,
+        healthchecks: raw.healthchecks,
         sources: raw.sources,
         sinks: raw.sinks,
         transforms: raw.transforms,

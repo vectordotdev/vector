@@ -126,6 +126,10 @@ components: {
 		// For example, the `http` sink has a `HTTP` title.
 		title: string
 
+		// Platform-specific policies, e.g. AWS IAM policies, that are
+		// required or recommended when using the component.
+		permissions?: iam: [#IAM, ...#IAM]
+
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
 	}
@@ -231,6 +235,10 @@ components: {
 	#FeaturesGenerate: {
 	}
 
+	#FeaturesKeepalive: {
+		enabled: bool
+	}
+
 	#FeaturesMultiline: {
 		enabled: bool
 	}
@@ -252,6 +260,8 @@ components: {
 			service:    #Service
 			interface?: #Interface
 		}
+
+		keepalive?: #FeaturesKeepalive
 
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
@@ -314,6 +324,8 @@ components: {
 			}
 		}
 
+		keepalive?: #FeaturesKeepalive
+
 		// `request` describes how the component issues and manages external
 		// requests.
 		request: {
@@ -327,6 +339,7 @@ components: {
 				retry_initial_backoff_secs: uint8
 				retry_max_duration_secs:    uint8
 				timeout_secs:               uint8
+				headers:                    bool
 			}
 		}
 
@@ -369,12 +382,12 @@ components: {
 	})
 
 	#MetricInput: {
-		counter:      bool
-		distribution: bool
-		gauge:        bool
-		histogram:    bool
-		summary:      bool
-		set:          bool
+		counter:      *false | bool
+		distribution: *false | bool
+		gauge:        *false | bool
+		histogram:    *false | bool
+		set:          *false | bool
+		summary:      *false | bool
 	}
 
 	#MetricOutput: [Name=string]: close({
@@ -389,6 +402,33 @@ components: {
 	#Output: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#IAM: {
+		#Policy: {
+			#RequiredFor: "write" | "healthcheck"
+
+			_action:        !=""
+			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			docs_url:       !=""
+			required_when?: !=""
+
+			if platform == "aws" {
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
+				action:   "\(_service):\(_action)"
+			}
+			if platform == "gcp" {
+				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
+				action:   "\(_service).\(_action)"
+			}
+		}
+
+		platform: "aws" | "gcp"
+		policies: [#Policy, ...#Policy]
+		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
+		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
+		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
+		_docs_tag: *_service | !=""
 	}
 
 	#Runtime: {
@@ -776,9 +816,51 @@ components: {
 
 			_types: {
 				common:      true
-				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
+				description: """
+					Key/value pairs representing mapped log field names and types. This is used to
+					coerce log fields from strings into their proper types. The available types are
+					listed in the **Types** list below.
+
+					Timestamp coercions need to be prefaced with `timestamp|`, for example
+					`\"timestamp|%F\"`. Timestamp specifiers can use either of the following:
+
+					1. One of the built-in-formats listed in the **Timestamp Formats** table below.
+					2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+					`chrono` library.
+
+					### Types
+
+					* `array`
+					* `bool`
+					* `bytes`
+					* `float`
+					* `int`
+					* `map`
+					* `null`
+					* `timestamp` (see the table below for formats)
+
+					### Timestamp Formats
+
+					Format | Description | Example
+					:------|:------------|:-------
+					`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
+					`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
+					`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+					`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
+					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
+					`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
+					`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
+					`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
+					`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
+					`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
+					`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
+
+					**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
+					"""
 				required:    false
 				warnings: []
+
 				type: object: {
 					examples: [
 						{
@@ -787,6 +869,7 @@ components: {
 							success:           "bool"
 							timestamp_iso8601: "timestamp|%F"
 							timestamp_custom:  "timestamp|%a %b %e %T %Y"
+							timestamp_unix:    "timestamp|%F %T"
 							parent: {"child": "int"}
 						},
 					]
@@ -807,8 +890,9 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum:
+				"type": string: enum: #Enum | *{
 					"\(Name)": "The type of this component."
+				}
 			}
 		}
 
@@ -845,6 +929,10 @@ components: {
 						receive_context: "Enriches data with useful \(features.receive.from.service.name) context."
 					}
 
+					if features.receive.keepalive.enabled != _|_ {
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
+					}
+
 					if features.receive.tls.enabled != _|_ {
 						tls_receive: "Securely receives data via Transport Layer Security (TLS)."
 					}
@@ -859,6 +947,10 @@ components: {
 
 					if features.send.compression.enabled != _|_ {
 						compress: "Compresses data to optimize bandwidth."
+					}
+
+					if features.send.keepalive.enabled != _|_ {
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
 					}
 
 					if features.send.request.enabled != _|_ {

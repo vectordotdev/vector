@@ -3,7 +3,6 @@ package metadata
 components: sinks: humio_metrics: {
 	title: "Humio Metrics"
 
-	description:   sinks._humio.description
 	classes:       sinks._humio.classes
 	features:      sinks._humio.features
 	support:       sinks._humio.support

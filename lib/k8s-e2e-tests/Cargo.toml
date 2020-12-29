@@ -8,15 +8,24 @@ publish = false
 
 [dependencies]
 futures = "0.3"
-k8s-openapi = { version = "0.9", default-features = false, features = ["v1_16"] }
+k8s-openapi = { version = "0.10.0", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
+regex = "1"
+reqwest = { version = "0.10", features = ["json"] }
 serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
 
 [features]
-all = ["agent"]
-agent = []
+e2e-tests = []
 
 [[test]]
 name = "vector-agent"
-required-features = ["agent"]
+required-features = ["e2e-tests"]
+
+[[test]]
+name = "vector-aggregator"
+required-features = ["e2e-tests"]
+
+[[test]]
+name = "vector"
+required-features = ["e2e-tests"]

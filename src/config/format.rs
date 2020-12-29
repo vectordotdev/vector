@@ -53,8 +53,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::config::ConfigBuilder;
-
     use super::*;
 
     /// This test ensures the logic to guess file format from the file path
@@ -117,14 +115,21 @@ mod tests {
         }
     }
 
-    macro_rules! concat_with_newlines {
-        ($($e:expr,)*) => { concat!( $($e, "\n"),+ ) };
-    }
-
     // Here we test that the deserializations from various formats match
     // the TOML format.
+    #[cfg(all(
+        feature = "sources-socket",
+        feature = "transforms-sampler",
+        feature = "sinks-socket"
+    ))]
     #[test]
     fn test_deserialize_matches_toml() {
+        use crate::config::ConfigBuilder;
+
+        macro_rules! concat_with_newlines {
+            ($($e:expr,)*) => { concat!( $($e, "\n"),+ ) };
+        }
+
         const SAMPLE_TOML: &str = r#"
             [sources.in]
             type = "socket"

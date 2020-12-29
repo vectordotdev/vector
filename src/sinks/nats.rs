@@ -2,11 +2,13 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    sinks::util::StreamSink,
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
     template::{Template, TemplateError},
+    Event,
 };
 use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
@@ -24,9 +26,9 @@ enum BuildError {
  * Code dealing with the SinkConfig struct.
  */
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NatsSinkConfig {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     #[serde(default = "default_name")]
     name: String,
     subject: String,
@@ -38,10 +40,8 @@ fn default_name() -> String {
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
@@ -127,13 +127,11 @@ pub struct NatsSink {
 impl NatsSink {
     fn new(config: NatsSinkConfig, acker: Acker) -> crate::Result<Self> {
         Ok(NatsSink {
-            acker,
             options: (&config).into(),
+            encoding: config.encoding,
             subject: Template::try_from(config.subject).context(SubjectTemplate)?,
             url: config.url,
-
-            // DEV: the following causes a move; needs to be last.
-            encoding: config.encoding.into(),
+            acker,
         })
     }
 }
@@ -258,10 +256,10 @@ mod integration_tests {
         let subject = format!("test-{}", random_string(10));
 
         let cnf = NatsSinkConfig {
-            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            encoding: EncodingConfig::from(Encoding::Text),
+            name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://127.0.0.1:4222".to_owned(),
-            ..Default::default()
         };
 
         // Establish the consumer subscription.

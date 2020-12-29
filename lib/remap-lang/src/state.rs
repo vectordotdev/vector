@@ -1,4 +1,4 @@
-use crate::{TypeDef, Value};
+use crate::{path::Path, TypeDef, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -36,7 +36,7 @@ pub struct Compiler {
     /// disallow those in assignments, which makes this easier to fix, or we're
     /// going to always return `Any` for coalesced paths. Either way, this is a
     /// known bug that we need to fix soon.
-    path_query_types: HashMap<String, TypeDef>,
+    path_query_types: HashMap<Path, TypeDef>,
 }
 
 impl Compiler {
@@ -48,11 +48,11 @@ impl Compiler {
         &mut self.variable_types
     }
 
-    pub fn path_query_type(&self, key: impl AsRef<str>) -> Option<&TypeDef> {
+    pub fn path_query_type(&self, key: impl AsRef<Path>) -> Option<&TypeDef> {
         self.path_query_types.get(key.as_ref())
     }
 
-    pub fn path_query_types_mut(&mut self) -> &mut HashMap<String, TypeDef> {
+    pub fn path_query_types_mut(&mut self) -> &mut HashMap<Path, TypeDef> {
         &mut self.path_query_types
     }
 }

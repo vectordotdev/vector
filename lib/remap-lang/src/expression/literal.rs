@@ -1,9 +1,27 @@
 use crate::{state, Expression, Object, Result, TypeDef, Value};
+use std::fmt;
+use std::ops::Deref;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Literal(Value);
 
 impl Literal {
+    pub fn new(value: Value) -> Self {
+        debug_assert!(
+            !matches!(value, Value::Array(_)),
+            "{} must use expression::Array instead of expression::Literal",
+            value.kind()
+        );
+
+        debug_assert!(
+            !matches!(value, Value::Map(_)),
+            "{} must use expression::Map instead of expression::Literal",
+            value.kind()
+        );
+
+        Self(value)
+    }
+
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
     }
@@ -11,11 +29,29 @@ impl Literal {
     pub fn as_value(&self) -> &Value {
         &self.0
     }
+
+    pub fn into_value(self) -> Value {
+        self.0
+    }
+}
+
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Deref for Literal {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<T: Into<Value>> From<T> for Literal {
     fn from(value: T) -> Self {
-        Self(value.into())
+        Self::new(value.into())
     }
 }
 
@@ -36,7 +72,6 @@ impl Expression for Literal {
 mod tests {
     use super::*;
     use crate::{test_type_def, value::Kind};
-    use std::collections::BTreeMap;
 
     test_type_def![
         boolean {
@@ -57,16 +92,6 @@ mod tests {
         float {
             expr: |_| Literal::from(123.456),
             def: TypeDef { kind: Kind::Float, ..Default::default() },
-        }
-
-        array {
-            expr: |_| Literal::from(vec!["foo"]),
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
-        }
-
-        map {
-            expr: |_| Literal::from(BTreeMap::default()),
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
         }
 
         timestamp {

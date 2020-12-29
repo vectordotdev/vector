@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: azure_monitor_logs: {
-	title:       "Azure Monitor Logs"
-	description: "[Azure Monitor](\(urls.azure_monitor)) is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
+	title: "Azure Monitor Logs"
 
 	classes: {
 		commonly_used: false

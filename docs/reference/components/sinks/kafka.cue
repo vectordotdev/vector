@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: kafka: {
-	title:       "Kafka"
-	description: components._kafka.description
+	title: "Kafka"
 
 	classes: {
 		commonly_used: true

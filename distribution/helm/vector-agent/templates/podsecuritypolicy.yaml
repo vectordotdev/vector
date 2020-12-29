@@ -18,6 +18,7 @@ spec:
       readOnly: true
     - pathPrefix: "/var/lib/docker/containers"
       readOnly: true
+    - pathPrefix: "/var/lib/vector/"
     {{- range .Values.extraVolumes }}
     {{- if .hostPath }}
     - pathPrefix: {{ .hostPath.path }}

@@ -21,10 +21,7 @@ jobs:
       - run: make ci-sweep
       - env:
           PASS_FEATURES: "default-cmake"
-        run: make package-x86_64-unknown-linux-musl
-      - run: |
-          mv ./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
+        run: make package-x86_64-unknown-linux-musl-all
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
@@ -39,9 +36,6 @@ jobs:
       - env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
-      - run: |
-          mv ./target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
@@ -65,9 +59,6 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
         run: make package-aarch64-unknown-linux-musl-all
-      - run: |
-          mv ./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
@@ -90,9 +81,6 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
-      - run: |
-          mv ./target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
@@ -115,9 +103,6 @@ jobs:
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
-      - run: |
-          mv ./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
@@ -141,8 +126,6 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
-      - run: |
-          mv ./target/artifacts/vector-x86_64-apple-darwin.tar.gz ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
@@ -158,11 +141,9 @@ jobs:
       - name: "Download Perl"
         shell: bash
         env:
-          VERSION: "5.30.0.1"
-          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+          VERSION: "5.32.0.1"
         run: |
-          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -204,13 +185,6 @@ jobs:
         run: |
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
-      - run: |
-          mv ./target/artifacts/vector-x86_64-pc-windows-msvc.zip \
-          ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-        shell: bash
-      - run:
-          mv ./target/artifacts/vector-x64.msi ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi
-        shell: bash
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
@@ -219,6 +193,64 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
+
+
+  deb-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - run: |
+          apt-get update && \
+          apt-get install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          make
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          path: target/artifacts
+      - run: |
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+
+  rpm-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - run: |
+          yum update -y && \
+          yum install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          tar \
+          make
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          path: target/artifacts
+      - run: |
+          rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   release-docker:
     runs-on: ubuntu-latest
@@ -263,6 +295,8 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
+      - rpm-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -337,6 +371,8 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
+      - deb-verify
+      - rpm-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -426,6 +462,8 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
+      - rpm-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -547,3 +585,30 @@ jobs:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
         run: make release-helm
+
+  release-failure:
+    name: release-failure
+    if: failure()
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-x86_64-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - deb-verify
+      - rpm-verify
+      - release-docker
+      - release-s3
+      - release-cloudsmith
+      - release-github
+      - release-helm
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Release failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

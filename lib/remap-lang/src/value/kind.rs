@@ -13,7 +13,8 @@ bitflags::bitflags! {
         const Map = 1 << 5;
         const Array = 1 << 6;
         const Timestamp = 1 << 7;
-        const Null = 1 << 8;
+        const Regex = 1 << 8;
+        const Null = 1 << 9;
     }
 }
 
@@ -22,6 +23,11 @@ impl Kind {
     /// [`value::Kind`]s.
     pub fn is_some(self) -> bool {
         !self.is_exact() && !self.is_all() && !self.is_empty()
+    }
+
+    /// Return the existing kinds, without non-scalar kinds (maps and arrays).
+    pub fn scalar(self) -> Self {
+        self & !(Kind::Array | Kind::Map)
     }
 }
 
@@ -112,6 +118,7 @@ impl_kind![
     (Map, map),
     (Array, array),
     (Timestamp, timestamp),
+    (Regex, regex),
     (Null, null),
 ];
 
@@ -133,6 +140,7 @@ impl From<&Value> for Kind {
             Value::Map(_) => Kind::Map,
             Value::Array(_) => Kind::Array,
             Value::Timestamp(_) => Kind::Timestamp,
+            Value::Regex(_) => Kind::Regex,
             Value::Null => Kind::Null,
         }
     }

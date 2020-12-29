@@ -1,13 +1,16 @@
 use crate::{state, Object, Result, TypeDef, Value};
 use std::convert::TryFrom;
+use std::fmt;
 
 mod argument;
 mod arithmetic;
+mod array;
 mod assignment;
 mod block;
 pub(crate) mod function;
 mod if_statement;
 mod literal;
+mod map;
 mod noop;
 mod not;
 pub(crate) mod path;
@@ -15,11 +18,13 @@ mod variable;
 
 pub use argument::Argument;
 pub use arithmetic::Arithmetic;
+pub use array::Array;
 pub use assignment::{Assignment, Target};
 pub use block::Block;
 pub use function::Function;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
+pub use map::Map;
 pub use noop::Noop;
 pub use not::Not;
 pub use path::Path;
@@ -36,6 +41,9 @@ pub enum Error {
     #[error("assignment error")]
     Assignment(#[from] assignment::Error),
 
+    #[error(r#"error for variable "{0}""#)]
+    Variable(String, #[source] variable::Error),
+
     #[error("path error")]
     Path(#[from] path::Error),
 
@@ -46,8 +54,17 @@ pub enum Error {
     IfStatement(#[from] if_statement::Error),
 }
 
-pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
+pub trait Expression: Send + Sync + fmt::Debug + dyn_clone::DynClone {
+    /// Resolve an expression to a concrete [`Value`].
+    ///
+    /// This method is executed at runtime.
+    ///
+    /// An expression is allowed to fail, which aborts the running program.
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
+
+    /// Resolve an expression to its [`TypeDef`] type definition.
+    ///
+    /// This method is executed at compile-time.
     fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
@@ -65,7 +82,7 @@ macro_rules! expression_dispatch {
         ///
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
-        #[derive(Debug, Clone)]
+        #[derive(Clone, PartialEq)]
         pub enum Expr {
             $($expr($expr)),+
         }
@@ -74,6 +91,18 @@ macro_rules! expression_dispatch {
             pub fn as_str(&self) -> &'static str {
                 match self {
                     $(Expr::$expr(_) => stringify!($expr)),+
+                }
+            }
+
+            pub fn boxed(self) -> Box<dyn Expression> {
+                Box::new(self)
+            }
+        }
+
+        impl fmt::Debug for Expr {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(Expr::$expr(v) => v.fmt(f)),+
                 }
             }
         }
@@ -124,22 +153,30 @@ macro_rules! expression_dispatch {
 }
 
 expression_dispatch![
+    Argument,
     Arithmetic,
+    Array,
     Assignment,
     Block,
     Function,
     IfStatement,
-    Literal,
+    Literal, // TODO: literal scalar
+    Map,
     Noop,
     Not,
     Path,
     Variable,
-    Argument,
 ];
 
 impl<T: Into<Value>> From<T> for Expr {
     fn from(value: T) -> Self {
-        Literal::from(value.into()).into()
+        let value = value.into();
+
+        match value {
+            Value::Array(array) => Array::from(array).into(),
+            Value::Map(map) => Map::from(map).into(),
+            _ => Literal::from(value).into(),
+        }
     }
 }
 

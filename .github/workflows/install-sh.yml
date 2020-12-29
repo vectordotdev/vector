@@ -21,3 +21,27 @@ jobs:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
         run: make sync-install
+
+  test-install:
+    needs:
+      - sync-install
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get install --yes curl bc
+      - run:  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
+      - run: ~/.vector/bin/vector --version
+
+  install-shell-failure:
+    name: install-shell-failure
+    if: failure()
+    needs:
+      - sync-install
+      - test-install
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Update of sh.vector.dev failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_s3: components._aws & {
-	title:       "AWS S3"
-	description: "[Amazon Simple Storage Service (Amazon S3)](\(urls.aws_s3)) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
+	title: "AWS S3"
 
 	classes: {
 		commonly_used: true
@@ -33,7 +32,7 @@ components: sinks: aws_s3: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "text"
+					default: null
 					enum: ["ndjson", "text"]
 				}
 			}
@@ -45,6 +44,7 @@ components: sinks: aws_s3: components._aws & {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
@@ -394,4 +394,26 @@ components: sinks: aws_s3: components._aws & {
 				"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "s3"
+			_docs_tag: "AmazonS3"
+
+			policies: [
+				{
+					_action: "HeadBucket"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "ListBucket"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutObject"
+				},
+			]
+		},
+	]
 }

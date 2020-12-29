@@ -33,7 +33,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                     let mut config = config::Config::builder();
                     config.add_source(
                         "in",
-                        sources::socket::SocketConfig::make_tcp_config(in_addr),
+                        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
                     );
                     config.add_sink(
                         "out",
@@ -100,11 +100,11 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 let mut config = config::Config::builder();
                 config.add_source(
                     "in1",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr1),
+                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
                 );
                 config.add_source(
                     "in2",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr2),
+                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
                 );
                 config.add_sink(
                     "out1",
@@ -172,7 +172,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                 let mut config = config::Config::builder();
                 config.add_source(
                     "in",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr),
+                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
                 );
                 config.add_transform(
                     "parser",
@@ -250,11 +250,11 @@ fn benchmark_complex(c: &mut Criterion) {
                 let mut config = config::Config::builder();
                 config.add_source(
                     "in1",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr1),
+                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr1),
                 );
                 config.add_source(
                     "in2",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr2),
+                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr2),
                 );
                 config.add_transform(
                     "parser",

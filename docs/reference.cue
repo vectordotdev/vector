@@ -225,13 +225,49 @@ _values: {
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
 #Service: {
+	// `description` describes the components with a single paragraph.
+	// It is used for SEO purposes and should be full of relevant keywords.
+	description?: =~"[.]$"
+
 	name:     string
 	thing:    string
 	url:      string
 	versions: string | null
 
-	setup?: [string, ...string]
+	setup?: #SetupSteps
+
+	connect_to?: [_=string]: {
+		logs?: {
+			description?: string
+			setup:        #SetupSteps
+		}
+
+		metrics?: {
+			description?: string
+			setup:        #SetupSteps
+		}
+	}
 }
+
+#SetupStep: {
+	title:        string
+	description?: string
+	notes?: [...string]
+
+	detour?: {
+		url: string
+	}
+
+	vector?: {
+		configure: #Object
+	}
+
+	if detour == _|_ && vector == _|_ {
+		description: string
+	}
+}
+
+#SetupSteps: [#SetupStep, ...#SetupStep]
 
 #Schema: [Name=string]: {
 	// `category` allows you to group options into categories.
@@ -405,7 +441,9 @@ _values: {
 	//      }
 	enum?: #Enum
 
-	if enum == _|_ {
+	examples?: [...string]
+
+	if Args.required {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[

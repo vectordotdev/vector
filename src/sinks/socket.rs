@@ -5,7 +5,6 @@ use crate::{
     sinks::util::{
         encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
-    tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -43,19 +42,15 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub fn make_tcp_config(
-        address: String,
-        encoding: EncodingConfig<Encoding>,
-        tls: Option<TlsConfig>,
-    ) -> Self {
-        SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig { address, tls }),
-            encoding,
-        }
+    pub fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
+        SocketSinkConfig { mode, encoding }
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None)
+        Self::new(
+            Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+            EncodingConfig::from(Encoding::Text),
+        )
     }
 }
 
@@ -158,10 +153,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                tls: None,
-            }),
+            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
             encoding: Encoding::Json.into(),
         };
 
@@ -220,9 +212,10 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                tls: Some(TlsConfig {
+            mode: Mode::Tcp(TcpSinkConfig::new(
+                addr.to_string(),
+                None,
+                Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
                         verify_certificate: Some(false),
@@ -231,7 +224,7 @@ mod test {
                         ..Default::default()
                     },
                 }),
-            }),
+            )),
             encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
@@ -338,10 +331,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                tls: None,
-            }),
+            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
             encoding: Encoding::Text.into(),
         };
 

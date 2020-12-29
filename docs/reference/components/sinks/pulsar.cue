@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: pulsar: {
-	title:       "Apache Pulsar"
-	description: "[Pulsar](\(urls.pulsar)) is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
+	title: "Apache Pulsar"
 
 	classes: {
 		commonly_used: false
@@ -21,19 +20,14 @@ components: sinks: pulsar: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "text"
+					default: null
 					enum: ["text", "json"]
 				}
 			}
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				service: {
-					name:     "Apache Pulsar"
-					thing:    "an \(name) cluster"
-					url:      urls.pulsar
-					versions: null
-				}
+				service: services.pulsar
 
 				interface: {
 					socket: {
@@ -117,5 +111,9 @@ components: sinks: pulsar: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

@@ -4,6 +4,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
+use std::collections::HashMap;
 use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
@@ -126,7 +127,7 @@ async fn validate_components(
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff).await {
+    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -146,6 +147,11 @@ async fn validate_healthchecks(
     pieces: &mut Pieces,
     fmt: &mut Formatter,
 ) -> bool {
+    if config.healthchecks.enabled {
+        fmt.warning("Health checks are disabled");
+        return !opts.deny_warnings;
+    }
+
     let healthchecks = topology::take_healthchecks(diff, pieces);
     // We are running health checks in serial so it's easier for the users
     // to parse which errors/warnings/etc. belong to which healthcheck.
@@ -157,12 +163,13 @@ async fn validate_healthchecks(
         };
 
         match tokio::spawn(healthcheck).await {
-            Ok(Ok(())) => {
+            Ok(Ok(_)) => {
                 if config
                     .sinks
                     .get(&name)
                     .expect("Sink not present")
-                    .healthcheck
+                    .healthcheck()
+                    .enabled
                 {
                     fmt.success(format!("Health check `{}`", name.as_str()));
                 } else {

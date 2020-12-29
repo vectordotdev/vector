@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct CoercerEventProcessed;
-
-impl InternalEvent for CoercerEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct CoercerConversionFailed<'a> {
     pub field: &'a str,
     pub error: crate::types::Error,
@@ -18,10 +9,10 @@ pub(crate) struct CoercerConversionFailed<'a> {
 
 impl<'a> InternalEvent for CoercerConversionFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        error!(
             message = "Could not convert types.",
             field = %self.field,
-            error = ?self.error,
+            error = %self.error,
             rate_limit_secs = 30
         );
     }

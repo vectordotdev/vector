@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: nginx_metrics: {
-	title:       "Nginx Metrics"
-	description: "[Nginx][urls.nginx] is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server."
+	title: "Nginx Metrics"
 
 	classes: {
 		commonly_used: false
@@ -16,12 +15,7 @@ components: sources: nginx_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Nginx Server"
-					thing:    "an \(name)"
-					url:      urls.nginx
-					versions: null
-				}
+				service: services.nginx
 
 				interface: {
 					socket: {
@@ -110,7 +104,7 @@ components: sources: nginx_metrics: {
 	telemetry: metrics: {
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
 		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
-		request_error_total:          components.sources.internal_metrics.output.metrics.request_error_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
 		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 

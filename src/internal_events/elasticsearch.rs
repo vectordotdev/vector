@@ -2,12 +2,12 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ElasticSearchEventReceived {
+pub struct ElasticSearchEventEncoded {
     pub byte_size: usize,
     pub index: String,
 }
 
-impl InternalEvent for ElasticSearchEventReceived {
+impl InternalEvent for ElasticSearchEventEncoded {
     fn emit_logs(&self) {
         trace!(message = "Inserting event.", index = %self.index);
     }

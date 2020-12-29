@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: new_relic_logs: {
-	title:       "New Relic Logs"
-	description: "[New Relic][urls.new_relic] is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services."
+	title: "New Relic Logs"
 
 	classes: {
 		commonly_used: false
@@ -41,15 +40,11 @@ components: sinks: new_relic_logs: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "New Relic logs"
-					thing:    "a \(name) account"
-					url:      urls.new_relic
-					versions: null
-				}
+				service: services.new_relic_logs
 
 				interface: {
 					socket: {

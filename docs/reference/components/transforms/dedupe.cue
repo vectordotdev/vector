@@ -3,6 +3,10 @@ package metadata
 components: transforms: dedupe: {
 	title: "Dedupe events"
 
+	description: """
+		Deduplicates events to reduce data volume by eliminating copies of data.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"

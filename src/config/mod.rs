@@ -1,6 +1,10 @@
 use crate::{
-    buffers::Acker, conditions, event::Metric, shutdown::ShutdownSignal, sinks, sources,
-    transforms, Pipeline,
+    buffers::Acker,
+    conditions,
+    event::Metric,
+    shutdown::ShutdownSignal,
+    sinks::{self, util::UriSerde},
+    sources, transforms, Pipeline,
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
@@ -40,6 +44,7 @@ pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
+    pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
@@ -128,6 +133,35 @@ impl GlobalOptions {
     }
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(default)]
+pub struct HealthcheckOptions {
+    pub enabled: bool,
+    pub require_healthy: bool,
+}
+
+impl HealthcheckOptions {
+    pub fn set_require_healthy(&mut self, require_healthy: impl Into<Option<bool>>) {
+        if let Some(require_healthy) = require_healthy.into() {
+            self.require_healthy = require_healthy;
+        }
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.enabled &= other.enabled;
+        self.require_healthy |= other.require_healthy;
+    }
+}
+
+impl Default for HealthcheckOptions {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            require_healthy: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
     Any,
@@ -178,13 +212,86 @@ inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SinkOuter {
+    pub inputs: Vec<String>,
+
+    // We are accepting this option for backward compatibility.
+    healthcheck_uri: Option<UriSerde>,
+
+    // We are accepting bool for backward compatibility.
+    #[serde(deserialize_with = "crate::serde::bool_or_struct")]
+    #[serde(default)]
+    healthcheck: SinkHealthcheckOptions,
+
     #[serde(default)]
     pub buffer: crate::buffers::BufferConfig,
-    #[serde(default = "healthcheck_default")]
-    pub healthcheck: bool,
-    pub inputs: Vec<String>,
+
     #[serde(flatten)]
     pub inner: Box<dyn SinkConfig>,
+}
+
+impl SinkOuter {
+    pub fn new(inputs: Vec<String>, inner: Box<dyn SinkConfig>) -> Self {
+        SinkOuter {
+            buffer: Default::default(),
+            healthcheck: SinkHealthcheckOptions::default(),
+            healthcheck_uri: None,
+            inner,
+            inputs,
+        }
+    }
+
+    pub fn resources(&self, name: &str) -> Vec<Resource> {
+        let mut resources = self.inner.resources();
+        resources.append(&mut self.buffer.resources(name));
+        resources
+    }
+
+    pub fn healthcheck(&self) -> SinkHealthcheckOptions {
+        if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
+            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
+        } else if self.healthcheck_uri.is_some() {
+            warn!("`healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead. ")
+        }
+        SinkHealthcheckOptions {
+            uri: self
+                .healthcheck
+                .uri
+                .clone()
+                .or_else(|| self.healthcheck_uri.clone()),
+            ..self.healthcheck.clone()
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct SinkHealthcheckOptions {
+    pub enabled: bool,
+    pub uri: Option<UriSerde>,
+}
+
+impl Default for SinkHealthcheckOptions {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            uri: None,
+        }
+    }
+}
+
+impl From<bool> for SinkHealthcheckOptions {
+    fn from(enabled: bool) -> Self {
+        Self { enabled, uri: None }
+    }
+}
+
+impl From<UriSerde> for SinkHealthcheckOptions {
+    fn from(uri: UriSerde) -> Self {
+        Self {
+            enabled: true,
+            uri: Some(uri),
+        }
+    }
 }
 
 #[async_trait]
@@ -208,12 +315,16 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct SinkContext {
     pub(super) acker: Acker,
+    pub(super) healthcheck: SinkHealthcheckOptions,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
-        Self { acker: Acker::Null }
+        Self {
+            acker: Acker::Null,
+            healthcheck: SinkHealthcheckOptions::default(),
+        }
     }
 
     pub fn acker(&self) -> Acker {
@@ -260,12 +371,27 @@ inventory::collect!(TransformDescription);
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
-    Port(SocketAddr),
+    Port(SocketAddr, Protocol),
     SystemFdOffset(usize),
     Stdin,
+    DiskBuffer(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Copy)]
+pub enum Protocol {
+    Tcp,
+    Udp,
 }
 
 impl Resource {
+    pub fn tcp(addr: SocketAddr) -> Self {
+        Self::Port(addr, Protocol::Tcp)
+    }
+
+    pub fn udp(addr: SocketAddr) -> Self {
+        Self::Port(addr, Protocol::Udp)
+    }
+
     /// From given components returns all that have a resource conflict with any other component.
     pub fn conflicts<K: Eq + Hash + Clone>(
         components: impl IntoIterator<Item = (K, Vec<Resource>)>,
@@ -276,9 +402,9 @@ impl Resource {
         // Find equality based conflicts
         for (key, resources) in components {
             for resource in resources {
-                if let Resource::Port(address) = &resource {
+                if let Resource::Port(address, protocol) = &resource {
                     if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), address.port()));
+                        unspecified.push((key.clone(), address.port(), *protocol));
                     }
                 }
 
@@ -292,10 +418,10 @@ impl Resource {
         // Port with unspecified address will bind to all network interfaces
         // so we have to check for all Port resources if they share the same
         // port.
-        for (key, port) in unspecified {
+        for (key, port, protocol0) in unspecified {
             for (resource, components) in resource_map.iter_mut() {
-                if let Resource::Port(address) = resource {
-                    if address.port() == port {
+                if let Resource::Port(address, protocol) = resource {
+                    if address.port() == port && &protocol0 == protocol {
                         components.insert(key.clone());
                     }
                 }
@@ -308,18 +434,22 @@ impl Resource {
     }
 }
 
-impl From<SocketAddr> for Resource {
-    fn from(addr: SocketAddr) -> Self {
-        Self::Port(addr)
+impl Display for Protocol {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        match self {
+            Protocol::Udp => write!(fmt, "udp"),
+            Protocol::Tcp => write!(fmt, "tcp"),
+        }
     }
 }
 
 impl Display for Resource {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Resource::Port(address) => write!(fmt, "{}", address),
+            Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Stdin => write!(fmt, "stdin"),
+            Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
 }
@@ -403,10 +533,6 @@ fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec
         }
     }
     Ok(())
-}
-
-fn healthcheck_default() -> bool {
-    true
 }
 
 #[cfg(all(
@@ -603,7 +729,7 @@ mod resource_tests {
     use std::net::{Ipv4Addr, SocketAddr};
 
     fn localhost(port: u16) -> Resource {
-        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port).into()
+        Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
     }
 
     fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
@@ -661,7 +787,10 @@ mod resource_tests {
             ("sink_0", vec![localhost(0)]),
             (
                 "sink_1",
-                vec![SocketAddr::new(Ipv4Addr::new(127, 0, 0, 2).into(), 0).into()],
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::new(127, 0, 0, 2).into(),
+                    0,
+                ))],
             ),
         ];
         let conflicting = Resource::conflicts(components);
@@ -674,7 +803,10 @@ mod resource_tests {
             ("sink_0", vec![localhost(0)]),
             (
                 "sink_1",
-                vec![SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0).into()],
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::UNSPECIFIED.into(),
+                    0,
+                ))],
             ),
         ];
         let conflicting = Resource::conflicts(components);
@@ -682,6 +814,28 @@ mod resource_tests {
             conflicting,
             hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
         );
+    }
+
+    #[test]
+    fn different_protocol() {
+        let components = vec![
+            (
+                "sink_0",
+                vec![Resource::tcp(SocketAddr::new(
+                    Ipv4Addr::LOCALHOST.into(),
+                    0,
+                ))],
+            ),
+            (
+                "sink_1",
+                vec![Resource::udp(SocketAddr::new(
+                    Ipv4Addr::LOCALHOST.into(),
+                    0,
+                ))],
+            ),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(conflicting, HashMap::new());
     }
 
     #[test]

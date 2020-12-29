@@ -1,6 +1,7 @@
 {{/* vim: set filetype=mustache: */}}
+
 {{/*
-Common labels
+Common labels.
 */}}
 {{- define "libvector.labels" -}}
 helm.sh/chart: {{ include "libvector.chart" . }}
@@ -12,7 +13,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Selector labels
+Selector labels.
 */}}
 {{- define "libvector.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "libvector.name" . }}

@@ -54,7 +54,7 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
     let sink_resources = config
         .sinks
         .iter()
-        .map(|(name, config)| (name, config.inner.resources()));
+        .map(|(name, config)| (name, config.resources(name)));
 
     let conflicting_componenets = Resource::conflicts(source_resources.chain(sink_resources));
 

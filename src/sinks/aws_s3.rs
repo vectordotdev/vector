@@ -1,9 +1,9 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
@@ -37,7 +37,7 @@ pub struct S3Sink {
     client: S3Client,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     pub bucket: String,
@@ -49,11 +49,7 @@ pub struct S3SinkConfig {
     options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
@@ -127,9 +123,7 @@ lazy_static! {
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Ndjson,
 }
@@ -138,7 +132,25 @@ inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
-impl_generate_config_from_default!(S3SinkConfig);
+impl GenerateConfig for S3SinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            bucket: "".to_owned(),
+            key_prefix: None,
+            filename_time_format: None,
+            filename_append_uuid: None,
+            filename_extension: None,
+            options: S3Options::default(),
+            region: RegionOrEndpoint::default(),
+            encoding: Encoding::Text.into(),
+            compression: Compression::gzip_default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            assume_role: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
@@ -377,7 +389,7 @@ impl RetryLogic for S3RetryLogic {
 fn encode_event(
     mut event: Event,
     key_prefix: &Template,
-    encoding: &EncodingConfigWithDefault<Encoding>,
+    encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
@@ -462,10 +474,12 @@ mod tests {
 
         let key_prefix = Template::try_from("{{ key }}").unwrap();
 
-        let encoding_config = EncodingConfigWithDefault {
+        let encoding_config = EncodingConfig {
             codec: Encoding::Ndjson,
+            schema: None,
+            only_fields: None,
             except_fields: Some(vec!["key".into()]),
-            ..Default::default()
+            timestamp_format: None,
         };
 
         let bytes = encode_event(event, &key_prefix, &encoding_config).unwrap();
@@ -706,16 +720,22 @@ mod integration_tests {
         ensure_bucket(&client()).await;
 
         S3SinkConfig {
-            key_prefix: Some(random_string(10) + "/date=%F/"),
             bucket: BUCKET.to_string(),
+            key_prefix: Some(random_string(10) + "/date=%F/"),
+            filename_time_format: None,
+            filename_append_uuid: None,
+            filename_extension: None,
+            options: S3Options::default(),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
+            encoding: Encoding::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
                 max_bytes: Some(batch_size),
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
-            ..Default::default()
+            request: TowerRequestConfig::default(),
+            assume_role: None,
         }
     }
 

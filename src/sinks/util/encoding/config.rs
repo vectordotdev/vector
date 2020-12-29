@@ -1,5 +1,6 @@
 use crate::{
     event::{PathComponent, PathIter},
+    serde::skip_serializing_if_default,
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },
@@ -21,14 +22,14 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
@@ -51,13 +52,29 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     }
 }
 
-impl<E> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E>
+impl<E> From<EncodingConfigWithDefault<E>> for EncodingConfig<E>
 where
     E: Default + PartialEq,
 {
-    fn into(self) -> EncodingConfigWithDefault<E> {
-        EncodingConfigWithDefault {
-            codec: self.codec,
+    fn from(encoding: EncodingConfigWithDefault<E>) -> Self {
+        Self {
+            codec: encoding.codec,
+            schema: encoding.schema,
+            only_fields: encoding.only_fields,
+            except_fields: encoding.except_fields,
+            timestamp_format: encoding.timestamp_format,
+        }
+    }
+}
+
+#[cfg(any(feature = "sinks-new_relic_logs", feature = "sinks-humio"))]
+impl<E> EncodingConfig<E> {
+    pub(crate) fn into_encoding<X>(self) -> EncodingConfig<X>
+    where
+        X: From<E>,
+    {
+        EncodingConfig {
+            codec: self.codec.into(),
             schema: self.schema,
             only_fields: self.only_fields,
             except_fields: self.except_fields,

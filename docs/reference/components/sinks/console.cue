@@ -28,7 +28,6 @@ components: sinks: console: {
 			tls: enabled:     false
 			to: {
 				service: services.stdout
-
 				interface: stdout: {}
 			}
 		}

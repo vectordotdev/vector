@@ -1,4 +1,5 @@
 use serde::{de, ser};
+use serde_json::Value;
 use std::fmt;
 
 pub const GZIP_NONE: usize = 0;
@@ -76,7 +77,10 @@ impl<'de> de::Deserialize<'de> for Compression {
                 match s {
                     "none" => Ok(Compression::None),
                     "gzip" => Ok(Compression::gzip_default()),
-                    _ => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
+                    _ => Err(de::Error::invalid_value(
+                        de::Unexpected::Str(s),
+                        &r#""none" or "gzip""#,
+                    )),
                 }
             }
 
@@ -99,9 +103,34 @@ impl<'de> de::Deserialize<'de> for Compression {
                             if level.is_some() {
                                 return Err(de::Error::duplicate_field("level"));
                             }
-                            level = Some(match map.next_value::<usize>() {
-                                Ok(value) => value.to_string(),
-                                Err(_) => map.next_value::<&str>()?.to_string(),
+                            level = Some(match map.next_value::<Value>()? {
+                                Value::Number(level) => match level.as_u64() {
+                                    Some(value) if value <= 9 => value as usize,
+                                    Some(_) | None => {
+                                        return Err(de::Error::invalid_value(
+                                            de::Unexpected::Other(&level.to_string()),
+                                            &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
+                                        ))
+                                    }
+                                },
+                                Value::String(level) => match level.as_str() {
+                                    "none" => GZIP_NONE,
+                                    "fast" => GZIP_FAST,
+                                    "default" => GZIP_DEFAULT,
+                                    "best" => GZIP_BEST,
+                                    level => {
+                                        return Err(de::Error::invalid_value(
+                                            de::Unexpected::Str(level),
+                                            &r#""none", "fast", "best" or "default""#,
+                                        ))
+                                    }
+                                },
+                                value => {
+                                    return Err(de::Error::invalid_type(
+                                        de::Unexpected::Other(&value.to_string()),
+                                        &"integer or string",
+                                    ));
+                                }
                             });
                         }
                         _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
@@ -110,33 +139,10 @@ impl<'de> de::Deserialize<'de> for Compression {
 
                 match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
                     "none" => match level {
-                        Some(_) => Err(de::Error::unknown_field("level", &["algorithm"])),
+                        Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
-                    "gzip" => Ok(Compression::Gzip(match level {
-                        Some(level) => Some(match level.as_str() {
-                            "none" => GZIP_NONE,
-                            "fast" => GZIP_FAST,
-                            "default" => GZIP_DEFAULT,
-                            "best" => GZIP_BEST,
-                            value => match value.parse::<usize>() {
-                                Ok(level) if level <= 9 => level,
-                                Ok(level) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Unsigned(level as u64),
-                                        &self,
-                                    ))
-                                }
-                                Err(_) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Str(value),
-                                        &self,
-                                    ))
-                                }
-                            },
-                        }),
-                        None => None,
-                    })),
+                    "gzip" => Ok(Compression::Gzip(level)),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
@@ -168,5 +174,71 @@ impl ser::Serialize for Compression {
             }
         };
         map.end()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Compression;
+
+    #[test]
+    fn deserialization() {
+        let fixtures_valid = [
+            (r#""none""#, Compression::None),
+            (r#"{"algorithm": "none"}"#, Compression::None),
+            (r#"{"algorithm": "gzip"}"#, Compression::Gzip(None)),
+            (
+                r#"{"algorithm": "gzip", "level": "best"}"#,
+                Compression::Gzip(Some(9)),
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": 8}"#,
+                Compression::Gzip(Some(8)),
+            ),
+        ];
+        for (sources, result) in fixtures_valid.iter() {
+            let deserialized: Result<Compression, _> = serde_json::from_str(sources);
+            assert_eq!(deserialized.expect("valid source"), *result);
+        }
+
+        let fixtures_invalid = [
+            (
+                r#"42"#,
+                r#"invalid type: integer `42`, expected string or map at line 1 column 2"#,
+            ),
+            (
+                r#""b42""#,
+                r#"invalid value: string "b42", expected "none" or "gzip" at line 1 column 5"#,
+            ),
+            (
+                r#"{"algorithm": "b42"}"#,
+                r#"unknown variant `b42`, expected `none` or `gzip` at line 1 column 20"#,
+            ),
+            (
+                r#"{"algorithm": "none", "level": "default"}"#,
+                r#"unknown field `level`, there are no fields at line 1 column 41"#,
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": -1}"#,
+                r#"invalid value: -1, expected 0, 1, 2, 3, 4, 5, 6, 7, 8 or 9 at line 1 column 34"#,
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": "good"}"#,
+                r#"invalid value: string "good", expected "none", "fast", "best" or "default" at line 1 column 38"#,
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": {}}"#,
+                r#"invalid type: {}, expected integer or string at line 1 column 34"#,
+            ),
+            (
+                r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,
+                r#"unknown field `key`, expected `algorithm` or `level` at line 1 column 47"#,
+            ),
+        ];
+        for (source, result) in fixtures_invalid.iter() {
+            let deserialized: Result<Compression, _> = serde_json::from_str(source);
+            let error = deserialized.expect_err("invalid source");
+            assert_eq!(error.to_string().as_str(), *result);
+        }
     }
 }

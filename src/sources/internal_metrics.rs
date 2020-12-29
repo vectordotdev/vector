@@ -5,8 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
@@ -68,9 +67,8 @@ async fn run(
     out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out = out
-        .sink_map_err(|error| error!(message = "Error sending internal metrics.", %error))
-        .sink_compat();
+    let mut out =
+        out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
     let duration = time::Duration::from_secs(interval);
     let mut interval = time::interval(duration).take_until(shutdown);
@@ -105,10 +103,10 @@ mod tests {
         gauge!("foo", 2.0);
         counter!("bar", 3);
         counter!("bar", 4);
-        histogram!("baz", 5);
-        histogram!("baz", 6);
-        histogram!("quux", 7, "host" => "foo");
-        histogram!("quux", 8, "host" => "foo");
+        histogram!("baz", 5.0);
+        histogram!("baz", 6.0);
+        histogram!("quux", 7.0, "host" => "foo");
+        histogram!("quux", 8.0, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 

@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: influxdb_logs: {
-	title:       "InfluxDB Logs"
-	description: "[InfluxDB](\(urls.influxdb)) is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+	title: "InfluxDB Logs"
 
 	classes: {
 		commonly_used: false
@@ -36,6 +35,7 @@ components: sinks: influxdb_logs: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: sinks._influxdb.features.send.tls
 			to:  sinks._influxdb.features.send.to

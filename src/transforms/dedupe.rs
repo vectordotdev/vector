@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
+    internal_events::DedupeEventDiscarded,
     transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
@@ -144,7 +144,6 @@ impl Dedupe {
     }
 
     fn transform_one(&mut self, event: Event) -> Option<Event> {
-        emit!(DedupeEventProcessed);
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
             emit!(DedupeEventDiscarded { event });

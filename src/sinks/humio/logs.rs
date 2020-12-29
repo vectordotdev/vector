@@ -1,29 +1,24 @@
 use super::{default_host_key, Encoding};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::HecSinkConfig,
-    sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
-    },
+    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    tls::TlsOptions,
 };
 use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     pub(in crate::sinks::humio) source: Option<Template>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub(in crate::sinks::humio) encoding: EncodingConfigWithDefault<Encoding>,
+    pub(in crate::sinks::humio) encoding: EncodingConfig<Encoding>,
 
     pub(in crate::sinks::humio) event_type: Option<Template>,
 
@@ -38,13 +33,31 @@ pub struct HumioLogsConfig {
 
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig,
+
+    pub(in crate::sinks::humio) tls: Option<TlsOptions>,
 }
 
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
 
-impl_generate_config_from_default!(HumioLogsConfig);
+impl GenerateConfig for HumioLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            token: "${HUMIO_TOKEN}".to_owned(),
+            endpoint: None,
+            source: None,
+            encoding: Encoding::Json.into(),
+            event_type: None,
+            host_key: default_host_key(),
+            compression: Compression::default(),
+            request: TowerRequestConfig::default(),
+            batch: BatchConfig::default(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
@@ -69,14 +82,16 @@ impl HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             endpoint,
-            source: self.source.clone(),
+            host_key: self.host_key.clone(),
+            indexed_fields: vec![],
+            index: None,
             sourcetype: self.event_type.clone(),
-            encoding: self.encoding.clone().transmute(),
+            source: self.source.clone(),
+            encoding: self.encoding.clone().into_encoding(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
-            host_key: self.host_key.clone(),
-            ..Default::default()
+            tls: self.tls.clone(),
         }
     }
 }
@@ -107,6 +122,7 @@ mod tests {
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"
+            encoding = "json"
         "#,
         )
         .unwrap();
@@ -260,17 +276,20 @@ mod integration_tests {
 
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
-        super::HumioLogsConfig {
-            endpoint: Some(HOST.to_string()),
+        HumioLogsConfig {
             token: token.to_string(),
-            compression: Compression::None,
+            endpoint: Some(HOST.to_string()),
+            source: None,
             encoding: Encoding::Json.into(),
+            event_type: None,
+            host_key: log_schema().host_key().to_string(),
+            compression: Compression::None,
+            request: TowerRequestConfig::default(),
             batch: BatchConfig {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().to_string(),
-            ..Default::default()
+            tls: None,
         }
     }
 

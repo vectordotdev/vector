@@ -10,7 +10,7 @@ remap: functions: ipv6_to_ipv4: {
 		},
 	]
 	return: ["string"]
-	category: "networking"
+	category: "IP"
 	description: #"""
 		Converts an IPv4 mapped IPv6 address to an IPv4 address.
 		This function will raise an error if the input address is not a compatible address.

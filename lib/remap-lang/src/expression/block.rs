@@ -1,6 +1,6 @@
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     expressions: Vec<Expr>,
 }
@@ -45,7 +45,7 @@ impl Expression for Block {
 mod tests {
     use super::*;
     use crate::{
-        expression::{Arithmetic, Literal},
+        expression::{Arithmetic, Array, Literal},
         test_type_def,
         value::Kind,
         Operator,
@@ -55,8 +55,8 @@ mod tests {
         no_expression {
             expr: |_| Block::new(vec![]),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Null,
+                ..Default::default()
             },
         }
 
@@ -86,6 +86,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes | Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -97,11 +98,16 @@ mod tests {
                           Box::new(Literal::from(true).into()),
                           Operator::Multiply,
                         ).into(),
-                        Literal::from(vec![1]).into(),
+                        Array::from(vec![1]).into(),
             ]),
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    fallible: false,
+                    kind: Kind::Integer,
+                    ..Default::default()
+                }.boxed()),
             },
         }
     ];

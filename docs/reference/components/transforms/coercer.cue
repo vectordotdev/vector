@@ -3,9 +3,13 @@ package metadata
 components: transforms: coercer: {
 	title: "Coercer"
 
+	description: """
+		Coerces log fields into typed values.
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -24,7 +28,7 @@ components: transforms: coercer: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [transforms.add_fields.support.warnings[0]]
 		notices: []
 	}
 

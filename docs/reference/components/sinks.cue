@@ -185,13 +185,23 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
+		if sinks[Name].features.healthcheck != _|_ {
 			if sinks[Name].features.healthcheck.enabled {
 				healthcheck: {
 					common:      true
-					description: "Enables/disables the sink healthcheck upon Vector boot."
+					description: "Health check options for the sink."
 					required:    false
-					type: bool: default: true
+					type: object: {
+						examples: []
+						options: {
+							enabled: {
+								common:      true
+								description: "Enables/disables the healthcheck upon Vector boot."
+								required:    false
+								type: bool: default: true
+							}
+						}
+					}
 				}
 			}
 		}
@@ -236,7 +246,7 @@ components: sinks: [Name=string]: {
 							concurrency: {
 								common: true
 								if sinks[Name].features.send.request.adaptive_concurrency {
-									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
+									description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
 								}
 								if !sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time."
@@ -301,6 +311,24 @@ components: sinks: [Name=string]: {
 									unit:    "seconds"
 								}
 							}
+
+							if sinks[Name].features.send.request.headers {
+								headers: {
+									common:      false
+									description: "Options for custom headers."
+									required:    false
+									warnings: []
+									type: object: {
+										examples: [
+											{
+												"Authorization": "${HTTP_TOKEN}"
+												"X-Powered-By":  "Vector"
+											},
+										]
+										options: {}
+									}
+								}
+							}
 						}
 					}
 				}
@@ -308,6 +336,28 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.keepalive != _|_ {
+				keepalive: {
+					common:      false
+					description: "Configures the TCP keepalive behavior for the connection to the sink."
+					required:    false
+					type: object: {
+						examples: []
+						options: {
+							time_secs: {
+								common:      false
+								description: "The time a connection needs to be idle before sending TCP keepalive probes."
+								required:    false
+								type: uint: {
+									default: null
+									unit:    "seconds"
+								}
+							}
+						}
+					}
+				}
+			}
+
 			if sinks[Name].features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
 					can_enable:             sinks[Name].features.send.tls.can_enable

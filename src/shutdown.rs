@@ -1,4 +1,4 @@
-use crate::stream::tripwire_handler;
+use crate::{stream::tripwire_handler, trigger::DisabledTrigger};
 use futures::{future, ready, FutureExt, TryFutureExt};
 use futures01::Future as Future01;
 use std::{
@@ -296,9 +296,7 @@ impl SourceShutdownCoordinator {
     ) -> impl Future01<Item = bool, Error = ()> {
         async move {
             // Call `shutdown_force_trigger.disable()` on drop.
-            let shutdown_force_trigger = ShutdownForceTriggerStorage {
-                trigger: Some(shutdown_force_trigger),
-            };
+            let shutdown_force_trigger = DisabledTrigger::new(shutdown_force_trigger);
 
             let fut = shutdown_complete_tripwire.then(tripwire_handler);
             if timeout_at(deadline, fut).await.is_ok() {
@@ -316,24 +314,6 @@ impl SourceShutdownCoordinator {
         .map(Ok)
         .boxed()
         .compat()
-    }
-}
-
-struct ShutdownForceTriggerStorage {
-    trigger: Option<Trigger>,
-}
-
-impl ShutdownForceTriggerStorage {
-    fn into_inner(mut self) -> Trigger {
-        self.trigger.take().unwrap()
-    }
-}
-
-impl Drop for ShutdownForceTriggerStorage {
-    fn drop(&mut self) {
-        if let Some(trigger) = self.trigger.take() {
-            trigger.disable();
-        }
     }
 }
 

@@ -2,14 +2,12 @@ use crate::{
     config::Resource,
     internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::Sink01CompatExt, future::BoxFuture, stream, FutureExt, StreamExt, TryFutureExt,
-};
-use futures01::Sink;
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
@@ -66,6 +64,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     fn run(
         self,
         addr: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
@@ -140,7 +139,9 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             let open_token =
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
-                            let fut = handle_stream(shutdown, socket, source, tripwire, host, out);
+                            let fut = handle_stream(
+                                shutdown, socket, keepalive, source, tripwire, host, out,
+                            );
                             tokio::spawn(
                                 fut.map(move |()| drop(open_token)).instrument(span.clone()),
                             );
@@ -156,10 +157,11 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 async fn handle_stream(
     mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
+    keepalive: Option<TcpKeepaliveConfig>,
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
+    out: impl Sink<Event> + Send + 'static,
 ) {
     tokio::select! {
         result = socket.handshake() => {
@@ -172,6 +174,12 @@ async fn handle_stream(
             return;
         }
     };
+
+    if let Some(keepalive) = keepalive {
+        if let Err(error) = socket.set_keepalive(keepalive) {
+            warn!(message = "Failed configuring TCP keepalive.", %error);
+        }
+    }
 
     let mut _token = None;
     let mut shutdown = Some(shutdown);
@@ -214,7 +222,7 @@ async fn handle_stream(
             None
         }
     }))
-    .forward(out.sink_compat())
+    .forward(out)
     .map_err(|_| warn!(message = "Error received while processing TCP source."))
     .map(|_| debug!("Connection closed."))
     .await
@@ -246,7 +254,7 @@ impl From<SocketAddr> for SocketListenAddr {
 impl From<SocketListenAddr> for Resource {
     fn from(addr: SocketListenAddr) -> Resource {
         match addr {
-            SocketListenAddr::SocketAddr(addr) => addr.into(),
+            SocketListenAddr::SocketAddr(addr) => Resource::tcp(addr),
             SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
         }
     }

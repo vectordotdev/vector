@@ -1,8 +1,7 @@
 use super::Error as E;
 use crate::{
-    expression,
-    function::{Argument, ArgumentList},
-    state, Expression, Function as Fn, Object, Result, TypeDef, Value,
+    expression, function::ArgumentList, state, Expr, Expression, Function as Fn, Object, Result,
+    TypeDef, Value,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -29,12 +28,21 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct Function {
     function: Box<dyn Expression>,
+
+    // only used for `PartialEq` impl
+    ident: &'static str,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+    }
 }
 
 impl Function {
     pub fn new(
         ident: String,
-        arguments: Vec<(Option<String>, Argument)>,
+        arguments: Vec<(Option<String>, Expr)>,
         definitions: &[Box<dyn Fn>],
     ) -> Result<Self> {
         let definition = definitions
@@ -90,21 +98,9 @@ impl Function {
                 )
             })?;
 
-            let argument = match argument {
-                // Wrap expression argument to validate its value type at
-                // runtime.
-                Argument::Expression(expr) => Argument::Expression(
-                    expression::Argument::new(
-                        Box::new(expr),
-                        definition.identifier(),
-                        param.keyword,
-                        param.accepts,
-                        ident,
-                    )
-                    .into(),
-                ),
-                Argument::Regex(_) => argument,
-            };
+            let argument =
+                expression::Argument::new(Box::new(argument), param.accepts, param.keyword, ident)
+                    .into();
 
             list.insert(param.keyword, argument);
         }
@@ -121,7 +117,7 @@ impl Function {
             .collect::<Result<_>>()?;
 
         let function = definition.compile(list)?;
-        Ok(Self { function })
+        Ok(Self { function, ident })
     }
 }
 
@@ -143,11 +139,14 @@ mod tests {
     test_type_def![pass_through {
         expr: |_| {
             let function = Box::new(Noop);
-            Function { function }
+            Function {
+                function,
+                ident: "foo",
+            }
         },
         def: TypeDef {
-            fallible: false,
             kind: Kind::Null,
+            ..Default::default()
         },
     }];
 }

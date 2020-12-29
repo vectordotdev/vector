@@ -73,7 +73,7 @@ async fn test_sink_panic() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_sink(
         "out",
@@ -159,7 +159,7 @@ async fn test_sink_error() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_sink(
         "out",
@@ -226,7 +226,7 @@ async fn test_source_error() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_source("error", ErrorSourceConfig);
     config.add_sink(
@@ -293,7 +293,7 @@ async fn test_source_panic() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        sources::socket::SocketConfig::make_tcp_config(in_addr),
+        sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_source("panic", PanicSourceConfig);
     config.add_sink(

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use vector::{
     config::{self, ConfigDiff, Format},
     topology,
@@ -9,7 +10,7 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
             let diff = ConfigDiff::initial(&c);
             match (
                 config::warnings(&c),
-                topology::builder::build_pieces(&c, &diff).await,
+                topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
                 (_, Err(errors)) => Err(errors),

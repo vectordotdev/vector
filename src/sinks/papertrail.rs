@@ -5,6 +5,7 @@ use crate::{
         tcp::TcpSinkConfig,
         Encoding, UriSerde,
     },
+    tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
     Event,
 };
@@ -18,6 +19,7 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 pub struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig<Encoding>,
+    keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
 }
 
@@ -44,21 +46,24 @@ impl SinkConfig for PapertrailConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
+            .uri
             .host()
             .map(str::to_string)
             .ok_or_else(|| "A host is required for endpoint".to_string())?;
         let port = self
             .endpoint
+            .uri
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let address = format!("{}:{}", host, port);
+        let keepalive = self.keepalive;
         let tls = Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled));
 
         let pid = std::process::id();
         let encoding = self.encoding.clone();
 
-        let sink_config = TcpSinkConfig::new(address, tls);
+        let sink_config = TcpSinkConfig::new(address, keepalive, tls);
         sink_config.build(cx, move |event| encode_event(event, pid, &encoding))
     }
 

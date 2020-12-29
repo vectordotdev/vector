@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: loki: {
-	title:       "Loki"
-	description: "[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream."
+	title: "Loki"
 
 	classes: {
 		commonly_used: true
@@ -40,6 +39,7 @@ components: sinks: loki: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -49,12 +49,7 @@ components: sinks: loki: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Loki"
-					thing:    "a \(name) database"
-					url:      urls.loki
-					versions: null
-				}
+				service: services.loki
 
 				interface: {
 					socket: {
@@ -83,6 +78,13 @@ components: sinks: loki: {
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Loki instance."
+			required:    true
+			type: string: {
+				examples: ["http://localhost:3100"]
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${LOKI_PASSWORD}"
 			username_example: "${LOKI_USERNAME}"
@@ -134,7 +136,8 @@ components: sinks: loki: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["some_tenant_id"]
+				examples: ["some_tenant_id", "{{ event_field }}"]
+				templateable: true
 			}
 		}
 	}

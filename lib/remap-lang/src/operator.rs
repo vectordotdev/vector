@@ -1,10 +1,11 @@
 use std::convert::AsRef;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
     Multiply,
     Divide,
+    IntegerDivide,
     Remainder,
     Add,
     Subtract,
@@ -27,6 +28,7 @@ impl FromStr for Operator {
         Ok(match s {
             "*" => Multiply,
             "/" => Divide,
+            "//" => IntegerDivide,
             "%" => Remainder,
             "+" => Add,
             "-" => Subtract,
@@ -50,6 +52,7 @@ impl AsRef<str> for Operator {
         match self {
             Multiply => "*",
             Divide => "/",
+            IntegerDivide => "//",
             Remainder => "%",
             Add => "+",
             Subtract => "-",

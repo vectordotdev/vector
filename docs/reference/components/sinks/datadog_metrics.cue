@@ -3,8 +3,7 @@ package metadata
 components: sinks: datadog_metrics: {
 	title: "Datadog Metrics"
 
-	description: sinks._datadog.description
-	classes:     sinks._datadog.classes
+	classes: sinks._datadog.classes
 
 	features: {
 		buffer: enabled:      false
@@ -27,6 +26,7 @@ components: sinks: datadog_metrics: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {

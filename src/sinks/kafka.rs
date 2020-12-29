@@ -5,7 +5,7 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
     template::{Template, TemplateError},
@@ -42,12 +42,12 @@ enum BuildError {
     TopicTemplate { source: TemplateError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
     key_field: Option<String>,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     batch: BatchConfig,
@@ -72,10 +72,8 @@ fn default_message_timeout_ms() -> u64 {
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
@@ -202,7 +200,7 @@ impl KafkaSink {
             producer: Arc::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
-            encoding: config.encoding.into(),
+            encoding: config.encoding,
             flush_signal: Arc::new(Notify::new()),
             delivery_fut: FuturesUnordered::new(),
             in_flight: FuturesUnordered::new(),
@@ -441,12 +439,13 @@ mod tests {
         let (key, bytes) = encode_event(
             event,
             &Some("key".into()),
-            &EncodingConfigWithDefault {
+            &EncodingConfig {
                 codec: Encoding::Json,
+                schema: None,
+                only_fields: None,
                 except_fields: Some(vec!["key".into()]),
-                ..Default::default()
-            }
-            .into(),
+                timestamp_format: None,
+            },
         );
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
@@ -480,12 +479,14 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: "localhost:9091".into(),
             topic: topic.clone(),
-            compression: KafkaCompression::None,
-            encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
+            encoding: EncodingConfig::from(Encoding::Text),
+            batch: BatchConfig::default(),
+            compression: KafkaCompression::None,
+            auth: KafkaAuthConfig::default(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            ..Default::default()
+            librdkafka_options: HashMap::new(),
         };
 
         super::healthcheck(config).await.unwrap();
@@ -525,7 +526,7 @@ mod integration_test {
             bootstrap_servers: "localhost:9091".to_string(),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            encoding: Encoding::Text.into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -650,13 +651,14 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: server.to_string(),
             topic: format!("{}-%Y%m%d", topic),
-            compression,
-            encoding: EncodingConfigWithDefault::from(Encoding::Text),
             key_field: None,
+            encoding: EncodingConfig::from(Encoding::Text),
+            batch: BatchConfig::default(),
+            compression,
             auth: kafka_auth.clone(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            ..Default::default()
+            librdkafka_options: HashMap::new(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         let (acker, ack_counter) = Acker::new_for_testing();

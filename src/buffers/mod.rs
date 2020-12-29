@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{config::Resource, Event};
 use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -10,7 +10,7 @@ use std::sync::{
 #[cfg(feature = "leveldb")]
 pub mod disk;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BufferConfig {
@@ -50,6 +50,7 @@ impl Default for WhenFull {
     }
 }
 
+#[derive(Clone)]
 pub enum BufferInputCloner {
     Memory(mpsc::Sender<Event>, WhenFull),
     #[cfg(feature = "leveldb")]
@@ -130,6 +131,16 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
             }
+        }
+    }
+
+    /// Resources that the sink is using.
+    #[cfg_attr(not(feature = "leveldb"), allow(unused))]
+    pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
+        match self {
+            BufferConfig::Memory { .. } => Vec::new(),
+            #[cfg(feature = "leveldb")]
+            BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_name.to_string())],
         }
     }
 }

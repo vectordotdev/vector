@@ -179,7 +179,7 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{test_util::collect_ready, Event};
+    use crate::{test_util::collect_ready01, Event};
     use futures::compat::Future01CompatExt;
     use futures01::{stream, sync::mpsc, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
     use tokio::time::{delay_for, Duration};
@@ -200,8 +200,8 @@ mod tests {
         let fanout = fanout.send_all(stream::iter_ok(recs.clone())).compat();
         let _ = fanout.await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_a).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_b).await.unwrap(), recs);
     }
 
     #[tokio::test]
@@ -258,9 +258,9 @@ mod tests {
 
         let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_c).await.unwrap(), &recs[2..]);
+        assert_eq!(collect_ready01(rx_a).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_c).await.unwrap(), &recs[2..]);
     }
 
     #[tokio::test]
@@ -287,8 +287,8 @@ mod tests {
         use futures::compat::Future01CompatExt;
         let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_b).await.unwrap(), &recs[..2]);
+        assert_eq!(collect_ready01(rx_a).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_b).await.unwrap(), &recs[..2]);
     }
 
     #[tokio::test]
@@ -427,9 +427,9 @@ mod tests {
 
         let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await.unwrap(), &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_a2).await.unwrap(), &recs[2..]);
+        assert_eq!(collect_ready01(rx_a1).await.unwrap(), &recs[..2]);
+        assert_eq!(collect_ready01(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_a2).await.unwrap(), &recs[2..]);
     }
 
     #[tokio::test]
@@ -463,9 +463,9 @@ mod tests {
 
         let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await.unwrap(), &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
-        assert_eq!(collect_ready(rx_a2).await.unwrap(), &recs[2..]);
+        assert_eq!(collect_ready01(rx_a1).await.unwrap(), &recs[..2]);
+        assert_eq!(collect_ready01(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready01(rx_a2).await.unwrap(), &recs[2..]);
     }
 
     #[tokio::test]

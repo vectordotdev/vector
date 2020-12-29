@@ -40,6 +40,7 @@ struct DatadogState {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
+    #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     // Deprecated name
     #[serde(alias = "host")]

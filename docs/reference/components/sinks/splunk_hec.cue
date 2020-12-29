@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: splunk_hec: {
-	title:       "Splunk HEC"
-	description: "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
+	title: "Splunk HEC"
 
 	classes: {
 		commonly_used: true
@@ -45,6 +44,7 @@ components: sinks: splunk_hec: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -54,23 +54,7 @@ components: sinks: splunk_hec: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Splunk"
-					thing:    "a \(name) index"
-					url:      urls.splunk
-					versions: null
-
-					setup: [
-						"""
-							Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
-							and create a Splunk HEC endpoint.
-							""",
-						"""
-							Splunk will provide you with a host and token. Copy those
-							values to the `host` and `token` options.
-							""",
-					]
-				}
+				service: services.splunk
 
 				interface: {
 					socket: {
@@ -103,6 +87,13 @@ components: sinks: splunk_hec: {
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Splunk instance."
+			required:    true
+			type: string: {
+				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
+			}
+		}
 		host_key: {
 			common:      true
 			description: "The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
@@ -169,7 +160,9 @@ components: sinks: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		http_requests_total:       components.sources.internal_metrics.output.metrics.http_requests_total
+		encode_errors_total:    components.sources.internal_metrics.output.metrics.encode_errors_total
+		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

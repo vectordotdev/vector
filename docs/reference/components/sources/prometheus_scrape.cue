@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: prometheus_scrape: {
-	title:       "Prometheus"
-	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
-	alias:       "prometheus"
+	title: "Prometheus Scrape"
+	alias: "prometheus"
 
 	classes: {
 		commonly_used: false
@@ -17,12 +16,7 @@ components: sources: prometheus_scrape: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Prometheus"
-					thing:    "one or more \(name) endpoints"
-					url:      urls.prometheus_client
-					versions: null
-				}
+				service: services.prometheus_client
 
 				interface: socket: {
 					api: {

@@ -6,8 +6,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{compat::Sink01CompatExt, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures01::Sink;
+use futures::{executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
 use tokio::sync::mpsc::channel;
@@ -94,9 +93,8 @@ where
     });
 
     Ok(Box::pin(async move {
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
         let res = receiver
             .take_until(shutdown)
@@ -136,8 +134,8 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 mod tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures01::{Async::*, Stream};
     use std::io::Cursor;
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -171,25 +169,23 @@ mod tests {
             .await
             .unwrap();
 
-        let event = rx.poll().unwrap();
+        let event = rx.try_recv();
 
-        assert!(event.is_ready());
+        assert!(event.is_ok());
         assert_eq!(
-            Ready(Some("hello world".into())),
-            event.map(|event| event
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy()))
+            Ok("hello world".into()),
+            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.poll().unwrap();
-        assert!(event.is_ready());
+        let event = rx.try_recv();
+        assert!(event.is_ok());
         assert_eq!(
-            Ready(Some("hello world again".into())),
-            event.map(|event| event
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy()))
+            Ok("hello world again".into()),
+            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.poll().unwrap();
-        assert!(event.is_ready());
-        assert_eq!(Ready(None), event);
+        let event = rx.try_recv();
+        assert!(event.is_err());
+        assert_eq!(Err(mpsc::error::TryRecvError::Closed), event);
     }
 }

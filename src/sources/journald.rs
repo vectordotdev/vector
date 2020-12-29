@@ -8,12 +8,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codec::BytesDelimitedCodec;
-use futures::{
-    compat::{Compat01As03Sink, Sink01CompatExt},
-    future,
-    stream::BoxStream,
-    SinkExt, StreamExt,
-};
+use futures::{future, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -145,7 +140,7 @@ impl SourceConfig for JournaldConfig {
                 checkpoint_path,
                 batch_size,
                 remap_priority: self.remap_priority,
-                out: out.sink_compat(),
+                out,
             }
             .run_shutdown(shutdown, start)
             .instrument(info_span!("journald-server")),
@@ -167,7 +162,7 @@ struct JournaldSource {
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
-    out: Compat01As03Sink<Pipeline, Event>,
+    out: Pipeline,
 }
 
 impl JournaldSource {
@@ -426,10 +421,8 @@ fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
     // journalctl will output non-ASCII values using an array
     // of integers. Look for those values and re-parse them.
     if let Some(record) = record.as_object_mut() {
-        for (_, value) in record.iter_mut() {
-            if let Some(decoded) = value.as_array().and_then(|v| decode_array(&v)) {
-                *value = decoded;
-            }
+        for (_, value) in record.iter_mut().filter(|(_, v)| v.is_array()) {
+            *value = decode_array(value.as_array().expect("already validated"));
         }
     }
     if remap {
@@ -438,7 +431,14 @@ fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> JsonValue {
+    decode_array_as_bytes(array).unwrap_or_else(|| {
+        let ser = serde_json::to_string(array).expect("already deserialized");
+        JsonValue::String(ser)
+    })
+}
+
+fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
@@ -574,9 +574,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::compat::Future01CompatExt;
     use futures::Stream;
-    use futures01::Stream as _;
     use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
@@ -595,6 +593,7 @@ mod tests {
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
 {"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
+{"_SYSTEMD_UNIT":"NetworkManager.service","MESSAGE":"<info>  [1608278027.6016] dhcp-init: Using DHCP client 'dhclient'","__CURSOR":"6","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"6","SYSLOG_FACILITY":["DHCP4","DHCP6"]}
 "#;
 
     struct FakeJournal {
@@ -671,7 +670,7 @@ mod tests {
             checkpoint_path,
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
-            out: tx.sink_compat(),
+            out: tx,
         }
         .run_shutdown(shutdown, Box::new(FakeJournal::new));
         tokio::spawn(source);
@@ -679,16 +678,13 @@ mod tests {
         delay_for(Duration::from_millis(100)).await;
         drop(trigger);
 
-        timeout(Duration::from_secs(1), rx.collect().compat())
-            .await
-            .expect("Unclosed channel")
-            .unwrap()
+        timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
     }
 
     #[tokio::test]
     async fn reads_journal() {
         let received = run_journal(&[], &[], None).await;
-        assert_eq!(received.len(), 6);
+        assert_eq!(received.len(), 7);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -715,7 +711,7 @@ mod tests {
     #[tokio::test]
     async fn excludes_units() {
         let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
-        assert_eq!(received.len(), 4);
+        assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -733,7 +729,7 @@ mod tests {
     #[tokio::test]
     async fn handles_checkpoint() {
         let received = run_journal(&[], &[], Some("1")).await;
-        assert_eq!(received.len(), 5);
+        assert_eq!(received.len(), 6);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
@@ -752,6 +748,16 @@ mod tests {
         assert_eq!(
             received[0].as_log()["SYSLOG_RAW"],
             Value::Bytes("¿World?".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn parses_string_sequences() {
+        let received = run_journal(&["NetworkManager.service"], &[], None).await;
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()["SYSLOG_FACILITY"],
+            Value::Bytes(r#"["DHCP4","DHCP6"]"#.into())
         );
     }
 

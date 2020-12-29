@@ -1,9 +1,6 @@
 package metadata
 
 components: sources: apache_metrics: {
-	_config_path: "/etc/apache2/httpd.conf"
-	_path:        "/server-status"
-
 	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
@@ -19,41 +16,7 @@ components: sources: apache_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Apache HTTP server (HTTPD)"
-					thing:    "an \(name)"
-					url:      urls.apache
-					versions: null
-
-					setup: [
-						"""
-							[Install the Apache HTTP server](\(urls.apache_install)).
-							""",
-						"""
-							Enable the [Apache Status module](\(urls.apache_mod_status))
-							in your Apache config:
-
-							```text file="\(_config_path)"
-							<Location "\(_path)">
-							    SetHandler server-status
-							    Require host example.com
-							</Location>
-							```
-							""",
-						"""
-							Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
-							for more detailed metrics (see [Output](#output)). Note,
-							this defaults to `On` in Apache >= 2.3.6.
-
-							```text file="\(_config_path)"
-							ExtendedStatus On
-							```
-							""",
-						"""
-							Start or reload Apache to apply the config changes.
-							""",
-					]
-				}
+				service: services.apache_http
 
 				interface: {
 					socket: {
@@ -80,7 +43,11 @@ components: sources: apache_metrics: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			"""
+			The [Apache Status module](\(urls.apache_mod_status)) must be enabled.
+			""",
+		]
 		warnings: []
 		notices: []
 	}

@@ -1,6 +1,6 @@
 use crate::{state, value, Expression, Object, Result, TypeDef, Value};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Noop;
 
 impl Expression for Noop {
@@ -10,8 +10,8 @@ impl Expression for Noop {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            fallible: false,
             kind: value::Kind::Null,
+            ..Default::default()
         }
     }
 }
@@ -24,8 +24,8 @@ mod tests {
     test_type_def![noop {
         expr: |_| Noop,
         def: TypeDef {
-            fallible: false,
             kind: value::Kind::Null,
+            ..Default::default()
         },
     }];
 }

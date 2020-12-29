@@ -4,11 +4,9 @@ pub mod metrics;
 use crate::sinks::splunk_hec;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Json,
     Text,
 }
