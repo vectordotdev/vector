@@ -3,11 +3,11 @@ package metadata
 remap: functions: is_blank: {
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The value to check for blankness"
-			required: true
+			required:    true
 			type: ["string", "null"]
-		}
+		},
 	]
 	return: ["boolean"]
 	category: "Parse"
@@ -29,8 +29,8 @@ remap: functions: is_blank: {
 			source: ".is_empty = is_blank(.string_field)"
 			output: {
 				string_field: "-"
-				is_empty: true
+				is_empty:     true
 			}
-		}
+		},
 	]
 }
