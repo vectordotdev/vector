@@ -97,7 +97,7 @@ components: sources: vector: {
 			counter:      output._passthrough_counter
 			distribution: output._passthrough_distribution
 			gauge:        output._passthrough_gauge
-			histrogram:   output._passthrough_histrogram
+			histogram:    output._passthrough_histogram
 			set:          output._passthrough_set
 		}
 	}
