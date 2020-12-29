@@ -428,7 +428,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, log_event};
+    use crate::{event::LookupBuf, log_schema, log_event};
 
     #[test]
     fn generate_config() {
@@ -441,8 +441,8 @@ mod tests {
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &batch_time_format,
             &Encoding::Text.into(),
@@ -458,11 +458,10 @@ mod tests {
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
-
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
@@ -477,11 +476,10 @@ mod tests {
     fn s3_encode_event_with_removed_key() {
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
-
         let key_prefix = Template::try_from("{{ key }}").unwrap();
 
         let encoding_config = EncodingConfig {
@@ -631,10 +629,6 @@ mod integration_tests {
         let (lines, _events) = random_lines_with_stream(100, 30);
 
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-            let mut e = log_event! {
-                crate::config::log_schema().message_key().clone() => line,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
-            };
             let i = if i < 10 {
                 1
             } else if i < 20 {
@@ -642,8 +636,11 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log()
-                .insert(LookupBuf::from("i"), format!("{}", i));
+            let mut e = log_event! {
+                log_schema().message_key().clone() => line,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                "i" => format!("{}", i),
+            };
             e
         });
         sink.run(stream::iter(events)).await.unwrap();

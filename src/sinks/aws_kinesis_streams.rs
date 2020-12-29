@@ -331,8 +331,8 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &None,
             &Encoding::Text.into(),
@@ -345,11 +345,11 @@ mod tests {
     #[test]
     fn kinesis_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "some_key",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
@@ -360,13 +360,11 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_custom_partition_key() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "some_key",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("key"), "some_key");
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], b"hello world");
@@ -375,13 +373,11 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_custom_partition_key_limit() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => random_string(300)
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("key"), random_string(300));
         let event = encode_event(event, &Some("key".into()), &Encoding::Text.into()).unwrap();
 
         assert_eq!(&event.data[..], b"hello world");
@@ -390,14 +386,11 @@ mod tests {
 
     #[test]
     fn kinesis_encode_event_apply_rules() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "some_key",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("key"), "some_key");
-
         let mut encoding: EncodingConfig<_> = Encoding::Json.into();
         encoding.except_fields = Some(vec!["key".into()]);
 
