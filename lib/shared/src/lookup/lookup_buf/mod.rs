@@ -23,7 +23,7 @@ mod test;
 
 /// `LookupBuf`s are pre-validated, owned event lookup paths.
 ///
-/// These are owned, ordered sets of `Segment`s. `Segment`s represent parts of a path such as
+/// These are owned, ordered sets of `SegmentBuf`s. `SegmentBuf`s represent parts of a path such as
 /// `pies.banana.slices[0]`. The segments would be `["pies", "banana", "slices", 0]`. You can "walk"
 /// a `LookupBuf` with an `iter()` call.
 ///

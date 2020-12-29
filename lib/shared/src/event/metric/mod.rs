@@ -37,6 +37,31 @@ pub enum MetricKind {
     Absolute,
 }
 
+impl TryFrom<remap_lang::Value> for MetricKind {
+    type Error = String;
+
+    fn try_from(value: remap_lang::Value) -> Result<Self, Self::Error> {
+        let value = value.try_bytes().map_err(|e| e.to_string())?;
+        match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
+            "incremental" => Ok(Self::Incremental),
+            "absolute" => Ok(Self::Absolute),
+            value => Err(format!(
+                "invalid metric kind {}, metric kind must be `absolute` or `incremental`",
+                value
+            )),
+        }
+    }
+}
+
+impl From<MetricKind> for remap_lang::Value {
+    fn from(kind: MetricKind) -> Self {
+        match kind {
+            MetricKind::Incremental => "incremental".into(),
+            MetricKind::Absolute => "absolute".into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 /// A MetricValue is the container for the actual value of a metric.
@@ -94,31 +119,6 @@ impl From<MetricValue> for remap_lang::Value {
             MetricValue::AggregatedSummary { .. } => "aggregated summary",
         }
         .into()
-    }
-}
-
-impl TryFrom<remap_lang::Value> for MetricKind {
-    type Error = String;
-
-    fn try_from(value: remap_lang::Value) -> Result<Self, Self::Error> {
-        let value = value.try_bytes().map_err(|e| e.to_string())?;
-        match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
-            "incremental" => Ok(Self::Incremental),
-            "absolute" => Ok(Self::Absolute),
-            value => Err(format!(
-                "invalid metric kind {}, metric kind must be `absolute` or `incremental`",
-                value
-            )),
-        }
-    }
-}
-
-impl From<MetricKind> for remap_lang::Value {
-    fn from(kind: MetricKind) -> Self {
-        match kind {
-            MetricKind::Incremental => "incremental".into(),
-            MetricKind::Absolute => "absolute".into(),
-        }
     }
 }
 
@@ -327,6 +327,121 @@ impl Metric {
     }
 }
 
+impl Display for Metric {
+    /// Display a metric using something like Prometheus' text format:
+    ///
+    /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
+    ///
+    /// TIMESTAMP is in ISO 8601 format with UTC time zone.
+    ///
+    /// KIND is either `=` for absolute metrics, or `+` for incremental
+    /// metrics.
+    ///
+    /// DATA is dependent on the type of metric, and is a simplified
+    /// representation of the data contents. In particular,
+    /// distributions, histograms, and summaries are represented as a
+    /// list of `X@Y` words, where `X` is the rate, count, or quantile,
+    /// and `Y` is the value or bucket.
+    ///
+    /// example:
+    /// ```text
+    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(timestamp) = &self.timestamp {
+            write!(fmt, "{:?} ", timestamp)?;
+        }
+        if let Some(namespace) = &self.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
+        }
+        write_word(fmt, &self.name)?;
+        write!(fmt, "{{")?;
+        if let Some(tags) = &self.tags {
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+        }
+        write!(
+            fmt,
+            "}} {} ",
+            match self.kind {
+                MetricKind::Absolute => '=',
+                MetricKind::Incremental => '+',
+            }
+        )?;
+        match &self.value {
+            MetricValue::Counter { value } => write!(fmt, "{}", value),
+            MetricValue::Gauge { value } => write!(fmt, "{}", value),
+            MetricValue::Set { values } => {
+                write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic,
+            } => {
+                write!(
+                    fmt,
+                    "{} ",
+                    match statistic {
+                        StatisticKind::Histogram => "histogram",
+                        StatisticKind::Summary => "summary",
+                    }
+                )?;
+                write_list(
+                    fmt,
+                    " ",
+                    values.iter().zip(sample_rates.iter()),
+                    |fmt, (value, rate)| write!(fmt, "{}@{}", rate, value),
+                )
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                counts,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    buckets.iter().zip(counts.iter()),
+                    |fmt, (bucket, count)| write!(fmt, "{}@{}", count, bucket),
+                )
+            }
+            MetricValue::AggregatedSummary {
+                quantiles,
+                values,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    quantiles.iter().zip(values.iter()),
+                    |fmt, (quantile, value)| write!(fmt, "{}@{}", quantile, value),
+                )
+            }
+        }
+    }
+}
+
+const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
+
+/// We can get the `type` of the metric in Remap, but can't set  it.
+const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
+
+#[derive(Debug, Snafu)]
+enum MetricPathError<'a> {
+    #[snafu(display("cannot set root path"))]
+    SetPathError,
+
+    #[snafu(display("invalid path {}: expected one of {}", path, expected))]
+    InvalidPath { path: &'a str, expected: &'a str },
+}
+
 impl remap_lang::Object for Metric {
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
         if path.is_root() {
@@ -475,121 +590,6 @@ impl remap_lang::Object for Metric {
             .to_string()),
         }
     }
-}
-
-impl Display for Metric {
-    /// Display a metric using something like Prometheus' text format:
-    ///
-    /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
-    ///
-    /// TIMESTAMP is in ISO 8601 format with UTC time zone.
-    ///
-    /// KIND is either `=` for absolute metrics, or `+` for incremental
-    /// metrics.
-    ///
-    /// DATA is dependent on the type of metric, and is a simplified
-    /// representation of the data contents. In particular,
-    /// distributions, histograms, and summaries are represented as a
-    /// list of `X@Y` words, where `X` is the rate, count, or quantile,
-    /// and `Y` is the value or bucket.
-    ///
-    /// example:
-    /// ```text
-    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
-    /// ```
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        if let Some(timestamp) = &self.timestamp {
-            write!(fmt, "{:?} ", timestamp)?;
-        }
-        if let Some(namespace) = &self.namespace {
-            write_word(fmt, namespace)?;
-            write!(fmt, "_")?;
-        }
-        write_word(fmt, &self.name)?;
-        write!(fmt, "{{")?;
-        if let Some(tags) = &self.tags {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
-            })?;
-        }
-        write!(
-            fmt,
-            "}} {} ",
-            match self.kind {
-                MetricKind::Absolute => '=',
-                MetricKind::Incremental => '+',
-            }
-        )?;
-        match &self.value {
-            MetricValue::Counter { value } => write!(fmt, "{}", value),
-            MetricValue::Gauge { value } => write!(fmt, "{}", value),
-            MetricValue::Set { values } => {
-                write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
-            }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
-                write!(
-                    fmt,
-                    "{} ",
-                    match statistic {
-                        StatisticKind::Histogram => "histogram",
-                        StatisticKind::Summary => "summary",
-                    }
-                )?;
-                write_list(
-                    fmt,
-                    " ",
-                    values.iter().zip(sample_rates.iter()),
-                    |fmt, (value, rate)| write!(fmt, "{}@{}", rate, value),
-                )
-            }
-            MetricValue::AggregatedHistogram {
-                buckets,
-                counts,
-                count,
-                sum,
-            } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
-                write_list(
-                    fmt,
-                    " ",
-                    buckets.iter().zip(counts.iter()),
-                    |fmt, (bucket, count)| write!(fmt, "{}@{}", count, bucket),
-                )
-            }
-            MetricValue::AggregatedSummary {
-                quantiles,
-                values,
-                count,
-                sum,
-            } => {
-                write!(fmt, "count={} sum={} ", count, sum)?;
-                write_list(
-                    fmt,
-                    " ",
-                    quantiles.iter().zip(values.iter()),
-                    |fmt, (quantile, value)| write!(fmt, "{}@{}", quantile, value),
-                )
-            }
-        }
-    }
-}
-
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
-
-/// We can get the `type` of the metric in Remap, but can't set  it.
-const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
-
-#[derive(Debug, Snafu)]
-enum MetricPathError<'a> {
-    #[snafu(display("cannot set root path"))]
-    SetPathError,
-
-    #[snafu(display("invalid path {}: expected one of {}", path, expected))]
-    InvalidPath { path: &'a str, expected: &'a str },
 }
 
 fn write_list<I, T, W>(

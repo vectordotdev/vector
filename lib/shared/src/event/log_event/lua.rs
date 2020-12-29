@@ -38,7 +38,7 @@ mod test {
     fn to_lua() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert(LookupBuf::from_str("a").unwrap(), 1);
+        log.insert("a", 1);
         log.insert(LookupBuf::from_str("nested.field").unwrap(), "2");
         log.insert(
             LookupBuf::from_str("nested.array[0]").unwrap(),
@@ -86,7 +86,7 @@ mod test {
         Lua::new().context(move |ctx| {
             let event: LogEvent = ctx.load(lua_event).eval().unwrap();
 
-            assert_eq!(event[Lookup::from_str("a").unwrap()], Value::Integer(1));
+            assert_eq!(event["a"], Value::Integer(1));
             assert_eq!(
                 event[Lookup::from_str("nested.field").unwrap()],
                 Value::Bytes("2".into())
