@@ -193,6 +193,9 @@ pub enum Error {
     #[error("unable to integer divide value type {0} by {1}")]
     IntDiv(Kind, Kind),
 
+    #[error("unable to divide by zero")]
+    DivideByZero,
+
     #[error("unable to add value type {1} to {0}")]
     Add(Kind, Kind),
 
@@ -489,9 +492,15 @@ impl Value {
     pub fn try_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Div(self.kind(), rhs.kind());
 
+        let rhs = f64::try_from(&rhs).map_err(|_| err())?;
+
+        if rhs == 0.0 {
+            return Err(Error::DivideByZero);
+        }
+
         let value = match self {
-            Value::Integer(lhv) => (lhv as f64 / f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv / f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv as f64 / rhs).into(),
+            Value::Float(lhv) => (lhv / rhs).into(),
             _ => return Err(err()),
         };
 
@@ -501,9 +510,15 @@ impl Value {
     pub fn try_int_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::IntDiv(self.kind(), rhs.kind());
 
+        let rhs = i64::try_from(&rhs).map_err(|_| err())?;
+
+        if rhs == 0 {
+            return Err(Error::DivideByZero);
+        }
+
         let value = match &self {
-            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (*lhv as i64 / i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv / rhs).into(),
+            Value::Float(lhv) => (*lhv as i64 / rhs).into(),
             _ => return Err(err()),
         };
 

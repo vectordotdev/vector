@@ -19,7 +19,7 @@ remap: functions: ip_subnet: {
 		},
 	]
 	return: ["string"]
-	category: "networking"
+	category: "IP"
 	description: #"""
 		Extracts the subnet address from a given IP address using a supplied subnet mask or prefix length.
 		Works with both IPv4 and IPv6 addresses. The IP version for the mask must be the same as the

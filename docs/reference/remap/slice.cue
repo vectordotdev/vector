@@ -23,7 +23,7 @@ remap: functions: slice: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Returns a slice of the provided string or array between the `start` and `end` positions specified.
 

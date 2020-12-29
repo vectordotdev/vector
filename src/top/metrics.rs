@@ -195,17 +195,9 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                     name: d.name,
                     kind: d.on.to_string(),
                     component_type: d.component_type,
-                    processed_events_total: d
-                        .processed_events_total
-                        .as_ref()
-                        .map(|ep| ep.processed_events_total as i64)
-                        .unwrap_or(0),
+                    processed_events_total: d.on.processed_events_total(),
                     processed_events_throughput_sec: 0,
-                    processed_bytes_total: d
-                        .processed_bytes_total
-                        .as_ref()
-                        .map(|ep| ep.processed_bytes_total as i64)
-                        .unwrap_or(0),
+                    processed_bytes_total: d.on.processed_bytes_total(),
                     processed_bytes_throughput_sec: 0,
                     errors: 0,
                 },

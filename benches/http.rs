@@ -46,7 +46,6 @@ fn benchmark_http(c: &mut Criterion) {
                                 uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                                 compression: *compression,
                                 method: Default::default(),
-                                healthcheck_uri: Default::default(),
                                 auth: Default::default(),
                                 headers: Default::default(),
                                 batch: sinks::util::BatchConfig {

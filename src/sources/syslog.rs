@@ -144,7 +144,7 @@ impl SourceConfig for SyslogConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address } => vec![address.into()],
+            Mode::Udp { address } => vec![Resource::udp(address)],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }

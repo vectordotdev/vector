@@ -78,6 +78,23 @@
       "result_e.equals" = 0.75
       "result_f.equals" = 0
 
+[transforms.remap_arithmetic_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a / .b
+  """
+[[tests]]
+  name = "remap_arithmetic_error"
+  no_outputs_from = ["remap_arithmetic_error"]
+  [tests.input]
+    insert_at = "remap_arithmetic_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = 10
+      b = 0
+
 [transforms.remap_boolean_arithmetic]
   inputs = []
   type = "remap"
@@ -908,7 +925,8 @@
   inputs = []
   type = "remap"
   source = """
-    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
+    .grokked2 = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty = true)
     """
 [[tests]]
   name = "remap_function_parse_grok"
@@ -923,6 +941,11 @@
     "grokked.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
     "grokked.level.equals" = "info"
     "grokked.message.equals" = "Hello world"
+    "grokked.email.equals" = ""
+    "grokked2.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
+    "grokked2.level.equals" = "info"
+    "grokked2.email.exists" = false
+    "grokked2.message.equals" = "Hello world"
 
 [transforms.remap_function_ip_subnet]
   inputs = []
@@ -1365,3 +1388,24 @@
       "namespace.equals" = "zork"
       "host.equals" = "ook"
       "type.equals" = "counter"
+
+[transforms.remap_function_encode_json]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = encode_json(parse_json(.a))
+    .b = encode_json(parse_json(.b))
+  """
+[[tests]]
+  name = "remap_function_encode_json"
+  [tests.input]
+    insert_at = "remap_function_encode_json"
+    type = "log"
+    [tests.input.log_fields]
+      a = "[1, 2, 3]"
+      b = """{"field1": {"field2": 1, "field3": null}}"""
+  [[tests.outputs]]
+    extract_from = "remap_function_encode_json"
+    [[tests.outputs.conditions]]
+      "a.equals" = "[1,2,3]"
+      "b.equals" = """{"field1":{"field2":1,"field3":null}}"""

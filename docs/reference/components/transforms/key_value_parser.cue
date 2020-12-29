@@ -9,7 +9,7 @@ components: transforms: key_value_parser: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -36,8 +36,10 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-				Performance characteristics of the `key_value` transform have not been benchmarked.
-				""",
+			This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
+			function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: [
 			"""

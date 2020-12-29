@@ -3,13 +3,12 @@ use crate::{
     event::{Metric, MetricKind, MetricValue},
     internal_events::{
         PrometheusNoNameError, PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived,
-        PrometheusRemoteWriteSnapError,
     },
     prometheus::{proto, METRIC_NAME_LABEL},
     shutdown::ShutdownSignal,
     sources::{
         self,
-        util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
     Event, Pipeline,
@@ -60,9 +59,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        let source = RemoteWriteSource {
-            decompressor: snap::raw::Decoder::new(),
-        };
+        let source = RemoteWriteSource;
         source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
 
@@ -76,50 +73,42 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 }
 
 #[derive(Clone)]
-struct RemoteWriteSource {
-    decompressor: snap::raw::Decoder,
-}
-
-impl RemoteWriteSource {
-    fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-        let body = self
-            .decompressor
-            .clone()
-            .decompress_vec(&body)
-            .map_err(|error| {
-                emit!(PrometheusRemoteWriteSnapError {
-                    error: error.clone()
-                });
-                ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    format!("Could not decompress write request: {}", error),
-                )
-            })?;
-        let request = proto::WriteRequest::decode(Bytes::from(body)).map_err(|error| {
-            emit!(PrometheusRemoteWriteParseError {
-                error: error.clone()
-            });
-            ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
-            )
-        })?;
-        Ok(decode_request(request))
-    }
-}
+struct RemoteWriteSource;
 
 impl HttpSource for RemoteWriteSource {
     fn build_event(
         &self,
-        body: Bytes,
-        _header_map: HeaderMap,
+        mut body: Bytes,
+        header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
-        let result = self.decode_body(body)?;
+        // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
+        // se we need to.
+        if header_map
+            .get("Content-Encoding")
+            .map(|header| header.as_ref())
+            != Some(b"snappy")
+        {
+            body = decode(&Some("snappy".to_string()), body)?;
+        }
+        let result = decode_body(body)?;
         let count = result.len();
         emit!(PrometheusRemoteWriteReceived { count });
         Ok(result)
     }
+}
+
+fn decode_body(body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
+    let request = proto::WriteRequest::decode(body).map_err(|error| {
+        emit!(PrometheusRemoteWriteParseError {
+            error: error.clone()
+        });
+        ErrorMessage::new(
+            StatusCode::BAD_REQUEST,
+            format!("Could not decode write request: {}", error),
+        )
+    })?;
+    Ok(decode_request(request))
 }
 
 fn decode_request(request: proto::WriteRequest) -> Vec<Event> {
@@ -258,5 +247,41 @@ mod test {
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(all(test, feature = "prometheus-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{shutdown, test_util, Pipeline};
+    use tokio::time::Duration;
+
+    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+
+    #[tokio::test]
+    async fn receive_something() {
+        let config = PrometheusRemoteWriteConfig {
+            address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
+            auth: None,
+            tls: None,
+        };
+
+        let (tx, rx) = Pipeline::new_test();
+        let source = config
+            .build(
+                "prometheus_remote_write",
+                &GlobalOptions::default(),
+                shutdown::ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap();
+
+        tokio::spawn(source);
+
+        tokio::time::delay_for(Duration::from_secs(2)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
     }
 }
