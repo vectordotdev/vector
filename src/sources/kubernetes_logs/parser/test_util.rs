@@ -1,9 +1,9 @@
 #![cfg(test)]
 
 use crate::{
+    config::log_schema,
     event::{Event, LogEvent, LookupBuf},
     log_event,
-    config::log_schema,
     transforms::Transform,
 };
 use chrono::{DateTime, Utc};

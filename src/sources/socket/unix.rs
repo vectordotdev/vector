@@ -1,8 +1,8 @@
 use crate::{
+    config::log_schema,
     event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     log_event,
-    config::log_schema,
     shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},

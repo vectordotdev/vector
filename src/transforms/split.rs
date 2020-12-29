@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -33,7 +33,7 @@ impl TransformConfig for SplitConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         let types = parse_check_conversion_map(
             &self
@@ -156,7 +156,7 @@ mod tests {
     use super::*;
     use crate::{
         config::TransformConfig,
-        event::{LogEvent, Lookup, Value},
+        event::{LogEvent, Value},
         log_event,
     };
 
@@ -195,8 +195,8 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => text.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let field_names = fields
             .split(' ')
@@ -222,18 +222,18 @@ mod tests {
     async fn split_adds_parsed_field_to_event() {
         let log = parse_log("1234 5678", "status time", None, None, false, &[]).await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
     async fn split_does_drop_parsed_field() {
         let log = parse_log("1234 5678", "status time", None, Some("message"), true, &[]).await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
@@ -248,8 +248,8 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("message")], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -264,10 +264,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[Lookup::from("number")], Value::Float(42.3));
-        assert_eq!(log[Lookup::from("flag")], Value::Boolean(true));
-        assert_eq!(log[Lookup::from("code")], Value::Integer(1234));
-        assert_eq!(log[Lookup::from("rest")], Value::Bytes("word".into()));
+        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["flag"], Value::Boolean(true));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -282,8 +282,8 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[Lookup::from("code")], Value::Integer(1234));
-        assert_eq!(log[Lookup::from("who")], Value::Bytes("foo".into()));
-        assert_eq!(log[Lookup::from("why")], Value::Bytes("bar".into()));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["who"], Value::Bytes("foo".into()));
+        assert_eq!(log["why"], Value::Bytes("bar".into()));
     }
 }

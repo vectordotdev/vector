@@ -211,10 +211,7 @@ impl FunctionTransform for Concat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{Lookup, LookupBuf},
-        log_event,
-    };
+    use crate::{event::Lookup, log_event};
 
     #[test]
     fn generate_config() {
@@ -223,16 +220,12 @@ mod tests {
 
     #[test]
     fn concat_to_from() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "first" => "Hello vector users",
+            "second" => "World",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("first"), "Hello vector users");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -252,16 +245,12 @@ mod tests {
 
     #[test]
     fn concat_full() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "first" => "Hello vector users",
+            "second" => "World",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("first"), "Hello vector users");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -280,16 +269,12 @@ mod tests {
     }
     #[test]
     fn concat_mixed() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "first" => "Hello vector users",
+            "second" => "World",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("first"), "Hello vector users");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -309,13 +294,11 @@ mod tests {
 
     #[test]
     fn concat_start_gt_end() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "only" => "Hello vector users",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("only"), "Hello vector users");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -328,11 +311,11 @@ mod tests {
 
     #[test]
     fn concat_start_gt_len() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "only" => "World",
         };
-        event.as_mut_log().insert(LookupBuf::from("only"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -345,11 +328,11 @@ mod tests {
 
     #[test]
     fn concat_end_gt_len() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "message".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "only" => "World"
         };
-        event.as_mut_log().insert(LookupBuf::from("only"), "World");
 
         let mut transform = Concat::new(
             "out".into(),

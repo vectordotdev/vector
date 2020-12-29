@@ -894,8 +894,8 @@ mod tests {
         trace_init();
 
         let message = log_event! {
-            crate::config::log_schema().message_key().clone() => "gzip_text_event".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "gzip_text_event".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
@@ -919,8 +919,8 @@ mod tests {
         trace_init();
 
         let message = log_event! {
-            crate::config::log_schema().message_key().clone() => "one_simple_text_event".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "one_simple_text_event".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
@@ -948,8 +948,8 @@ mod tests {
 
         let messages = (0..n)
             .map(|i| log_event! {
-                crate::config::log_schema().message_key().clone() => format!("multiple_simple_text_event_{}", i),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => format!("multiple_simple_text_event_{}", i),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             })
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
@@ -972,8 +972,8 @@ mod tests {
         trace_init();
 
         let message = log_event! {
-            crate::config::log_schema().message_key().clone() => "one_simple_json_event".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "one_simple_json_event".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
@@ -1001,8 +1001,8 @@ mod tests {
 
         let messages = (0..n)
             .map(|i| log_event! {
-                crate::config::log_schema().message_key().clone() => format!("multiple_simple_json_event{}", i),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => format!("multiple_simple_json_event{}", i),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             })
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
@@ -1062,8 +1062,8 @@ mod tests {
         trace_init();
 
         let message = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "raw".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (source, address) = source().await;
 
@@ -1111,8 +1111,8 @@ mod tests {
         trace_init();
 
         let message = log_event! {
-            crate::config::log_schema().message_key().clone() => "no_authorization".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "no_authorization".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let (source, address) = source_with(None).await;
         let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;

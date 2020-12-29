@@ -357,8 +357,8 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = log_event! {
-        crate::config::log_schema().message_key().clone() => parsed.msg[..].to_string(),
-        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        log_schema().message_key().clone() => parsed.msg[..].to_string(),
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
 
     // Add source type
@@ -542,8 +542,8 @@ mod test {
         );
 
         let mut expected = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => msg.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         {
@@ -553,8 +553,8 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from_str("host").unwrap(), "74794bfb6795");
-            expected.insert(LookupBuf::from_str("hostname").unwrap(), "74794bfb6795");
+            expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
 
             expected.insert(LookupBuf::from_str("meta.sequenceId").unwrap(), "1");
             expected.insert(LookupBuf::from_str("meta.sysUpTime").unwrap(), "37");
@@ -562,11 +562,11 @@ mod test {
             expected.insert(LookupBuf::from_str("origin.software").unwrap(), "test");
             expected.insert(LookupBuf::from_str("origin.ip").unwrap(), "192.168.0.1");
 
-            expected.insert(LookupBuf::from_str("severity").unwrap(), "notice");
-            expected.insert(LookupBuf::from_str("facility").unwrap(), "user");
-            expected.insert(LookupBuf::from_str("version").unwrap(), 1);
-            expected.insert(LookupBuf::from_str("appname").unwrap(), "root");
-            expected.insert(LookupBuf::from_str("procid").unwrap(), 8449);
+            expected.insert("severity", "notice");
+            expected.insert("facility", "user");
+            expected.insert("version", 1);
+            expected.insert("appname", "root");
+            expected.insert("procid", 8449);
         }
 
         assert_eq!(
@@ -585,8 +585,8 @@ mod test {
         );
 
         let mut expected = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => msg.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
             let expected = expected.as_mut_log();
@@ -595,13 +595,13 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(log_schema().host_key().clone(), "74794bfb6795");
-            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from("severity"), "notice");
-            expected.insert(LookupBuf::from("facility"), "user");
-            expected.insert(LookupBuf::from("version"), 1);
-            expected.insert(LookupBuf::from("appname"), "root");
-            expected.insert(LookupBuf::from("procid"), 8449);
+            expected.insert("severity", "notice");
+            expected.insert("facility", "user");
+            expected.insert("version", 1);
+            expected.insert("appname", "root");
+            expected.insert("procid", 8449);
         }
 
         let event = event_from_str(LookupBuf::from("host"), None, &raw);
@@ -682,8 +682,8 @@ mod test {
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
 
         let mut expected = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => msg.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
             let expected = expected.as_mut_log();
@@ -692,11 +692,11 @@ mod test {
             expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
-            expected.insert(LookupBuf::from("severity"), "notice");
-            expected.insert(LookupBuf::from("facility"), "user");
-            expected.insert(LookupBuf::from("appname"), "root");
-            expected.insert(LookupBuf::from("procid"), 8539);
+            expected.insert("hostname", "74794bfb6795");
+            expected.insert("severity", "notice");
+            expected.insert("facility", "user");
+            expected.insert("appname", "root");
+            expected.insert("procid", 8539);
         }
 
         assert_eq!(
@@ -715,8 +715,8 @@ mod test {
         );
 
         let mut expected = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => msg.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
             let expected = expected.as_mut_log();
@@ -724,11 +724,11 @@ mod test {
                 chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
             expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from_str("host").unwrap(), "74794bfb6795");
-            expected.insert(LookupBuf::from_str("hostname").unwrap(), "74794bfb6795");
-            expected.insert(LookupBuf::from_str("severity").unwrap(), "info");
-            expected.insert(LookupBuf::from_str("facility").unwrap(), "local7");
-            expected.insert(LookupBuf::from_str("appname").unwrap(), "liblogging-stdlog");
+            expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
+            expected.insert("severity", "info");
+            expected.insert("facility", "local7");
+            expected.insert("appname", "liblogging-stdlog");
             expected.insert(LookupBuf::from_str("origin.software").unwrap(), "rsyslogd");
             expected.insert(LookupBuf::from_str("origin.swVersion").unwrap(), "8.24.0");
             expected.insert(LookupBuf::from_str("origin.x-pid").unwrap(), "8979");
@@ -754,8 +754,8 @@ mod test {
         );
 
         let mut expected = log_event! {
-            crate::config::log_schema().message_key().clone() => msg.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => msg.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
             let expected = expected.as_mut_log();
@@ -766,11 +766,11 @@ mod test {
                     .and_hms_micro(21, 53, 30, 605_850),
             );
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from_str("host").unwrap(), "74794bfb6795");
-            expected.insert(LookupBuf::from_str("hostname").unwrap(), "74794bfb6795");
-            expected.insert(LookupBuf::from_str("severity").unwrap(), "info");
-            expected.insert(LookupBuf::from_str("facility").unwrap(), "local7");
-            expected.insert(LookupBuf::from_str("appname").unwrap(), "liblogging-stdlog");
+            expected.insert("host", "74794bfb6795");
+            expected.insert("hostname", "74794bfb6795");
+            expected.insert("severity", "info");
+            expected.insert("facility", "local7");
+            expected.insert("appname", "liblogging-stdlog");
             expected.insert(LookupBuf::from_str("origin.software").unwrap(), "rsyslogd");
             expected.insert(LookupBuf::from_str("origin.swVersion").unwrap(), "8.24.0");
             expected.insert(LookupBuf::from_str("origin.x-pid").unwrap(), "9043");

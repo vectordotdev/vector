@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{LookupBuf, Value},
     internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -30,7 +30,7 @@ impl TransformConfig for AnsiStripperConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         Ok(Transform::function(AnsiStripper { field }))
     }
@@ -93,13 +93,13 @@ mod tests {
                 };
 
                 let event = log_event! {
-                    crate::config::log_schema().message_key().clone() => $in,
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => $in,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 };
                 let event = transform.transform_one(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(crate::config::log_schema().message_key(), false).unwrap(),
+                    event.into_log().remove(log_schema().message_key(), false).unwrap(),
                     Value::from("foo bar")
                 );
             )+

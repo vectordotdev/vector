@@ -196,7 +196,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::TransformConfig,
+        config::{log_schema, TransformConfig},
         event::{LogEvent, Lookup, LookupBuf, Value},
         log_event,
     };
@@ -212,8 +212,8 @@ mod tests {
         trim_value: Option<String>,
     ) -> LogEvent {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => text.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut parser = KeyValueConfig {

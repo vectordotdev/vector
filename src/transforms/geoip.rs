@@ -209,6 +209,7 @@ impl FunctionTransform for Geoip {
 mod tests {
     use super::*;
     use crate::{
+        config::log_schema,
         event::LookupBuf,
         log_event,
         transforms::json_parser::{JsonParser, JsonParserConfig},
@@ -224,8 +225,8 @@ mod tests {
     fn geoip_city_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 
@@ -257,8 +258,8 @@ mod tests {
     fn geoip_city_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 
@@ -290,8 +291,8 @@ mod tests {
     fn geoip_city_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 
@@ -323,8 +324,8 @@ mod tests {
     fn geoip_isp_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 
@@ -356,8 +357,8 @@ mod tests {
     fn geoip_isp_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 
@@ -386,8 +387,8 @@ mod tests {
     fn geoip_isp_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let event = parser.transform_one(event).unwrap();
 

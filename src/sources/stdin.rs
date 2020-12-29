@@ -118,8 +118,8 @@ where
 
 fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> Event {
     let mut event = log_event! {
-        crate::config::log_schema().message_key().clone() => line,
-        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        log_schema().message_key().clone() => line,
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
 
     // Add source type

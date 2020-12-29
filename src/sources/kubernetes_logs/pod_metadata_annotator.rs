@@ -384,10 +384,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(
-                        "node_name",
-                        "sandbox0-node-name",
-                    );
+                    log.insert("node_name", "sandbox0-node-name");
                     log
                 },
             ),

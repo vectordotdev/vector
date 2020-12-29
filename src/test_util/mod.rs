@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
+    config::{log_schema, Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -163,8 +163,8 @@ pub fn random_lines_with_stream(
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
     let stream = stream::iter(lines.clone()).map(|v| {
         shared::log_event! {
-            crate::config::log_schema().message_key().clone() => v,
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => v,
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         }
     });
     (lines, stream)
@@ -188,8 +188,8 @@ pub fn random_events_with_stream(
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
     random_events_with_stream_generic(count, move || {
         shared::log_event! {
-            crate::config::log_schema().message_key().clone() => random_string(len),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => random_string(len),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         }
     })
 }

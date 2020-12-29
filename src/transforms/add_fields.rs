@@ -134,7 +134,7 @@ impl FunctionTransform for AddFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Lookup, log_event};
+    use crate::{config::log_schema, event::Lookup, log_event};
     use std::{iter::FromIterator, string::ToString};
 
     #[test]
@@ -145,8 +145,8 @@ mod tests {
     #[test]
     fn add_fields_event() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "augment me".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "augment me".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
@@ -164,8 +164,8 @@ mod tests {
     #[test]
     fn add_fields_templating() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "augment me".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "augment me".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
@@ -183,8 +183,8 @@ mod tests {
     #[test]
     fn add_fields_overwrite() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -204,8 +204,8 @@ mod tests {
     fn add_fields_preserves_types() {
         crate::test_util::trace_init();
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut fields = IndexMap::new();

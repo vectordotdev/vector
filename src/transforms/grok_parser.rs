@@ -175,8 +175,8 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => event.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => event.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),

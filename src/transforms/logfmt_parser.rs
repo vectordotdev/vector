@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -30,7 +30,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
+            .unwrap_or_else(|| log_schema().message_key().clone());
         let conversions = parse_conversion_map(
             &self
                 .types
@@ -115,7 +115,7 @@ impl FunctionTransform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::TransformConfig,
+        config::{log_schema, TransformConfig},
         event::{LogEvent, Lookup, Value},
         log_event,
     };
@@ -127,8 +127,8 @@ mod tests {
 
     async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => text.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => text.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut parser = LogfmtConfig {
@@ -149,9 +149,9 @@ mod tests {
         crate::test_util::trace_init();
         let log = parse_log("status=1234 time=\"5678\"", false, &[]).await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -159,9 +159,9 @@ mod tests {
         crate::test_util::trace_init();
         let log = parse_log("status=1234 time=5678", true, &[]).await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
@@ -169,8 +169,8 @@ mod tests {
         crate::test_util::trace_init();
         let log = parse_log("status=1234 message=yes", true, &[]).await;
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("message")], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -183,10 +183,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[Lookup::from("number")], Value::Float(42.3));
-        assert_eq!(log[Lookup::from("flag")], Value::Boolean(true));
-        assert_eq!(log[Lookup::from("code")], Value::Integer(1234));
-        assert_eq!(log[Lookup::from("rest")], Value::Bytes("word".into()));
+        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["flag"], Value::Boolean(true));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -198,20 +198,20 @@ mod tests {
             &[("status", "integer"), ("bytes", "integer")],
         ).await;
 
-        assert_eq!(log[Lookup::from("at")], "info".into());
-        assert_eq!(log[Lookup::from("method")], "GET".into());
-        assert_eq!(log[Lookup::from("path")], "/cart_link".into());
+        assert_eq!(log["at"], "info".into());
+        assert_eq!(log["method"], "GET".into());
+        assert_eq!(log["path"], "/cart_link".into());
         assert_eq!(
-            log[Lookup::from("request_id")],
+            log["request_id"],
             "05726858-c44e-4f94-9a20-37df73be9006".into(),
         );
-        assert_eq!(log[Lookup::from("fwd")], "73.75.38.87".into());
-        assert_eq!(log[Lookup::from("dyno")], "web.1".into());
-        assert_eq!(log[Lookup::from("connect")], "1ms".into());
-        assert_eq!(log[Lookup::from("service")], "22ms".into());
-        assert_eq!(log[Lookup::from("status")], Value::Integer(304));
-        assert_eq!(log[Lookup::from("bytes")], Value::Integer(656));
-        assert_eq!(log[Lookup::from("protocol")], "http".into());
+        assert_eq!(log["fwd"], "73.75.38.87".into());
+        assert_eq!(log["dyno"], "web.1".into());
+        assert_eq!(log["connect"], "1ms".into());
+        assert_eq!(log["service"], "22ms".into());
+        assert_eq!(log["status"], Value::Integer(304));
+        assert_eq!(log["bytes"], Value::Integer(656));
+        assert_eq!(log["protocol"], "http".into());
     }
 
     #[tokio::test]

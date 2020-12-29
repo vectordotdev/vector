@@ -329,40 +329,39 @@ group_by = [ "request_id" ]
             log_schema().message_key().clone() => "test message 1".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_1.as_mut_log().insert(LookupBuf::from("counter"), 1);
-        e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_1.as_mut_log().insert("counter", 1);
+        e_1.as_mut_log().insert("request_id", "1");
 
         let mut e_2 = log_event! {
             log_schema().message_key().clone() => "test message 2".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_2.as_mut_log().insert(LookupBuf::from("counter"), 2);
-        e_2.as_mut_log().insert(LookupBuf::from("request_id"), "2");
+        e_2.as_mut_log().insert("counter", 2);
+        e_2.as_mut_log().insert("request_id", "2");
 
         let mut e_3 = log_event! {
             log_schema().message_key().clone() => "test message 3".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_3.as_mut_log().insert(LookupBuf::from("counter"), 3);
-        e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_3.as_mut_log().insert("counter", 3);
+        e_3.as_mut_log().insert("request_id", "1");
 
         let mut e_4 = log_event! {
             log_schema().message_key().clone() => "test message 4".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_4.as_mut_log().insert(LookupBuf::from("counter"), 4);
-        e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
-        e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
+        e_4.as_mut_log().insert("counter", 4);
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
         let mut e_5 = log_event! {
             log_schema().message_key().clone() => "test message 5".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
-        e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
-        e_5.as_mut_log()
-            .insert(LookupBuf::from("extra_field"), "value1");
-        e_5.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
+        e_5.as_mut_log().insert("counter", 5);
+        e_5.as_mut_log().insert("request_id", "2");
+        e_5.as_mut_log().insert("extra_field", "value1");
+        e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
         let in_stream = futures01::stream::iter_ok(inputs);
@@ -411,31 +410,29 @@ merge_strategies.baz = "max"
             log_schema().message_key().clone() => "test message 1".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_1.as_mut_log().insert(LookupBuf::from("foo"), "first foo");
-        e_1.as_mut_log().insert(LookupBuf::from("bar"), "first bar");
-        e_1.as_mut_log().insert(LookupBuf::from("baz"), 2);
-        e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_1.as_mut_log().insert("foo", "first foo");
+        e_1.as_mut_log().insert("bar", "first bar");
+        e_1.as_mut_log().insert("baz", 2);
+        e_1.as_mut_log().insert("request_id", "1");
 
         let mut e_2 = log_event! {
             log_schema().message_key().clone() => "test message 2".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_2.as_mut_log()
-            .insert(LookupBuf::from("foo"), "second foo");
-        e_2.as_mut_log().insert(LookupBuf::from("bar"), 2);
-        e_2.as_mut_log()
-            .insert(LookupBuf::from("baz"), "not number");
-        e_2.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_2.as_mut_log().insert("foo", "second foo");
+        e_2.as_mut_log().insert("bar", 2);
+        e_2.as_mut_log().insert("baz", "not number");
+        e_2.as_mut_log().insert("request_id", "1");
 
         let mut e_3 = log_event! {
             log_schema().message_key().clone() => "test message 3".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_3.as_mut_log().insert(LookupBuf::from("foo"), 10);
-        e_3.as_mut_log().insert(LookupBuf::from("bar"), "third bar");
-        e_3.as_mut_log().insert(LookupBuf::from("baz"), 3);
-        e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
-        e_3.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
+        e_3.as_mut_log().insert("foo", 10);
+        e_3.as_mut_log().insert("bar", "third bar");
+        e_3.as_mut_log().insert("baz", 3);
+        e_3.as_mut_log().insert("request_id", "1");
+        e_3.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3];
         let in_stream = futures01::stream::iter_ok(inputs);
@@ -477,38 +474,37 @@ group_by = [ "request_id" ]
             log_schema().message_key().clone() => "test message 1".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_1.as_mut_log().insert(LookupBuf::from("counter"), 1);
-        e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_1.as_mut_log().insert("counter", 1);
+        e_1.as_mut_log().insert("request_id", "1");
 
         let mut e_2 = log_event! {
             log_schema().message_key().clone() => "test message 2".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_2.as_mut_log().insert(LookupBuf::from("counter"), 2);
+        e_2.as_mut_log().insert("counter", 2);
 
         let mut e_3 = log_event! {
             log_schema().message_key().clone() => "test message 3".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_3.as_mut_log().insert(LookupBuf::from("counter"), 3);
-        e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
+        e_3.as_mut_log().insert("counter", 3);
+        e_3.as_mut_log().insert("request_id", "1");
 
         let mut e_4 = log_event! {
             log_schema().message_key().clone() => "test message 4".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_4.as_mut_log().insert(LookupBuf::from("counter"), 4);
-        e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
-        e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
+        e_4.as_mut_log().insert("counter", 4);
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
         let mut e_5 = log_event! {
             log_schema().message_key().clone() => "test message 5".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
-        e_5.as_mut_log()
-            .insert(LookupBuf::from("extra_field"), "value1");
-        e_5.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
+        e_5.as_mut_log().insert("counter", 5);
+        e_5.as_mut_log().insert("extra_field", "value1");
+        e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
         let in_stream = Box::new(futures01::stream::iter_ok(inputs));
@@ -545,67 +541,55 @@ merge_strategies.bar = "concat"
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = log_event! {
+        let e_1 = log_event! {
             log_schema().message_key().clone() => "test message 1".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!([1, 3]),
+            "bar" => json!([1, 3]),
+            "request_id" => "1",
         };
-        e_1.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!([1, 3]));
-        e_1.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!([1, 3]));
-        e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_2 = log_event! {
+        let e_2 = log_event! {
             log_schema().message_key().clone() => "test message 2".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!([2, 4]),
+            "bar" => json!([2, 4]),
+            "request_id" => "2",
         };
-        e_2.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!([2, 4]));
-        e_2.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!([2, 4]));
-        e_2.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
-        let mut e_3 = log_event! {
+        let e_3 = log_event! {
             log_schema().message_key().clone() => "test message 3".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!([5, 7]),
+            "bar" => json!([5, 7]),
+            "request_id" => "1",
         };
-        e_3.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!([5, 7]));
-        e_3.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!([5, 7]));
-        e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
-        let mut e_4 = log_event! {
+        let e_4 = log_event! {
             log_schema().message_key().clone() => "test message 4".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!("done"),
+            "bar" => json!("done"),
+            "request_id" => "1",
+            "test_end" => "yep",
         };
-        e_4.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!("done"));
-        e_4.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!("done"));
-        e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
-        e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
-        let mut e_5 = log_event! {
+        let e_5 = log_event! {
             log_schema().message_key().clone() => "test message 5".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!([6, 8]),
+            "bar" => json!([6, 8]),
+            "request_id" => "2",
         };
-        e_5.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!([6, 8]));
-        e_5.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!([6, 8]));
-        e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
-        let mut e_6 = log_event! {
+        let e_6 = log_event! {
             log_schema().message_key().clone() => "test message 6".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => json!("done"),
+            "bar" => json!("done"),
+            "request_id" => "2",
+            "test_end" => "yep",
         };
-        e_6.as_mut_log()
-            .insert(LookupBuf::from("foo"), json!("done"));
-        e_6.as_mut_log()
-            .insert(LookupBuf::from("bar"), json!("done"));
-        e_6.as_mut_log().insert(LookupBuf::from("request_id"), "2");
-        e_6.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5, e_6];
         let in_stream = Box::new(futures01::stream::iter_ok(inputs));

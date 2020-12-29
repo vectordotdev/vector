@@ -77,11 +77,7 @@ impl FunctionTransform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::log_schema,
-        event::{Lookup, LookupBuf},
-        log_event,
-    };
+    use crate::{config::log_schema, event::Lookup, log_event};
 
     #[test]
     fn generate_config() {
@@ -90,24 +86,19 @@ mod tests {
 
     #[test]
     fn remove_fields() {
-        let mut event = log_event! {
+        let event = log_event! {
             log_schema().message_key().clone() => "message".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "to_remove" => "some value",
+            "to_keep" => "another value",
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("to_remove"), "some value");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("to_keep"), "another value");
-
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
         let new_event = transform.transform_one(event).unwrap();
 
-        assert!(new_event.as_log().get(Lookup::from("to_remove")).is_none());
-        assert!(new_event.as_log().get(Lookup::from("unknown")).is_none());
+        assert!(new_event.as_log().get("to_remove").is_none());
+        assert!(new_event.as_log().get("unknown").is_none());
         assert_eq!(
             new_event.as_log()[Lookup::from("to_keep")],
             "another value".into()

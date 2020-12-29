@@ -222,7 +222,7 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::log_event;
+    use crate::{config::log_schema, log_event};
     use chrono::TimeZone;
 
     #[test]
@@ -271,8 +271,8 @@ mod tests {
     #[test]
     fn render_static() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let template = Template::try_from("foo").unwrap();
 
@@ -282,8 +282,8 @@ mod tests {
     #[test]
     fn render_dynamic() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -296,8 +296,8 @@ mod tests {
     #[test]
     fn render_dynamic_with_prefix() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -310,8 +310,8 @@ mod tests {
     #[test]
     fn render_dynamic_with_postfix() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -324,8 +324,8 @@ mod tests {
     #[test]
     fn render_dynamic_missing_key() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
@@ -338,8 +338,8 @@ mod tests {
     #[test]
     fn render_dynamic_multiple_keys() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         event.as_mut_log().insert(LookupBuf::from("baz"), "quux");
@@ -354,8 +354,8 @@ mod tests {
     #[test]
     fn render_dynamic_weird_junk() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         event.as_mut_log().insert(LookupBuf::from("baz"), "quux");
@@ -372,8 +372,8 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -389,8 +389,8 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -409,8 +409,8 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("foo"), "butts");
         event
@@ -430,8 +430,8 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("format"), "%F");
         event
@@ -451,8 +451,8 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("%F"), "foo");
         event

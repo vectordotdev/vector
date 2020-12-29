@@ -1,10 +1,6 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use crate::{
-    config::log_schema,
-    event::{Event},
-    Pipeline,
-};
+use crate::{config::log_schema, event::Event, Pipeline};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::GzDecoder;

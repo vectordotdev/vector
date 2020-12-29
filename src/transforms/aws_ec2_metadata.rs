@@ -548,44 +548,23 @@ mod integration_tests {
         let event = rx.next().await.unwrap().unwrap();
         let log = event.as_log();
 
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         assert_eq!(
-            log.get(Lookup::from("availability-zone")),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("public-ipv4")),
-            Some(&"192.1.1.1".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("public-hostname")),
+            log.get("public-hostname"),
             Some(&"mock-public-hostname".into())
         );
-        assert_eq!(
-            log.get(Lookup::from("local-ipv4")),
-            Some(&"192.1.1.2".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("local-hostname")),
-            Some(&"mock-hostname".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("instance-id")),
-            Some(&"i-096fba6d03d36d262".into())
-        );
-        assert_eq!(
-            log.get(Lookup::from("ami-id")),
-            Some(&"ami-05f27d4d6770a43d2".into())
-        );
+        assert_eq!(log.get("local-ipv4"), Some(&"192.1.1.2".into()));
+        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
+        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
+        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
         assert_eq!(
             log.get(Lookup::from("instance-type")),
             Some(&"t2.micro".into())
         );
-        assert_eq!(log.get(Lookup::from("region")), Some(&"us-east-1".into()));
-        assert_eq!(log.get(Lookup::from("vpc-id")), Some(&"mock-vpc-id".into()));
-        assert_eq!(
-            log.get(Lookup::from_str("subnet-id").unwrap()),
-            Some(&"mock-subnet-id".into())
-        );
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
         assert_eq!(
             log.get(Lookup::from_str("role-name[0]").unwrap()),
             Some(&"mock-user".into())
@@ -618,13 +597,13 @@ mod integration_tests {
             log.get(Lookup::from("public-ipv4")),
             Some(&"192.1.1.1".into())
         );
-        assert_eq!(log.get(Lookup::from("public-hostname")), None);
-        assert_eq!(log.get(Lookup::from("local-ipv4")), None);
-        assert_eq!(log.get(Lookup::from("local-hostname")), None);
-        assert_eq!(log.get(Lookup::from("instance-id")), None,);
-        assert_eq!(log.get(Lookup::from("instance-type")), None,);
-        assert_eq!(log.get(Lookup::from("ami-id")), None);
-        assert_eq!(log.get(Lookup::from("region")), Some(&"us-east-1".into()));
+        assert_eq!(log.get("public-hostname"), None);
+        assert_eq!(log.get("local-ipv4"), None);
+        assert_eq!(log.get("local-hostname"), None);
+        assert_eq!(log.get("instance-id"), None,);
+        assert_eq!(log.get("instance-type"), None,);
+        assert_eq!(log.get("ami-id"), None);
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
     }
 
     #[tokio::test]
@@ -680,14 +659,8 @@ mod integration_tests {
             let event = rx.next().await.unwrap().unwrap();
             let log = event.as_log();
 
-            assert_eq!(
-                log.get(Lookup::from("availability-zone")),
-                Some(&"ww-region-1a".into())
-            );
-            assert_eq!(
-                log.get(Lookup::from("public-ipv4")),
-                Some(&"192.1.1.1".into())
-            );
+            assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+            assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         }
     }
 }

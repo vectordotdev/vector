@@ -143,7 +143,7 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::{super::test_util, *};
-    use crate::{log_event, config::log_schema, test_util::trace_init, transforms::Transform};
+    use crate::{config::log_schema, log_event, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

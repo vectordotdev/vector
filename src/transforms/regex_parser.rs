@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, Lookup, LookupBuf, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -140,7 +140,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -315,7 +315,7 @@ impl FunctionTransform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::{
-        config::TransformConfig,
+        config::{log_schema, TransformConfig},
         event::{LogEvent, Lookup, Value},
         log_event,
     };
@@ -327,8 +327,8 @@ mod tests {
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => event.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => event.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"
@@ -356,9 +356,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -371,8 +371,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(Lookup::from("status")), None);
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log.get("status"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -385,9 +385,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("time")], "5678".into());
-        assert!(log.get(Lookup::from("message")).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
@@ -400,8 +400,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[Lookup::from("status")], "1234".into());
-        assert_eq!(log[Lookup::from("message")], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -414,7 +414,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -516,7 +516,7 @@ mod tests {
         let log = do_transform("none", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
-        assert!(log.get(Lookup::from("status")).is_none());
+        assert!(log.get("status").is_none());
     }
 
     #[tokio::test]
@@ -533,9 +533,9 @@ mod tests {
         )
         .await
         .expect("Failed to parse log");
-        assert_eq!(log[Lookup::from("check")], Value::Boolean(false));
-        assert_eq!(log[Lookup::from("status")], Value::Integer(1234));
-        assert_eq!(log[Lookup::from("time")], Value::Float(6789.01));
+        assert_eq!(log["check"], Value::Boolean(false));
+        assert_eq!(log["status"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(6789.01));
     }
 
     #[tokio::test]
@@ -559,10 +559,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(log[Lookup::from("id1")], Value::Integer(1234));
-        assert_eq!(log.get(Lookup::from("id2")), None);
-        assert_eq!(log.get(Lookup::from("time")), None);
-        assert_eq!(log.get(Lookup::from("check")), None);
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log.get("id2"), None);
+        assert_eq!(log.get("time"), None);
+        assert_eq!(log.get("check"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -586,10 +586,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(Lookup::from("id1")), None);
-        assert_eq!(log[Lookup::from("id2")], Value::Integer(1234));
-        assert_eq!(log[Lookup::from("time")], Value::Float(235.42));
-        assert_eq!(log[Lookup::from("check")], Value::Boolean(true));
-        assert!(log.get(Lookup::from("message")).is_some());
+        assert_eq!(log.get("id1"), None);
+        assert_eq!(log["id2"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["check"], Value::Boolean(true));
+        assert!(log.get("message").is_some());
     }
 }
