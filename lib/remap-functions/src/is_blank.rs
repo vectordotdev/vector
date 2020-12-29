@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-use remap::prelude::*;
 use regex::Regex;
+use remap::prelude::*;
 
 lazy_static! {
     static ref ALL_WHITESPACE_PATTERN: Regex = Regex::new(r"^(\s*)$").unwrap();
