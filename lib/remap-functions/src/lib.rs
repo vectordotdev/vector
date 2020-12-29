@@ -115,6 +115,10 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "md5")]
+pub use crate::md5::Md5;
+#[cfg(feature = "sha1")]
+pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -155,8 +159,6 @@ pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
 #[cfg(feature = "log")]
 pub use log::Log;
-#[cfg(feature = "md5")]
-pub use md5::Md5;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -189,8 +191,6 @@ pub use redact::Redact;
 pub use replace::Replace;
 #[cfg(feature = "round")]
 pub use round::Round;
-#[cfg(feature = "sha1")]
-pub use sha1::Sha1;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
