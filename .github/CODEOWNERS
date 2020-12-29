@@ -90,6 +90,8 @@
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
+/lib/remap-cli/ @JeanMertz
+
 /lib/remap-lang/ @JeanMertz @FungusHumungus
 /lib/remap-functions/ @JeanMertz
 /lib/remap-functions/src/assert.rs @FungusHumungus
@@ -207,8 +209,6 @@
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
-
-/src/vrl/ @JeanMertz
 
 /src/wasm/ @hoverbear @JeanMertz
 
