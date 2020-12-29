@@ -39,6 +39,7 @@ impl ComponentsQuery {
         relay::query(
             state::filter_components(|(_name, components)| Some(components.clone())).into_iter(),
             relay::Params::new(after, before, first, last),
+            10,
         )
         .await
     }
