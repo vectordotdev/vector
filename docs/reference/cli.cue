@@ -376,7 +376,7 @@ cli: {
 				"program": {
 					_short: "p"
 					description: """
-						File containing the programing to execute. Can be used instead of `PROGRAM`.
+						File containing the program to execute. Can be used instead of `PROGRAM`.
 						"""
 					type: "string"
 				}
