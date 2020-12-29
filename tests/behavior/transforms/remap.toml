@@ -1487,3 +1487,22 @@
       "result.log_events[0].id.equals" = ""
       "result.log_events[0].timestamp.equals" = "2020-09-14T19:00:03.794Z"
       "result.log_events[0].message.equals" = "CWL CONTROL MESSAGE: Checking health of destination Firehose."
+
+[transforms.remap_function_parse_key_value]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = parse_key_value(.message, field_split = ":", separator = ",", trim_key = "'", trim_value = "<>")
+  '''
+[[tests]]
+  name = "remap_function_parse_key_value"
+  [tests.input]
+    insert_at = "remap_function_parse_key_value"
+    type = "log"
+    [tests.input.log_fields]
+      message = "'zork': <zoog>, 'nonk': <nink>"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_key_value"
+    [[tests.outputs.conditions]]
+    "result.zork.equals" = "zoog"
+    "result.nonk.equals" = "nink"
