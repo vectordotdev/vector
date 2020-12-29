@@ -38,7 +38,7 @@ pub fn run(opts: &Opts) -> exitcode::ExitCode {
         Ok(_) => exitcode::OK,
         Err(err) => {
             eprintln!("{}", err);
-            exitcode::IOERR
+            exitcode::SOFTWARE
         }
     }
 }
