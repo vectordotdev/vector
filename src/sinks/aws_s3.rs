@@ -428,7 +428,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, log_schema, log_event};
+    use crate::{config::log_schema, log_event};
 
     #[test]
     fn generate_config() {
@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
-        let mut event = log_event! {
+        let event = log_event! {
             log_schema().message_key().clone() => message.clone(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
             "key" => "value",
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn s3_encode_event_with_removed_key() {
         let message = "hello world".to_string();
-        let mut event = log_event! {
+        let event = log_event! {
             log_schema().message_key().clone() => message.clone(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
             "key" => "value",
@@ -575,7 +575,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        event::LookupBuf,
         log_event,
         test_util::{random_lines_with_stream, random_string},
     };
@@ -636,7 +635,7 @@ mod integration_tests {
             } else {
                 3
             };
-            let mut e = log_event! {
+            let e = log_event! {
                 log_schema().message_key().clone() => line,
                 log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 "i" => format!("{}", i),

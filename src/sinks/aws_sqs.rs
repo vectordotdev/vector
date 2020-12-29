@@ -283,7 +283,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, log_event};
+    use crate::{log_event, config::log_schema};
     use std::collections::BTreeMap;
 
     #[test]
@@ -291,8 +291,8 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &Encoding::Text.into(),
             None,
@@ -305,11 +305,11 @@ mod tests {
     #[test]
     fn sqs_encode_event_json() {
         let message = "hello world".to_string();
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
