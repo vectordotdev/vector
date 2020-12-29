@@ -5,7 +5,7 @@ pub use cmd::run;
 pub use cmd::Opts;
 
 #[derive(thiserror::Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("io error")]
     Io(#[from] std::io::Error),
 
