@@ -169,11 +169,11 @@ mod tests {
     #[test]
     fn equal() {
         let mut event_1 = LogEvent::default();
-        event_1.insert(LookupBuf::from("hostname"), "localhost");
-        event_1.insert(LookupBuf::from("irrelevant"), "not even used");
+        event_1.insert("hostname", "localhost");
+        event_1.insert("irrelevant", "not even used");
         let mut event_2 = event_1.clone();
         event_2.insert(
-            LookupBuf::from("irrelevant"),
+            "irrelevant",
             "does not matter if it's different",
         );
 
@@ -190,10 +190,10 @@ mod tests {
     #[test]
     fn not_equal() {
         let mut event_1 = LogEvent::default();
-        event_1.insert(LookupBuf::from("hostname"), "localhost");
-        event_1.insert(LookupBuf::from("container_id"), "abc");
+        event_1.insert("hostname", "localhost");
+        event_1.insert("container_id", "abc");
         let mut event_2 = event_1.clone();
-        event_2.insert(LookupBuf::from("container_id"), "def");
+        event_2.insert("container_id", "def");
 
         let discriminant_fields =
             vec![LookupBuf::from("hostname"), LookupBuf::from("container_id")];
@@ -209,11 +209,11 @@ mod tests {
     fn field_order() {
         crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
-        event_1.insert(LookupBuf::from("a"), "a");
-        event_1.insert(LookupBuf::from("b"), "b");
+        event_1.insert("a", "a");
+        event_1.insert("b", "b");
         let mut event_2 = LogEvent::default();
-        event_2.insert(LookupBuf::from("b"), "b");
-        event_2.insert(LookupBuf::from("a"), "a");
+        event_2.insert("b", "b");
+        event_2.insert("a", "a");
 
         let discriminant_fields = vec![LookupBuf::from("a"), LookupBuf::from("b")];
 
@@ -284,7 +284,7 @@ mod tests {
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from_str("nested.a").unwrap(), "a"); // `nested` is a `Value::Map`
         let mut event_2 = LogEvent::default();
-        event_2.insert(LookupBuf::from_str("nested").unwrap(), "x"); // `nested` is a `Value::String`
+        event_2.insert("nested", "x"); // `nested` is a `Value::String`
 
         let discriminant_fields = vec![LookupBuf::from("nested")];
 
@@ -302,15 +302,15 @@ mod tests {
 
         let event_stream_1 = {
             let mut event = LogEvent::default();
-            event.insert(LookupBuf::from("hostname"), "a.test");
-            event.insert(LookupBuf::from("container_id"), "abc");
+            event.insert("hostname", "a.test");
+            event.insert("container_id", "abc");
             event
         };
 
         let event_stream_2 = {
             let mut event = LogEvent::default();
-            event.insert(LookupBuf::from("hostname"), "b.test");
-            event.insert(LookupBuf::from("container_id"), "def");
+            event.insert("hostname", "b.test");
+            event.insert("container_id", "def");
             event
         };
 
@@ -329,40 +329,40 @@ mod tests {
 
         {
             let mut event = event_stream_1.clone();
-            event.insert(LookupBuf::from("message"), "a");
+            event.insert("message", "a");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_1.clone();
-            event.insert(LookupBuf::from("message"), "b");
-            event.insert(LookupBuf::from("irrelevant"), "c");
+            event.insert("message", "b");
+            event.insert("irrelevant", "c");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert(LookupBuf::from("message"), "d");
+            event.insert("message", "d");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert(LookupBuf::from("message"), "e");
-            event.insert(LookupBuf::from("irrelevant"), "d");
+            event.insert("message", "e");
+            event.insert("irrelevant", "d");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert(LookupBuf::from("message"), "f");
+            event.insert("message", "f");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert(LookupBuf::from("message"), "g");
-            event.insert(LookupBuf::from("irrelevant"), "d");
+            event.insert("message", "g");
+            event.insert("irrelevant", "d");
             assert_eq!(process_event(event), 1);
         }
 

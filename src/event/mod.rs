@@ -287,8 +287,8 @@ mod test {
     fn serialization() {
         crate::test_util::trace_init();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "raw log line".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "raw log line".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert("foo", "bar".to_string());
         event.as_mut_log().insert("bar", "baz".to_string());
@@ -313,8 +313,8 @@ mod test {
         crate::test_util::trace_init();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert("int", 4);
         event.as_mut_log().insert("float", 5.5);
