@@ -17,6 +17,7 @@ remap: functions: is_blank: {
 
 		* An empty string (`""`)
 		* A string that only contains whitespace (regardless of the string's length)
+		* Dash (`"-"`)
 		* `null`
 		"""#
 	examples: [
