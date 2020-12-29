@@ -53,7 +53,7 @@ components: sinks: kafka: {
 	configuration: {
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		key_field: {
-			description: "The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used. Not used on metrics."
+			description: "The log field name or tags key to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log or in tags, a blank value will be used."
 			required:    true
 			warnings: []
 			type: string: {
@@ -132,7 +132,7 @@ components: sinks: kafka: {
 	}
 
 	input: {
-		logs:    true
+		logs: true
 		metrics: {
 			counter:      true
 			distribution: true
