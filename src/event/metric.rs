@@ -577,6 +577,10 @@ impl Object for Metric {
             .to_string()),
         }
     }
+
+    fn remove_and_get(&mut self, _: &Path, _: bool) -> Result<Option<remap::Value>, ()> {
+        unimplemented!();
+    }
 }
 
 fn write_list<I, T, W>(

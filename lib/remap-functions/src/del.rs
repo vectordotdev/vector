@@ -105,7 +105,7 @@ mod tests {
                 map!["exists": 127],
                 Ok(value!(127)),
                 DelFn::new(Path::from("exists")),
-            )
+            ),
         ];
 
         let mut state = state::Program::default();

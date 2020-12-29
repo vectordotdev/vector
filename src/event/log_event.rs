@@ -320,6 +320,10 @@ impl Object for LogEvent {
             .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
             .collect()
     }
+
+    fn remove_and_get(&mut self, _: &Path, _: bool) -> Result<Option<remap::Value>, ()> {
+        unimplemented!();
+    }
 }
 
 #[cfg(test)]
