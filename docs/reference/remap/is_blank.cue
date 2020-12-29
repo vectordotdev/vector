@@ -15,10 +15,8 @@ remap: functions: is_blank: {
 		Determines whether the provided value should be considered blank, where blank is defined as
 		one of the following:
 
+		* An empty string (`""`)
 		* A string that only contains whitespace (regardless of the string's length)
-		* Empty string (`""`)
-		* `"-"`
-		* `"\n"`
 		* `null`
 		"""#
 	examples: [
