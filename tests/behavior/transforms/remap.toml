@@ -1409,3 +1409,55 @@
     [[tests.outputs.conditions]]
       "a.equals" = "[1,2,3]"
       "b.equals" = """{"field1":{"field2":1,"field3":null}}"""
+
+[transforms.remap_function_parse_regex]
+  inputs = []
+  type = "remap"
+  source = '''
+    . = parse_regex(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
+    .bytes_in = to_int(.bytes_in)
+    .status = to_int(.status)
+    .bytes_out = to_int(.bytes_out)
+  '''
+[[tests]]
+  name = "remap_function_parse_regex"
+  [tests.input]
+    insert_at = "remap_function_parse_regex"
+    type = "log"
+    [tests.input.log_fields]
+      message = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_regex"
+    [[tests.outputs.conditions]]
+    "bytes_in.equals" = 5667
+    "host.equals" = "5.86.210.12"
+    "user.equals" = "zieme4647"
+    "timestamp.equals" = "19/06/2019:17:20:49 -0400"
+    "method.equals" = "GET"
+    "path.equals" = "/embrace/supply-chains/dynamic/vertical"
+    "status.equals" = 201
+    "bytes_out.equals" = 20574
+    "0.equals" = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+
+[transforms.remap_function_parse_regex_all]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = parse_regex_all(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
+  '''
+[[tests]]
+  name = "remap_function_parse_regex_all"
+  [tests.input]
+    insert_at = "remap_function_parse_regex_all"
+    type = "log"
+    [tests.input.log_fields]
+      message = "apples and carrots, peaches and peas"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_regex_all"
+    [[tests.outputs.conditions]]
+    "result[0].fruit.equals" = "apples"
+    "result[0].veg.equals" = "carrots"
+    "result[0].0.equals" = "apples and carrots"
+    "result[1].fruit.equals" = "peaches"
+    "result[1].veg.equals" = "peas"
+    "result[1].0.equals" = "peaches and peas"

@@ -216,7 +216,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
                         let _guard=span.enter();
-                        info!(message = "Handling HTTP request.", headers = ?headers, rate_limit_secs = 30);
+                        debug!(message = "Handling HTTP request.", headers = ?headers);
 
                         let mut out = out.clone();
 
