@@ -600,7 +600,7 @@ impl Condition for CheckFields {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::log_event;
+    use crate::{log_event, config::log_schema};
 
     #[test]
     fn generate_config() {
@@ -670,8 +670,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "neither".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -684,7 +684,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "foo".to_string());
+            .insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -693,22 +693,22 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("other_thing"), "bar".to_string());
+            .insert("other_thing", "bar".to_string());
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "hello".to_string());
+            .insert("third_thing", "hello".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "world".to_string());
+            .insert("third_thing", "world".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "not foo".to_string());
+            .insert("message", "not foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -735,8 +735,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "neither".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -749,10 +749,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "hello foo world".to_string());
+            .insert("message", "hello foo world".to_string());
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "hello world".to_string());
+            .insert("third_thing", "hello world".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -778,13 +778,13 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "world".to_string());
+            .insert("third_thing", "world".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "not fo0".to_string());
+            .insert("message", "not fo0".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -807,8 +807,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "neither".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -821,7 +821,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "foo hello world".to_string());
+            .insert("message", "foo hello world".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -837,7 +837,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "not prefixed".to_string());
+            .insert("message", "not prefixed".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -864,8 +864,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "neither".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -878,10 +878,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "hello world".to_string());
+            .insert("third_thing", "hello world".to_string());
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "foo hello world".to_string());
+            .insert("message", "foo hello world".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -909,13 +909,13 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "world".to_string());
+            .insert("third_thing", "world".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "not prefixed".to_string());
+            .insert("message", "not prefixed".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -942,8 +942,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "neither".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "neither".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -956,10 +956,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "hello world foo".to_string());
+            .insert("message", "hello world foo".to_string());
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "hello world".to_string());
+            .insert("third_thing", "hello world".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -985,13 +985,13 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "world hello".to_string());
+            .insert("third_thing", "world hello".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "not suffixed".to_string());
+            .insert("message", "not suffixed".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1018,8 +1018,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "not foo".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "not foo".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1029,7 +1029,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("other_thing"), "not bar".to_string());
+            .insert("other_thing", "not bar".to_string());
         event.as_mut_log().insert(
             LookupBuf::from("third_thing"),
             "not hello or world".to_string(),
@@ -1039,7 +1039,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "world".to_string());
+            .insert("third_thing", "world".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1048,7 +1048,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "hello".to_string());
+            .insert("third_thing", "hello".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1057,10 +1057,10 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("third_thing"), "safe".to_string());
+            .insert("third_thing", "safe".to_string());
         event
             .as_mut_log()
-            .insert(LookupBuf::from("other_thing"), "bar".to_string());
+            .insert("other_thing", "bar".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1069,7 +1069,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "foo".to_string());
+            .insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1095,8 +1095,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "starts with a bang".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "starts with a bang".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1106,13 +1106,13 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("other_thing"), "at the end".to_string());
+            .insert("other_thing", "at the end".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("other_thing"), "end up here".to_string());
+            .insert("other_thing", "end up here".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1121,7 +1121,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("message"), "foo".to_string());
+            .insert("message", "foo".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1147,8 +1147,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "ignored message".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "ignored message".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1158,7 +1158,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "10.1.2.3".to_string());
+            .insert("foo", "10.1.2.3".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1170,19 +1170,19 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("bar"), "2000::".to_string());
+            .insert("bar", "2000::".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("bar"), "192.168.255.255".to_string());
+            .insert("bar", "192.168.255.255".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "192.200.200.200".to_string());
+            .insert("foo", "192.200.200.200".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1191,7 +1191,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "not an ip".to_string());
+            .insert("foo", "not an ip".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1208,8 +1208,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "ignored field".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "ignored field".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1219,13 +1219,13 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "not ignored".to_string());
+            .insert("foo", "not ignored".to_string());
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("bar"), "also not ignored".to_string());
+            .insert("bar", "also not ignored".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1242,8 +1242,8 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), false);
         assert_eq!(
@@ -1253,7 +1253,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "helloworld".to_string());
+            .insert("foo", "helloworld".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1262,7 +1262,7 @@ mod test {
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("bar"), vec![0, 1, 2, 3]);
+            .insert("bar", vec![0, 1, 2, 3]);
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
     }
@@ -1277,15 +1277,15 @@ mod test {
         let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "ignored field".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "ignored field".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert(LookupBuf::from("foo"), "not ignored".to_string());
+            .insert("foo", "not ignored".to_string());
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
