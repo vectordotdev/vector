@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -244,7 +244,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(crate::config::log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.clone_into_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -270,8 +270,8 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &Encoding::Text.into(),
         )
@@ -284,8 +284,8 @@ mod tests {
     fn firehose_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into()).unwrap();
@@ -293,7 +293,7 @@ mod tests {
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(
-            map[&crate::config::log_schema().message_key().to_string()],
+            map[&log_schema().message_key().to_string()],
             message
         );
         assert_eq!(map["key"], "value".to_string());
