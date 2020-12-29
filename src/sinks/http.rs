@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
@@ -178,7 +178,7 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(crate::config::log_schema().message_key()) {
+                if let Some(v) = event.get(log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b
@@ -321,8 +321,8 @@ mod tests {
     fn http_encode_event_text() {
         let encoding = EncodingConfig::from(Encoding::Text);
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut config = default_config(Encoding::Text);
@@ -336,8 +336,8 @@ mod tests {
     fn http_encode_event_json() {
         let encoding = EncodingConfig::from(Encoding::Ndjson);
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         let mut config = default_config(Encoding::Json);

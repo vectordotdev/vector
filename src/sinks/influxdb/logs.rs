@@ -240,7 +240,8 @@ fn value_to_field(v: Value) -> Field {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LookupBuf},
+        config::log_schema,
+        event::LookupBuf,
         log_event,
         sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
         sinks::util::{
@@ -272,16 +273,12 @@ mod tests {
 
     #[test]
     fn test_encode_event_apply_rules() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "aws.cloud.eur",
+            "timestamp" => ts(),
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "aws.cloud.eur");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -304,26 +301,16 @@ mod tests {
 
     #[test]
     fn test_encode_event_v1() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "aws.cloud.eur",
+            "int" => 4i32,
+            "float" => 5.5,
+            "bool" => true,
+            "string" => "thisisastring",
+            "timestamp" => ts(),
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "aws.cloud.eur");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("source_type"), "file");
-
-        event.as_mut_log().insert(LookupBuf::from("int"), 4i32);
-        event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
-        event.as_mut_log().insert(LookupBuf::from("bool"), true);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("string"), "thisisastring");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -359,26 +346,17 @@ mod tests {
 
     #[test]
     fn test_encode_event() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "aws.cloud.eur",
+            "source_type" => "file",
+            "int" => 4i32,
+            "float"=> 5.5,
+            "bool" => true,
+            "string" => "thisisastring",
+            "timestamp" => ts(),
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "aws.cloud.eur");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("source_type"), "file");
-
-        event.as_mut_log().insert(LookupBuf::from("int"), 4i32);
-        event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
-        event.as_mut_log().insert(LookupBuf::from("bool"), true);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("string"), "thisisastring");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -414,15 +392,12 @@ mod tests {
 
     #[test]
     fn test_encode_event_without_tags() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "value" => 100,
+            "timestamp" => ts(),
         };
-
-        event.as_mut_log().insert(LookupBuf::from("value"), 100);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -450,28 +425,14 @@ mod tests {
     fn test_encode_nested_fields() {
         crate::test_util::trace_init();
 
-        let mut event = Event::new_empty_log();
-
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("a").unwrap(), 1);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("nested.field").unwrap(), "2");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("nested.bool").unwrap(), true);
-        event.as_mut_log().insert(
-            LookupBuf::from_str("nested.array[0]").unwrap(),
-            "example-value",
-        );
-        event.as_mut_log().insert(
-            LookupBuf::from_str("nested.array[2]").unwrap(),
-            "another-value",
-        );
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("nested.array[3]").unwrap(), 15);
+        let event = log_event! {
+            "a" => 1,
+            LookupBuf::from_str("nested.field").unwrap() => "2",
+            LookupBuf::from_str("nested.bool").unwrap() => true,
+            LookupBuf::from_str("nested.array[0]").unwrap() => "example-value",
+            LookupBuf::from_str("nested.array[2]").unwrap() => "another-value",
+            LookupBuf::from_str("nested.array[3]").unwrap() => 15,
+        };
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -504,20 +465,13 @@ mod tests {
 
     #[test]
     fn test_add_tag() {
-        let mut event = log_event! {
+        let event = log_event! {
             crate::config::log_schema().message_key().clone() => "hello".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "source_type" => "file",
+            "as_a_tag" => 10,
+            "timestamp" => ts(),
         };
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("source_type").unwrap(), "file");
-
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("as_a_tag").unwrap(), 10);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("timestamp").unwrap(), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -574,22 +528,13 @@ mod tests {
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
-            let mut event = log_event! {
+            let event = log_event! {
                 crate::config::log_schema().message_key().clone() => line.to_string(),
                 crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                LookupBuf::from_str(&format!("key{}", i)).unwrap() => format!("value{}", i),
+                LookupBuf::from_str("timestamp").unwrap() => Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0),
+                LookupBuf::from_str("source_type").unwrap() => "file",
             };
-            event.as_mut_log().insert(
-                LookupBuf::from_str(&format!("key{}", i)).unwrap(),
-                format!("value{}", i),
-            );
-
-            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from_str("timestamp").unwrap(), timestamp);
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from_str("source_type").unwrap(), "file");
 
             events.push(event);
         }
@@ -645,21 +590,13 @@ mod tests {
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
-            let mut event = log_event! {
+            let event = log_event! {
                 crate::config::log_schema().message_key().clone() => line.to_string(),
                 crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                LookupBuf::from(format!("key{}", i)) => format!("value{}", i),
+                LookupBuf::from("timestamp") => Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0),
+                LookupBuf::from("source_type") => "file",
             };
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from(format!("key{}", i)), format!("value{}", i));
-
-            let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("timestamp"), timestamp);
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("source_type"), "file");
 
             events.push(event);
         }
@@ -765,27 +702,19 @@ mod integration_tests {
 
         let mut events = Vec::new();
 
-        let mut event1 = log_event! {
+        let event1 = log_event! {
             crate::config::log_schema().message_key().clone() => "message_1".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "host" => "aws.cloud.eur",
+            "source_type" => "file",
         };
-        event1
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "aws.cloud.eur");
-        event1
-            .as_mut_log()
-            .insert(LookupBuf::from("source_type"), "file");
 
-        let mut event2 = log_event! {
+        let event2 = log_event! {
             crate::config::log_schema().message_key().clone() => "message_2".to_string(),
             crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            LookupBuf::from("host") => "aws.cloud.eur",
+            LookupBuf::from("source_type") => "file",
         };
-        event2
-            .as_mut_log()
-            .insert(LookupBuf::from("host"), "aws.cloud.eur");
-        event2
-            .as_mut_log()
-            .insert(LookupBuf::from("source_type"), "file");
 
         events.push(event1);
         events.push(event2);
