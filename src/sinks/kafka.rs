@@ -406,10 +406,13 @@ fn encode_event(
     let key = key_field
         .as_ref()
         .and_then(|f| match &event {
-            Event::Log(log) => log.get(f),
-            Event::Metric(_) => None,
+            Event::Log(log) => log.get(f).map(|value| value.as_bytes().to_vec()),
+            Event::Metric(metric) => metric
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.get(f))
+                .map(|value| value.clone().into_bytes()),
         })
-        .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
     encoding.apply_rules(&mut event);
