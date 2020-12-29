@@ -370,6 +370,7 @@ cli: {
 					description: """
 						File containing the object(s) to manipulate. Leave empty to use stdin.
 						"""
+					type: "string"
 				}
 
 				"program": {
@@ -377,6 +378,7 @@ cli: {
 					description: """
 						File containing the programing to execute. Can be used instead of `PROGRAM`.
 						"""
+					type: "string"
 				}
 			}
 
