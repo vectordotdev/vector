@@ -44,7 +44,7 @@ impl Expression for IsBlankFn {
                     Ok(true.into())
                 } else {
                     match s {
-                        "\n" | "-" => Ok(true.into()),
+                        "\n" => Ok(true.into()),
                         _ => Ok(false.into()),
                     }
                 }
