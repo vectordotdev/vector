@@ -12,6 +12,7 @@ use vector::{
         disk::{leveldb_buffer, DiskBuffer},
         Acker,
     },
+    config::log_schema,
     log_event,
     sinks::util::StreamSink,
     test_util::{random_lines, runtime},
@@ -192,8 +193,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
     stream::iter_ok(random_lines(size)).map(|v| {
         log_event! {
-            vector::config::log_schema().message_key().clone() => v,
-            vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => v,
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         }
     })
 }

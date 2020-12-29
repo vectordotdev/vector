@@ -13,8 +13,8 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     group.bench_function("dynamic", |b| {
         let index = Template::try_from("index-%Y.%m.%d").unwrap();
         let mut event = log_event! {
-            vector::config::log_schema().message_key().clone() => "hello world".to_string(),
-            vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -30,8 +30,8 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     group.bench_function("static", |b| {
         let index = Template::try_from("index").unwrap();
         let mut event = log_event! {
-            vector::config::log_schema().message_key().clone() => "hello world".to_string(),
-            vector::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()

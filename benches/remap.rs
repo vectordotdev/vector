@@ -80,10 +80,11 @@ fn benchmark_remap(c: &mut Criterion) {
         );
 
         let event = {
-            let mut event = Event::from("augment me");
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("copy_from"), "buz".to_owned());
+            let mut event = log_event! {
+                log_schema().message_key().clone() => "augment me",
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                "copy_from" => "buz".to_owned(),
+            };
             event
         };
 
@@ -102,12 +103,10 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let mut tform: Box<dyn FunctionTransform> = Box::new(AddFields::new(fields, true).unwrap());
 
-        let event = {
-            let mut event = Event::from("augment me");
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("copy_from"), "buz".to_owned());
-            event
+        let event = log_event! {
+            log_schema().message_key().clone() => "augment me",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "copy_from" => "buz".to_owned(),
         };
 
         b.iter_batched(
@@ -143,12 +142,10 @@ fn benchmark_remap(c: &mut Criterion) {
             .unwrap(),
         );
 
-        let event = {
-            let mut event = Event::from("parse me");
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("foo"), r#"{"key": "value"}"#.to_owned());
-            event
+        let event = log_event! {
+            log_schema().message_key().clone() => "parse me",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => r#"{"key": "value"}"#.to_owned(),
         };
 
         b.iter_batched(
@@ -167,12 +164,10 @@ fn benchmark_remap(c: &mut Criterion) {
             overwrite_target: None,
         }));
 
-        let event = {
-            let mut event = Event::from("parse me");
-            event
-                .as_mut_log()
-                .insert(LookupBuf::from("foo"), r#"{"key": "value"}"#.to_owned());
-            event
+        let event = log_event! {
+            log_schema().message_key().clone() => "parse me",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "foo" => r#"{"key": "value"}"#.to_owned(),
         };
 
         b.iter_batched(
@@ -211,7 +206,10 @@ fn benchmark_remap(c: &mut Criterion) {
             .unwrap(),
         );
 
-        let mut event = Event::from("coerce me");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "coerce me",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         for (key, value) in [
             (LookupBuf::from("number"), "1234".to_string()),
             (LookupBuf::from("bool"), "yes".to_string()),
@@ -256,7 +254,10 @@ fn benchmark_remap(c: &mut Criterion) {
             })
             .into_function();
 
-        let mut event = Event::from("coerce me");
+        let mut event = log_event! {
+            log_schema().message_key().clone() => "coerce me",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
         for (key, value) in [
             (LookupBuf::from("number"), "1234".to_string()),
             (LookupBuf::from("bool"), "yes".to_string()),

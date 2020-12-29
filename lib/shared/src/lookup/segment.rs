@@ -233,7 +233,7 @@ impl<'a> Segment<'a> {
                 let index = segment
                     .as_str()
                     .parse()
-                    .map_err(LookupError::IndexParsing)?;
+                    .map_err(|source| LookupError::IndexParsing { source })?;
                 tracing::trace!(segment = %index, ?rule, action = %"push");
                 Segment::index(index)
             }
