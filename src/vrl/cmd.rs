@@ -1,7 +1,4 @@
-use super::{
-    Error,
-    repl::repl,
-};
+use super::{repl::repl, Error};
 use remap::{state, Object, Program, Runtime, Value};
 use std::collections::BTreeMap;
 use std::fs::File;

@@ -1,11 +1,11 @@
 use super::Error;
 use remap::{state, Object, Program, Runtime, Value};
-use rustyline::{Context, Editor, Helper};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
+use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 pub fn repl(mut objects: Vec<Value>) -> Result<(), Error> {

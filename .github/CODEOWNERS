@@ -91,7 +91,6 @@
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
 /lib/remap-lang/ @JeanMertz @FungusHumungus
-/lib/remap-cli/ @JeanMertz
 /lib/remap-functions/ @JeanMertz
 /lib/remap-functions/src/assert.rs @FungusHumungus
 /lib/remap-functions/src/compact.rs @FungusHumungus
@@ -209,7 +208,7 @@
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 
-/src/remap/ @JeanMertz
+/src/vrl/ @JeanMertz
 
 /src/wasm/ @hoverbear @JeanMertz
 
