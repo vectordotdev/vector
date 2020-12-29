@@ -4,8 +4,6 @@ use structopt::{clap::AppSettings, StructOpt};
 
 #[cfg(feature = "api-client")]
 use crate::top;
-#[cfg(feature = "vrl-cli")]
-use crate::vrl;
 
 #[cfg(windows)]
 use crate::service;
@@ -155,7 +153,7 @@ pub enum SubCommand {
 
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
-    VRL(vrl::Opts),
+    VRL(remap_cli::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

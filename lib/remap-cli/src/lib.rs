@@ -1,8 +1,8 @@
-mod cmd;
+pub mod cmd;
+#[cfg(feature = "repl")]
 mod repl;
 
-pub use cmd::run;
-pub use cmd::Opts;
+pub use cmd::{cmd, Opts};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -14,4 +14,8 @@ pub enum Error {
 
     #[error("json error")]
     Json(#[from] serde_json::Error),
+
+    #[cfg(not(feature = "repl"))]
+    #[error("repl feature disabled, program input required")]
+    ReplFeature,
 }

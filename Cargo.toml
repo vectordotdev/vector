@@ -43,6 +43,7 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/prometheus-parser",
   "lib/vector-api-client",
+  "lib/remap-cli",
   "lib/remap-lang",
   "lib/remap-functions",
 ]
@@ -55,6 +56,7 @@ file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+remap-cli = { path = "lib/remap-cli", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -201,8 +203,6 @@ indoc = "1.0.3"
 avro-rs = { version = "0.12.0", optional = true }
 dirs-next = { version = "1", optional = true }
 fakedata_generator = "0.2.4"
-rustyline = { version = "7.0.0", default-features = false, optional = true }
-thiserror = "1.0.23"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -289,7 +289,7 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 kubernetes = ["k8s-openapi", "evmap"]
 
 # VRL
-vrl-cli = ["rustyline"]
+vrl-cli = ["remap-cli"]
 
 # API
 api = [

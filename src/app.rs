@@ -18,8 +18,6 @@ use futures01::sync::mpsc;
 use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
-#[cfg(feature = "vrl-cli")]
-use crate::vrl;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 
@@ -124,7 +122,7 @@ impl Application {
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::VRL(s) => vrl::run(&s),
+                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);

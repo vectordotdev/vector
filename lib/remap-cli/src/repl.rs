@@ -1,4 +1,4 @@
-use super::Error;
+use crate::Error;
 use remap::{state, Object, Program, Runtime, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -8,7 +8,7 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
-pub fn repl(mut objects: Vec<Value>) -> Result<(), Error> {
+pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
 
     let mut rt = Runtime::new(state::Program::default());
@@ -48,7 +48,7 @@ pub fn repl(mut objects: Vec<Value>) -> Result<(), Error> {
 >      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
-> Any other value is resolved to a VRL expression.
+> Any other value is resolved to a TRL expression.
 >
 > Try it out now by typing `.` and hitting [enter] to see the result.\n"
     );

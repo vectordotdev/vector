@@ -1,4 +1,4 @@
-use super::{repl::repl, Error};
+use super::{Error, repl};
 use remap::{state, Object, Program, Runtime, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -33,8 +33,8 @@ pub struct Opts {
     print_object: bool,
 }
 
-pub fn run(opts: &Opts) -> exitcode::ExitCode {
-    match run_program(opts) {
+pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    match run(opts) {
         Ok(_) => exitcode::OK,
         Err(err) => {
             eprintln!("{}", err);
@@ -43,7 +43,7 @@ pub fn run(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn run_program(opts: &Opts) -> Result<(), Error> {
+fn run(opts: &Opts) -> Result<(), Error> {
     let objects = read_into_objects(opts.input_file.as_ref())?;
     let program = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
 
@@ -67,6 +67,16 @@ fn run_program(opts: &Opts) -> Result<(), Error> {
 
         Ok(())
     }
+}
+
+#[cfg(feature = "repl")]
+fn repl(objects: Vec<Value>) -> Result<(), Error> {
+    repl::run(objects)
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(object: Vec<Value>) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
