@@ -115,7 +115,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LookupBuf, log_event};
+    use crate::{config::log_schema, log_event};
 
     #[test]
     fn generate_config() {
@@ -124,11 +124,11 @@ mod tests {
 
     #[test]
     fn encode_event_apply_rules() {
-        let mut evt = log_event! {
-            crate::config::log_schema().message_key().clone() => "vector".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let evt = log_event! {
+            log_schema().message_key().clone() => "vector".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "magic" => "key",
         };
-        evt.as_mut_log().insert(LookupBuf::from("magic"), "key");
 
         let bytes = encode_event(
             evt,

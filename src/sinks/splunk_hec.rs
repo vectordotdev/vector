@@ -300,6 +300,7 @@ fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
 mod tests {
     use super::*;
     use crate::{
+        config::log_schema,
         log_event,
         sinks::util::{http::HttpSink, test::load_sink},
     };
@@ -329,14 +330,12 @@ mod tests {
 
     #[test]
     fn splunk_encode_event_json() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
+            "magic" => "vector",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("magic"), "vector");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -387,11 +386,11 @@ mod tests {
 
     #[test]
     fn splunk_encode_event_text() {
-        let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        let event = log_event! {
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            "key" => "value",
         };
-        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -490,8 +489,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         sink.run(stream::once(ready(event))).await.unwrap();
 
@@ -512,8 +511,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         sink.run(stream::once(ready(event))).await.unwrap();
 
@@ -532,8 +531,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         sink.run(stream::once(ready(event))).await.unwrap();
 
@@ -554,8 +553,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event
             .as_mut_log()
@@ -608,8 +607,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
@@ -631,8 +630,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         event
@@ -661,8 +660,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
@@ -689,8 +688,8 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         event

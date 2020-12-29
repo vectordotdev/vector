@@ -84,7 +84,7 @@ impl SinkConfig for SocketSinkConfig {
 mod test {
     use super::*;
     use crate::{
-        config::SinkContext,
+        config::{log_schema, SinkContext},
         event::Event,
         test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
     };
@@ -118,8 +118,8 @@ mod test {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = shared::log_event! {
-            crate::config::log_schema().message_key().clone() => String::from("raw log line"),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => String::from("raw log line"),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         sink.run(stream::once(ready(event))).await.unwrap();
 

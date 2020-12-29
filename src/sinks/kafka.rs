@@ -338,8 +338,8 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         .context(TopicTemplate)?
         .render_string(
             shared::log_event! {
-                crate::config::log_schema().message_key().clone() => String::from(""),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => String::from(""),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }
             .borrow(),
         ) {
@@ -394,7 +394,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::log_event;
+    use crate::{config::log_schema, log_event};
     use std::collections::BTreeMap;
 
     #[test]
@@ -408,8 +408,8 @@ mod tests {
         let message = "hello world".to_string();
         let (key_bytes, bytes) = encode_event(
             log_event! {
-                crate::config::log_schema().message_key().clone() => message.clone(),
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message.clone(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             },
             &None,
             &EncodingConfig::from(Encoding::Text),
@@ -423,8 +423,8 @@ mod tests {
     fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.clone(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.clone(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
@@ -446,8 +446,8 @@ mod tests {
     #[test]
     fn kafka_encode_event_apply_rules() {
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
 

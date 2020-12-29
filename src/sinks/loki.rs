@@ -247,6 +247,7 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 mod tests {
     use super::*;
     use crate::{
+        config::log_schema,
         event::LookupBuf,
         log_event,
         sinks::util::{
@@ -275,8 +276,8 @@ mod tests {
         .unwrap();
 
         let mut e1 = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         e1.as_mut_log()
@@ -315,8 +316,8 @@ mod tests {
         .unwrap();
 
         let mut e1 = log_event! {
-            crate::config::log_schema().message_key().clone() => "hello world".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "hello world".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
 
         e1.as_mut_log()
@@ -413,8 +414,8 @@ mod integration_tests {
 
         let events = lines.clone().into_iter().map(|v| {
             log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => v,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }
         });
         let _ = sink
@@ -455,8 +456,8 @@ mod integration_tests {
             .take(10)
             .map(|v| {
                 log_event! {
-                    crate::config::log_schema().message_key().clone() => v,
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => v,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 }
             })
             .collect::<Vec<_>>();
@@ -497,8 +498,8 @@ mod integration_tests {
             .into_iter()
             .map(|v| {
                 log_event! {
-                    crate::config::log_schema().message_key().clone() => v,
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => v,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 }
             })
             .collect::<Vec<_>>();
@@ -567,8 +568,8 @@ mod integration_tests {
             .into_iter()
             .map(|v| {
                 log_event! {
-                    crate::config::log_schema().message_key().clone() => v,
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                    log_schema().message_key().clone() => v,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 }
             })
             .collect::<Vec<_>>();

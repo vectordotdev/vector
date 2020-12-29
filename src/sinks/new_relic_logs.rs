@@ -167,7 +167,7 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
-        config::SinkConfig,
+        config::{log_schema, SinkConfig},
         log_event,
         sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
         test_util::next_addr,
@@ -329,8 +329,8 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(|v| {
             log_event! {
-                crate::config::log_schema().message_key().clone() => v,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => v,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             }
         });
         let pump = sink.run(events);

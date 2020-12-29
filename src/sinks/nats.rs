@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
     sinks::util::{
@@ -196,7 +196,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
         Encoding::Json => serde_json::to_string(event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(crate::config::log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_default(),
     }
@@ -219,8 +219,8 @@ mod tests {
     #[test]
     fn encodes_raw_logs() {
         let event = log_event! {
-            crate::config::log_schema().message_key().clone() => "foo".to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => "foo".to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         assert_eq!(
             "foo",
