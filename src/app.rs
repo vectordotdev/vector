@@ -18,10 +18,10 @@ use futures01::sync::mpsc;
 use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 #[cfg(feature = "vrl-cli")]
 use crate::vrl;
+#[cfg(feature = "api")]
+use crate::{api, internal_events::ApiStarted};
 
 #[cfg(windows)]
 use crate::service;
