@@ -1,8 +1,5 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
-use crate::{event::*, lookup::*};
-use pest::iterators::Pair;
-use remap_lang::parser::ParserRule;
 use std::{
     collections::VecDeque,
     convert::TryFrom,
@@ -11,15 +8,21 @@ use std::{
     str,
     str::FromStr,
 };
-use toml::Value as TomlValue;
-use tracing::{instrument, trace};
 
 use indexmap::map::IndexMap;
-use serde::de::{self, Visitor};
+use pest::iterators::Pair;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{self, Visitor};
+use toml::Value as TomlValue;
+use tracing::{instrument, trace};
+use remap_lang::parser::ParserRule;
+use crate::{event::*, lookup::*};
 
 #[cfg(test)]
 mod test;
+
+mod segmentbuf;
+pub use segmentbuf::SegmentBuf;
 
 /// `LookupBuf`s are pre-validated, owned event lookup paths.
 ///

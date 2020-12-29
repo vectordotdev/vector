@@ -1,19 +1,22 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
+use core::fmt;
+use std::{collections::VecDeque, convert::TryFrom, str};
+use std::fmt::{Display, Formatter};
+use std::ops::{Index, IndexMut};
+use pest::iterators::Pair;
+use pest::Parser;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{self, Visitor};
+use tracing::instrument;
+use remap_lang::parser::{Parser as RemapParser, ParserRule};
+use crate::lookup::*;
+
 #[cfg(test)]
 mod test;
 
-use crate::lookup::*;
-use core::fmt;
-use pest::iterators::Pair;
-use pest::Parser;
-use remap_lang::parser::{Parser as RemapParser, ParserRule};
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::ops::{Index, IndexMut};
-use std::{collections::VecDeque, convert::TryFrom, str};
-use tracing::instrument;
+mod segment;
+pub use segment::Segment;
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///

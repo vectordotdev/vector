@@ -1,18 +1,14 @@
-mod segmentbuf;
-pub use segmentbuf::SegmentBuf;
-
-mod lookup_view;
-pub use lookup_view::Lookup;
-mod lookup_buf;
-pub use lookup_buf::LookupBuf;
-mod segment;
-pub use segment::Segment;
-mod error;
-pub use error::LookupError;
-
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+
+pub use error::LookupError;
+pub use lookup_buf::{LookupBuf, SegmentBuf};
+pub use lookup_view::{Lookup, Segment};
+
+mod lookup_view;
+mod lookup_buf;
+mod error;
 
 // This trait, while it is not necessarily imported and used, exists
 // to enforce parity among view/buf types.
