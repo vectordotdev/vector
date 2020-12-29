@@ -61,7 +61,12 @@ impl Expression for ToIntFn {
         self.value
             .type_def(state)
             .fallible_unless(
-                Kind::Integer | Kind::Float | Kind::Bytes | Kind::Boolean | Kind::Timestamp | Kind::Null,
+                Kind::Integer
+                    | Kind::Float
+                    | Kind::Bytes
+                    | Kind::Boolean
+                    | Kind::Timestamp
+                    | Kind::Null,
             )
             .with_constraint(Kind::Integer)
     }
