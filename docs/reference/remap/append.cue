@@ -18,8 +18,9 @@ remap: functions: append: {
 	return: ["array"]
 	category: "Array"
 	description: """
-		Appends the specified item to an array and returns the new array. The item can be of any VRL
-		type and is appended even if an item with the same value is already present in the array.
+		Appends the specified item to an array and returns the modified array. The item can be of
+		any VRL type and is appended even if an item with the same value is already present in the
+		array.
 		"""
 	examples: [
 		{
