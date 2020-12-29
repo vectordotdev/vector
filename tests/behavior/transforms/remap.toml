@@ -1420,6 +1420,8 @@
     .d = is_blank(.d)
     .e = is_blank(.e)
     .f = is_blank(.f)
+    .g = is_blank(.g)
+    .h = is_blank(.h)
   """
 [[tests]]
   name = "remap_function_is_blank"
@@ -1432,8 +1434,9 @@
       c = "     "
       d = "-"
       e = "null"
-      f = "i am a teapot"
-      g = 127
+      f = "\n"
+      g = "i am a teapot"
+      h = 127
   [[tests.outputs]]
     extract_from = "remap_function_is_blank"
     [[tests.outputs.conditions]]
@@ -1442,8 +1445,9 @@
       "c.equals" = true
       "d.equals" = true
       "e.equals" = true
-      "f.equals" = false
+      "f.equals" = true
       "g.equals" = false
+      "h.equals" = false
 
 [transforms.remap_function_parse_regex]
   inputs = []
