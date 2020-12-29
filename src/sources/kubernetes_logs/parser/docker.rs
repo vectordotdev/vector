@@ -143,7 +143,7 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::{super::test_util, *};
-    use crate::{log_event, test_util::trace_init, transforms::Transform};
+    use crate::{log_event, config::log_schema, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -243,8 +243,8 @@ pub mod tests {
 
         for message in cases {
             let input = log_event! {
-                crate::config::log_schema().message_key().clone() => message,
-                crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                log_schema().message_key().clone() => message,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
             };
             let mut output = Vec::new();
             Docker.transform(&mut output, input);

@@ -2,6 +2,7 @@ use crate::{
     event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     log_event,
+    config::log_schema,
     shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
@@ -44,11 +45,11 @@ impl UnixConfig {
 fn build_event(host_key: LookupBuf, received_from: Option<Bytes>, line: &str) -> Option<Event> {
     let byte_size = line.len();
     let mut event = log_event! {
-        crate::config::log_schema().message_key().clone() => line,
-        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        log_schema().message_key().clone() => line,
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key().clone(),
+        log_schema().source_type_key().clone(),
         Bytes::from("socket"),
     );
     if let Some(host) = received_from {

@@ -2,7 +2,7 @@ use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
 use crate::{
     config::log_schema,
-    event::{Event, LookupBuf},
+    event::{Event},
     Pipeline,
 };
 use bytes::Bytes;
@@ -66,8 +66,8 @@ fn parse_records(
 
                 log.insert(log_schema().message_key().clone(), record);
                 log.insert(log_schema().timestamp_key().clone(), request.timestamp);
-                log.insert(LookupBuf::from("request_id"), request_id.to_string());
-                log.insert(LookupBuf::from("source_arn"), source_arn.to_string());
+                log.insert("request_id", request_id.to_string());
+                log.insert("source_arn", source_arn.to_string());
 
                 event
             })

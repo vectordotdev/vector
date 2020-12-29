@@ -308,8 +308,8 @@ fn create_event<'a>(
     });
 
     let mut event = log_event! {
-        crate::config::log_schema().message_key().clone() => line,
-        crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        log_schema().message_key().clone() => line,
+        log_schema().timestamp_key().clone() => chrono::Utc::now(),
     };
 
     // Add source type

@@ -202,8 +202,8 @@ fn line_to_event(line: String) -> Event {
         let message = parts[7];
 
         let mut event = log_event! {
-            crate::config::log_schema().message_key().clone() => message.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => message.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         let log = event.as_mut_log();
 
@@ -224,8 +224,8 @@ fn line_to_event(line: String) -> Event {
             rate_limit_secs = 10
         );
         log_event! {
-            crate::config::log_schema().message_key().clone() => line.to_string(),
-            crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            log_schema().message_key().clone() => line.to_string(),
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
         }
     };
 

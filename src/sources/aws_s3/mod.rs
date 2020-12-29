@@ -258,7 +258,7 @@ mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
         config::{GlobalOptions, SourceConfig},
-        event::{Lookup, Value},
+        event::{Value},
         line_agg,
         rusoto::RegionOrEndpoint,
         shutdown::ShutdownSignal,
@@ -386,19 +386,19 @@ mod integration_tests {
 
             let log = event.as_log();
             assert_eq!(
-                log.get(Lookup::from("message")),
+                log.get("message"),
                 Some(&Value::from(message.to_string()))
             );
             assert_eq!(
-                log.get(Lookup::from("bucket")),
+                log.get("bucket"),
                 Some(&Value::from(bucket.clone()))
             );
             assert_eq!(
-                log.get(Lookup::from("object")),
+                log.get("object"),
                 Some(&Value::from(key.clone()))
             );
             assert_eq!(
-                log.get(Lookup::from("region")),
+                log.get("region"),
                 Some(&Value::from("us-east-1".to_string()))
             );
         }

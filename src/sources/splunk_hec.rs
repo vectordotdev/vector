@@ -453,7 +453,7 @@ impl<R: Read> Stream for EventStream<R> {
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             for (key, value) in object {
-                log.insert(LookupBuf::from(key), value);
+                log.insert(key, value);
             }
         }
 

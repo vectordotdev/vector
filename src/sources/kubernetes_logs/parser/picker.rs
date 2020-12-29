@@ -63,7 +63,7 @@ mod tests {
     use super::super::{cri, docker, test_util};
     use super::*;
     use crate::{
-        event::{Event, LogEvent, LookupBuf},
+        event::{Event, LogEvent},
         log_event,
         test_util::trace_init,
         transforms::Transform,
@@ -111,7 +111,7 @@ mod tests {
             // Non-bytes `message` field.
             {
                 let mut input = Event::new_empty_log();
-                input.as_mut_log().insert(LookupBuf::from("message"), 123);
+                input.as_mut_log().insert("message", 123);
                 input
             },
         ];

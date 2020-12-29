@@ -243,9 +243,9 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(LookupBuf::from_str("name").unwrap(), "sandbox0-name");
-                    log.insert(LookupBuf::from_str("ns").unwrap(), "sandbox0-ns");
-                    log.insert(LookupBuf::from_str("uid").unwrap(), "sandbox0-uid");
+                    log.insert("name", "sandbox0-name");
+                    log.insert("ns", "sandbox0-ns");
+                    log.insert("uid", "sandbox0-uid");
                     log.insert(
                         LookupBuf::from_str("labels.sandbox0-label0").unwrap(),
                         "val0",
@@ -337,7 +337,7 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert(LookupBuf::from_str("container_name").unwrap(), "sandbox0-container0-name");
+                log.insert("container_name", "sandbox0-container0-name");
                 log
             },
         )];
@@ -385,7 +385,7 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert(
-                        LookupBuf::from_str("node_name").unwrap(),
+                        "node_name",
                         "sandbox0-node-name",
                     );
                     log

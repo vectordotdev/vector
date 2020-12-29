@@ -203,17 +203,6 @@ fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 
-// fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-//     match value {
-//         JsonValue::Object(_) => "Object",
-//         JsonValue::Array(_) => "Array",
-//         JsonValue::String(_) => "String",
-//         JsonValue::Number(_) => "Number",
-//         JsonValue::Bool(_) => "Bool",
-//         JsonValue::Null => "Null",
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};

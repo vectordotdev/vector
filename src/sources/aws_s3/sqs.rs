@@ -358,9 +358,9 @@ impl Ingestor {
                     };
 
                     let log = event.as_mut_log();
-                    log.insert(LookupBuf::from("bucket"), s3_event.s3.bucket.name.clone());
-                    log.insert(LookupBuf::from("object"), s3_event.s3.object.key.clone());
-                    log.insert(LookupBuf::from("region"), s3_event.aws_region.clone());
+                    log.insert("bucket", s3_event.s3.bucket.name.clone());
+                    log.insert("object", s3_event.s3.object.key.clone());
+                    log.insert("region", s3_event.aws_region.clone());
                     log.insert(log_schema().timestamp_key().clone(), timestamp);
 
                     if let Some(metadata) = &metadata {
