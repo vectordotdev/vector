@@ -84,8 +84,8 @@ components: sources: postgresql_metrics: {
 		}
 		included_databases: {
 			description: "A list of databases to match against `datname` column for which you want to collect logs from."
-			common: false,
-			required: false,
+			common:      false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: examples: ["postgres", "vector"]
@@ -93,17 +93,17 @@ components: sources: postgresql_metrics: {
 		}
 		excluded_databases: {
 			description: "A list of databases to match against `datname` column for which you don't want to collect logs from."
-			common: false,
-			required: false,
+			common:      false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: examples: ["postgres", "vector"]
 			}
 		}
 		tls: {
-			common: false
+			common:      false
 			description: "TLS options to connect to the PostgreSQL Server."
-			required: false
+			required:    false
 			type: object: {
 				examples: []
 				options: {
