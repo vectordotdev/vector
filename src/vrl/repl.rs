@@ -48,7 +48,7 @@ pub fn repl(mut objects: Vec<Value>) -> Result<(), Error> {
 >      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
-> Any other value is resolved to a TRL expression.
+> Any other value is resolved to a VRL expression.
 >
 > Try it out now by typing `.` and hitting [enter] to see the result.\n"
     );

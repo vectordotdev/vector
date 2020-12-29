@@ -18,31 +18,31 @@ be filed as issues, once development is a bit further along.
 ## Profiling
 
 - add `--profile` flag
-- profile performance of TRL scripts
+- profile performance of VRL scripts
 - execution time (total and per expression)
 - memory allocations (<https://docs.rs/dhat/0.1.1/dhat/>)
 
 ## Documentation
 
 - add `--docs` flag
-- should open the TRL documentation in the browser
+- should open the VRL documentation in the browser
 - add `--examples` flag
 - should print a list of common input > program > result examples
 
 ## Add Function Support
 
-- currently all TRL functions are implemented in Vector itself
+- currently all VRL functions are implemented in Vector itself
 - this means they aren't available in this CLI
-- we should move those into a `trl-contrib` library
+- we should move those into a `vrl-contrib` library
 - this CLI (and Vector) will depend on that library
 - this ensures feature parity between Vector and this CLI
 
 ## Support WASM Binary
 
 - this one is only partially related to the CLI
-- the goal is to compile TRL to wasm
+- the goal is to compile VRL to wasm
 - using that, provide a simple demo website that has two input fields
 - one field takes a JSON payload
-- the second a TRL program
+- the second a VRL program
 - running the program shows the execution result on the page
-- TRL runs locally in the browser, no web-server required
+- VRL runs locally in the browser, no web-server required
