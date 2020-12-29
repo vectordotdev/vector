@@ -270,6 +270,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_blank")]
+        Box::new(IsBlank),
         #[cfg(feature = "log")]
         Box::new(Log),
         #[cfg(feature = "merge")]
