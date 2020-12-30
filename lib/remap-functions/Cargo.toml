@@ -66,6 +66,8 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_syslog",
+    "parse_regex",
+    "parse_regex_all",
     "parse_timestamp",
     "parse_url",
     "redact",
@@ -111,7 +113,7 @@ ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 log = ["tracing"]
-match = []
+match = ["regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = []
@@ -122,6 +124,8 @@ parse_aws_vpc_flow_log = []
 parse_duration = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
+parse_regex = ["regex"]
+parse_regex_all = ["regex"]
 parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_url = ["url"]

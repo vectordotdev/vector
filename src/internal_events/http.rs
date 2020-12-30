@@ -35,7 +35,7 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
             message = "Received bad request.",
             code = ?self.error_code,
             error_message = ?self.error_message,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -51,7 +51,7 @@ impl InternalEvent for HTTPEventMissingMessage {
     fn emit_logs(&self) {
         warn!(
             message = "Event missing the message key; dropping event.",
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         );
     }
 
@@ -88,7 +88,7 @@ impl<'a> InternalEvent for HTTPDecompressError<'a> {
             message = "Failed decompressing payload.",
             encoding= %self.encoding,
             error = %self.error,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 

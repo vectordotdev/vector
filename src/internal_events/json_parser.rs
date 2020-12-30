@@ -18,7 +18,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
                 field = %self.field,
                 value = %self.value,
                 error = ?self.error,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             )
         } else {
             warn!(
@@ -26,7 +26,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
                 field = %self.field,
                 value = %self.value,
                 error = ?self.error,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             )
         }
     }
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
         warn!(
             message = "Target field already exists.",
             target_field = %self.target_field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 

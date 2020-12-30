@@ -442,7 +442,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in group template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -454,7 +454,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in stream template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -464,7 +464,9 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
+        .map_err(
+            |error| error!(message = "Could not encode event.", %error, internal_log_rate_secs = 5),
+        )
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))

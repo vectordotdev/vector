@@ -28,7 +28,7 @@ impl<'a> InternalEvent for ElasticSearchMissingKeys<'a> {
         warn!(
             message = "Keys do not exist on the event; dropping event.",
             missing_keys = ?self.keys,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 

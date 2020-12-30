@@ -11,7 +11,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
         warn!(
             message = "Regex pattern failed to match.",
             field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -45,7 +45,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
         warn!(
             message = "Target field already exists.",
             target_field = %self.target_field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
@@ -66,7 +66,7 @@ impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
             message = "Could not convert types.",
             name = %self.name,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
