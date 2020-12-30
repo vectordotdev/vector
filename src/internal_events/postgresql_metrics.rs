@@ -27,7 +27,7 @@ pub struct PostgresqlMetricsCollectFailed<'a> {
 
 impl<'a> InternalEvent for PostgresqlMetricsCollectFailed<'a> {
     fn emit_logs(&self) {
-        error!(message = "PostgreSQL request error.", endpoint = %self.endpoint, error = %self.error)
+        error!(message = "PostgreSQL query error.", endpoint = %self.endpoint, error = %self.error)
     }
 
     fn emit_metrics(&self) {

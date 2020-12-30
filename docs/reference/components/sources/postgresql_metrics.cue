@@ -25,10 +25,6 @@ components: sources: postgresql_metrics: {
 
 				interface: {
 					socket: {
-						// api: {
-						//  title: "TODO: permissions"
-						//  url:   urls.?
-						// }
 						direction: "outgoing"
 						protocols: ["tcp", "unix"]
 						ssl: "optional"
@@ -120,13 +116,25 @@ components: sources: postgresql_metrics: {
 		}
 	}
 
-	// how_it_works: {}
+	how_it_works: {
+		privileges: {
+			title: "Required Privileges"
+			body:  """
+				PostgreSQL Metrics component collect metrics by making queries
+				to PostgreSQL Server. You need to be sure that provided user
+				allowed to make select queries for statistics views:
+
+				- `pg_stat_database`
+				- `pg_stat_database_conflicts`
+				- `pg_stat_bgwriter`
+				"""
+		}
+	}
 
 	telemetry: metrics: {
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
 		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		request_errors_total:         components.sources.internal_metrics.output.metrics.request_errors_total
-		// TODO: add more
 	}
 
 	output: metrics: {
