@@ -128,7 +128,7 @@ impl LogEvent {
                 requires_quoting: _,
             } => {
                 if working_lookup.len() == 0 {
-                    // Terminus: We **must** insert here or abort.
+                    // Terminus: We **must** get something here, else we truly have nothing.
                     trace!(field = %name, "Getting from root.");
                     self.fields.get(name)
                 } else {
@@ -437,11 +437,8 @@ impl LogEvent {
                 if working_lookup.len() == 0 {
                     // Terminus: We **must** insert here or abort.
                     trace!(field = %name, "Getting from root.");
-                    let retval = self.fields.remove(name);
-                    if prune && self.fields.get(name) == Some(&Value::Null) {
-                        self.fields.remove(name);
-                    }
-                    retval
+                    // Do not need to prune, it's already a root value.
+                    self.fields.remove(name)
                 } else {
                     trace!(field = %name, "Seeking into map.");
                     let retval = match self.fields.get_mut(name) {
