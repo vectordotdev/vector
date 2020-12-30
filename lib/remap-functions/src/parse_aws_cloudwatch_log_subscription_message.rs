@@ -9,7 +9,7 @@ pub struct ParseAwsCloudWatchLogSubscriptionMessage;
 
 impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
     fn identifier(&self) -> &'static str {
-        "parse_json"
+        "parse_aws_cloudwatch_log_subscription_message"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
