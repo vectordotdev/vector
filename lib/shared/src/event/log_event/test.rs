@@ -866,7 +866,10 @@ mod remap {
                 map! { "foo": "bar", "baz": "qux" },
                 Ok(vec![".", ".baz", ".foo"]),
             ),
-            (map! { "foo": map!{ "bar": "baz" }}, Ok(vec![".", ".foo.bar"])),
+            (
+                map! { "foo": map!{ "bar": "baz" }},
+                Ok(vec![".", ".foo.bar"]),
+            ),
             (map! { "a": vec![0, 1] }, Ok(vec![".", ".a[0]", ".a[1]"])),
             (
                 map! {
@@ -888,7 +891,11 @@ mod remap {
                         },
                     ],
                 },
-                Ok(vec![".", ".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
+                Ok(vec![
+                    ".",
+                    ".a[0].b[0].c.d.e[0][0]",
+                    ".a[0].b[0].c.d.e[0][1]",
+                ]),
             ),
         ];
 
