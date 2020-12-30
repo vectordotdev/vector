@@ -101,7 +101,12 @@ mod tests {
 
         string_fallible {
             expr: |_| ToIntFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         map_fallible {
@@ -112,11 +117,6 @@ mod tests {
         array_fallible {
             expr: |_| ToIntFn { value: array![].boxed() },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
-        }
-
-        timestamp_infallible {
-            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
-            def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
         }
     ];
 
