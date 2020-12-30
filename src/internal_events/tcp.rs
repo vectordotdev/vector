@@ -58,7 +58,7 @@ pub struct TcpSocketConnectionError {
 
 impl InternalEvent for TcpSocketConnectionError {
     fn emit_logs(&self) {
-        warn!(message = "Connection error.", error = %self.error, rate_limit_secs = 10);
+        warn!(message = "Connection error.", error = %self.error, internal_log_rate_secs = 10);
     }
 
     fn emit_metrics(&self) {
