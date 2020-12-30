@@ -310,6 +310,7 @@ mod tests {
             "bool" => true,
             "string" => "thisisastring",
             "timestamp" => ts(),
+            "source_type" => "file",
         };
 
         let sink = create_sink(

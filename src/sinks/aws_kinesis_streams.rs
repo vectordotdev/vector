@@ -348,7 +348,7 @@ mod tests {
         let event = log_event! {
             log_schema().message_key().clone() => message.clone(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
-            "key" => "some_key",
+            "key" => "value",
         };
         let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 

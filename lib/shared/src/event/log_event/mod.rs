@@ -96,7 +96,7 @@ impl LogEvent {
         let _guard = span.enter();
 
         // The first step should always be a field.
-        let this_segment = working_lookup.pop_front().unwrap();
+        let this_segment = working_lookup.pop_front().expect("Cannot get immutable borrow of root of event. Call `take()` instead.");
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
@@ -172,7 +172,7 @@ impl LogEvent {
         let _guard = span.enter();
 
         // The first step should always be a field.
-        let this_segment = working_lookup.pop_front().unwrap();
+        let this_segment = working_lookup.pop_front().expect("Cannot get mutable borrow of root of event. Call `take()` instead.");
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
@@ -273,7 +273,7 @@ impl LogEvent {
         let _guard = span.enter();
 
         // The first step should always be a field.
-        let this_segment = working_lookup.pop_front().unwrap();
+        let this_segment = working_lookup.pop_front().expect("Cannot insert to root of event. Create a new event instead.");
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
@@ -404,7 +404,7 @@ impl LogEvent {
         let _guard = span.enter();
 
         // The first step should always be a field.
-        let this_segment = working_lookup.pop_front().unwrap();
+        let this_segment = working_lookup.pop_front().expect("Cannot remove the root of event. Delete the event instead.");
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         match this_segment {
