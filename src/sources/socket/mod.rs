@@ -165,9 +165,10 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    #[cfg(unix)]
+    use crate::event::Value;
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
-        event::Value,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
