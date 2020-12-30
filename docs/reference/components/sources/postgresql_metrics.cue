@@ -119,7 +119,7 @@ components: sources: postgresql_metrics: {
 	how_it_works: {
 		privileges: {
 			title: "Required Privileges"
-			body:  """
+			body: """
 				PostgreSQL Metrics component collect metrics by making queries
 				to PostgreSQL Server. You need to be sure that provided user
 				allowed to make select queries for statistics views:
