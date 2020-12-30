@@ -10,10 +10,11 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::TransformConfig,
+    config::{TransformConfig, log_schema},
     event::{Event, LookupBuf, Value},
     test_util::runtime,
 };
+use shared::log_event;
 
 criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
 criterion_main!(benches);
@@ -80,7 +81,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
 
         let event = {
-            let mut event = log_event! {
+            let event = log_event! {
                 log_schema().message_key().clone() => "augment me",
                 log_schema().timestamp_key().clone() => chrono::Utc::now(),
                 "copy_from" => "buz".to_owned(),
