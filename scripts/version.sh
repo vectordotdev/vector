@@ -10,6 +10,6 @@ set -euo pipefail
 #   An optional "nightly" suffix is added if the build channel
 #   is nightly.
 
-VERSION="${VERSION:-"$(awk -F ' = ' '$1 ~ /version/ { gsub(/[\"]/, "", $2); printf("%s",$2) }' Cargo.toml)"}"
+VERSION="${VERSION:-"$(awk -F ' = ' '$1 ~ /version/ { gsub(/["]/, "", $2); printf("%s",$2) }' Cargo.toml)"}"
 CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 echo "$VERSION"
