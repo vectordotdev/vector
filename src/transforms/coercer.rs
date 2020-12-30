@@ -31,12 +31,13 @@ impl TransformConfig for CoercerConfig {
             &self
                 .types
                 .iter()
+                // Bit of a hack here, `parse_conversion_map` should ideally take LookupBufs.
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
         )?
         .into_iter()
-        .map(|(k, v)| (k.into(), v))
-        .collect();
+        .map(|(k, v)| LookupBuf::from_str(&k).map(|k| (k, v)))
+        .collect::<Result<_, _>>()?;
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
@@ -75,7 +76,7 @@ impl FunctionTransform for Coercer {
             let new_log = new_event.as_mut_log();
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field, false) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                    match conv.convert::<Value>(value.clone_into_bytes()) {
                         Ok(converted) => {
                             new_log.insert(field.clone(), converted);
                         }
@@ -88,7 +89,7 @@ impl FunctionTransform for Coercer {
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field, false) {
-                    match conv.convert::<Value>(value.into_bytes()) {
+                    match conv.convert::<Value>(value.clone_into_bytes()) {
                         Ok(converted) => {
                             log.insert(field.clone(), converted);
                         }
