@@ -19,7 +19,7 @@ pub struct LuaScriptError {
 
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, rate_limit_secs = 30);
+        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
     }
 
     fn emit_metrics(&self) {
@@ -34,7 +34,7 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = ?self.error, rate_limit_secs = 30);
+        error!(message = "Error in lua script; discarding event.", error = ?self.error, internal_log_rate_secs = 30);
     }
 
     fn emit_metrics(&self) {

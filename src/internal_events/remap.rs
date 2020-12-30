@@ -20,7 +20,7 @@ impl InternalEvent for RemapMappingError {
         warn!(
             message,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
@@ -37,7 +37,7 @@ impl InternalEvent for RemapConditionExecutionError {
     fn emit_logs(&self) {
         warn!(
             message = "Remap condition execution failed.",
-            rate_limit_secs = 120
+            internal_log_rate_secs = 120
         )
     }
 

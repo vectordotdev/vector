@@ -209,7 +209,7 @@ impl rlua::UserData for LuaEvent {
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = %key,
-                            rate_limit_secs = 30
+                            internal_log_rate_secs = 30
                         );
                         this.inner.as_mut_log().remove(&key, false);
                     }

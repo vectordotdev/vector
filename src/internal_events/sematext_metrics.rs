@@ -14,7 +14,7 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
             message = "Invalid metric received; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 
@@ -36,7 +36,7 @@ impl InternalEvent for SematextMetricsEncodeEventFailed {
         warn!(
              message = "Failed to encode event; dropping event.",
              error = %self.error,
-             rate_limit_secs = 30
+             internal_log_rate_secs = 30
         );
     }
 

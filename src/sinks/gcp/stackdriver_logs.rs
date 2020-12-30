@@ -229,7 +229,7 @@ fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            rate_limit_secs = 10
+                            internal_log_rate_secs = 10
                         );
                         0
                     }
@@ -240,7 +240,7 @@ fn remap_severity(severity: Value) -> Value {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
                 ?value,
-                rate_limit_secs = 10
+                internal_log_rate_secs = 10
             );
             0
         }

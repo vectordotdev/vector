@@ -274,7 +274,7 @@ fn encode_event(
             warn!(
                 message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
             );
             return None;
         }

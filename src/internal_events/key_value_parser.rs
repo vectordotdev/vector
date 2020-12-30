@@ -14,7 +14,7 @@ impl<'a> InternalEvent for KeyValueParseFailed<'a> {
             message = "Event failed to parse as key/value.",
             key = %self.key,
             error = %self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
@@ -35,7 +35,7 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
         warn!(
             message = "Target field already exists.",
             target_field = %self.target_field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
@@ -56,7 +56,7 @@ impl<'a> InternalEvent for KeyValueFieldDoesNotExist<'a> {
         warn!(
             message = "Field specified does not exist.",
             field = %self.field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
