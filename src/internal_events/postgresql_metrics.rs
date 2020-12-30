@@ -1,4 +1,4 @@
-use crate::{internal_events::InternalEvent, sources::postgresql_metrics::CollectError};
+use crate::internal_events::InternalEvent;
 use metrics::{counter, histogram};
 use std::time::Instant;
 
@@ -21,7 +21,7 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectFailed<'a> {
-    pub error: CollectError,
+    pub error: String,
     pub endpoint: &'a String,
 }
 

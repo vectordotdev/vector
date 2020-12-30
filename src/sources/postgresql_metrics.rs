@@ -74,7 +74,7 @@ enum BuildError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum CollectError {
+enum CollectError {
     #[snafu(display("failed to get value by key: {} (reason: {})", key, source))]
     PostgresGetValue { source: PgError, key: &'static str },
     #[snafu(display("query failed: {}", source))]
@@ -133,7 +133,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
         );
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
-        let sources = try_join_all(self.endpoints.iter().map(|endpoint| {
+        let mut sources = try_join_all(self.endpoints.iter().map(|endpoint| {
             PostgresqlMetrics::new(
                 endpoint.clone(),
                 datname_filter.clone(),
@@ -151,7 +151,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             let mut interval = time::interval(duration).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
-                let metrics = join_all(sources.iter().map(|source| source.collect())).await;
+                let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
                 emit!(PostgresqlMetricsCollectCompleted {
                     start,
                     end: Instant::now()
@@ -278,7 +278,9 @@ impl DatnameFilter {
 
 #[derive(Debug)]
 struct PostgresqlMetrics {
-    client: Client,
+    config: Config,
+    tls_config: Option<PostgresqlMetricsTlsConfig>,
+    client: Option<Client>,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
     datname_filter: DatnameFilter,
@@ -298,10 +300,6 @@ impl PostgresqlMetrics {
             });
         }
 
-        let client = Self::build_client(&config, tls_config).await?;
-
-        Self::check_server_version(&client, &config).await?;
-
         let mut tags = BTreeMap::new();
         tags.insert("endpoint".into(), config_to_endpoint(&config));
         tags.insert(
@@ -313,87 +311,87 @@ impl PostgresqlMetrics {
             },
         );
 
-        Ok(Self {
-            client,
+        let mut this = Self {
+            config,
+            tls_config,
+            client: None,
             namespace,
             tags,
             datname_filter,
-        })
+        };
+        this.build_client().await?;
+        Ok(this)
     }
 
-    async fn build_client(
-        config: &Config,
-        tls_config: Option<PostgresqlMetricsTlsConfig>,
-    ) -> Result<Client, BuildError> {
-        Ok(match tls_config {
+    async fn build_client(&mut self) -> Result<(), BuildError> {
+        self.client = Some(match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
                     SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
-                builder.set_ca_file(tls_config.ca_file).context(TlsFailed)?;
+                builder
+                    .set_ca_file(tls_config.ca_file.clone())
+                    .context(TlsFailed)?;
                 let connector = MakeTlsConnector::new(builder.build());
 
                 let (client, connection) =
-                    config
+                    self.config
                         .connect(connector)
                         .await
                         .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&config),
+                            endpoint: config_to_endpoint(&self.config),
                         })?;
-
-                // TODO:
-                // 1) need shutdown?
-                // 2) remove unwrap()
-                // 3) reconnect
-                tokio::spawn(async move {
-                    // if let Err(e) = connection.await {
-                    //     eprintln!("connection error: {}", e);
-                    // }
-                    let result = connection.await;
-                    println!("connection finished");
-                    result.unwrap();
-                });
-
+                tokio::spawn(connection);
                 client
             }
             None => {
                 let (client, connection) =
-                    config
+                    self.config
                         .connect(NoTls)
                         .await
                         .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&config),
+                            endpoint: config_to_endpoint(&self.config),
                         })?;
-
-                // Same
-                tokio::spawn(async move {
-                    connection.await.unwrap();
-                });
-
+                tokio::spawn(connection);
                 client
             }
-        })
-    }
+        });
 
-    async fn check_server_version(client: &Client, config: &Config) -> Result<(), BuildError> {
-        let version_row = client
+        let version_row = self
+            .get_client()
             .query_one("SELECT version()", &[])
             .await
             .with_context(|| VersionFailed {
-                endpoint: config_to_endpoint(&config),
+                endpoint: config_to_endpoint(&self.config),
             })?;
         let version = version_row
             .try_get::<&str, &str>("version")
             .with_context(|| VersionFailed {
-                endpoint: config_to_endpoint(&config),
+                endpoint: config_to_endpoint(&self.config),
             })?;
-        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&config), server_version = %version);
+        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+
         Ok(())
     }
 
-    async fn collect(&self) -> stream::BoxStream<'static, Metric> {
-        let (up_value, metrics) = match self.collect_metrics().await {
+    fn get_client(&self) -> &Client {
+        self.client.as_ref().unwrap()
+    }
+
+    async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
+        let build_client = match self.client {
+            Some(_) => Ok(()),
+            None => self.build_client().await,
+        };
+
+        let metrics = match build_client {
+            Ok(()) => self.collect_metrics().await.map_err(|err| err.to_string()),
+            Err(err) => Err(err.to_string()),
+        };
+
+        let (up_value, metrics) = match metrics {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
+                self.client = None;
                 emit!(PostgresqlMetricsCollectFailed {
                     error,
                     endpoint: self.tags.get("endpoint").expect("should be defined"),
@@ -419,7 +417,7 @@ impl PostgresqlMetrics {
     async fn collect_pg_stat_database(&self) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
-            .pg_stat_database(&self.client)
+            .pg_stat_database(self.get_client())
             .await
             .context(QueryError)?;
 
@@ -542,7 +540,7 @@ impl PostgresqlMetrics {
     async fn collect_pg_stat_database_conflicts(&self) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
-            .pg_stat_database_conflicts(&self.client)
+            .pg_stat_database_conflicts(self.get_client())
             .await
             .context(QueryError)?;
 
@@ -583,7 +581,7 @@ impl PostgresqlMetrics {
 
     async fn collect_pg_stat_bgwriter(&self) -> Result<Vec<Metric>, CollectError> {
         let row = self
-            .client
+            .get_client()
             .query_one("SELECT * FROM pg_stat_bgwriter", &[])
             .await
             .context(QueryError)?;
