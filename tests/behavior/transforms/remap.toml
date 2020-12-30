@@ -1410,23 +1410,23 @@
       "a.equals" = "[1,2,3]"
       "b.equals" = """{"field1":{"field2":1,"field3":null}}"""
 
-[transforms.remap_function_is_blank]
+[transforms.remap_function_is_nullish]
   inputs = []
   type = "remap"
   source = """
-    .a = is_blank(.a)
-    .b = is_blank(.b)
-    .c = is_blank(.c)
-    .d = is_blank(.d)
-    .e = is_blank(.e)
-    .f = is_blank(.f)
-    .g = is_blank(.g)
-    .h = is_blank(.h)
+    .a = is_nullish(.a)
+    .b = is_nullish(.b)
+    .c = is_nullish(.c)
+    .d = is_nullish(.d)
+    .e = is_nullish(.e)
+    .f = is_nullish(.f)
+    .g = is_nullish(.g)
+    .h = is_nullish(.h)
   """
 [[tests]]
-  name = "remap_function_is_blank"
+  name = "remap_function_is_nullish"
   [tests.input]
-    insert_at = "remap_function_is_blank"
+    insert_at = "remap_function_is_nullish"
     type = "log"
     [tests.input.log_fields]
       a = ""
@@ -1437,7 +1437,7 @@
       f = "i am a teapot"
       g = 127
   [[tests.outputs]]
-    extract_from = "remap_function_is_blank"
+    extract_from = "remap_function_is_nullish"
     [[tests.outputs.conditions]]
       "a.equals" = true
       "b.equals" = true

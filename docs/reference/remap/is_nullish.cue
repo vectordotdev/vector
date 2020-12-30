@@ -1,10 +1,10 @@
 package metadata
 
-remap: functions: is_blank: {
+remap: functions: is_nullish: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to check for blankness"
+			description: #"The value to check for "nullishness", i.e. a useless value."#
 			required:    true
 			type: ["string", "null"]
 		},
@@ -12,11 +12,11 @@ remap: functions: is_blank: {
 	return: ["boolean"]
 	category: "Check"
 	description: #"""
-		Determines whether the provided value should be considered blank, where blank is defined as
-		one of the following:
+		Determines whether the provided value should be considered "nullish," where nullish
+		includes all of the following:
 
 		* An empty string (`""`)
-		* A string that only contains whitespace (regardless of the string's length)
+		* A string that only contains whitespace
 		* Dash (`"-"`)
 		* Newline (`"\n"`)
 		* `null`
@@ -27,7 +27,7 @@ remap: functions: is_blank: {
 			input: {
 				string_field: "-"
 			}
-			source: ".is_empty = is_blank(.string_field)"
+			source: ".is_empty = is_nullish(.string_field)"
 			output: {
 				string_field: "-"
 				is_empty:     true

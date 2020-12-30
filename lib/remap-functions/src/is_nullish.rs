@@ -7,11 +7,11 @@ lazy_static! {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct IsBlank;
+pub struct IsNullish;
 
-impl Function for IsBlank {
+impl Function for IsNullish {
     fn identifier(&self) -> &'static str {
-        "is_blank"
+        "is_nullish"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -25,16 +25,16 @@ impl Function for IsBlank {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(IsBlankFn { value }))
+        Ok(Box::new(IsNullishFn { value }))
     }
 }
 
 #[derive(Clone, Debug)]
-struct IsBlankFn {
+struct IsNullishFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for IsBlankFn {
+impl Expression for IsNullishFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         match self.value.execute(state, object)? {
             Value::Bytes(v) => {
@@ -66,7 +66,7 @@ mod tests {
 
     test_type_def![
         string_infallible {
-            expr: |_| IsBlankFn {
+            expr: |_| IsNullishFn {
                 value: Literal::from("some string").boxed(),
             },
             def: TypeDef {
@@ -77,7 +77,7 @@ mod tests {
         }
 
         null_infallible {
-            expr: |_| IsBlankFn {
+            expr: |_| IsNullishFn {
                 value: Literal::from(()).boxed(),
             },
             def: TypeDef {
@@ -88,7 +88,7 @@ mod tests {
         }
 
         integer_fallible {
-            expr: |_| IsBlankFn {
+            expr: |_| IsNullishFn {
                 value: Literal::from(42).boxed(),
             },
             def: TypeDef {
@@ -99,7 +99,7 @@ mod tests {
         }
 
         array_fallible {
-            expr: |_| IsBlankFn {
+            expr: |_| IsNullishFn {
                 value: Array::from(vec!["foo"]).boxed(),
             },
             def: TypeDef {
@@ -111,7 +111,7 @@ mod tests {
     ];
 
     test_function![
-        is_blank => IsBlank;
+        is_nullish => IsNullish;
 
         empty_string {
             args: func_args![value: value!("")],
