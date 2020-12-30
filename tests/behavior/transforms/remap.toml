@@ -1421,7 +1421,6 @@
     .e = is_nullish(.e)
     .f = is_nullish(.f)
     .g = is_nullish(.g)
-    .h = is_nullish(.h)
   """
 [[tests]]
   name = "remap_function_is_nullish"
@@ -1435,7 +1434,6 @@
       d = "-"
       e = "\n"
       f = "i am a teapot"
-      g = 127
   [[tests.outputs]]
     extract_from = "remap_function_is_nullish"
     [[tests.outputs.conditions]]
@@ -1445,7 +1443,6 @@
       "d.equals" = true
       "e.equals" = true
       "f.equals" = false
-      "g.equals" = false
 
 [transforms.remap_function_parse_regex]
   inputs = []
