@@ -57,6 +57,7 @@ mod test {
         let pairs = vec![
             ("'⍺βγ'", Value::Bytes("⍺βγ".into())),
             ("123", Value::Integer(123)),
+            #[allow(clippy::approx_constant)] // Pi
             ("3.14159265359", Value::Float(3.14159265359)),
             ("true", Value::Boolean(true)),
             (
@@ -68,6 +69,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
+                                #[allow(clippy::approx_constant)] // E
                                 vec![("other".into(), 2.718281828.into())]
                                     .into_iter()
                                     .collect(),
@@ -124,6 +126,7 @@ mod test {
                 "#,
             ),
             (
+                #[allow(clippy::approx_constant)] // Pi
                 Value::Float(3.14159265359),
                 r#"
                 function (value)
@@ -147,6 +150,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
+                                #[allow(clippy::approx_constant)] // E
                                 vec![("other".into(), 2.718281828.into())]
                                     .into_iter()
                                     .collect(),

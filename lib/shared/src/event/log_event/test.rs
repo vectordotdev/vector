@@ -744,7 +744,7 @@ mod remap {
         ];
 
         for (object, segments, value, expect, result) in cases {
-            let object: BTreeMap<String, Value> = object.into();
+            let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
             let value: remap::Value = value;

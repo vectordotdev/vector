@@ -168,7 +168,7 @@ mod corner_cases {
         let marker = Value::from(true);
         assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
         // Since the `foo` map is now empty, this should get cleaned.
-        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
         assert!(!value.contains("foo"));
     }
 
@@ -180,7 +180,7 @@ mod corner_cases {
         let marker = Value::from(true);
         assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
         // Since the `foo` map is now empty, this should get cleaned.
-        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
         assert!(!value.contains("foo"));
     }
 
@@ -192,7 +192,7 @@ mod corner_cases {
         let marker = Value::from(true);
         assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
         // Since the `foo` map is now empty, this should get cleaned.
-        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
         assert!(!value.contains(0));
     }
 
@@ -204,7 +204,7 @@ mod corner_cases {
         let marker = Value::from(true);
         assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
         // Since the `foo` map is now empty, this should get cleaned.
-        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker.clone()));
+        assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
         assert!(!value.contains(0));
     }
 }
