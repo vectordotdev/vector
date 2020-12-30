@@ -3,7 +3,7 @@ use regex::Regex;
 use remap::prelude::*;
 
 lazy_static! {
-    static ref ALL_WHITESPACE_PATTERN: Regex = Regex::new(r"^(\s*)$").unwrap();
+    static ref BLANK_STRING_PATTERN: Regex = Regex::new(r"^(\s*|\\n|\-)$").unwrap();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -40,14 +40,9 @@ impl Expression for IsBlankFn {
             Value::Bytes(v) => {
                 let s = &String::from_utf8_lossy(&v)[..];
 
-                if ALL_WHITESPACE_PATTERN.is_match(s) {
-                    Ok(true.into())
-                } else {
-                    match s {
-                        "-" | "\n" => Ok(true.into()),
-                        _ => Ok(false.into()),
-                    }
-                }
+                let matches = BLANK_STRING_PATTERN.is_match(s);
+
+                Ok(matches.into())
             }
             Value::Null => Ok(true.into()),
             _ => Err("input must be a string or null".into()),
