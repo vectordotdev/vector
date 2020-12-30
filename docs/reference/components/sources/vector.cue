@@ -82,14 +82,23 @@ components: sources: vector: {
 		}
 	}
 
-	output: logs: event: {
-		description: "A Vector event"
-		fields: {
-			"*": {
-				description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
-				required:    true
-				type: "*": {}
+	output: {
+		logs: event: {
+			description: "A Vector event"
+			fields: {
+				"*": {
+					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
+					required:    true
+					type: "*": {}
+				}
 			}
+		}
+		metrics: {
+			counter:      output._passthrough_counter
+			distribution: output._passthrough_distribution
+			gauge:        output._passthrough_gauge
+			histogram:    output._passthrough_histogram
+			set:          output._passthrough_set
 		}
 	}
 

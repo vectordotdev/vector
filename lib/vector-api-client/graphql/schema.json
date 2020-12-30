@@ -1596,6 +1596,33 @@
               }
             },
             {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "name",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Gets a configured component by name",
+              "isDeprecated": false,
+              "name": "componentByName",
+              "type": {
+                "kind": "INTERFACE",
+                "name": "Component",
+                "ofType": null
+              }
+            },
+            {
               "args": [],
               "deprecationReason": null,
               "description": "Returns `true` to denote the GraphQL server is reachable",

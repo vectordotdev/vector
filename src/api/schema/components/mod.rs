@@ -3,6 +3,7 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
+use crate::api::schema::components::state::component_by_name;
 use crate::config::Config;
 use async_graphql::{Interface, Object, Subscription};
 use lazy_static::lazy_static;
@@ -43,6 +44,11 @@ impl ComponentsQuery {
     /// Configured sinks
     async fn sinks(&self) -> Vec<sink::Sink> {
         state::get_sinks()
+    }
+
+    /// Gets a configured component by name
+    async fn component_by_name(&self, name: String) -> Option<Component> {
+        component_by_name(&name)
     }
 }
 
@@ -138,8 +144,9 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            let _ =
-                COMPONENT_CHANGED.send(ComponentChanged::Removed(state::component_by_name(name)));
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
+                state::component_by_name(name).expect("Couldn't get component by name"),
+            ));
         });
 
     // Publish all components that have been added
