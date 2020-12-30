@@ -860,14 +860,14 @@ mod remap {
             (map! {}, Ok(vec!["."])),
             (
                 map! { "\"foo bar baz\"": "bar" },
-                Ok(vec![r#"."foo bar baz""#]),
+                Ok(vec![".", r#"."foo bar baz""#]),
             ),
             (
                 map! { "foo": "bar", "baz": "qux" },
-                Ok(vec![".baz", ".foo"]),
+                Ok(vec![".", ".baz", ".foo"]),
             ),
-            (map! { "foo": map!{ "bar": "baz" }}, Ok(vec![".foo.bar"])),
-            (map! { "a": vec![0, 1] }, Ok(vec![".a[0]", ".a[1]"])),
+            (map! { "foo": map!{ "bar": "baz" }}, Ok(vec![".", ".foo.bar"])),
+            (map! { "a": vec![0, 1] }, Ok(vec![".", ".a[0]", ".a[1]"])),
             (
                 map! {
                     "a": map!{ "b": "c" },
@@ -878,7 +878,7 @@ mod remap {
                         map!{"h": 3},
                     ],
                 },
-                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
+                Ok(vec![".", ".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
             ),
             (
                 map! {
@@ -888,7 +888,7 @@ mod remap {
                         },
                     ],
                 },
-                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
+                Ok(vec![".", ".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
             ),
         ];
 
