@@ -19,7 +19,7 @@ impl Function for EncodeBase64 {
                 keyword: "padding",
                 accepts: |v| matches!(v, Value::Boolean(_)),
                 required: false,
-            }
+            },
         ]
     }
 
@@ -57,9 +57,15 @@ impl Expression for EncodeBase64Fn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
+        let padding_def = self
+            .padding
+            .as_ref()
+            .map(|padding| padding.type_def(state).fallible_unless(Kind::Boolean));
+
         self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
+            .merge_optional(padding_def)
             .with_constraint(Kind::Bytes)
     }
 }
@@ -70,7 +76,7 @@ mod test {
     use value::Kind;
 
     test_type_def![
-        value_string_infallible {
+        value_string_padding_unspecified_infallible {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from("foo").boxed(),
                 padding: None,
@@ -78,10 +84,34 @@ mod test {
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_non_string_infallible {
+        value_string_padding_boolean_infallible {
+            expr: |_| EncodeBase64Fn {
+                value: Literal::from("foo").boxed(),
+                padding: Some(Literal::from(false).boxed()),
+            },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+        }
+
+        value_padding_non_boolean_fallible {
+            expr: |_| EncodeBase64Fn {
+                value: Literal::from("foo").boxed(),
+                padding: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        }
+
+        value_non_string_fallible {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from(127).boxed(),
                 padding: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        }
+
+        both_types_wrong_fallible {
+            expr: |_| EncodeBase64Fn {
+                value: Literal::from(127).boxed(),
+                padding: Some(Literal::from("foo").boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
