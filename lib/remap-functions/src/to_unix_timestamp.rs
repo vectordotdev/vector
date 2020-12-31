@@ -4,6 +4,38 @@ use std::str::FromStr;
 #[derive(Clone, Copy, Debug)]
 pub struct ToUnixTimestamp;
 
+impl Function for ToUnixTimestamp {
+    fn identifier(&self) -> &'static str {
+        "to_unix_timestamp"
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[
+            Parameter {
+                keyword: "value",
+                accepts: |v| matches!(v, Value::Timestamp(_)),
+                required: true,
+            },
+            Parameter {
+                keyword: "unit",
+                accepts: |v| matches!(v, Value::Bytes(_)),
+                required: false,
+            },
+        ]
+    }
+
+    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+        let value = arguments.required("value")?.boxed();
+
+        let unit = arguments
+            .optional_enum("unit", &Unit::all_str())?
+            .map(|s| Unit::from_str(&s).expect("validated enum"))
+            .unwrap_or_default();
+
+        Ok(Box::new(ToUnixTimestampFn { value, unit }))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Unit {
     Seconds,
@@ -38,38 +70,6 @@ impl Default for Unit {
     }
 }
 
-impl Function for ToUnixTimestamp {
-    fn identifier(&self) -> &'static str {
-        "to_unix_timestamp"
-    }
-
-    fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: |v| matches!(v, Value::Timestamp(_)),
-                required: true,
-            },
-            Parameter {
-                keyword: "unit",
-                accepts: |v| matches!(v, Value::Bytes(_)),
-                required: false,
-            },
-        ]
-    }
-
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-
-        let unit = arguments
-            .optional_enum("unit", &Unit::all_str())?
-            .map(|s| Unit::from_str(&s).expect("validated enum"))
-            .unwrap_or_default();
-
-        Ok(Box::new(ToUnixTimestampFn { value, unit }))
-    }
-}
-
 impl FromStr for Unit {
     type Err = &'static str;
 
@@ -89,13 +89,6 @@ impl FromStr for Unit {
 struct ToUnixTimestampFn {
     value: Box<dyn Expression>,
     unit: Unit,
-}
-
-impl ToUnixTimestampFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, unit: Unit) -> Self {
-        Self { value, unit }
-    }
 }
 
 impl Expression for ToUnixTimestampFn {
@@ -122,7 +115,6 @@ impl Expression for ToUnixTimestampFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use chrono::{DateTime, Utc};
     use value::Kind;
 
     test_type_def![
