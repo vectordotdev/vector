@@ -237,7 +237,7 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            warn!(message = "Failed to encode event; dropping event.", %error, rate_limit_secs = 30);
+            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
         };
     }
 

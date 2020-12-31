@@ -15,7 +15,7 @@ use tracing_core::{
 };
 use tracing_subscriber::layer::{Context, Layer};
 
-const RATE_LIMIT_FIELD: &str = "rate_limit_secs";
+const RATE_LIMIT_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
 const DEFAULT_LIMIT: u64 = 5;
 
@@ -34,7 +34,13 @@ struct State {
 }
 
 impl Limit {
-    fn create_event<S: Subscriber>(&self, id: &Identifier, ctx: &Context<S>, message: String) {
+    fn create_event<S: Subscriber>(
+        &self,
+        id: &Identifier,
+        ctx: &Context<S>,
+        message: String,
+        rate_limit: u64,
+    ) {
         let store = self.callsite_store.read().unwrap();
         let metadata = store.get(id).unwrap();
 
@@ -43,13 +49,7 @@ impl Limit {
         let message = display(message);
 
         if let Some(message_field) = fields.field("message") {
-            let values = [
-                (&message_field, Some(&message as &dyn Value)),
-                (
-                    &fields.field(RATE_LIMIT_FIELD).unwrap(),
-                    Some(&5 as &dyn Value),
-                ),
-            ];
+            let values = [(&message_field, Some(&message as &dyn Value))];
 
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
@@ -58,7 +58,7 @@ impl Limit {
         } else {
             let values = [(
                 &fields.field(RATE_LIMIT_FIELD).unwrap(),
-                Some(&5 as &dyn Value),
+                Some(&rate_limit as &dyn Value),
             )];
 
             let valueset = fields.value_set(&values);
@@ -115,16 +115,18 @@ where
                     let start = state.start.unwrap_or_else(Instant::now);
 
                     if start.elapsed().as_secs() < state.limit {
-                        if state.count.load(Ordering::Acquire) == 1 {
-                            let message = format!("{:?} is being rate limited.", state.message);
-
-                            self.create_event(&id, &ctx, message);
-                        }
-
                         let prev = state.count.fetch_add(1, Ordering::Relaxed);
+                        match prev {
+                            0 => return true,
+                            1 => {
+                                let message = format!(
+                                    "Internal log [{}] is being rate limited.",
+                                    state.message
+                                );
 
-                        if prev == 0 {
-                            return true;
+                                self.create_event(&id, &ctx, message, state.limit);
+                            }
+                            _ => (),
                         }
                     } else {
                         drop(events);
@@ -132,12 +134,16 @@ where
                         let mut events = self.events.write().expect("lock poisoned!");
 
                         if let Some(state) = events.remove(&id) {
-                            let message = format!(
-                                "{:?} {:?} events were rate limited.",
-                                state.count, state.message
-                            );
+                            let count = state.count.load(Ordering::Relaxed);
+                            if count > 1 {
+                                let message = format!(
+                                    "Internal log [{}] has been rate limited {} times.",
+                                    state.message,
+                                    count - 1
+                                );
 
-                            self.create_event(&id, &ctx, message);
+                                self.create_event(&id, &ctx, message, state.limit);
+                            }
                         }
                     }
 

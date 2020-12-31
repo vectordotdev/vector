@@ -92,7 +92,7 @@ impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
             message = "Error in communication with Docker daemon.",
             error = ?self.error,
             container_id = ?self.container_id,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -113,7 +113,7 @@ impl<'a> InternalEvent for DockerLogsContainerMetadataFetchFailed<'a> {
             message = "Failed to fetch container metadata.",
             error = ?self.error,
             container_id = ?self.container_id,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -134,7 +134,7 @@ impl<'a> InternalEvent for DockerLogsTimestampParseFailed<'a> {
             message = "Failed to parse timestamp as RFC3339 timestamp.",
             error = ?self.error,
             container_id = ?self.container_id,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -157,7 +157,7 @@ impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupported<'a> {
                 to get logs from the Docker daemon."#,
             error = ?self.error,
             container_id = ?self.container_id,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
