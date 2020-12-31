@@ -126,7 +126,10 @@ impl Template {
             RE.captures_iter(&self.src)
                 .map(|c| {
                     c.get(1)
-                        .map(|s| LookupBuf::from(s.as_str().trim().to_string()))
+                        .map(|s| {
+                            let s = s.as_str().trim().to_string();
+                            LookupBuf::from_str(&*s).unwrap_or_else(|_| LookupBuf::from(&*s))
+                        })
                         .expect("src should match regex")
                 })
                 .collect::<Vec<_>>()
@@ -153,7 +156,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .get(1)
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
-            if let Some(val) = event.as_log().get(Lookup::from(key)) {
+            if let Some(val) = event.as_log().get(Lookup::from_str(key).unwrap_or_else(|_| Lookup::from(key))) {
                 val.to_string_lossy()
             } else {
                 missing_fields.push(key.to_owned());
