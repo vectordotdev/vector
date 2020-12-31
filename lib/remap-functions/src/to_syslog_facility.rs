@@ -49,7 +49,7 @@ impl Expression for ToSyslogFacilityFn {
             12 => Ok("ntp"),
             13 => Ok("security"),
             14 => Ok("console"),
-            15 => Ok("cron"),
+            15 => Ok("solaris-cron"),
             16 => Ok("local0"),
             17 => Ok("local1"),
             18 => Ok("local2"),
@@ -58,10 +58,7 @@ impl Expression for ToSyslogFacilityFn {
             21 => Ok("local5"),
             22 => Ok("local6"),
             23 => Ok("local7"),
-            _ => Err(Error::from(format!(
-                "severity facility {} not valid",
-                value
-            ))),
+            _ => Err(Error::from(format!("facility code {} not valid", value))),
         };
 
         match code {
