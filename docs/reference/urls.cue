@@ -76,6 +76,7 @@ urls: {
 	azure_monitor:                                            "https://azure.microsoft.com/en-us/services/monitor/"
 	azure_monitor_logs_endpoints:                             "https://docs.microsoft.com/en-us/rest/api/monitor/"
 	base64:                                                   "https://en.wikipedia.org/wiki/Base64"
+	base64_padding:                                           "https://en.wikipedia.org/wiki/Base64#Output_padding"
 	basic_auth:                                               "https://en.wikipedia.org/wiki/Basic_access_authentication"
 	big_query_streaming:                                      "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
 	cargo_audit:                                              "https://github.com/RustSec/cargo-audit"
