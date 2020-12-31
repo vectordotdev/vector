@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use remap::prelude::*;
+use shared::log_event;
 use vector::transforms::{
     add_fields::AddFields,
     coercer::CoercerConfig,
@@ -10,11 +11,10 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::{TransformConfig, log_schema},
+    config::{log_schema, TransformConfig},
     event::{Event, LookupBuf, Value},
     test_util::runtime,
 };
-use shared::log_event;
 
 criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
 criterion_main!(benches);
