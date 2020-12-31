@@ -1,3 +1,7 @@
+use nom::{
+    self, branch::alt, bytes::complete::tag, bytes::complete::take_until, combinator::map,
+    combinator::rest, multi::separated_list1, sequence::tuple, IResult,
+};
 use remap::prelude::*;
 use std::collections::BTreeMap;
 
@@ -126,11 +130,18 @@ impl Expression for ParseKeyValueFn {
             None => None,
         };
 
+        /*
         Ok(value
             .split(&separator)
             .filter_map(|pair| parse_pair(pair, &field_split, &trim_key, &trim_value))
             .collect::<BTreeMap<_, _>>()
             .into())
+        */
+
+        let (_, values) =
+            parse_line(&value, &field_split, &separator).map_err(|e| e.to_string())?;
+
+        Ok(values.into_iter().collect::<BTreeMap<_, _>>().into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -161,11 +172,108 @@ impl Expression for ParseKeyValueFn {
     }
 }
 
+fn parse_line<'a>(
+    input: &'a str,
+    field_split: &'a str,
+    separator: &'a str,
+) -> IResult<&'a str, Vec<(String, Value)>> {
+    separated_list1(tag(separator), parse_key_value(field_split, separator))(input)
+}
+
+/// Parse a single `key=value` tuple.
+fn parse_key_value<'a>(
+    field_split: &'a str,
+    separator: &'a str,
+) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value)> {
+    move |input| {
+        map(
+            tuple((
+                take_until(field_split),
+                tag(field_split),
+                alt((take_until(separator), rest)),
+            )),
+            |(field, _, value): (&str, &str, &str)| (field.to_string(), value.into()),
+        )(input)
+    }
+}
+
+/// Checks if the current input starts with a delimiter character.
+/// If it does it returns the end delimiter. Otherwise it returns None.
+fn is_delimited(input: &str, delimiters: &Option<String>) -> Option<char> {
+    match (input.chars().next(), delimiters) {
+        (Some(chr), Some(delimiters)) => {
+            let mut delimiters = delimiters.chars();
+            match delimiters.next() {
+                Some(start) if chr == start => match delimiters.next() {
+                    Some(next) => Some(next),
+                    None => Some(start),
+                },
+                _ => None,
+            }
+        }
+        (_, _) => None,
+    }
+}
+
+/// Parses the value.
+/// The value has two parsing strategies.
+///
+/// 1. If it starts with one of the trim values, we assume it is a delimited field, so we parse up to
+///    the closing delimiter. If the trim_value is one character, this is the close, if it is more than
+///    one, than the close is any character other than the opening delimiter.
+/// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
+///    the next separator or the eof.
+///
+fn parse_value<'a>(
+    trim_value: &'a Option<String>,
+    separator: &'a str,
+) -> impl Fn(&'a str) -> IResult<&'a str, Value> {
+    move |input| {
+        map(
+            match is_delimited(input, trim_value) {
+                Some(_) => alt((take_until(separator), rest)),
+                None => alt((take_until(separator), rest)),
+            },
+            |value| Value::from(value),
+        )(input)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use remap::value;
     use value::Kind;
+
+    #[test]
+    fn test_parse() {
+        assert_eq!(
+            Ok(("", ("ook".to_string(), "pook".into()))),
+            parse_key_value("=", " ")("ook=pook")
+        );
+    }
+
+    #[test]
+    fn test_parse_line() {
+        assert_eq!(
+            Ok((
+                "",
+                vec![
+                    ("ook".to_string(), "pook".into()),
+                    ("nork".to_string(), "noog".into())
+                ]
+            )),
+            parse_line("ook=pook nork=noog", "=", " ")
+        );
+    }
+
+    #[test]
+    fn test_parse_value() {
+        assert_eq!(
+            Ok(("", "noog".into())),
+            parse_value(&Some(r#"""#.to_string()), " ")(r#""noog""#)
+        );
+    }
 
     test_type_def![
         value_string {
@@ -232,7 +340,7 @@ mod test {
 
         default {
             args: func_args! [
-                value: "at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd=\"204.204.204.204\" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"
+                value: "at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd=\"204.204.204.204\" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http",
             ],
             want: Ok(value!({"at": "info",
                              "method": "GET",
