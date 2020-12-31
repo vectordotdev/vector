@@ -119,16 +119,17 @@ impl FunctionTransform for GrokParser {
             if let Some(matches) = self.pattern_built.match_against(&value) {
                 let drop_field = self.drop_field && matches.get(&self.field.to_string()).is_none();
                 for (name, value) in matches.iter() {
+                    let name_lookup = LookupBuf::from_str(name).unwrap_or_else(|_| LookupBuf::from(name));
                     let conv = self
                         .types
-                        .get(&LookupBuf::from(name))
+                        .get(&name_lookup)
                         .unwrap_or(&Conversion::Bytes);
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
                                 event.insert(path.clone(), value);
                             } else {
-                                event.insert(LookupBuf::from(name), value);
+                                event.insert(name_lookup, value);
                             }
                         }
                         Err(error) => emit!(GrokParserConversionFailed { name, error }),
