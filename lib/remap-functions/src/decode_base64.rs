@@ -59,7 +59,7 @@ mod test {
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_non_string_infallible {
+        value_non_string_fallible {
             expr: |_| DecodeBase64Fn {
                 value: Literal::from(127).boxed(),
             },
