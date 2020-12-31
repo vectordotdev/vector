@@ -92,7 +92,7 @@ mod test {
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_padding_non_boolean_fallible {
+        value_string_padding_non_boolean_fallible {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from("foo").boxed(),
                 padding: Some(Literal::from("foo").boxed()),
