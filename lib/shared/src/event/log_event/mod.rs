@@ -14,7 +14,7 @@ use std::{
     iter::FromIterator,
     str::FromStr,
 };
-use tracing::{debug, instrument, trace, trace_span};
+use tracing::{info, debug, instrument, trace, trace_span};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -235,6 +235,11 @@ impl LogEvent {
         let span = trace_span!("remove", lookup = %working_lookup);
         let _guard = span.enter();
 
+        if working_lookup == Lookup::default() {
+            info!("Tried to remove lookup `.` from LogEvent. Refusing.");
+            return None;
+        }
+
         self.fields
             .remove(working_lookup, prune)
             .unwrap_or_else(|error| {
@@ -257,6 +262,7 @@ impl LogEvent {
     ///     lookup_key.clone() => 2,
     /// }.into_log();
     /// let mut keys = event.keys(false);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str(".").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
@@ -282,9 +288,19 @@ impl LogEvent {
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let event = log_event! {
     ///     plain_key => 1,
-    ///     lookup_key.clone() => 2,
+    ///     lookup_key => 2,
     /// }.into_log();
     /// let mut keys = event.pairs(false);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str(".").unwrap(), &Value::from({
+    ///     let mut inner_inner_map = std::collections::BTreeMap::default();
+    ///     inner_inner_map.insert(String::from("slam"), Value::from(2));
+    ///     let mut inner_map = std::collections::BTreeMap::default();
+    ///     inner_map.insert(String::from("stick"), Value::from(inner_inner_map));
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("vic"), Value::from(inner_map));
+    ///     map.insert(String::from("lick"), Value::from(1));
+    ///     map
+    /// }))));
     /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
     /// assert_eq!(keys.next(), Some((Lookup::from_str("vic").unwrap(), &Value::from({
     ///     let mut inner_map = std::collections::BTreeMap::default();
@@ -466,12 +482,7 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        // The LogEvent API itself is not able to consistently return `pairs()` and `keys()` including
-        // the root, so it's done here, instead.
-        let this = Some(Lookup::default());
-        let rest = self.keys(true);
-        this.into_iter()
-            .chain(rest)
+        self.keys(true).into_iter()
             .map(|v| {
                 remap_lang::Path::from_str(v.to_string().as_str())
                     // TODO: We should not degrade the error to a string here.

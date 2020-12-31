@@ -1104,6 +1104,7 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.lookups(None, false);
+    /// assert_eq!(keys.next(), Some(Lookup::from_str(".").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
@@ -1130,7 +1131,7 @@ impl Value {
             })),
             Value::Map(m) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().into_iter();
+                let this = prefix.clone().or(Some(Lookup::default())).into_iter();
                 let children = m
                     .iter()
                     .map(move |(k, v)| {
@@ -1146,7 +1147,7 @@ impl Value {
                     })
                     .flatten();
 
-                if only_leaves {
+                if only_leaves && !self.is_empty() {
                     Box::new(children)
                 } else {
                     Box::new(this.chain(children))
@@ -1154,7 +1155,7 @@ impl Value {
             }
             Value::Array(a) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().into_iter();
+                let this = prefix.clone().or(Some(Lookup::default())).into_iter();
                 let children = a
                     .iter()
                     .enumerate()
@@ -1171,7 +1172,7 @@ impl Value {
                     })
                     .flatten();
 
-                if only_leaves {
+                if only_leaves && !self.is_empty() {
                     Box::new(children)
                 } else {
                     Box::new(this.chain(children))
@@ -1196,6 +1197,16 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.pairs(None, false);
+    /// assert_eq!(keys.next(), Some((Lookup::from_str(".").unwrap(), &Value::from({
+    ///     let mut inner_inner_map = std::collections::BTreeMap::default();
+    ///     inner_inner_map.insert(String::from("slam"), Value::from(2));
+    ///     let mut inner_map = std::collections::BTreeMap::default();
+    ///     inner_map.insert(String::from("stick"), Value::from(inner_inner_map));
+    ///     let mut map = std::collections::BTreeMap::default();
+    ///     map.insert(String::from("vic"), Value::from(inner_map));
+    ///     map.insert(String::from("lick"), Value::from(1));
+    ///     map
+    /// }))));
     /// assert_eq!(keys.next(), Some((Lookup::from_str("lick").unwrap(), &Value::from(1))));
     /// assert_eq!(keys.next(), Some((Lookup::from_str("vic").unwrap(), &Value::from({
     ///     let mut inner_map = std::collections::BTreeMap::default();
@@ -1237,7 +1248,7 @@ impl Value {
             ),
             Value::Map(m) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().map(|v| (v, self)).into_iter();
+                let this = prefix.clone().or(Some(Lookup::default())).map(|v| (v, self)).into_iter();
                 let children = m
                     .iter()
                     .map(move |(k, v)| {
@@ -1253,7 +1264,7 @@ impl Value {
                     })
                     .flatten();
 
-                if only_leaves {
+                if only_leaves && !self.is_empty() {
                     Box::new(children)
                 } else {
                     Box::new(this.chain(children))
@@ -1261,7 +1272,7 @@ impl Value {
             }
             Value::Array(a) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().map(|v| (v, self)).into_iter();
+                let this = prefix.clone().or(Some(Lookup::default())).map(|v| (v, self)).into_iter();
                 let children = a
                     .iter()
                     .enumerate()
@@ -1278,7 +1289,7 @@ impl Value {
                     })
                     .flatten();
 
-                if only_leaves {
+                if only_leaves && !self.is_empty() {
                     Box::new(children)
                 } else {
                     Box::new(this.chain(children))

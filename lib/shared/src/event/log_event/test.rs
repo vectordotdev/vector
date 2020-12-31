@@ -1,9 +1,23 @@
 use crate::{event::*, log_event, lookup::*, map, test::open_fixture};
 use serde_json::json;
 use tracing::trace;
+use std::collections::BTreeMap;
 
 mod insert_get_remove {
     use super::*;
+
+    #[test_env_log::test]
+    fn itself() -> crate::Result<()> {
+        let mut event = LogEvent::default();
+        let lookup = LookupBuf::from_str(".")?;
+        let mut value = Value::Map(BTreeMap::default());
+        event.insert(lookup.clone(), value.clone());
+        assert_eq!(event.inner(), &value);
+        assert_eq!(event.get(&lookup), Some(&value));
+        assert_eq!(event.get_mut(&lookup), Some(&mut value));
+        assert_eq!(event.remove(&lookup, false), None); // Cannot remove self from Event.
+        Ok(())
+    }
 
     #[test_env_log::test]
     fn root() -> crate::Result<()> {
@@ -428,50 +442,67 @@ fn keys_and_pairs() -> crate::Result<()> {
     pairs.sort_by(|v, x| v.0.cmp(&x.0));
 
     // Ensure a new field element that was injected is iterated over.
+    let mut i = 0;
+    let expected = Lookup::from_str(".").unwrap();
+    assert_eq!(keys[i], expected);
     let expected = Lookup::from_str("snooper").unwrap();
-    assert_eq!(keys[0], expected);
-    assert_eq!(pairs[0].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("snooper.booper").unwrap();
-    assert_eq!(keys[1], expected);
-    assert_eq!(pairs[1].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     // Ensure a new array element that was injected is iterated over.
     let expected = Lookup::from_str("snooper.booper[0]").unwrap();
-    assert_eq!(keys[2], expected);
-    assert_eq!(pairs[2].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("snooper.booper[1]").unwrap();
-    assert_eq!(keys[3], expected);
-    assert_eq!(pairs[3].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("snooper.booper[1][0]").unwrap();
-    assert_eq!(keys[4], expected);
-    assert_eq!(pairs[4].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("snooper.booper[1][1]").unwrap();
-    assert_eq!(keys[5], expected);
-    assert_eq!(pairs[5].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("snooper.booper[1][2]").unwrap();
-    assert_eq!(keys[6], expected);
-    assert_eq!(pairs[6].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     // Try inside arrays now.
     let expected = Lookup::from_str("whomp").unwrap();
-    assert_eq!(keys[7], expected);
-    assert_eq!(pairs[7].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("whomp[0]").unwrap();
-    assert_eq!(keys[8], expected);
-    assert_eq!(pairs[8].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("whomp[1]").unwrap();
-    assert_eq!(keys[9], expected);
-    assert_eq!(pairs[9].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("whomp[1].glomp").unwrap();
-    assert_eq!(keys[10], expected);
-    assert_eq!(pairs[10].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("whomp[1].glomp[0]").unwrap();
-    assert_eq!(keys[11], expected);
-    assert_eq!(pairs[11].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("whomp[1].glomp[1]").unwrap();
-    assert_eq!(keys[12], expected);
-    assert_eq!(pairs[12].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
     let expected = Lookup::from_str("zoop").unwrap();
-    assert_eq!(keys[13], expected);
-    assert_eq!(pairs[13].0, expected);
+    i += 1;
+    assert_eq!(keys[i], expected);
+    assert_eq!(pairs[i].0, expected);
 
     Ok(())
 }
@@ -864,17 +895,17 @@ mod remap {
             (map! {}, Ok(vec!["."])),
             (
                 map! { "\"foo bar baz\"": "bar" },
-                Ok(vec![".", r#"."foo bar baz""#]),
+                Ok(vec![r#"."foo bar baz""#]),
             ),
             (
                 map! { "foo": "bar", "baz": "qux" },
-                Ok(vec![".", ".baz", ".foo"]),
+                Ok(vec![".baz", ".foo"]),
             ),
             (
                 map! { "foo": map!{ "bar": "baz" }},
-                Ok(vec![".", ".foo.bar"]),
+                Ok(vec![".foo.bar"]),
             ),
-            (map! { "a": vec![0, 1] }, Ok(vec![".", ".a[0]", ".a[1]"])),
+            (map! { "a": vec![0, 1] }, Ok(vec![".a[0]", ".a[1]"])),
             (
                 map! {
                     "a": map!{ "b": "c" },
@@ -885,7 +916,7 @@ mod remap {
                         map!{"h": 3},
                     ],
                 },
-                Ok(vec![".", ".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
+                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
             ),
             (
                 map! {
@@ -896,7 +927,6 @@ mod remap {
                     ],
                 },
                 Ok(vec![
-                    ".",
                     ".a[0].b[0].c.d.e[0][0]",
                     ".a[0].b[0].c.d.e[0][1]",
                 ]),
