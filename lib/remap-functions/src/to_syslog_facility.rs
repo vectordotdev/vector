@@ -58,7 +58,10 @@ impl Expression for ToSyslogFacilityFn {
             21 => Ok("local5"),
             22 => Ok("local6"),
             23 => Ok("local7"),
-            _ => Err(Error::from(format!("severity facility {} not valid", value))),
+            _ => Err(Error::from(format!(
+                "severity facility {} not valid",
+                value
+            ))),
         };
 
         match code {
