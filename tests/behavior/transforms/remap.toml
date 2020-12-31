@@ -1433,7 +1433,8 @@
       c = "     "
       d = "-"
       e = "\n"
-      f = "i am a teapot"
+      f = "\r"
+      g = "i am a teapot"
   [[tests.outputs]]
     extract_from = "remap_function_is_nullish"
     [[tests.outputs.conditions]]
@@ -1442,7 +1443,8 @@
       "c.equals" = true
       "d.equals" = true
       "e.equals" = true
-      "f.equals" = false
+      "f.equals" = true
+      "g.equals" = false
 
 [transforms.remap_function_parse_regex]
   inputs = []
