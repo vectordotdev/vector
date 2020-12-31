@@ -14,7 +14,7 @@ use std::{
     iter::FromIterator,
     str::FromStr,
 };
-use tracing::{info, debug, instrument, trace, trace_span};
+use tracing::{debug, info, instrument, trace, trace_span};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -482,7 +482,8 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        self.keys(true).into_iter()
+        self.keys(true)
+            .into_iter()
             .map(|v| {
                 remap_lang::Path::from_str(v.to_string().as_str())
                     // TODO: We should not degrade the error to a string here.

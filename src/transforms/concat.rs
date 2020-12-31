@@ -93,7 +93,7 @@ impl Substring {
             Some(source) => {
                 let s = String::from_utf8_lossy(source.as_bytes());
                 LookupBuf::from_str(&*s).unwrap_or_else(|_| LookupBuf::from(&*s))
-            },
+            }
             None => {
                 return Err(BuildError::InvalidSubstring {
                     name: "invalid format, use 'source[start..end]' or 'source'".into(),

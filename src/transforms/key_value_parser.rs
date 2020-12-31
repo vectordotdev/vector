@@ -162,7 +162,8 @@ impl FunctionTransform for KeyValue {
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
-                let key_lookup_buf = LookupBuf::from_str(&*key).unwrap_or_else(|_| LookupBuf::from(&*key));
+                let key_lookup_buf =
+                    LookupBuf::from_str(&*key).unwrap_or_else(|_| LookupBuf::from(&*key));
 
                 if let Some(conv) = self.conversions.get(&key_lookup_buf) {
                     match conv.convert::<Value>(val.into()) {

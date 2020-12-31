@@ -39,7 +39,12 @@ impl TransformConfig for LogfmtConfig {
                 .collect(),
         )?
         .into_iter()
-        .map(|(k, v)| (LookupBuf::from_str(&*k).unwrap_or_else(|_| LookupBuf::from(&*k)), v))
+        .map(|(k, v)| {
+            (
+                LookupBuf::from_str(&*k).unwrap_or_else(|_| LookupBuf::from(&*k)),
+                v,
+            )
+        })
         .collect();
 
         Ok(Transform::function(Logfmt {

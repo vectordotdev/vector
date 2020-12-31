@@ -1248,7 +1248,11 @@ impl Value {
             ),
             Value::Map(m) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().or(Some(Lookup::default())).map(|v| (v, self)).into_iter();
+                let this = prefix
+                    .clone()
+                    .or(Some(Lookup::default()))
+                    .map(|v| (v, self))
+                    .into_iter();
                 let children = m
                     .iter()
                     .map(move |(k, v)| {
@@ -1272,7 +1276,11 @@ impl Value {
             }
             Value::Array(a) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-                let this = prefix.clone().or(Some(Lookup::default())).map(|v| (v, self)).into_iter();
+                let this = prefix
+                    .clone()
+                    .or(Some(Lookup::default()))
+                    .map(|v| (v, self))
+                    .into_iter();
                 let children = a
                     .iter()
                     .enumerate()

@@ -1,7 +1,7 @@
 use crate::{event::*, log_event, lookup::*, map, test::open_fixture};
 use serde_json::json;
-use tracing::trace;
 use std::collections::BTreeMap;
+use tracing::trace;
 
 mod insert_get_remove {
     use super::*;
@@ -901,10 +901,7 @@ mod remap {
                 map! { "foo": "bar", "baz": "qux" },
                 Ok(vec![".baz", ".foo"]),
             ),
-            (
-                map! { "foo": map!{ "bar": "baz" }},
-                Ok(vec![".foo.bar"]),
-            ),
+            (map! { "foo": map!{ "bar": "baz" }}, Ok(vec![".foo.bar"])),
             (map! { "a": vec![0, 1] }, Ok(vec![".a[0]", ".a[1]"])),
             (
                 map! {
@@ -926,10 +923,7 @@ mod remap {
                         },
                     ],
                 },
-                Ok(vec![
-                    ".a[0].b[0].c.d.e[0][0]",
-                    ".a[0].b[0].c.d.e[0][1]",
-                ]),
+                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
             ),
         ];
 

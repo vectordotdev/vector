@@ -156,7 +156,10 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .get(1)
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
-            if let Some(val) = event.as_log().get(Lookup::from_str(key).unwrap_or_else(|_| Lookup::from(key))) {
+            if let Some(val) = event
+                .as_log()
+                .get(Lookup::from_str(key).unwrap_or_else(|_| Lookup::from(key)))
+            {
                 val.to_string_lossy()
             } else {
                 missing_fields.push(key.to_owned());
