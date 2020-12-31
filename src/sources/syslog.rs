@@ -238,7 +238,7 @@ impl SyslogDecoder {
         src: &mut BytesMut,
     ) -> Option<Result<Option<String>, LinesCodecError>> {
         if let Some(&first_byte) = src.get(0) {
-            if 49 <= first_byte && first_byte <= 57 {
+            if (49..=57).contains(&first_byte) {
                 // First character is non zero number so we can assume that
                 // octet count framing is used.
                 trace!("Octet counting encoded event detected.");

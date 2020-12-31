@@ -231,15 +231,16 @@ fn function_arguments_from_pairs(
 
         pairs
             .map(|pair| pair.into_inner().next().unwrap())
-            .map(|pair| match pair.as_rule() {
-                Rule::positional_item => {
-                    index += 1;
-                    positional_item_from_pair(pair, &mut arguments, index - 1, signature)
+            .try_for_each(|pair| -> Result<()> {
+                match pair.as_rule() {
+                    Rule::positional_item => {
+                        index += 1;
+                        positional_item_from_pair(pair, &mut arguments, index - 1, signature)
+                    }
+                    Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
+                    _ => unexpected_parser_sytax!(pair),
                 }
-                Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
-                _ => unexpected_parser_sytax!(pair),
-            })
-            .collect::<Result<()>>()?;
+            })?;
     }
 
     // check invalid arity
@@ -258,28 +259,26 @@ fn function_arguments_from_pairs(
         .iter()
         .filter(|p| p.required)
         .filter(|p| !arguments.keywords().contains(&p.keyword))
-        .map(|p| {
+        .try_for_each(|p| -> Result<_> {
             Err(format!(
                 "required argument '{}' missing for function '{}'",
                 p.keyword,
                 signature.as_str()
             ))
-        })
-        .collect::<Result<_>>()?;
+        })?;
 
     // check unknown argument keywords
     arguments
         .keywords()
         .iter()
         .filter(|k| !signature.parameters().iter().any(|p| &p.keyword == *k))
-        .map(|k| {
+        .try_for_each(|k| -> Result<_> {
             Err(format!(
                 "unknown argument keyword '{}' for function '{}'",
                 k,
                 signature.as_str()
             ))
-        })
-        .collect::<Result<_>>()?;
+        })?;
 
     Ok(arguments)
 }
