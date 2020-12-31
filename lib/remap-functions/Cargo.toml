@@ -40,6 +40,7 @@ default = [
     "ceil",
     "compact",
     "contains",
+    "decode_base64",
     "del",
     "downcase",
     "encode_base64",
@@ -100,6 +101,7 @@ assert = []
 ceil = []
 compact = []
 contains = []
+decode_base64 = ["base64"]
 del = []
 downcase = []
 encode_base64 = ["base64"]

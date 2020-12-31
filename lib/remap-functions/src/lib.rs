@@ -8,6 +8,8 @@ mod ceil;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base64")]
+mod decode_base64;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -131,6 +133,8 @@ pub use ceil::Ceil;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base64")]
+pub use decode_base64::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -250,6 +254,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base64")]
+        Box::new(DecodeBase64),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
