@@ -11,7 +11,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"], value);
+        assert_eq!(event.inner().as_map()["root"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -25,7 +25,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root.\"doot\"")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_map()["doot"], value);
+        assert_eq!(event.inner().as_map()["root"].as_map()["doot"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -38,7 +38,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"], value);
+        assert_eq!(event.inner().as_map()["root"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -46,7 +46,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("scrubby")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["scrubby"], value);
+        assert_eq!(event.inner().as_map()["scrubby"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -59,7 +59,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("(snoot | boot).loot")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["snoot"].as_map()["loot"], value);
+        assert_eq!(event.inner().as_map()["snoot"].as_map()["loot"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -76,7 +76,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root.(snoot | boot)")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_map()["snoot"], value);
+        assert_eq!(event.inner().as_map()["root"].as_map()["snoot"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -99,11 +99,11 @@ mod insert_get_remove {
         event.insert(lookup.clone(), value.clone());
 
         assert_eq!(
-            event.inner()["root"].as_map()["snoot"].as_map()["leep"],
+            event.inner().as_map()["root"].as_map()["snoot"].as_map()["leep"],
             value
         );
         assert_eq!(
-            event.inner()["root"].as_map()["boot"].as_map()["beep"].as_map()["leep"],
+            event.inner().as_map()["root"].as_map()["boot"].as_map()["beep"].as_map()["leep"],
             value
         );
 
@@ -124,7 +124,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root.field")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_map()["field"], value);
+        assert_eq!(event.inner().as_map()["root"].as_map()["field"], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -138,7 +138,7 @@ mod insert_get_remove {
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
         assert_eq!(
-            event.inner()["root"].as_map()["field"].as_map()["subfield"],
+            event.inner().as_map()["root"].as_map()["field"].as_map()["subfield"],
             value
         );
         assert_eq!(event.get(&lookup), Some(&value));
@@ -153,7 +153,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root[0]")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_array()[0], value);
+        assert_eq!(event.inner().as_map()["root"].as_array()[0], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -166,7 +166,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root[2]")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_array()[2], value);
+        assert_eq!(event.inner().as_map()["root"].as_array()[2], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -174,7 +174,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root[1]")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_array()[1], value);
+        assert_eq!(event.inner().as_map()["root"].as_array()[1], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -182,7 +182,7 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root[0]")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_array()[0], value);
+        assert_eq!(event.inner().as_map()["root"].as_array()[0], value);
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -195,7 +195,10 @@ mod insert_get_remove {
         let lookup = LookupBuf::from_str("root[0][0]")?;
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
-        assert_eq!(event.inner()["root"].as_array()[0].as_array()[0], value);
+        assert_eq!(
+            event.inner().as_map()["root"].as_array()[0].as_array()[0],
+            value
+        );
         assert_eq!(event.get(&lookup), Some(&value));
         assert_eq!(event.get_mut(&lookup), Some(&mut value));
         assert_eq!(event.remove(&lookup, false), Some(value));
@@ -209,7 +212,7 @@ mod insert_get_remove {
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
         assert_eq!(
-            event.inner()["root"].as_array()[0].as_map()["nested"],
+            event.inner().as_map()["root"].as_array()[0].as_map()["nested"],
             value
         );
         assert_eq!(event.get(&lookup), Some(&value));
@@ -227,7 +230,8 @@ mod insert_get_remove {
         let mut value = Value::Boolean(true);
         event.insert(lookup.clone(), value.clone());
         assert_eq!(
-            event.inner()["root"].as_array()[10].as_map()["nested"].as_array()[10].as_map()["more"]
+            event.inner().as_map()["root"].as_array()[10].as_map()["nested"].as_array()[10]
+                .as_map()["more"]
                 .as_array()[9]
                 .as_map()["than"]
                 .as_array()[8]

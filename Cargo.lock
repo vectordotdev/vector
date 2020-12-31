@@ -5890,6 +5890,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "chrono",
+ "derivative 2.1.1",
  "derive_is_enum_variant",
  "indexmap",
  "lazy_static",

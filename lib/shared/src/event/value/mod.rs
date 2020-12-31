@@ -57,7 +57,6 @@ use tracing::{instrument, trace, trace_span};
 /// let mut value = Value::from(1);
 /// assert_eq!(value.as_integer(), &1);
 /// assert_eq!(value.as_integer_mut(), &mut 1);
-/// assert_eq!(value.into_integer(), 1);
 /// ```
 // The ordering of these fields, **particularly timestamps and bytes** is very important as serde's
 // untagged enum parser handles it in order.
@@ -79,8 +78,8 @@ pub enum Value {
     /// ```rust
     /// use shared::{event::*, lookup::*};
     /// let val = Value::from(String::from("Foo"));
-    /// assert_eq!(String::from_utf8_lossy(&*val.as_bytes()).to_string(), String::from("Foo"));
-    /// assert_eq!(String::from_utf8(val.into_bytes().to_vec()).unwrap(), String::from("Foo"));
+    /// assert_eq!(String::from_utf8_lossy(val.as_bytes()).to_string(), String::from("Foo"));
+    /// assert_eq!(String::from_utf8(val.as_bytes().to_vec()).unwrap(), String::from("Foo"));
     /// ```
     Bytes(Bytes),
     /// A map of fields to other values.
@@ -109,14 +108,6 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
-    pub fn into_integer(self) -> i64 {
-        match self {
-            Value::Integer(i) => i,
-            _ => panic!("Tried to call `Value::into_integer` on a non-integer value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
     pub fn as_float(&self) -> &f64 {
         match self {
             Value::Float(ref f) => f,
@@ -129,14 +120,6 @@ impl Value {
         match self {
             Value::Float(ref mut f) => f,
             _ => panic!("Tried to call `Value::as_float` on a non-float value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
-    pub fn into_float(self) -> f64 {
-        match self {
-            Value::Float(f) => f,
-            _ => panic!("Tried to call `Value::into_float` on a non-float value."),
         }
     }
 
@@ -157,14 +140,6 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
-    pub fn into_bool(self) -> bool {
-        match self {
-            Value::Boolean(b) => b,
-            _ => panic!("Tried to call `Value::into_bool` on a non-bool value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
     pub fn as_timestamp(&self) -> &DateTime<Utc> {
         match self {
             Value::Timestamp(ref t) => t,
@@ -177,14 +152,6 @@ impl Value {
         match self {
             Value::Timestamp(ref mut t) => t,
             _ => panic!("Tried to call `Value::as_timestamp` on a non-timestamp value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
-    pub fn into_timestamp(self) -> DateTime<Utc> {
-        match self {
-            Value::Timestamp(t) => t,
-            _ => panic!("Tried to call `Value::into_timestamp` on a non-timestamp value."),
         }
     }
 
@@ -205,14 +172,6 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
-    pub fn into_bytes(self) -> Bytes {
-        match self {
-            Value::Bytes(b) => b,
-            _ => panic!("Tried to call `Value::into_bytes` on a non-bytes value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
         match self {
             Value::Map(ref m) => m,
@@ -229,14 +188,6 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
-    pub fn into_map(self) -> BTreeMap<String, Value> {
-        match self {
-            Value::Map(m) => m,
-            _ => panic!("Tried to call `Value::into_map` on a non-map value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
     pub fn as_array(&self) -> &Vec<Value> {
         match self {
             Value::Array(ref a) => a,
@@ -249,14 +200,6 @@ impl Value {
         match self {
             Value::Array(ref mut a) => a,
             _ => panic!("Tried to call `Value::as_array` on a non-array value."),
-        }
-    }
-
-    #[instrument(level = "trace")]
-    pub fn into_array(self) -> Vec<Value> {
-        match self {
-            Value::Array(v) => v,
-            _ => panic!("Tried to call `Value::into_array` on a non-array value."),
         }
     }
 
@@ -343,33 +286,33 @@ impl Value {
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
-    /// assert_eq!(val.len(), 0);
+    /// assert_eq!(val.len(), None);
     ///
     /// let mut val = Value::from(Vec::<Value>::default());
-    /// assert_eq!(val.len(), 0);
+    /// assert_eq!(val.len(), Some(0));
     /// val.insert(0, 1);
-    /// assert_eq!(val.len(), 1);
+    /// assert_eq!(val.len(), Some(1));
     /// val.insert(3, 1);
-    /// assert_eq!(val.len(), 4);
+    /// assert_eq!(val.len(), Some(4));
     ///
     /// let mut val = Value::from(BTreeMap::default());
-    /// assert_eq!(val.len(), 0);
+    /// assert_eq!(val.len(), Some(0));
     /// val.insert("foo", 1);
-    /// assert_eq!(val.len(), 1);
+    /// assert_eq!(val.len(), Some(1));
     /// val.insert("bar", 2);
-    /// assert_eq!(val.len(), 2);
+    /// assert_eq!(val.len(), Some(2));
     /// ```
     #[instrument(level = "trace")]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> Option<usize> {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
-            | Value::Null => 0,
-            Value::Map(v) => v.len(),
-            Value::Array(v) => v.len(),
+            | Value::Null => None,
+            Value::Map(v) => Some(v.len()),
+            Value::Array(v) => Some(v.len()),
         }
     }
 
@@ -416,7 +359,7 @@ impl Value {
             | (Some(segment), Value::Integer(_)) => {
                 trace!("Encountered descent into a primitive.");
                 Err(EventError::PrimitiveDescent {
-                    primitive_at: LookupBuf::from(segment.clone()),
+                    primitive_at: LookupBuf::default(),
                     original_target: {
                         let mut l = LookupBuf::from(segment);
                         l.extend(working_lookup);
@@ -798,7 +741,7 @@ impl Value {
                 if working_lookup.len() > 0 {
                     trace!("Encountered descent into a primitive.");
                     Err(EventError::PrimitiveDescent {
-                        primitive_at: LookupBuf::from(segment.clone().into_buf()),
+                        primitive_at: LookupBuf::default(),
                         original_target: {
                             let mut l = LookupBuf::from(segment.clone().into_buf());
                             l.extend(working_lookup.into_buf());
@@ -856,11 +799,11 @@ impl Value {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
                                 trace!(prune, "Map is empty. May need to prune.");
-                                inner_is_empty = true
+                                inner_is_empty = true;
                             } else {
                                 trace!(
                                     prune,
-                                    items = inner.len(),
+                                    items = ?inner.len(),
                                     "Map is not empty, no possible pruning."
                                 );
                             };
@@ -869,7 +812,7 @@ impl Value {
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        trace!("Pruning.");
+                        trace!(field = %name, "Pruning.");
                         map.remove(*name);
                     } else {
                         trace!("Pruning not required.");

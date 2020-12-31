@@ -5,15 +5,16 @@ pub mod lua;
 mod test;
 
 use crate::{event::*, lookup::*};
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
+    str::FromStr,
 };
-use tracing::{debug, error, instrument, trace, trace_span};
+use tracing::{debug, instrument, trace, trace_span};
 
 /// A map of [`crate::event::Value`].
 ///
@@ -44,19 +45,20 @@ use tracing::{debug, error, instrument, trace, trace_span};
 /// assert_eq!(event.get(&lookup), Some(&Value::from(1)));
 /// ```
 ///
-/// It's possible to access the inner [`BTreeMap`](std::collections::BTreeMap):
+/// It's possible to access the inner [`Value`](crate::event::Value):
 ///
 /// ```rust
 /// use shared::{event::*, lookup::*};
+/// use std::convert::TryFrom;
 /// let mut event = LogEvent::default();
 /// event.insert(String::from("foo"), 1);
 ///
 /// use std::collections::BTreeMap;
-/// let _inner: &BTreeMap<_, _> = event.inner();
-/// let _inner: &mut BTreeMap<_, _> = event.inner_mut();
-/// let inner: BTreeMap<_, _> = event.take();
+/// let _inner: &Value = event.inner();
+/// let _inner: &mut Value = event.inner_mut();
+/// let inner: Value = event.take();
 ///
-/// let event = LogEvent::from(inner);
+/// let event = LogEvent::try_from(inner).unwrap();
 /// ```
 ///
 /// There exists a `log_event` macro you may also utilize to create this type:
@@ -70,10 +72,13 @@ use tracing::{debug, error, instrument, trace, trace_span};
 /// assert!(event.contains("foo"));
 /// assert!(event.contains(Lookup::from_str("foo").unwrap()));
 /// ```
-#[derive(PartialEq, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Derivative, Serialize, Deserialize)]
+#[derivative(Default)]
 pub struct LogEvent {
+    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[serde(flatten)]
-    fields: BTreeMap<String, Value>,
+    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    fields: Value,
 }
 
 impl LogEvent {
@@ -91,68 +96,14 @@ impl LogEvent {
     /// assert_eq!(event.get(&lookup_key), Some(&Value::from(2)));
     /// ```
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
-        let mut working_lookup = lookup.into();
+        let working_lookup = lookup.into();
         let span = trace_span!("get", lookup = %working_lookup);
         let _guard = span.enter();
 
-        // The first step should always be a field.
-        let this_segment = working_lookup
-            .pop_front()
-            .expect("Cannot get immutable borrow of root of event. Call `take()` instead.");
-        // This is good, since the first step into a LogEvent will also be a field.
-
-        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
-        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        match this_segment {
-            Segment::Coalesce(sub_segments) => {
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
-                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
-                    if self.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
-                        needle = Some(lookup);
-                        break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
-                    }
-                }
-                match needle {
-                    Some(needle) => self.get(needle),
-                    None => None,
-                }
-            }
-            Segment::Field {
-                name,
-                requires_quoting: _,
-            } => {
-                if working_lookup.len() == 0 {
-                    // Terminus: We **must** get something here, else we truly have nothing.
-                    trace!(field = %name, "Getting from root.");
-                    self.fields.get(name)
-                } else {
-                    trace!(field = %name, "Descending into map.");
-                    match self.fields.get(name) {
-                        Some(v) => v.get(working_lookup).unwrap_or_else(|error| {
-                            debug!("{:?}", error);
-                            None
-                        }),
-                        None => None,
-                    }
-                }
-            }
-            // In this case, the user has passed us an invariant.
-            Segment::Index(_) => {
-                error!(
-                    "Lookups into LogEvents should never start with indexes.\
-                        Please report your config."
-                );
-                None
-            }
-        }
+        self.fields.get(working_lookup).unwrap_or_else(|error| {
+            debug!(%error, "Error while getting immutable borrow.");
+            None
+        })
     }
 
     /// Get a mutable borrow of the value by lookup.
@@ -169,68 +120,14 @@ impl LogEvent {
     /// assert_eq!(event.get_mut(&lookup_key), Some(&mut Value::from(2)));
     /// ```
     pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
-        let mut working_lookup = lookup.into();
+        let working_lookup = lookup.into();
         let span = trace_span!("get_mut", lookup = %working_lookup);
         let _guard = span.enter();
 
-        // The first step should always be a field.
-        let this_segment = working_lookup
-            .pop_front()
-            .expect("Cannot get mutable borrow of root of event. Call `take()` instead.");
-        // This is good, since the first step into a LogEvent will also be a field.
-
-        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
-        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        match this_segment {
-            Segment::Coalesce(sub_segments) => {
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
-                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
-                    if self.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
-                        needle = Some(lookup);
-                        break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
-                    }
-                }
-                match needle {
-                    Some(needle) => self.get_mut(needle),
-                    None => None,
-                }
-            }
-            Segment::Field {
-                name,
-                requires_quoting: _,
-            } => {
-                if working_lookup.len() == 0 {
-                    // Terminus: We **must** insert here or abort.
-                    trace!(field = %name, "Getting from root.");
-                    self.fields.get_mut(name)
-                } else {
-                    trace!(field = %name, "Descending into map.");
-                    match self.fields.get_mut(name) {
-                        Some(v) => v.get_mut(working_lookup).unwrap_or_else(|error| {
-                            debug!("{:?}", error);
-                            None
-                        }),
-                        None => None,
-                    }
-                }
-            }
-            // In this case, the user has passed us an invariant.
-            Segment::Index(_) => {
-                error!(
-                    "Lookups into LogEvents should never start with indexes.\
-                        Please report your config."
-                );
-                None
-            }
-        }
+        self.fields.get_mut(working_lookup).unwrap_or_else(|error| {
+            debug!(%error, "Error while getting mutable borrow.");
+            None
+        })
     }
 
     /// Determine if the log event contains a value at a given lookup.
@@ -272,112 +169,41 @@ impl LogEvent {
         lookup: impl Into<LookupBuf>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        let mut working_lookup: LookupBuf = lookup.into();
+        let working_lookup: LookupBuf = lookup.into();
         let span = trace_span!("insert", lookup = %working_lookup);
         let _guard = span.enter();
 
-        // The first step should always be a field.
-        let this_segment = working_lookup
-            .pop_front()
-            .expect("Cannot insert to root of event. Create a new event instead.");
-        // This is good, since the first step into a LogEvent will also be a field.
-
-        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
-        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        match this_segment {
-            SegmentBuf::Coalesce(sub_segments) => {
-                trace!("Seeking first match of coalesce.");
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = LookupBuf::try_from(sub_segment).ok()?;
-                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
-                    if !self.contains(&lookup) {
-                        trace!(option = %lookup, "Found coalesce option.");
-                        needle = Some(lookup);
-                        break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
-                    }
-                }
-                match needle {
-                    Some(needle) => self.insert(needle, value),
-                    None => None,
-                }
-            }
-            SegmentBuf::Field {
-                name,
-                requires_quoting: _,
-            } => {
-                let next_value = match working_lookup.get(0) {
-                    Some(SegmentBuf::Index(_)) => Value::Array(Vec::with_capacity(0)),
-                    Some(SegmentBuf::Field { .. }) => Value::Map(Default::default()),
-                    Some(SegmentBuf::Coalesce(set)) => {
-                        let mut cursor_set = set;
-                        loop {
-                            match cursor_set.get(0).and_then(|v| v.get(0)) {
-                                None => return None,
-                                Some(SegmentBuf::Field { .. }) => {
-                                    break Value::Map(Default::default())
-                                }
-                                Some(SegmentBuf::Index(i)) => {
-                                    break Value::Array(Vec::with_capacity(*i))
-                                }
-                                Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
-                            }
-                        }
-                    }
-                    None => {
-                        trace!(field = %name, "Inserting into root of event.");
-                        return self.fields.insert(name, value.into());
-                    }
-                };
-                trace!(field = %name, "Seeking into map.");
-                let entry = self.fields.entry(name.clone()).or_insert_with(|| {
-                    trace!(field = %name, "Inserting at leaf.");
-                    next_value
-                });
-                let outcome = entry.insert(working_lookup, value);
-                match outcome {
-                    Ok(v) => v,
-                    Err(EventError::PrimitiveDescent {
-                        primitive_at,
-                        original_target,
-                        original_value: Some(original_value),
-                    }) => {
-                        trace!(%primitive_at, %original_target, "Encountered descent into a primitive.");
-                        // When we find a primitive descent, we overwrite it.
-                        match entry.remove(&primitive_at, true) {
-                            Err(EventError::RemovingSelf) => {
-                                self.fields.remove(&name);
-                                trace!(%primitive_at, "Removed primitive, trying again.");
-                                let mut target = LookupBuf::from(name);
-                                target.extend(original_target);
-                                self.insert(target, original_value)
-                            }
-                            _ => entry
-                                .insert(original_target, original_value)
-                                .map_err(|error| {
-                                    debug!("{:?}", error);
-                                    error
-                                })
-                                .unwrap_or(Option::<Value>::None),
-                        }
-                    }
+        let outcome = self.fields.insert(working_lookup, value);
+        match outcome {
+            Ok(v) => v,
+            Err(EventError::PrimitiveDescent {
+                primitive_at,
+                original_target,
+                original_value: Some(original_value),
+            }) => {
+                trace!(%primitive_at, %original_target, "Encountered descent into a primitive.");
+                // When we find a primitive descent, we overwrite it.
+                match self.fields.remove(&primitive_at, true) {
+                    Err(EventError::RemovingSelf) => {
+                        trace!("Must remove self.");
+                        let mut val = Value::from(BTreeMap::default());
+                        core::mem::swap(&mut self.fields, &mut val);
+                        Some(val)
+                    },
                     Err(error) => {
-                        debug!("{:?}", error);
+                        debug!(%primitive_at, %original_target, %error, "Error while removing primitive.");
                         None
                     }
+                    _ => self.fields
+                        .insert(original_target, original_value)
+                        .unwrap_or_else(|error| {
+                            debug!(%primitive_at, %error, "Error while inserting after removing primitive.");
+                            Option::<Value>::None
+                        }),
                 }
             }
-            // In this case, the user has passed us an invariant.
-            SegmentBuf::Index(_) => {
-                error!(
-                    "Lookups into LogEvents should never start with indexes.\
-                        Please report your config."
-                );
+            Err(error) => {
+                debug!(%error, "Error while inserting.");
                 None
             }
         }
@@ -405,77 +231,16 @@ impl LogEvent {
         lookup: impl Into<Lookup<'lookup>> + Debug,
         prune: bool,
     ) -> Option<Value> {
-        let mut working_lookup = lookup.into();
+        let working_lookup = lookup.into();
         let span = trace_span!("remove", lookup = %working_lookup);
         let _guard = span.enter();
 
-        // The first step should always be a field.
-        let this_segment = working_lookup
-            .pop_front()
-            .expect("Cannot remove the root of event. Delete the event instead.");
-        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
-        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        match this_segment {
-            Segment::Coalesce(sub_segments) => {
-                trace!("Seeking first match of coalesce.");
-                // Creating a needle with a back out of the loop is very important.
-                let mut needle = None;
-                for sub_segment in sub_segments {
-                    let mut lookup = Lookup::try_from(sub_segment).ok()?;
-                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
-                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
-                    lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
-                    if self.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
-                        needle = Some(lookup);
-                        break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
-                    }
-                }
-                match needle {
-                    Some(needle) => self.remove(needle, prune),
-                    None => None,
-                }
-            }
-            Segment::Field {
-                name,
-                requires_quoting: _,
-            } => {
-                if working_lookup.len() == 0 {
-                    // Terminus: We **must** insert here or abort.
-                    trace!(field = %name, "Getting from root.");
-                    // Do not need to prune, it's already a root value.
-                    self.fields.remove(name)
-                } else {
-                    trace!(field = %name, "Seeking into map.");
-                    let retval = match self.fields.get_mut(name) {
-                        Some(v) => v.remove(working_lookup, prune).unwrap_or_else(|e| {
-                            trace!(?e);
-                            None
-                        }),
-                        None => None,
-                    };
-                    if let Some(val) = self.fields.get_mut(name) {
-                        if val.is_empty() && prune {
-                            trace!(is_empty = val.is_empty(), %prune, field = %name, "Pruning.");
-                            self.fields.remove(name);
-                        } else {
-                            trace!(is_empty = val.is_empty(), %prune, field = %name, "Not pruning.");
-                        }
-                    }
-                    retval
-                }
-            }
-            // In this case, the user has passed us an invariant.
-            Segment::Index(_) => {
-                error!(
-                    "Lookups into LogEvents should never start with indexes.\
-                        Please report your config."
-                );
+        self.fields
+            .remove(working_lookup, prune)
+            .unwrap_or_else(|error| {
+                debug!(%error, "Error while removing");
                 None
-            }
-        }
+            })
     }
 
     /// Iterate over the lookups available in this log event.
@@ -503,13 +268,7 @@ impl LogEvent {
     /// ```
     #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn keys<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = Lookup<'a>> + 'a {
-        self.fields
-            .iter()
-            .map(move |(k, v)| {
-                let lookup = Lookup::from(k);
-                v.lookups(Some(lookup), only_leaves)
-            })
-            .flatten()
+        self.fields.lookups(None, only_leaves)
     }
 
     /// Iterate over all lookup/value pairs.
@@ -547,13 +306,7 @@ impl LogEvent {
     /// ```
     #[instrument(level = "trace", skip(self, only_leaves))]
     pub fn pairs<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
-        self.fields
-            .iter()
-            .map(move |(k, v)| {
-                let lookup = Lookup::from(k);
-                v.pairs(Some(lookup), only_leaves)
-            })
-            .flatten()
+        self.fields.pairs(None, only_leaves)
     }
 
     /// Determine if the log event is empty of fields.
@@ -583,7 +336,7 @@ impl LogEvent {
         )) = walker.next()
         {
             trace!(%segment, index, "Seeking segment.");
-            self.fields.entry(segment)
+            self.fields.as_map_mut().entry(segment)
         } else {
             unreachable!(
                 "It is an invariant to have a `Lookup` without a contained `Segment`.\
@@ -632,10 +385,10 @@ impl LogEvent {
     /// ```rust
     /// use shared::{event::*, lookup::*};
     /// let event = LogEvent::default();
-    /// assert_eq!(event.take(), std::collections::BTreeMap::default());
+    /// assert_eq!(event.take(), Value::Map(std::collections::BTreeMap::default()));
     /// ```
     #[instrument(level = "trace", skip(self))]
-    pub fn take(self) -> BTreeMap<String, Value> {
+    pub fn take(self) -> Value {
         self.fields
     }
 
@@ -644,10 +397,10 @@ impl LogEvent {
     /// ```rust
     /// use shared::{event::*, lookup::*};
     /// let mut event = LogEvent::default();
-    /// assert_eq!(event.inner(), &std::collections::BTreeMap::default());
+    /// assert_eq!(event.inner(), &Value::Map(std::collections::BTreeMap::default()));
     /// ```
     #[instrument(level = "trace", skip(self))]
-    pub fn inner(&self) -> &BTreeMap<String, Value> {
+    pub fn inner(&self) -> &Value {
         &self.fields
     }
 
@@ -656,10 +409,10 @@ impl LogEvent {
     /// ```rust
     /// use shared::{event::*, lookup::*};
     /// let mut event = LogEvent::default();
-    /// assert_eq!(event.inner_mut(), &mut std::collections::BTreeMap::default());
+    /// assert_eq!(event.inner_mut(), &Value::Map(std::collections::BTreeMap::default()));
     /// ```
     #[instrument(level = "trace", skip(self))]
-    pub fn inner_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    pub fn inner_mut(&mut self) -> &mut Value {
         &mut self.fields
     }
 }
@@ -693,10 +446,10 @@ impl remap_lang::Object for LogEvent {
     }
 
     fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
-        let value = Value::from(value);
+        let mut value = Value::from(value);
         if path.is_root() {
-            if let Value::Map(mut v) = value {
-                std::mem::swap(&mut self.fields, &mut v);
+            if let Value::Map(_) = value {
+                std::mem::swap(&mut self.fields, &mut value);
                 // TODO: Why does this not return value?
                 Ok(())
             } else {
@@ -730,14 +483,16 @@ impl remap_lang::Object for LogEvent {
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
-        LogEvent { fields: map }
+        LogEvent {
+            fields: Value::from(map),
+        }
     }
 }
 
 impl Into<BTreeMap<String, Value>> for LogEvent {
     fn into(self) -> BTreeMap<String, Value> {
         let Self { fields } = self;
-        fields
+        fields.try_into().expect("Tried to turn a log event which was not a map into a map. This is an invariant, please report it.")
     }
 }
 
@@ -751,7 +506,8 @@ impl From<HashMap<String, Value>> for LogEvent {
 
 impl Into<HashMap<String, Value>> for LogEvent {
     fn into(self) -> HashMap<String, Value> {
-        self.fields.into_iter().collect()
+        let map: BTreeMap<_, _> = self.into();
+        map.into_iter().collect()
     }
 }
 
@@ -768,6 +524,19 @@ impl TryFrom<serde_json::Value> for LogEvent {
             )),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into a LogEvent.",
+            )),
+        }
+    }
+}
+
+impl TryFrom<Value> for LogEvent {
+    type Error = crate::Error;
+
+    fn try_from(fields: Value) -> Result<Self, Self::Error> {
+        match fields {
+            Value::Map(_) => Ok(Self { fields }),
+            _ => Err(crate::Error::from(
+                "Attempted to convert non-Map value into a LogEvent.",
             )),
         }
     }
@@ -808,7 +577,8 @@ impl IntoIterator for LogEvent {
     type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
+        let map: BTreeMap<_, _> = self.fields.try_into().expect("Tried to turn a log event which was not a map into a map. This is an invariant, please report it.");
+        map.into_iter()
     }
 }
 
