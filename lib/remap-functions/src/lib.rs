@@ -12,6 +12,8 @@ mod contains;
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base64")]
+mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "ends_with")]
@@ -133,6 +135,8 @@ pub use contains::Contains;
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base64")]
+pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
@@ -250,6 +254,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base64")]
+        Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "ends_with")]
