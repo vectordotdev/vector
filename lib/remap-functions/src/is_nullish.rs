@@ -3,7 +3,12 @@ use regex::Regex;
 use remap::prelude::*;
 
 lazy_static! {
-    static ref BLANK_STRING_PATTERN: Regex = Regex::new(r"^(\s*|\\n|\-)$").unwrap();
+    // This pattern considers each of these as nullish:
+    // * Whitespace-only strings of any length
+    // * Newline (\n)
+    // * Carriage return (\r)
+    // * Single dash (-)
+    static ref NULLISH_STRING_PATTERN: Regex = Regex::new(r"^(\s*|\\n|\\r|\-)$").unwrap();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -40,7 +45,7 @@ impl Expression for IsNullishFn {
             Value::Bytes(v) => {
                 let s = &String::from_utf8_lossy(&v)[..];
 
-                let matches = BLANK_STRING_PATTERN.is_match(s);
+                let matches = NULLISH_STRING_PATTERN.is_match(s);
 
                 Ok(matches.into())
             }
@@ -130,6 +135,11 @@ mod tests {
 
         newline_string {
             args: func_args![value: value!("\n")],
+            want: Ok(value!(true)),
+        }
+
+        carriage_return_string {
+            args: func_args![value: value!("\r")],
             want: Ok(value!(true)),
         }
 
