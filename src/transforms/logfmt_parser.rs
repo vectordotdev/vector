@@ -81,6 +81,7 @@ impl FunctionTransform for Logfmt {
                 .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
+                // This is **technically** user input, but we can't really avoid it.
                 let key = LookupBuf::from_str(&*key).unwrap_or_else(|_| LookupBuf::from(&*key));
                 if key == self.field {
                     drop_field = false;
