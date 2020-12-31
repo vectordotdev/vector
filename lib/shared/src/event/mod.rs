@@ -5,16 +5,16 @@ pub mod metric;
 pub mod value;
 pub mod visitors;
 
+use crate::lookup::*;
 pub use error::EventError;
 pub use log_event::LogEvent;
 pub use metric::{Metric, MetricKind, MetricValue};
-pub use value::Value;
 use std::str::FromStr;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
-use crate::lookup::*;
+pub use value::Value;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {

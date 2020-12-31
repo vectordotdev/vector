@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event},
+    event::Event,
     internal_events::{HTTPBadRequest, HTTPDecompressError, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
