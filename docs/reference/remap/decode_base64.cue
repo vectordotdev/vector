@@ -16,12 +16,12 @@ remap: functions: decode_base64: {
 		{
 			title: "Decode Base64 data"
 			input: {
-				message: "please encode me"
+				message: "eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU="
 			}
 			source: ".decoded = decode_base64(.message)"
 			output: {
 				message: "eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU="
-				encoded: "you have successfully decoded me"
+				decoded: "you have successfully decoded me"
 			}
 		},
 	]
