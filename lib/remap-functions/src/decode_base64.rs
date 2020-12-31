@@ -34,7 +34,7 @@ impl Expression for DecodeBase64Fn {
 
         match base64::decode(value) {
             Ok(v) => Ok(Value::from(v)),
-            Err(_) => Err("unable to decode value to base64".into())
+            Err(_) => Err("unable to decode value to base64".into()),
         }
     }
 
@@ -73,6 +73,11 @@ mod test {
         string_value {
             args: func_args![value: value!("c29tZSBzdHJpbmcgdmFsdWU=")],
             want: Ok(value!("some string value")),
+        }
+
+        empty_string_value {
+            args: func_args![value: value!("")],
+            want: Ok(value!("")),
         }
     ];
 }
