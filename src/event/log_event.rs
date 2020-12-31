@@ -288,6 +288,31 @@ impl Object for LogEvent {
         Ok(())
     }
 
+    /// Remove the value from the event and return it.
+    /// Avoid just calling get to retreive the value since that clones and we can avoid that.
+    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, ()> {
+        if path.is_root() {
+            return Ok(Some(
+                std::mem::replace(&mut self.fields, BTreeMap::new())
+                    .into_iter()
+                    .map(|(key, value)| (key, value.into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into(),
+            ));
+        }
+
+        // loop until we find a path that exists.
+        for key in path.to_alternative_strings() {
+            if !self.contains(&key) {
+                continue;
+            }
+
+            return Ok(self.remove_prune(&key, compact).map(Into::into));
+        }
+
+        Ok(None)
+    }
+
     fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
@@ -319,10 +344,6 @@ impl Object for LogEvent {
         self.keys()
             .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
             .collect()
-    }
-
-    fn remove_and_get(&mut self, _: &Path, _: bool) -> Result<Option<remap::Value>, ()> {
-        unimplemented!();
     }
 }
 
@@ -664,6 +685,86 @@ mod test {
             let path = Path::new_unchecked(segments);
 
             assert_eq!(Object::remove(&mut event, &path, compact), Ok(()));
+            assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
+        }
+    }
+
+    #[test]
+    fn object_remove_and_get() {
+        use crate::map;
+        use remap::{Field::*, Object, Path, Segment::*};
+
+        let cases = vec![
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("foo".to_owned()))],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Coalesce(vec![
+                    Quoted("foo bar".to_owned()),
+                    Regular("foo".to_owned()),
+                ])],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                false,
+                Some(map!["foo": Value::Array(vec![])].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Field(Quoted("bar baz".to_owned())),
+                    Index(0),
+                ],
+                false,
+                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+            ),
+            (
+                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Field(Quoted("bar baz".to_owned())),
+                    Index(0),
+                ],
+                true,
+                Some(map!["bar": "baz"].into()),
+            ),
+        ];
+
+        for (object, segments, compact, expect) in cases {
+            let mut event = LogEvent::from(object);
+            let path = Path::new_unchecked(segments);
+            let removed = Object::get(&event, &path).unwrap();
+
+            assert_eq!(
+                Object::remove_and_get(&mut event, &path, compact),
+                Ok(removed)
+            );
             assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
         }
     }
