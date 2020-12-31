@@ -184,9 +184,9 @@ mod tests {
             want: Ok(value!("console")),
         }
 
-        cron {
+        solaris_cron {
             args: func_args![value: value!(15)],
-            want: Ok(value!("cron")),
+            want: Ok(value!("solaris-cron")),
         }
 
         local0 {
