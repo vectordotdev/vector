@@ -41,12 +41,14 @@ default = [
     "contains",
     "del",
     "downcase",
+    "encode_json",
     "ends_with",
     "exists",
     "flatten",
     "floor",
     "format_number",
     "format_timestamp",
+    "includes",
     "ip_cidr_contains",
     "ip_subnet",
     "ip_to_ipv6",
@@ -64,6 +66,8 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_syslog",
+    "parse_regex",
+    "parse_regex_all",
     "parse_timestamp",
     "parse_url",
     "redact",
@@ -80,7 +84,9 @@ default = [
     "to_bool",
     "to_float",
     "to_int",
+    "to_syslog_level",
     "to_string",
+    "to_syslog_severity",
     "to_timestamp",
     "tokenize",
     "truncate",
@@ -94,18 +100,20 @@ compact = []
 contains = []
 del = []
 downcase = []
+encode_json = ["serde_json"]
 ends_with = []
 exists = []
 flatten = []
 floor = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+includes = []
 ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 log = ["tracing"]
-match = []
+match = ["regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = []
@@ -116,6 +124,8 @@ parse_aws_vpc_flow_log = []
 parse_duration = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
+parse_regex = ["regex"]
+parse_regex_all = ["regex"]
 parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_url = ["url"]
@@ -133,7 +143,9 @@ strip_whitespace = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
+to_syslog_severity = []
 to_string = []
+to_syslog_level = []
 to_timestamp = ["chrono"]
 tokenize = ["shared/tokenize"]
 truncate = []

@@ -7,7 +7,7 @@ use crate::{
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -22,6 +22,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
@@ -53,14 +54,17 @@ pub struct ElasticSearchConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
     pub auth: Option<ElasticSearchAuth>,
 
-    pub headers: Option<HashMap<String, String>>,
+    // Deprecated, moved to request.
+    pub headers: Option<IndexMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
+    pub bulk_action: BulkAction,
 }
 
 lazy_static! {
@@ -82,6 +86,31 @@ pub enum Encoding {
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
     Aws { assume_role: Option<String> },
+}
+
+#[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum BulkAction {
+    #[derivative(Default)]
+    Index,
+    Create,
+}
+
+impl BulkAction {
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "index",
+            BulkAction::Create => "create",
+        }
+    }
+
+    pub fn as_json_pointer(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "/index",
+            BulkAction::Create => "/create",
+        }
+    }
 }
 
 inventory::submit! {
@@ -108,7 +137,7 @@ impl SinkConfig for ElasticSearchConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::with_retry_logic(
             common,
@@ -146,6 +175,7 @@ pub struct ElasticSearchCommon {
     compression: Compression,
     region: Region,
     query_params: HashMap<String, String>,
+    bulk_action: BulkAction,
 }
 
 #[derive(Debug, Snafu)]
@@ -177,14 +207,16 @@ impl HttpSink for ElasticSearchCommon {
             .ok()?;
 
         let mut action = json!({
-            "index": {
+            self.bulk_action.as_str(): {
                 "_index": index,
                 "_type": self.doc_type,
             }
         });
         maybe_set_id(
             self.config.id_key.as_ref(),
-            action.pointer_mut("/index").unwrap(),
+            action
+                .pointer_mut(self.bulk_action.as_json_pointer())
+                .unwrap(),
             &mut event,
         );
 
@@ -216,10 +248,8 @@ impl HttpSink for ElasticSearchCommon {
                 request.add_header("Content-Encoding", ce);
             }
 
-            if let Some(headers) = &self.config.headers {
-                for (header, value) in headers {
-                    request.add_header(header, value);
-                }
+            for (header, value) in &self.config.request.headers {
+                request.add_header(header, value);
             }
 
             request.set_payload(Some(events));
@@ -243,10 +273,8 @@ impl HttpSink for ElasticSearchCommon {
                 builder = builder.header("Content-Encoding", ce);
             }
 
-            if let Some(headers) = &self.config.headers {
-                for (header, value) in headers {
-                    builder = builder.header(&header[..], &value[..]);
-                }
+            for (header, value) in &self.config.request.headers {
+                builder = builder.header(&header[..], &value[..]);
             }
 
             if let Some(auth) = &self.authorization {
@@ -374,8 +402,9 @@ impl ElasticSearchCommon {
         let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let bulk_action = config.bulk_action.clone();
 
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert("timeout".into(), format!("{}s", request.timeout.as_secs()));
@@ -392,7 +421,9 @@ impl ElasticSearchCommon {
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 
         let tls_settings = TlsSettings::from_options(&config.tls)?;
-        let config = config.clone();
+        let mut config = config.clone();
+
+        config.request.add_old_option(config.headers.take());
 
         Ok(Self {
             base_url,
@@ -406,6 +437,7 @@ impl ElasticSearchCommon {
             compression,
             region,
             query_params,
+            bulk_action,
         })
     }
 
@@ -527,6 +559,31 @@ mod tests {
         maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
+    }
+
+    #[test]
+    fn sets_create_action_when_configured() {
+        use crate::config::log_schema;
+        use chrono::{TimeZone, Utc};
+
+        let config = ElasticSearchConfig {
+            bulk_action: BulkAction::Create,
+            index: Some(String::from("vector")),
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert(
+            log_schema().timestamp_key(),
+            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+        );
+        let encoded = es.encode_event(event).unwrap();
+        let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
+{"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
     }
 
     #[test]

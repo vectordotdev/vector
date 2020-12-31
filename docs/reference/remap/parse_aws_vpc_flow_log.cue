@@ -16,7 +16,7 @@ remap: functions: parse_aws_vpc_flow_log: {
 		},
 	]
 	return: ["map"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a [VPC Flow Logs]\(urls.aws_vpc_flow_logs\) into it's constituent components.
 		"""#

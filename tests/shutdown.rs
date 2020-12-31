@@ -163,8 +163,9 @@ fn configuration_path_recomputed() {
         &source_config(
             r#"
         type = "generator"
-        batch_interval = 1.0 # optional, no default
-        lines = []"#,
+        format = "shuffle"
+        interval = 1.0 # optional, no default
+        lines = ["foo", "bar"]"#,
         ),
     );
 
@@ -226,8 +227,9 @@ fn timely_shutdown_generator() {
     test_timely_shutdown(source_vector(
         r#"
     type = "generator"
-    batch_interval = 1.0 # optional, no default
-    lines = []"#,
+    format = "shuffle"
+    interval = 1.0 # optional, no default
+    lines = ["foo", "bar"]"#,
     ));
 }
 

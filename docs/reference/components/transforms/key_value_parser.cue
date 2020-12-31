@@ -1,11 +1,15 @@
 package metadata
 
 components: transforms: key_value_parser: {
-	title: "Key Value Parser"
+	title: "Key-value Parser"
+
+	description: """
+		Loosely parses a log field's value in key-value format.
+		"""
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -32,13 +36,15 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-					Performance characteristics of the `key_value` transform have not been benchmarked.
-				""",
+			This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
+			function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
 		]
 		notices: [
 			"""
-					It is likely that the `key_value` transform will replace the `logfmt` transform in the future since
-					it offers a more flexible super-set of that transform.
+				It is likely that the `key_value` transform will replace the `logfmt_parser` transform
+				in the future since it offers a more flexible superset of that transform.
 				""",
 		]
 	}

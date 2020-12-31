@@ -10,7 +10,7 @@ remap: functions: tokenize: {
 		},
 	]
 	return: ["array"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Splits the string up into an array of tokens. A token is considered to be:
 		- A word surrounded by whitespace.

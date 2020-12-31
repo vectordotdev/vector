@@ -3,9 +3,13 @@ package metadata
 components: transforms: split: {
 	title: "Split"
 
+	description: """
+		Splits a string field on a defined separator.
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -24,7 +28,13 @@ components: transforms: split: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new [`remap` transform's `split`
+			function](\(urls.vector_remap_transform)#split). The `remap` transform provides a simple
+			syntax for robust data transformation. Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

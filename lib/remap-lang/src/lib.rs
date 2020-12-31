@@ -1,5 +1,4 @@
 mod error;
-mod object;
 mod operator;
 mod parser;
 mod path;
@@ -10,6 +9,7 @@ mod type_def;
 
 pub mod expression;
 pub mod function;
+pub mod object;
 pub mod prelude;
 pub mod state;
 pub mod value;

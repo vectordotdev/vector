@@ -49,7 +49,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
         debug!(
             message = %format!("Parse error:\n\n{}\n\n", self.error),
             url = %self.url,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 

@@ -44,6 +44,7 @@ components: sinks: http: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    true
 			}
 			tls: {
 				enabled:                true
@@ -91,27 +92,28 @@ components: sinks: http: {
 			password_example: "${HTTP_PASSWORD}"
 			username_example: "${HTTP_USERNAME}"
 		}}
-		headers: {
-			common:      false
-			description: "Options for custom headers."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [
-					{
-						"Authorization": "${HTTP_TOKEN}"
-						"X-Powered-By":  "Vector"
-					},
-				]
-				options: {}
-			}
-		}
 		uri: {
-			description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
-			required:    true
+			description: """
+				The full URI to make HTTP requests to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
+			}
+		}
+		healthcheck: type: object: options: uri: {
+			common: false
+			description: """
+				The full URI to make HTTP health check request to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["https://10.22.212.22:9000/health"]
 			}
 		}
 	}

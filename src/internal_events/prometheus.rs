@@ -56,7 +56,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -113,21 +113,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug)]
-pub struct PrometheusRemoteWriteSnapError {
-    pub error: snap::Error,
-}
-
-impl InternalEvent for PrometheusRemoteWriteSnapError {
-    fn emit_logs(&self) {
-        error!(message = "Could not decompress request body.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct PrometheusRemoteWriteReceived {
     pub count: usize,
 }
@@ -145,7 +130,7 @@ impl InternalEvent for PrometheusNoNameError {
     fn emit_logs(&self) {
         error!(
             message = "Decoded timeseries is missing the __name__ field.",
-            rate_limit_secs = 5
+            internal_log_rate_secs = 5
         );
     }
 

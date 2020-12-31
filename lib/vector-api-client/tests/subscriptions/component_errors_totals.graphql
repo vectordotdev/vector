@@ -1,0 +1,8 @@
+subscription ComponentErrorsTotalsSubscription ($interval: Int!) {
+    componentErrorsTotals(interval: $interval) {
+        name
+        metric {
+            errorsTotal
+        }
+    }
+}
