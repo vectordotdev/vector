@@ -8,14 +8,13 @@ pub mod visitors;
 pub use error::EventError;
 pub use log_event::LogEvent;
 pub use metric::{Metric, MetricKind, MetricValue};
+pub use value::Value;
+use std::str::FromStr;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
-pub use value::Value;
-
 use crate::lookup::*;
-use std::str::FromStr;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
