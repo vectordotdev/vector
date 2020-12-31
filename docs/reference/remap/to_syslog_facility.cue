@@ -19,9 +19,9 @@ remap: functions: to_syslog_facility: {
 		{
 			title: "Success"
 			input: {
-				SYSLOG_FACILITY: "4"
+				syslog_facility: "4"
 			}
-			source: ".log_facility = to_syslog_facility(.SYSLOG_FACILITY)"
+			source: ".log_facility = to_syslog_facility(.syslog_facility)"
 			output: {
 				log_facility: "auth"
 			}
@@ -29,9 +29,9 @@ remap: functions: to_syslog_facility: {
 		{
 			title: "Error"
 			input: {
-				SYSLOG_FACILITY: "1337"
+				syslog_facility: "1337"
 			}
-			source: ".log_facility = to_syslog_facility(.SYSLOG_FACILITY)"
+			source: ".log_facility = to_syslog_facility(.syslog_facility)"
 			output: {
 				error: remap.errors.ParseError
 			}
