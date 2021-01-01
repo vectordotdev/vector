@@ -57,8 +57,15 @@ components: sinks: _humio: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.humio
 
@@ -78,6 +85,15 @@ components: sinks: _humio: {
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "The base URL of the Humio instance."
+			required:    false
+			type: string: {
+				default: "https://cloud.humio.com"
+				examples: ["http://127.0.0.1", "http://example.com"]
+			}
+		}
 		event_type: {
 			common:      false
 			description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"

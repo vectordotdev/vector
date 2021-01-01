@@ -77,6 +77,22 @@ components: sources: kubernetes_logs: {
 							default: "kubernetes.container_name"
 						}
 					}
+					pod_ip: {
+						common:      false
+						description: "Event field for Pod IPv4 Address."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_ip"
+						}
+					}
+					pod_ips: {
+						common:      false
+						description: "Event field for Pod IPv4 and IPv6 Addresses."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_ips"
+						}
+					}
 					pod_labels: {
 						common:      false
 						description: "Event field for Pod labels."
@@ -197,6 +213,24 @@ components: sources: kubernetes_logs: {
 					default: null
 				}
 			}
+			"kubernetes.pod_ip": {
+				description: "Pod IPv4 address."
+				required:    false
+				common:      true
+				type: string: {
+					examples: ["192.168.1.1"]
+					default: null
+				}
+			}
+			"kubernetes.pod_ips": {
+				description: "Pod IPv4 and IPv6 addresses."
+				required:    false
+				common:      true
+				type: string: {
+					examples: ["192.168.1.1", "::1"]
+					default: null
+				}
+			}
 			"kubernetes.pod_labels": {
 				description: "Pod labels name."
 				required:    false
@@ -274,6 +308,8 @@ components: sources: kubernetes_logs: {
 				"file":                       "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"
 				"kubernetes.container_image": "gcr.io/k8s-minikube/storage-provisioner:v3"
 				"kubernetes.container_name":  "storage-provisioner"
+				"kubernetes.pod_ip":          "192.168.1.1"
+				"kubernetes.pod_ips": ["192.168.1.1", "::1"]
 				"kubernetes.pod_labels": {
 					"addonmanager.kubernetes.io/mode": "Reconcile"
 					"gcp-auth-skip-secret":            "true"

@@ -3,6 +3,11 @@ package metadata
 components: transforms: metric_to_log: {
 	title: "Metric to Log"
 
+	description: """
+		Converts a metric event into a log event, which can be useful for sending metrics
+		to log-support downstream components.
+		"""
+
 	classes: {
 		commonly_used: true
 		development:   "stable"

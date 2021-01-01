@@ -24,6 +24,11 @@ impl Kind {
     pub fn is_some(self) -> bool {
         !self.is_exact() && !self.is_all() && !self.is_empty()
     }
+
+    /// Return the existing kinds, without non-scalar kinds (maps and arrays).
+    pub fn scalar(self) -> Self {
+        self & !(Kind::Array | Kind::Map)
+    }
 }
 
 macro_rules! impl_kind {

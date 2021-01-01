@@ -9,6 +9,7 @@ mod tests {
     use crate::support::{fork_test, sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
+    use metrics::counter;
     use std::{
         collections::HashMap,
         net::SocketAddr,
@@ -79,7 +80,7 @@ mod tests {
             .await
             .unwrap();
 
-        let result = vector::topology::start_validated(c, diff, pieces, false).await;
+        let result = vector::topology::start_validated(c, diff, pieces).await;
         let (topology, _graceful_crash) = result.unwrap();
 
         topology
@@ -429,8 +430,9 @@ mod tests {
 
                     [sources.processed_events_total_batch_source]
                       type = "generator"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
-                      batch_interval = 0.01
+                      interval = 0.01
 
                     [sinks.processed_events_total_batch_sink]
                       # General
@@ -456,8 +458,12 @@ mod tests {
                     .await
                     .expect("Didn't return results");
 
-                assert_eq!(data[0].name, "processed_events_total_batch_source");
-                assert_eq!(data[1].name, "processed_events_total_batch_sink");
+                for name in &[
+                    "processed_events_total_batch_source",
+                    "processed_events_total_batch_sink",
+                ] {
+                    assert!(data.iter().any(|d| d.name == *name));
+                }
             },
         )
     }
@@ -476,8 +482,9 @@ mod tests {
 
                     [sources.processed_bytes_total_batch_source]
                       type = "generator"
+                      format = "shuffle"
                       lines = ["Random line", "And another"]
-                      batch_interval = 0.1
+                      interval = 0.1
 
                     [sinks.processed_bytes_total_batch_sink]
                       # General
@@ -518,8 +525,9 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_added_sink]
                   # General
@@ -564,13 +572,15 @@ mod tests {
 
                 [sources.component_added_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sources.component_added_source_2]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_added_sink]
                   # General
@@ -581,7 +591,7 @@ mod tests {
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
-            topology.reload_config_and_respawn(c, false).await.unwrap();
+            topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());
 
             // Await the join handle
@@ -599,13 +609,15 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sources.component_removed_source_2]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["3rd line", "4th line"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_removed_sink]
                   # General
@@ -651,8 +663,9 @@ mod tests {
 
                 [sources.component_removed_source_1]
                   type = "generator"
+                  format = "shuffle"
                   lines = ["Random line", "And another"]
-                  batch_interval = 0.1
+                  interval = 0.1
 
                 [sinks.component_removed_sink]
                   # General
@@ -663,11 +676,215 @@ mod tests {
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
-            topology.reload_config_and_respawn(c, false).await.unwrap();
+            topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());
 
             // Await the join handle
             handle.await.unwrap();
+        })
+    }
+
+    #[test]
+    fn api_graphql_errors_total() {
+        metrics_test("tests::api_graphql_errors_total", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.error_gen]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  batch_interval = 0.1
+
+                [sinks.blackhole]
+                  # General
+                  type = "blackhole"
+                  inputs = ["error_gen"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = new_subscription_client(server.addr()).await;
+
+            // Spawn a handler for listening to changes
+            let handle = tokio::spawn(async move {
+                let subscription = client.errors_total_subscription(50);
+
+                tokio::pin! {
+                    let stream = subscription.stream();
+                }
+
+                // If we get results, it means the error has been picked up. Check the count is > 0
+                assert!(
+                    stream
+                        .next()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .data
+                        .unwrap()
+                        .errors_total
+                        .errors_total
+                        > 0.00
+                );
+            });
+
+            // Emit an error metric
+            counter!("processing_errors_total", 1);
+
+            handle.await.unwrap()
+        });
+    }
+
+    #[test]
+    fn api_grahql_component_errors_total() {
+        metrics_test("tests::api_grahql_component_errors_total", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.error_gen]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  batch_interval = 0.1
+
+                [sinks.blackhole]
+                  # General
+                  type = "blackhole"
+                  inputs = ["error_gen"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = new_subscription_client(server.addr()).await;
+
+            // Spawn a handler for listening to changes
+            let handle = tokio::spawn(async move {
+                let subscription = client.errors_total_subscription(50);
+
+                tokio::pin! {
+                    let stream = subscription.stream();
+                }
+
+                // If we get results, it means the error has been picked up. Check the count is > 0
+                assert!(
+                    stream
+                        .next()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .data
+                        .unwrap()
+                        .errors_total
+                        .errors_total
+                        > 0.00
+                );
+            });
+
+            // Emit an error metric
+            counter!("processing_errors_total", 1);
+
+            handle.await.unwrap()
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn api_graphql_files_source_metrics() {
+        use std::io::Write;
+        use tempfile::{tempdir, NamedTempFile};
+
+        metrics_test("tests::api_graphql_files_source_metrics", async {
+            let lines = vec!["test1", "test2", "test3"];
+
+            let checkpoints = tempdir().unwrap();
+            let mut named_file = NamedTempFile::new().unwrap();
+            let path = named_file.path().to_str().unwrap().to_string();
+            let mut file = named_file.as_file_mut();
+
+            for line in &lines {
+                writeln!(&mut file, "{}", line).unwrap();
+            }
+
+            let conf = format!(
+                r#"
+                [api]
+                  enabled = true
+
+                [sources.file]
+                  type = "file"
+                  data_dir = "{}"
+                  include = ["{}"]
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["file"]
+                  print_amount = 100000
+            "#,
+                checkpoints.path().to_str().unwrap(),
+                path
+            );
+
+            let topology = from_str_config(&conf).await;
+            let server = api::Server::start(topology.config());
+
+            // Short delay to ensure logs are picked up
+            tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+
+            let client = make_client(server.addr());
+            let res = client.file_source_metrics_query().await;
+
+            match &res.unwrap().data.unwrap().sources[0].metrics.on {
+                file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOn::FileSourceMetrics(
+                    file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOnFileSourceMetrics { files, .. },
+                ) => {
+                    assert_eq!(files[0].name, path);
+                    assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                }
+                _ => panic!("not a file source"),
+            }
+        })
+    }
+
+    #[test]
+    fn api_graphql_component_by_name() {
+        metrics_test("tests::api_graphql_component_by_name", async {
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.gen1]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["Random line", "And another"]
+                  interval = 0.1
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["gen1"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(&conf).await;
+            let server = api::Server::start(topology.config());
+            let client = make_client(server.addr());
+
+            // Retrieving a component that doesn't exist should return None
+            let res = client.component_by_name_query("xxx").await;
+            assert!(res.unwrap().data.unwrap().component_by_name.is_none());
+
+            // The `gen1` name should exist
+            let res = client.component_by_name_query("gen1").await;
+            assert_eq!(
+                res.unwrap().data.unwrap().component_by_name.unwrap().name,
+                "gen1"
+            );
         })
     }
 }

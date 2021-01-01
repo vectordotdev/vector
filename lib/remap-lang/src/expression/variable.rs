@@ -85,7 +85,8 @@ mod tests {
             expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
-                    kind: Kind::Bytes
+                    kind: Kind::Bytes,
+                    ..Default::default()
                 });
 
                 Variable::new("foo".to_owned(), None)
@@ -93,6 +94,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
+                ..Default::default()
             },
         }
 

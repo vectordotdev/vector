@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct RemapEventProcessed;
-
-impl InternalEvent for RemapEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct RemapMappingError {
     /// If set to true, the remap transform has dropped the event after a failed
     /// mapping. This internal event will reflect that in its messaging.
@@ -29,7 +20,7 @@ impl InternalEvent for RemapMappingError {
         warn!(
             message,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 
@@ -46,7 +37,7 @@ impl InternalEvent for RemapConditionExecutionError {
     fn emit_logs(&self) {
         warn!(
             message = "Remap condition execution failed.",
-            rate_limit_secs = 120
+            internal_log_rate_secs = 120
         )
     }
 

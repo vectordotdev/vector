@@ -14,9 +14,16 @@ remap: functions: parse_grok: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "remove_empty"
+			description: "If set to true, any patterns that resolve to an empty value will be removed from the result."
+			required:    false
+			default:     true
+			type: ["boolean"]
+		},
 	]
 	return: ["map"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a string using the Rust [`grok` library](https://github.com/daschl/grok). All patterns
 		[listed here](https://github.com/daschl/grok/tree/master/patterns) are supported. It is recommended

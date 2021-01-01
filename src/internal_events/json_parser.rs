@@ -3,19 +3,6 @@ use metrics::counter;
 use serde_json::Error;
 
 #[derive(Debug)]
-pub(crate) struct JsonParserEventProcessed;
-
-impl InternalEvent for JsonParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
     pub field: &'a str,
     pub value: &'a str,
@@ -31,7 +18,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
                 field = %self.field,
                 value = %self.value,
                 error = ?self.error,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             )
         } else {
             warn!(
@@ -39,7 +26,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
                 field = %self.field,
                 value = %self.value,
                 error = ?self.error,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             )
         }
     }
@@ -61,7 +48,7 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
         warn!(
             message = "Target field already exists.",
             target_field = %self.target_field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 

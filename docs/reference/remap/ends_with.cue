@@ -23,7 +23,7 @@ remap: functions: ends_with: {
 		},
 	]
 	return: ["boolean"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Determines if a given string ends with a given `substring`.
 		The search can be optionally case insensitive.

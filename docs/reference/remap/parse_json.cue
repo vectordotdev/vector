@@ -10,7 +10,7 @@ remap: functions: parse_json: {
 		},
 	]
 	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Returns an `object` whose text representation is a JSON
 		payload in `string` form.

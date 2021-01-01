@@ -377,7 +377,7 @@ mod integration_tests {
                 .unwrap()
         });
 
-        let events = collect_n(rx, expected_lines.len()).await.unwrap();
+        let events = collect_n(rx, expected_lines.len()).await;
 
         assert_eq!(expected_lines.len(), events.len());
         for (i, event) in events.iter().enumerate() {

@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, LogSchema, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -18,15 +18,17 @@ use bollard::{
     errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
-    Docker,
+    Docker, API_DEFAULT_VERSION,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
+use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     future::ready,
+    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Duration,
@@ -34,6 +36,9 @@ use std::{
 };
 
 use tokio::sync::mpsc;
+
+// From bollard source.
+const DEFAULT_TIMEOUT: u64 = 120;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
@@ -51,6 +56,10 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    #[serde(default = "LogSchema::default_host_key")]
+    host_key: String,
+    docker_host: Option<String>,
+    tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
@@ -61,9 +70,20 @@ pub struct DockerLogsConfig {
     retry_backoff_secs: u64,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct DockerTlsConfig {
+    ca_file: PathBuf,
+    crt_file: PathBuf,
+    key_file: PathBuf,
+}
+
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            host_key: LogSchema::default_host_key(),
+            docker_host: None,
+            tls: None,
             exclude_containers: None,
             include_containers: None,
             include_labels: None,
@@ -207,7 +227,7 @@ impl DockerLogsSourceCore {
     fn new(config: DockerLogsConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
-        let docker = docker()?;
+        let docker = docker(config.docker_host.clone(), config.tls.clone())?;
 
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
@@ -326,6 +346,9 @@ impl DockerLogsSource {
 
         let backoff_secs = config.retry_backoff_secs;
 
+        let host_key = config.host_key.clone();
+        let hostname = crate::get_hostname().ok();
+
         // Only logs created at, or after this moment are logged.
         let core = DockerLogsSourceCore::new(config)?;
 
@@ -346,6 +369,8 @@ impl DockerLogsSource {
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
+            host_key,
+            hostname,
             core: Arc::new(core),
             out,
             main_send,
@@ -537,6 +562,8 @@ impl DockerLogsSource {
 /// Used to construct and start event stream futures
 #[derive(Clone)]
 struct EventStreamBuilder {
+    host_key: String,
+    hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
     out: Pipeline,
@@ -656,9 +683,12 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
+        let host_key = self.host_key.clone();
+        let hostname = self.hostname.clone();
         let result = events_stream
+            .map(move |event| add_hostname(event, &host_key, &hostname))
             .map(Ok)
-            .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
+            .forward(self.out.clone())
             .await;
 
         // End of stream
@@ -668,13 +698,21 @@ impl EventStreamBuilder {
 
         let result = match result {
             Ok(()) => Ok(info),
-            Err(()) => Err(info.id),
+            Err(crate::pipeline::ClosedError) => Err(info.id),
         };
         // This is %error because the API doesn't support Display.
         if let Err(error) = self.main_send.send(result) {
             error!(message = "Unable to return ContainerLogInfo to main.", %error);
         }
     }
+}
+
+fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> Event {
+    if let Some(hostname) = hostname {
+        event.as_mut_log().insert(host_key, hostname.clone());
+    }
+
+    event
 }
 
 /// Container ID as assigned by Docker.
@@ -989,16 +1027,53 @@ impl ContainerMetadata {
     }
 }
 
-fn docker() -> Result<Docker, DockerError> {
-    let scheme = env::var("DOCKER_HOST").ok().and_then(|host| {
-        let uri = host.parse::<hyper::Uri>().expect("invalid url");
-        uri.into_parts().scheme
-    });
+// From bollard source, unfortunately they don't export this function.
+fn default_certs() -> Option<DockerTlsConfig> {
+    let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
+    let base = match from_env {
+        Ok(path) => PathBuf::from(path),
+        Err(_) => dirs_next::home_dir()?.join(".docker"),
+    };
+    Some(DockerTlsConfig {
+        ca_file: base.join("ca.pem"),
+        key_file: base.join("key.pem"),
+        crt_file: base.join("cert.pem"),
+    })
+}
 
-    match scheme.as_ref().map(|s| s.as_str()) {
-        Some("http") => Docker::connect_with_http_defaults(),
-        Some("https") => Docker::connect_with_ssl_defaults(),
-        _ => Docker::connect_with_local_defaults(),
+fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, DockerError> {
+    let host = host.or_else(|| env::var("DOCKER_HOST").ok());
+
+    match host {
+        None => Docker::connect_with_local_defaults(),
+
+        Some(host) => {
+            let scheme = host
+                .parse::<Uri>()
+                .ok()
+                .and_then(|uri| uri.into_parts().scheme);
+
+            match scheme.as_ref().map(|scheme| scheme.as_str()) {
+                Some("http") => {
+                    Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                }
+                Some("https") => {
+                    let tls = tls
+                        .or_else(default_certs)
+                        .ok_or(DockerError::NoCertPathError)?;
+                    Docker::connect_with_ssl(
+                        &host,
+                        &tls.key_file,
+                        &tls.crt_file,
+                        &tls.ca_file,
+                        DEFAULT_TIMEOUT,
+                        API_DEFAULT_VERSION,
+                    )
+                }
+                // unix socket on unix, named pipe on windows
+                _ => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION),
+            }
+        }
     }
 }
 
@@ -1051,14 +1126,14 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::{compat::Future01CompatExt, stream::TryStreamExt};
-    use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
+    use futures::stream::TryStreamExt;
+    use tokio::sync::mpsc;
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> mpsc01::Receiver<Event> {
+    ) -> mpsc::Receiver<Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -1067,7 +1142,7 @@ mod integration_tests {
     }
 
     /// None if docker is not present on the system
-    fn source_with_config(config: DockerLogsConfig) -> mpsc01::Receiver<Event> {
+    fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
         // trace_init();
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
@@ -1267,7 +1342,7 @@ mod integration_tests {
         }
 
         // Wait for before message
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
             "before".into()
@@ -1276,10 +1351,12 @@ mod integration_tests {
         id
     }
 
-    async fn is_empty<T>(mut rx: mpsc01::Receiver<T>) -> Result<bool, ()> {
-        futures01::future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
-            .compat()
-            .await
+    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
+        match rx.try_recv() {
+            Ok(_) => Ok(false),
+            Err(mpsc::error::TryRecvError::Empty) => Ok(true),
+            Err(mpsc::error::TryRecvError::Closed) => Err(()),
+        }
     }
 
     #[tokio::test]
@@ -1292,10 +1369,10 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, Some(label), message, &docker).await;
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
@@ -1320,10 +1397,10 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(2, name, None, message, &docker).await;
-        let events = collect_n(out, 2).await.unwrap();
+        let events = collect_n(out, 2).await;
         container_remove(&id, &docker).await;
 
         assert_eq!(
@@ -1346,11 +1423,11 @@ mod integration_tests {
 
         let out = source_with(&[name1], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id0 = container_log_n(1, name0, None, "11", &docker).await;
         let id1 = container_log_n(1, name1, None, message, &docker).await;
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
 
@@ -1371,7 +1448,7 @@ mod integration_tests {
         let included1 = format!("{}_{}", prefix, "include1");
         let excluded0 = format!("{}_{}", prefix, "excluded0");
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let out = source_with_config(DockerLogsConfig {
             include_containers: Some(vec![prefix.to_owned()]),
@@ -1382,7 +1459,7 @@ mod integration_tests {
         let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
         let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
-        let events = collect_ready(out).await.unwrap();
+        let events = collect_ready(out).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
         container_remove(&id2, &docker).await;
@@ -1410,11 +1487,11 @@ mod integration_tests {
 
         let out = source_with(&[name0, name1], label);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id0 = container_log_n(1, name0, None, "13", &docker).await;
         let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
 
@@ -1432,11 +1509,11 @@ mod integration_tests {
         let name = "vector_test_currently_running";
         let label = "vector_test_label_currently_running";
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
         let id = running_container(name, Some(label), message, &docker).await;
         let out = source_with(&[name], None);
 
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
@@ -1467,10 +1544,10 @@ mod integration_tests {
 
         let out = source_with_config(config);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message, &docker).await;
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         container_remove(&id, &docker).await;
 
         assert_eq!(
@@ -1492,7 +1569,7 @@ mod integration_tests {
 
         let exclude_out = source_with_config(config_ex);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message, &docker).await;
         container_remove(&id, &docker).await;
@@ -1516,13 +1593,13 @@ mod integration_tests {
             ..DockerLogsConfig::default()
         };
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = running_container(name, None, message, &docker).await;
         let exclude_out = source_with_config(config_ex);
         let include_out = source_with_config(config_in);
 
-        let _ = collect_n(include_out, 1).await.unwrap();
+        let _ = collect_n(include_out, 1).await;
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
@@ -1541,10 +1618,10 @@ mod integration_tests {
 
         let out = source_with(&[name], None);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let id = container_log_n(1, name, None, message.as_str(), &docker).await;
-        let events = collect_n(out, 1).await.unwrap();
+        let events = collect_n(out, 1).await;
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
@@ -1580,7 +1657,7 @@ mod integration_tests {
 
         let out = source_with_config(config);
 
-        let docker = docker().unwrap();
+        let docker = docker(None, None).unwrap();
 
         let command = emitted_messages
             .into_iter()
@@ -1593,7 +1670,7 @@ mod integration_tests {
             container_remove(&id, &docker).await;
             panic!("Container failed to start with error: {:?}", error);
         }
-        let events = collect_n(out, expected_messages.len()).await.unwrap();
+        let events = collect_n(out, expected_messages.len()).await;
         container_remove(&id, &docker).await;
 
         let actual_messages = events

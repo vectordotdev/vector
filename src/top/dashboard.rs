@@ -142,7 +142,7 @@ impl<'a> Widgets<'a> {
                     v => format!(
                         "{} ({}/s)",
                         if self.opts.human_metrics {
-                            v.human_format()
+                            v.human_format_bytes()
                         } else {
                             v.thousands_format()
                         },

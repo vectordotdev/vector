@@ -1,3 +1,5 @@
+#[cfg(feature = "sources-utils-fake")]
+pub mod fake;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
@@ -8,8 +10,10 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
-#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
+#[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
+#[cfg(feature = "sources-prometheus")]
+pub(crate) use self::http::decode;
 #[cfg(feature = "sources-utils-http")]
 pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;

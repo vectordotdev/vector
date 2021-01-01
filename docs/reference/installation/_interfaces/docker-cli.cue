@@ -60,7 +60,7 @@ installation: _interfaces: "docker-cli": {
 					file:                 "\n  -v /var/log:/var/log \\"
 					docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
 					http:                 "\n  -p 80:80 \\"
-					logplex:              "\n  -p 80:80 \\"
+					heroku_logs:          "\n  -p 80:80 \\"
 					socket:               "\n  -p 9000:9000 \\"
 					splunk_hec:           "\n  -p 8080:8080 \\"
 					statsd:               "\n  -p 8125:8125 \\"

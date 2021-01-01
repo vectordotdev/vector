@@ -2,18 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 use std::num::ParseFloatError;
 
-pub(crate) struct LogToMetricEventProcessed;
-
-impl InternalEvent for LogToMetricEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
 pub(crate) struct LogToMetricFieldNotFound<'a> {
     pub field: &'a str,
 }
@@ -45,7 +33,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
             message = "Failed to parse field as float.",
             field = %self.field,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -66,7 +54,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
         warn!(
             message = "Failed to render template.",
             %error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -83,7 +71,7 @@ pub(crate) struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse template.", error = ?self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse template.", error = ?self.error, internal_log_rate_secs = 30);
     }
 
     fn emit_metrics(&self) {

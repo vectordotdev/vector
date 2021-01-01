@@ -35,6 +35,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/shared",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -44,10 +45,12 @@ members = [
   "lib/vector-api-client",
   "lib/remap-lang",
   "lib/remap-cli",
+  "lib/remap-functions",
 ]
 
 [dependencies]
 # Internal libs
+shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -71,9 +74,9 @@ tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.13.0-alpha.8" }
-metrics-util = { version = "0.4.0-alpha.6"  }
-metrics-tracing-context = { version = "0.1.0-alpha.3"  }
+metrics = { version = "0.13.0-alpha.13" }
+metrics-util = { version = "0.4.0-alpha.10" }
+metrics-tracing-context = { version = "0.1.0-alpha.7" }
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
@@ -105,8 +108,8 @@ goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.1.6", optional = true }
-async-graphql-warp = { version = "2.1.6", optional = true }
+async-graphql = { version = "2.4.3", optional = true }
+async-graphql-warp = { version = "2.4.3", optional = true }
 itertools = { version = "0.9.0", optional = true }
 
 # API client
@@ -117,6 +120,7 @@ tui = { version = "0.13.0", optional = true, default-features = false, features 
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
+remap-functions = { path = "lib/remap-functions" }
 
 # External libs
 derivative = "2.1.1"
@@ -128,24 +132,24 @@ bytes = { version = "0.5.6", features = ["serde"] }
 stream-cancel = "0.6.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
-openssl = "0.10.30"
+openssl = "0.10.32"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
-async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
+async-compression = { version = "0.3.7", features = ["tokio-02", "gzip", "zstd"] }
 structopt = "0.3.21"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
-typetag = "0.1"
-toml = "0.5.7"
+typetag = "0.1.6"
+toml = "0.5.8"
 syslog = "5"
-syslog_loose = { version = "0.5.0" }
+syslog_loose = "0.7.0"
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
 rdkafka = { version = "0.24.0", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.3.1"
-seahash = { version = "3.0.6", optional = true }
+seahash = { version = "4.0.1", optional = true }
 semver = { version = "0.11.0", features = ["serde"] }
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
@@ -159,14 +163,14 @@ pest = "2.1.3"
 pest_derive = "2.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
-snafu = { version = "0.6", features = ["futures-01", "futures"] }
+snafu = { version = "0.6.10", features = ["futures-01", "futures"] }
 url = "2.2.0"
 percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.9.0", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
-inventory = "0.1"
-maxminddb = { version = "0.15.0", optional = true }
+inventory = "0.1.10"
+maxminddb = { version = "0.17.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0"}
 colored = "2.0"
 warp = { version = "0.2.5", default-features = false, optional = true }
@@ -175,27 +179,29 @@ logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
 getset = "0.1.1"
-lru = "0.6.1"
+lru = "0.6.3"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
-k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
+k8s-openapi = { version = "0.10.0", features = ["v1_16"], optional = true }
 portpicker = "0.1.0"
-sha-1 = "0.9"
+sha-1 = "0.9.2"
 sha2 = "0.9"
 sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
-heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
+heim = { version = "0.1.0-rc.1", optional = true, features = ["full"] }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
-anyhow = { version = "1.0.28" }
-snap = { version = "1.0.2", optional = true }
+anyhow = { version = "1.0.36" }
+snap = { version = "1.0.3", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-avro-rs = "0.12.0"
+avro-rs = { version = "0.12.0", optional = true }
+dirs-next = { version = "1", optional = true }
+fakedata_generator = "0.2.4"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -209,7 +215,7 @@ schannel = "0.1"
 windows-service = "0.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "0.4"
+security-framework = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
@@ -217,7 +223,7 @@ nix = "0.19.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
-built = { version = "0.4", features = ["git2", "chrono"] }
+built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
@@ -233,8 +239,8 @@ tokio01-test = "0.1.1"
 tower-test = "0.3.0"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
-assert_cmd = "1.0"
-reqwest = { version = "0.10.6", features = ["json"] }
+assert_cmd = "1.0.2"
+reqwest = { version = "0.10.9", features = ["json"] }
 rusty-fork = "0.3.0"
 
 [features]
@@ -312,7 +318,7 @@ sources = [
   "sources-journald",
   "sources-kafka",
   "sources-kubernetes-logs",
-  "sources-logplex",
+  "sources-heroku_logs",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
   "sources-prometheus",
@@ -327,9 +333,9 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
-sources-docker_logs = ["bollard"]
+sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
-sources-generator = []
+sources-generator = ["sources-utils-fake"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
 sources-internal_logs = []
@@ -337,17 +343,18 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-logplex = ["sources-utils-http"]
+sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
-sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
+sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
 sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
-sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-fake = []
+sources-utils-http = ["sources-utils-tls", "warp", "snap"]
 sources-utils-tcp-keepalive = []
 sources-utils-tls = []
 sources-utils-unix = []
@@ -481,7 +488,7 @@ sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["tokio-util/udp"]
 sinks-vector = []
-sinks-pulsar = ["pulsar"]
+sinks-pulsar = ["avro-rs", "pulsar"]
 
 # Identifies that the build is a nightly build
 nightly = []
@@ -569,3 +576,13 @@ required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+# TODO: update to next 0.12.x (after 0.12.0, if any)
+avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
+# Not maintained, our branch update `sync` and `quote` crates: https://github.com/fitzgen/derive_is_enum_variant/pull/3
+derive_is_enum_variant = { version = "0.1.1", git = "https://github.com/timberio/derive_is_enum_variant", rev = "e4550f8ca1366823b8366f0126a7d00ee8ffb080" }
+# TODO: update to the next 0.13.x (after 0.13.9, if any) or 0.14 (or higher)
+hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "a00cc20afc597cb55cbc62c70b0b25b46c82a0a6" }
+# Not maintained, our branch update `rand` crate: https://github.com/Dentosal/portpicker-rs/pull/3
+portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }

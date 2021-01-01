@@ -39,6 +39,7 @@ components: sinks: loki: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -77,6 +78,13 @@ components: sinks: loki: {
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Loki instance."
+			required:    true
+			type: string: {
+				examples: ["http://localhost:3100"]
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${LOKI_PASSWORD}"
 			username_example: "${LOKI_USERNAME}"
@@ -128,7 +136,8 @@ components: sinks: loki: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["some_tenant_id"]
+				examples: ["some_tenant_id", "{{ event_field }}"]
+				templateable: true
 			}
 		}
 	}

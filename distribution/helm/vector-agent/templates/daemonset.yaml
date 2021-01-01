@@ -14,9 +14,7 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if not .Values.externalConfigMap }}
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        {{- end }}
+        {{- include "libvector.rerollAnnotations" . | nindent 8 }}
         {{- include "libvector.metricsPrometheusPodAnnotations" . | nindent 8 }}
         {{- with .Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
@@ -57,6 +55,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- if .Values.hostMetricsSource.enabled }}
+            - name: PROCFS_ROOT
+              value: /host/proc
+            - name: SYSFS_ROOT
+              value: /host/sys
+            {{- end }}
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
@@ -84,6 +88,16 @@ spec:
             - name: config-dir
               mountPath: /etc/vector
               readOnly: true
+            {{- if .Values.hostMetricsSource.enabled }}
+            # Host procsfs mount.
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            # Host sysfs mount.
+            - name: sysfs
+              mountPath: /host/sys
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             # Extra volumes.
             {{- toYaml . | nindent 12 }}
@@ -123,6 +137,16 @@ spec:
               {{- with .Values.extraConfigDirSources }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
+        {{- if .Values.hostMetricsSource.enabled }}
+        # Host procsfs.
+        - name: procfs
+          hostPath:
+            path: /proc
+        # Host sysfs.
+        - name: sysfs
+          hostPath:
+            path: /sys
+        {{- end }}
         {{- with .Values.extraVolumes }}
         # Extra volumes.
         {{- toYaml . | nindent 8 }}

@@ -12,8 +12,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     Event, Pipeline,
 };
-use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
-use futures01::Sink;
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -155,9 +154,8 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> sources::Source {
-    let out = out
-        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
-        .sink_compat();
+    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
+
     Box::pin(tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
@@ -419,7 +417,7 @@ mod integration_tests {
         tokio::spawn(source);
         tokio::time::delay_for(Duration::from_secs(1)).await;
 
-        let events = test_util::collect_ready(rx).await.unwrap();
+        let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events

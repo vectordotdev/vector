@@ -19,10 +19,10 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 #
 
 PROJECT_ROOT="$(pwd)"
-ARCHIVE_NAME="vector-$TARGET.tar.gz"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
+ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"
-PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
 
 #
 # Header
@@ -73,22 +73,12 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 
 cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build --no-strip
 
-# If the TARGET is musl populate the TYPE variable
-if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
-  TYPE="musl"
-else
-  TYPE=""
-fi
-
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
   nbase=${base//_/-}
-  if [ "${TYPE}" = 'musl' ]; then
-    nbase=${nbase//amd64.deb/musl-amd64.deb}
-  fi
-    mv "${file}" target/"${TARGET}"/debian/"${nbase}";
+  mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 
 #

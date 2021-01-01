@@ -32,6 +32,18 @@ serviceAccount:
   # template.
   name: ""
 
+# Add an annotation to the `Pod`s managed by `DaemonSet` with a random value,
+# generated at Helm Chart template evaluation time.
+# Enabling this will cause the `Pod`s to be recreated every time the value
+# changes - effectively restarting them on each update.
+podRollmeAnnotation: false
+
+# Add an annotation to the `Pod`s managed by `DaemonSet` with a checksum of
+# the Helm release values (as in `values.yaml` content and `--set` flags).
+# Enabling this will cause the `Pod`s to be recreated every time values
+# change.
+podValuesChecksumAnnotation: false
+
 # Annotations to add to the `Pod`s managed by `DaemonSet`.
 podAnnotations: {}
 
@@ -142,6 +154,16 @@ internalMetricsSource:
   # The name to use for the "built-in" internal metrics source.
   sourceId: internal_metrics
   # Raw TOML config to embed at the internal metrics source.
+  rawConfig: null
+
+# The "built-in" host metrics source emitting the metrics gathered from the node
+# that Vector is executing on.
+hostMetricsSource:
+  # Disable to omit the host metrics source from being added.
+  enabled: true
+  # The name to use for the "built-in" host metrics source.
+  sourceId: host_metrics
+  # Raw TOML config to embed at the host metrics source.
   rawConfig: null
 
 # The "built-in" prometheus sink exposing metrics in the Prometheus scraping

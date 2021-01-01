@@ -143,7 +143,7 @@ impl HttpSink for LokiConfig {
                     error!(
                         message = "Error rendering `tenant_id` template.",
                         ?missing,
-                        rate_limit_secs = 30
+                        internal_log_rate_secs = 30
                     );
                 })
                 .ok()

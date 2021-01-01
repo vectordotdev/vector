@@ -4,8 +4,7 @@ use crate::{config::log_schema, event::Event, Pipeline};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::GzDecoder;
-use futures::{compat::Future01CompatExt, TryFutureExt};
-use futures01::Sink;
+use futures::{SinkExt, StreamExt, TryFutureExt};
 use snafu::ResultExt;
 use std::io::Read;
 use warp::reject;
@@ -15,17 +14,17 @@ pub async fn firehose(
     request_id: String,
     source_arn: String,
     request: FirehoseRequest,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let events = parse_records(request, request_id.as_str(), source_arn.as_str())
         .with_context(|| ParseRecords {
             request_id: request_id.clone(),
         })
         .map_err(reject::custom)?;
+    let mut stream = futures::stream::iter(events).map(Ok);
 
     let request_id = request_id.clone();
-    out.send_all(futures01::stream::iter_ok(events))
-        .compat()
+    out.send_all(&mut stream)
         .map_err(|error| {
             let error = RequestError::ShuttingDown {
                 request_id: request_id.clone(),

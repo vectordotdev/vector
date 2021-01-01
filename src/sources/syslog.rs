@@ -16,8 +16,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{compat::Sink01CompatExt, StreamExt};
-use futures01::Sink;
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
@@ -145,7 +144,7 @@ impl SourceConfig for SyslogConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address } => vec![address.into()],
+            Mode::Udp { address } => vec![Resource::udp(address)],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
@@ -315,7 +314,7 @@ pub fn udp(
                     }
                 }
             })
-            .forward(out.sink_compat())
+            .forward(out)
             .await;
 
         info!("Finished sending.");
