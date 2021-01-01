@@ -70,7 +70,7 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
 
-fn extract_excluded_containers_for_pod(pod: &'_ Pod) -> impl Iterator<Item = &'_ str> {
+fn extract_excluded_containers_for_pod(pod: &Pod) -> impl Iterator<Item = &str> {
     let metadata = &pod.metadata;
     metadata.annotations.iter().flat_map(|annotations| {
         annotations
