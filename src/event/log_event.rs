@@ -290,7 +290,7 @@ impl Object for LogEvent {
 
     /// Remove the value from the event and return it.
     /// Avoid just calling get to retreive the value since that clones and we can avoid that.
-    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, ()> {
+    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
         if path.is_root() {
             return Ok(Some(
                 std::mem::replace(&mut self.fields, BTreeMap::new())

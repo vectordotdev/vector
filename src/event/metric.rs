@@ -320,9 +320,9 @@ impl Metric {
             .insert(name, value);
     }
 
-    /// Deletes the tag, if it exists.
-    pub fn delete_tag(&mut self, name: &str) {
-        self.tags.as_mut().and_then(|tags| tags.remove(name));
+    /// Deletes the tag, if it exists, returns the old tag value.
+    pub fn delete_tag(&mut self, name: &str) -> Option<String> {
+        self.tags.as_mut().and_then(|tags| tags.remove(name))
     }
 }
 
@@ -517,6 +517,12 @@ impl Object for Metric {
                 Ok(self.timestamp.map(Into::into))
             }
             [Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
+            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags.as_ref().map(|tags| {
+                tags.iter()
+                    .map(|(name, value)| (name.clone(), value.clone().into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into()
+            })),
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
@@ -542,6 +548,7 @@ impl Object for Metric {
             result.push(Path::from_str("timestamp").expect("invalid path"));
         }
         if let Some(tags) = &self.tags {
+            result.push(Path::from_str("tags").expect("invalid path"));
             for name in tags.keys() {
                 result.push(Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
             }
@@ -566,6 +573,10 @@ impl Object for Metric {
                 self.timestamp = None;
                 Ok(())
             }
+            [Segment::Field(tags)] if tags.as_str() == "tags" => {
+                self.tags = None;
+                Ok(())
+            }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 self.delete_tag(field.as_str());
                 Ok(())
@@ -578,8 +589,36 @@ impl Object for Metric {
         }
     }
 
-    fn remove_and_get(&mut self, _: &Path, _: bool) -> Result<Option<remap::Value>, ()> {
-        unimplemented!();
+    fn remove_and_get(&mut self, path: &Path, _: bool) -> Result<Option<remap::Value>, String> {
+        if path.is_root() {
+            return Err(MetricPathError::SetPathError.to_string());
+        }
+
+        match path.segments() {
+            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
+                Ok(self.namespace.take().map(Into::into))
+            }
+            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
+                Ok(self.timestamp.take().map(Into::into))
+            }
+            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self
+                .tags
+                .take()
+                .map(|tags| {
+                    tags.into_iter()
+                        .map(|(name, value)| (name, value.into()))
+                        .collect::<BTreeMap<_, _>>()
+                })
+                .map(Into::into)),
+            [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
+                Ok(self.delete_tag(field.as_str()).map(Into::into))
+            }
+            _ => Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_SET,
+            }
+            .to_string()),
+        }
     }
 }
 
@@ -974,7 +1013,7 @@ mod test {
 
         assert_eq!(
             Ok(
-                ["name", "namespace", "timestamp", "tags.tig", "kind", "type"]
+                ["name", "namespace", "timestamp", "tags", "tags.tig", "kind", "type"]
                     .iter()
                     .map(|path| Path::from_str(path).expect("invalid path"))
                     .collect()
@@ -1026,10 +1065,10 @@ mod test {
 
             assert_eq!(Ok(current), metric.get(&path));
             assert_eq!(Ok(()), metric.insert(&path, new.clone()));
-            assert_eq!(Ok(Some(new)), metric.get(&path));
+            assert_eq!(Ok(Some(new.clone())), metric.get(&path));
 
             if delete {
-                assert_eq!(Ok(()), metric.remove(&path, true));
+                assert_eq!(Ok(Some(new)), metric.remove_and_get(&path, true));
                 assert_eq!(Ok(None), metric.get(&path));
             }
         }

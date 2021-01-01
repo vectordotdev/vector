@@ -19,7 +19,7 @@ impl Object for Value {
         Ok(())
     }
 
-    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, ()> {
+    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
         match self.get(path) {
             Ok(Some(val)) => {
                 self.remove_by_path(path, compact);
