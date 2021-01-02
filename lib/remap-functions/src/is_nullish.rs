@@ -94,7 +94,7 @@ mod tests {
 
         integer_fallible {
             expr: |_| IsNullishFn {
-                value: Literal::from(42).boxed(),
+                value: lit!(42).boxed(),
             },
             def: TypeDef {
                 fallible: true,
@@ -105,7 +105,7 @@ mod tests {
 
         array_fallible {
             expr: |_| IsNullishFn {
-                value: Array::from(vec!["foo"]).boxed(),
+                value: array!["foo"].boxed(),
             },
             def: TypeDef {
                 fallible: true,
