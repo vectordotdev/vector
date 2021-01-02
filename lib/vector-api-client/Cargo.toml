@@ -12,7 +12,7 @@ serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Error handling
-anyhow = "1.0.28"
+anyhow = "1.0.37"
 
 # Tokio / Futures
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
