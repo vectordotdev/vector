@@ -9,47 +9,54 @@ impl Function for Del {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        generate_param_list! {
-            accepts = |_| true,
-            required = false,
-            keywords = [
-                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
-            ],
-        }
+        &[Parameter {
+            keyword: "field",
+            accepts: |_| true,
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let mut paths = vec![];
-        paths.push(arguments.required_path("1")?);
+        let field = arguments.required_path("field")?;
 
-        for i in 2..=16 {
-            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
-                paths.push(path)
-            }
-        }
-
-        Ok(Box::new(DelFn { paths }))
+        Ok(Box::new(DelFn { field }))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DelFn {
-    paths: Vec<Path>,
+    field: Path,
+}
+
+impl DelFn {
+    #[cfg(test)]
+    fn new(field: Path) -> Self {
+        Self { field }
+    }
 }
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        self.paths
-            .iter()
-            .try_for_each(|path| object.remove(path.as_ref(), false))?;
-
-        Ok(Value::Null)
+        match object.remove_and_get(self.field.as_ref(), false) {
+            Ok(Some(val)) => Ok(val),
+            _ => Ok(Value::Null),
+        }
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
         TypeDef {
-            fallible: true,
-            kind: value::Kind::Null,
+            fallible: false,
+            kind: Kind::Bytes
+                | Kind::Integer
+                | Kind::Float
+                | Kind::Boolean
+                | Kind::Map
+                | Kind::Array
+                | Kind::Timestamp
+                | Kind::Regex
+                | Kind::Null,
             ..Default::default()
         }
     }
@@ -58,15 +65,58 @@ impl Expression for DelFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map;
 
-    test_type_def![static_type_def {
-        expr: |_| DelFn {
-            paths: vec![Path::from("foo")]
-        },
-        def: TypeDef {
-            fallible: true,
-            kind: value::Kind::Null,
-            ..Default::default()
-        },
-    }];
+    #[test]
+    fn del() {
+        let cases = vec![
+            (
+                // String field exists
+                map!["exists": "value"],
+                Ok(value!("value")),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // String field doesn't exist
+                map!["exists": "value"],
+                Ok(value!(null)),
+                DelFn::new(Path::from("does_not_exist")),
+            ),
+            (
+                // Array field exists
+                map!["exists": value!([1, 2, 3])],
+                Ok(value!([1, 2, 3])),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Null field exists
+                map!["exists": value!(null)],
+                Ok(value!(null)),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Map field exists
+                map!["exists": map!["foo": "bar"]],
+                Ok(value!(map!["foo": "bar"])),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Integer field exists
+                map!["exists": 127],
+                Ok(value!(127)),
+                DelFn::new(Path::from("exists")),
+            ),
+        ];
+
+        let mut state = state::Program::default();
+
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
+        }
+    }
 }

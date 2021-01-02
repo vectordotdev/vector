@@ -170,6 +170,27 @@
       "buz.first.exists" = false
       "buz.second.equals" = "buz second value"
 
+[transforms.remap_rename_fields]
+  inputs = []
+  type = "remap"
+  source = """
+    .bar = del(.foo.second)
+    .buz = .foo
+  """
+[[tests]]
+  name = "remap_rename_fields"
+  [tests.input]
+    insert_at = "remap_rename_fields"
+    type = "log"
+    [tests.input.log_fields]
+      "foo.first" = "foo first value"
+      "foo.second" = "foo second value"
+  [[tests.outputs]]
+    extract_from = "remap_rename_fields"
+    [[tests.outputs.conditions]]
+      "bar.equals" = "foo second value"
+      "buz.first.equals" = "foo first value"
+
 [transforms.remap_coercion]
   inputs = []
   type = "remap"

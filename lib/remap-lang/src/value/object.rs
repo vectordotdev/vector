@@ -18,6 +18,16 @@ impl Object for Value {
         self.remove_by_path(path, compact);
         Ok(())
     }
+
+    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+        match self.get(path) {
+            Ok(Some(val)) => {
+                self.remove_by_path(path, compact);
+                Ok(Some(val))
+            }
+            _ => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -248,7 +258,38 @@ mod tests {
             let path = Path::new_unchecked(segments);
 
             assert_eq!(Object::remove(&mut object, &path, compact), Ok(()));
-            assert_eq!(Object::get(&object, &Path::root()), Ok(expect))
+            assert_eq!(Object::get(&object, &Path::root()), Ok(expect));
+        }
+    }
+
+    #[test]
+    fn object_remove_and_get() {
+        let cases = vec![
+            (
+                value![{foo: "bar"}],
+                vec![Field(Regular("foo".to_owned()))],
+                true,
+                Some(value!("bar")),
+                Some(value!({})),
+            ),
+            (
+                value![{foo: "bar", boop: "bop"}],
+                vec![Field(Regular("boop".to_owned()))],
+                true,
+                Some(value!("bop")),
+                Some(value!({foo: "bar"})),
+            ),
+        ];
+
+        for (mut object, segments, compact, expect, end_result) in cases {
+            let path = Path::new_unchecked(segments);
+
+            assert_eq!(
+                Object::remove_and_get(&mut object, &path, compact),
+                Ok(expect)
+            );
+            assert_eq!(Object::get(&object, &path), Ok(None));
+            assert_eq!(Object::get(&object, &Path::root()), Ok(end_result));
         }
     }
 
