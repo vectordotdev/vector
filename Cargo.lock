@@ -1479,6 +1479,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b937cd1fbd1f194ac842196bd2529f21618088ee6d8bff6a46ece611451c96b"
+dependencies = [
+ "cfg-if 1.0.0",
+ "num_cpus",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1826,7 +1836,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "crc",
- "dashmap",
+ "dashmap 4.0.1",
  "flate2",
  "futures 0.3.8",
  "glob 0.3.0",
@@ -3567,7 +3577,7 @@ dependencies = [
  "atomic-shim",
  "crossbeam-epoch 0.9.1",
  "crossbeam-utils 0.8.1",
- "dashmap",
+ "dashmap 3.11.10",
  "indexmap",
  "metrics",
  "parking_lot 0.11.1",
