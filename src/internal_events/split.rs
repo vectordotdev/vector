@@ -11,7 +11,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
         warn!(
             message = "Field does not exist.",
             field = %self.field,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -32,7 +32,7 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
             message = "Could not convert types.",
             field = %self.field,
             error = ?self.error,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 

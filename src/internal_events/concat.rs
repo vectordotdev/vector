@@ -19,7 +19,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
             self.start,
             self.end,
             self.length,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -38,7 +38,7 @@ impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {
         debug!(
             message = "Substring source missing.",
             self.source,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 }

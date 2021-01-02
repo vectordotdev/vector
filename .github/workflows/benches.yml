@@ -80,6 +80,9 @@ jobs:
         with:
           name: "criterion"
           path: "./target/criterion.zip"
+      - name: Upload criterion data to S3
+        run: scripts/upload-benchmarks-s3.sh
+      # note: should run last to flag regressions
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:

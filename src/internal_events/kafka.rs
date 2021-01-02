@@ -8,7 +8,7 @@ pub struct KafkaEventReceived {
 
 impl InternalEvent for KafkaEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", rate_limit_secs = 10);
+        trace!(message = "Received one event.", internal_log_rate_secs = 10);
     }
 
     fn emit_metrics(&self) {

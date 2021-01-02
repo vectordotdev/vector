@@ -11,7 +11,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
         error!(
             message = "IP Address not parsed correctly.",
             address = %self.address,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -30,7 +30,7 @@ impl<'a> InternalEvent for GeoipFieldDoesNotExist<'a> {
         error!(
             message = "Field does not exist.",
             field = %self.field,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
