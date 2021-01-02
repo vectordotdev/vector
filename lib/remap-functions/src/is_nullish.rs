@@ -1,15 +1,4 @@
-use lazy_static::lazy_static;
-use regex::Regex;
 use remap::prelude::*;
-
-lazy_static! {
-    // This pattern considers each of these as nullish:
-    // * Whitespace-only strings of any length
-    // * Newline (\n)
-    // * Carriage return (\r)
-    // * Single dash (-)
-    static ref NULLISH_STRING_PATTERN: Regex = Regex::new(r"^(\s*|\\n|\\r|\-)$").unwrap();
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsNullish;
@@ -45,9 +34,13 @@ impl Expression for IsNullishFn {
             Value::Bytes(v) => {
                 let s = &String::from_utf8_lossy(&v)[..];
 
-                let matches = NULLISH_STRING_PATTERN.is_match(s);
-
-                Ok(matches.into())
+                match s {
+                    "-" => Ok(true.into()),
+                    _ => {
+                        let has_whitespace = s.chars().all(char::is_whitespace);
+                        Ok(has_whitespace.into())
+                    }
+                }
             }
             Value::Null => Ok(true.into()),
             _ => Err("input must be a string or null".into()),
