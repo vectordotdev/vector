@@ -306,7 +306,7 @@ impl Sink<Event> for KafkaSink {
                     Err((error, future_record))
                         if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
                     {
-                        debug!(message = "The rdkafka queue full.", %error, %seqno, rate_limit_secs = 1);
+                        debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
                         let _ = flush_signal.notified().await;
                     }

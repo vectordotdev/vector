@@ -7,7 +7,7 @@ pub struct AddTagsTagOverwritten<'a> {
 
 impl<'a> InternalEvent for AddTagsTagOverwritten<'a> {
     fn emit_logs(&self) {
-        debug!(message = "Tag overwritten.", tag = %self.tag, rate_limit_secs = 30);
+        debug!(message = "Tag overwritten.", tag = %self.tag, internal_log_rate_secs = 30);
     }
 }
 
@@ -18,6 +18,6 @@ pub struct AddTagsTagNotOverwritten<'a> {
 
 impl<'a> InternalEvent for AddTagsTagNotOverwritten<'a> {
     fn emit_logs(&self) {
-        debug!(message = "Tag not overwritten.", tag = %self.tag, rate_limit_secs = 30);
+        debug!(message = "Tag not overwritten.", tag = %self.tag, internal_log_rate_secs = 30);
     }
 }

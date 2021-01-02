@@ -252,7 +252,7 @@ where
                     warn!(
                         message = "Unhandled error response.",
                         ?error,
-                        rate_limit_secs = 5
+                        internal_log_rate_secs = 5
                     );
                     false
                 }
