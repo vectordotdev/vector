@@ -5891,6 +5891,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "nom 6.0.1",
+ "serde",
  "snafu",
  "tracing 0.1.22",
 ]

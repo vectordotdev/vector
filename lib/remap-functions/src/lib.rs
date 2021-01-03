@@ -52,6 +52,8 @@ mod ok;
 mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_duration")]
@@ -169,6 +171,8 @@ pub use ok::OK;
 pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_duration")]
@@ -290,6 +294,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
+        #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+        Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]

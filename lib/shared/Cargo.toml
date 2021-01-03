@@ -9,14 +9,21 @@ publish = false
 bytes = { version = "0.5.6", optional = true }
 chrono = { version = "0.4", optional = true }
 nom = { version = "6", optional = true }
+serde = { version = "1.0.117", optional = true }
 snafu = { version = "0.6", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [features]
 
 default = [
+    "aws_cloudwatch_logs_subscription",
     "conversion",
     "tokenize",
+]
+
+aws_cloudwatch_logs_subscription = [
+    "chrono/serde",
+    "serde",
 ]
 
 conversion = [
