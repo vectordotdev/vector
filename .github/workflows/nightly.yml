@@ -255,7 +255,7 @@ jobs:
     runs-on: ${{ matrix.macos_version }}
     strategy:
       matrix:
-        macos_version: ["macos-10.15'","macos-11.0"]
+        macos_version: ["macos-10.15","macos-11.0"]
     steps:
       - name: checkout
         uses: actions/checkout@v1
