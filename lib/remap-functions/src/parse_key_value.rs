@@ -205,10 +205,13 @@ mod test {
                 "",
                 vec![
                     ("ook".to_string(), "pook".into()),
-                    ("nork".to_string(), "noog".into())
+                    ("@timestamp".to_string(), "2020-12-31T12:43:22.2322232Z".into()),
+                    ("key#hash".to_string(), "value".into()),
+                    ("key=with=special=characters".to_string(), "value".into()),
+                    ("key".to_string(), "with special=characters".into()),
                 ]
             )),
-            parse_line("ook=pook nork=noog", "=", " ")
+            parse_line(r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#, "=", " ")
         );
     }
 
@@ -316,6 +319,16 @@ mod test {
         }
 
         delimited {
+            args: func_args! [
+                value: r#""zork one":"zoog\"zink\"zork", nonk:nink"#,
+                field_split: ":",
+                separator: ",",
+            ],
+            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
+                             "nonk": "nink"}))
+        }
+
+        delimited_with_spaces {
             args: func_args! [
                 value: r#""zork one" : "zoog\"zink\"zork"  ,      nonk          : nink"#,
                 field_split: ":",
