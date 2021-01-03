@@ -254,7 +254,10 @@ jobs:
           rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   osx-verify:
-    runs-on: macos-10.15
+    runs-on: ${{ matrix.macos_version }}
+    strategy:
+      matrix:
+        macos_version: ["macos-10.15","macos-11.0"]
     steps:
       - name: checkout
         uses: actions/checkout@v1
