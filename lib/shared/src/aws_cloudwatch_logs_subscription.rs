@@ -1,7 +1,7 @@
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AwsCloudWatchLogsSubscriptionMessageType {
     ControlMessage,
@@ -25,4 +25,13 @@ pub struct AwsCloudWatchLogsSubscriptionMessage {
     pub log_stream: String,
     pub subscription_filters: Vec<String>,
     pub log_events: Vec<AwsCloudWatchLogEvent>,
+}
+
+impl AwsCloudWatchLogsSubscriptionMessageType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => "CONTROL_MESSAGE",
+            AwsCloudWatchLogsSubscriptionMessageType::DataMessage => "DATA_MESSAGE",
+        }
+    }
 }

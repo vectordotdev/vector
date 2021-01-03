@@ -1,8 +1,6 @@
 use crate::map;
 use remap::prelude::*;
-use shared::aws_cloudwatch_logs_subscription::{
-    AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
-};
+use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;
@@ -41,14 +39,9 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
         let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
             .map_err(|e| format!("unable to parse: {}", e))?;
 
-        let message_type = match message.message_type {
-            AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => "CONTROL_MESSAGE",
-            AwsCloudWatchLogsSubscriptionMessageType::DataMessage => "DATA_MESSAGE",
-        };
-
         Ok(map![
             "owner": message.owner,
-            "message_type": message_type,
+            "message_type": message.message_type.as_str(),
             "log_group": message.log_group,
             "log_stream": message.log_stream,
             "subscription_filters": message.subscription_filters,
