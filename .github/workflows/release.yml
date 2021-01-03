@@ -195,7 +195,6 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
 
-
   deb-verify:
     needs:
       - build-x86_64-unknown-linux-gnu-packages
@@ -261,6 +260,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
