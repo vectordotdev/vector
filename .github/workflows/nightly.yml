@@ -206,6 +206,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
       - run: |
           apt-get update && \
           apt-get install -y \
@@ -273,11 +275,19 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
           path: target/artifacts
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
