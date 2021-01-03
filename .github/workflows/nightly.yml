@@ -206,8 +206,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v1
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
       - run: |
           apt-get update && \
           apt-get install -y \
