@@ -21,41 +21,31 @@ remap: functions: parse_key_value: {
 			required:    false
 			default:    " "
 			type: ["string"]
-		},
-		{
-			name:        "trim_key"
-			description: "Any characters that should be trimmed from around the key."
-			required:    false
-			type: ["string"]
-		},
-		{
-			name:        "trim_value"
-			description: "Any characters that should be trimmed from around the value."
-			required:    false
-			type: ["string"]
-		},
+		}
 	]
 	return: ["map"]
 	category: "Parse"
 	description: """
 		Parses a string in key value format.
+		Fields can be delimited with a `"`. `"` within a delimited field can be escaped by `\`.
 		"""
 	examples: [
 		{
 			title: "Successful match"
 			input: {
 				message: #"""
-						"at":<info>,"method":<GET>,"path":</>,"protocol":<http>"
+				level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager
 					"""#
 			}
 			source: #"""
-					. = parse_key_value(.message, field_split=":", separator=":", trim_key="\\"", trim_value="<>")
+					. = parse_key_value(.message, field_split=" ", separator="=")
 				"""#
 			output: {
-				at:       "info"
-				method:   "GET"
-				path:     "/"
-				protocol: "http"
+				level: "info"
+				msg: "Stopping all fetchers" 
+				tag: "stopping_fetchers"
+				id:  "ConsumerFetcherManager-1382721708341"
+				module: "kafka.consumer.ConsumerFetcherManager"
 			}
 		},
 	]

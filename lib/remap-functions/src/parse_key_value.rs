@@ -1,6 +1,12 @@
 use nom::{
-    self, branch::alt, bytes::complete::tag, bytes::complete::take_until, combinator::map,
-    combinator::rest, multi::separated_list1, sequence::tuple, IResult,
+    self,
+    branch::alt,
+    bytes::complete::{escaped, tag, take_until, take_while1},
+    character::complete::{char, satisfy, space0},
+    combinator::{map, rest},
+    multi::{many1, separated_list1},
+    sequence::{delimited, preceded, tuple},
+    IResult,
 };
 use remap::prelude::*;
 use std::collections::BTreeMap;
@@ -30,16 +36,6 @@ impl Function for ParseKeyValue {
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
-            Parameter {
-                keyword: "trim_key",
-                accepts: |v| matches!(v, Value::Bytes(_)),
-                required: false,
-            },
-            Parameter {
-                keyword: "trim_value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
-                required: false,
-            },
         ]
     }
 
@@ -47,15 +43,11 @@ impl Function for ParseKeyValue {
         let value = arguments.required("value")?.boxed();
         let field_split = arguments.optional("field_split").map(Expr::boxed);
         let separator = arguments.optional("separator").map(Expr::boxed);
-        let trim_key = arguments.optional("trim_key").map(Expr::boxed);
-        let trim_value = arguments.optional("trim_value").map(Expr::boxed);
 
         Ok(Box::new(ParseKeyValueFn {
             value,
             field_split,
             separator,
-            trim_key,
-            trim_value,
         }))
     }
 }
@@ -65,36 +57,6 @@ pub(crate) struct ParseKeyValueFn {
     value: Box<dyn Expression>,
     field_split: Option<Box<dyn Expression>>,
     separator: Option<Box<dyn Expression>>,
-    trim_key: Option<Box<dyn Expression>>,
-    trim_value: Option<Box<dyn Expression>>,
-}
-
-fn parse_pair(
-    pair: &str,
-    field_split: &str,
-    trim_key: &Option<Vec<char>>,
-    trim_value: &Option<Vec<char>>,
-) -> Option<(String, Value)> {
-    let pair = pair.trim();
-
-    let split_index = pair.find(field_split).unwrap_or(0);
-    let (key, _val) = pair.split_at(split_index);
-    let key = key.trim();
-    if key.is_empty() {
-        return None;
-    }
-    let key = match trim_key {
-        Some(trim_key) => key.trim_matches(trim_key as &[_]),
-        None => key,
-    };
-
-    let val = pair[split_index + field_split.len()..].trim();
-    let val = match trim_value {
-        Some(trim_value) => val.trim_matches(trim_value as &[_]),
-        None => val,
-    };
-
-    Some((key.to_string(), val.into()))
 }
 
 impl Expression for ParseKeyValueFn {
@@ -111,32 +73,6 @@ impl Expression for ParseKeyValueFn {
             Some(s) => String::from_utf8_lossy(&s.execute(state, object)?.try_bytes()?).to_string(),
             None => " ".to_string(),
         };
-
-        let trim_key = match &self.trim_key {
-            Some(s) => Some(
-                String::from_utf8_lossy(&s.execute(state, object)?.try_bytes()?)
-                    .chars()
-                    .collect::<Vec<_>>(),
-            ),
-            None => None,
-        };
-
-        let trim_value = match &self.trim_value {
-            Some(s) => Some(
-                String::from_utf8_lossy(&s.execute(state, object)?.try_bytes()?)
-                    .chars()
-                    .collect::<Vec<_>>(),
-            ),
-            None => None,
-        };
-
-        /*
-        Ok(value
-            .split(&separator)
-            .filter_map(|pair| parse_pair(pair, &field_split, &trim_key, &trim_value))
-            .collect::<BTreeMap<_, _>>()
-            .into())
-        */
 
         let (_, values) =
             parse_line(&value, &field_split, &separator).map_err(|e| e.to_string())?;
@@ -157,27 +93,34 @@ impl Expression for ParseKeyValueFn {
                     .type_def(state)
                     .fallible_unless(value::Kind::Bytes)
             }))
-            .merge_optional(
-                self.trim_key
-                    .as_ref()
-                    .map(|trim_key| trim_key.type_def(state).fallible_unless(value::Kind::Bytes)),
-            )
-            .merge_optional(self.trim_value.as_ref().map(|trim_value| {
-                trim_value
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Bytes)
-            }))
             .fallible_unless(value::Kind::Bytes)
             .with_constraint(value::Kind::Map)
     }
 }
 
+/// Parse the line as a separated list of key value pairs.
 fn parse_line<'a>(
     input: &'a str,
     field_split: &'a str,
     separator: &'a str,
 ) -> IResult<&'a str, Vec<(String, Value)>> {
-    separated_list1(tag(separator), parse_key_value(field_split, separator))(input)
+    separated_list1(
+        parse_separator(separator),
+        parse_key_value(field_split, separator),
+    )(input)
+}
+
+/// Parses the separator between the key/value pairs.
+/// If the separator is a space, we parse as many as we can,
+/// If it is not a space eat any whitespace before our separator as well as the separator.
+fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+    move |input| {
+        if separator == " " {
+            map(many1(tag(separator)), |_| " ")(input)
+        } else {
+            preceded(space0, tag(separator))(input)
+        }
+    }
 }
 
 /// Parse a single `key=value` tuple.
@@ -188,55 +131,57 @@ fn parse_key_value<'a>(
     move |input| {
         map(
             tuple((
-                take_until(field_split),
-                tag(field_split),
-                alt((take_until(separator), rest)),
+                preceded(space0, parse_key(field_split)),
+                preceded(space0, tag(field_split)),
+                preceded(space0, parse_value(separator)),
             )),
-            |(field, _, value): (&str, &str, &str)| (field.to_string(), value.into()),
+            |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
         )(input)
     }
 }
 
-/// Checks if the current input starts with a delimiter character.
-/// If it does it returns the end delimiter. Otherwise it returns None.
-fn is_delimited(input: &str, delimiters: &Option<String>) -> Option<char> {
-    match (input.chars().next(), delimiters) {
-        (Some(chr), Some(delimiters)) => {
-            let mut delimiters = delimiters.chars();
-            match delimiters.next() {
-                Some(start) if chr == start => match delimiters.next() {
-                    Some(next) => Some(next),
-                    None => Some(start),
-                },
-                _ => None,
-            }
-        }
-        (_, _) => None,
+/// Parses a string delimited by the given character.
+/// Can be escaped using `\`.
+fn parse_delimited(delimiter: char) -> impl Fn(&str) -> IResult<&str, &str> {
+    move |input| {
+        delimited(
+            char(delimiter),
+            escaped(
+                take_while1(|c: char| c != '\\' && c != delimiter),
+                '\\',
+                satisfy(|c| c == '\\' || c == delimiter),
+            ),
+            char(delimiter),
+        )(input)
     }
+}
+
+/// An undelimited value is all the text until our separator, or if it is the last value in the line,
+/// just take the rest of the string.
+fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+    move |input| map(alt((take_until(separator), rest)), |s: &str| s.trim())(input)
 }
 
 /// Parses the value.
 /// The value has two parsing strategies.
 ///
-/// 1. If it starts with one of the trim values, we assume it is a delimited field, so we parse up to
-///    the closing delimiter. If the trim_value is one character, this is the close, if it is more than
-///    one, than the close is any character other than the opening delimiter.
+/// 1. Parse as a delimited field - currently the delimiter is hardcoded to a `"`.
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
 ///    the next separator or the eof.
 ///
-fn parse_value<'a>(
-    trim_value: &'a Option<String>,
-    separator: &'a str,
-) -> impl Fn(&'a str) -> IResult<&'a str, Value> {
+fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, Value> {
     move |input| {
         map(
-            match is_delimited(input, trim_value) {
-                Some(_) => alt((take_until(separator), rest)),
-                None => alt((take_until(separator), rest)),
-            },
-            |value| Value::from(value),
+            alt((parse_delimited('"'), parse_undelimited(separator))),
+            Into::into,
         )(input)
     }
+}
+
+/// Parses the key.
+/// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+fn parse_key<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+    move |input| alt((parse_delimited('"'), parse_undelimited(separator)))(input)
 }
 
 #[cfg(test)]
@@ -269,10 +214,11 @@ mod test {
 
     #[test]
     fn test_parse_value() {
-        assert_eq!(
-            Ok(("", "noog".into())),
-            parse_value(&Some(r#"""#.to_string()), " ")(r#""noog""#)
-        );
+        // delimited
+        assert_eq!(Ok(("", "noog".into())), parse_value(" ")(r#""noog""#));
+
+        // undelimited
+        assert_eq!(Ok(("", "noog".into())), parse_value(" ")("noog"));
     }
 
     test_type_def![
@@ -281,8 +227,6 @@ mod test {
                 value: Literal::from("foo").boxed(),
                 field_split: None,
                 separator: None,
-                trim_key: None,
-                trim_value: None,
             },
             def: TypeDef {
                 kind: Kind::Map,
@@ -295,8 +239,6 @@ mod test {
                 value: Literal::from(1).boxed(),
                 field_split: None,
                 separator: None,
-                trim_key: None,
-                trim_value: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -310,8 +252,6 @@ mod test {
                 value: Literal::from("ook").boxed(),
                 field_split: Some(Literal::from("=").boxed()),
                 separator: None,
-                trim_key: None,
-                trim_value: None,
             },
             def: TypeDef {
                 kind: Kind::Map,
@@ -324,8 +264,6 @@ mod test {
                 value: Literal::from("ook").boxed(),
                 field_split: Some(Literal::from(1).boxed()),
                 separator: None,
-                trim_key: None,
-                trim_value: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -340,14 +278,14 @@ mod test {
 
         default {
             args: func_args! [
-                value: "at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd=\"204.204.204.204\" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http",
+                value: r#"at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"#,
             ],
             want: Ok(value!({"at": "info",
                              "method": "GET",
                              "path": "/",
                              "host": "myapp.herokuapp.com",
                              "request_id": "8601b555-6a83-4c12-8269-97c8e32cdb22",
-                             "fwd": "\"204.204.204.204\"",
+                             "fwd": "204.204.204.204",
                              "dyno": "web.1",
                              "connect": "1ms",
                              "service": "18ms",
@@ -357,15 +295,43 @@ mod test {
                              "protocol": "http"}))
         }
 
-        custom_separator {
+        logfmt {
             args: func_args! [
-                value: "'zork': <zoog>, 'nonk': <nink>",
+                value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#
+            ],
+            want: Ok(value!({"level": "info",
+                             "msg": "Stopping all fetchers",
+                             "tag": "stopping_fetchers",
+                             "id": "ConsumerFetcherManager-1382721708341",
+                             "module": "kafka.consumer.ConsumerFetcherManager"}))
+        }
+
+        spaces {
+            args: func_args! [
+                value: r#""zork one" : "zoog\"zink\"zork"        nonk          : nink"#,
+                field_split: ":",
+            ],
+            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
+                             "nonk": "nink"}))
+        }
+
+        delimited {
+            args: func_args! [
+                value: r#""zork one" : "zoog\"zink\"zork"  ,      nonk          : nink"#,
                 field_split: ":",
                 separator: ",",
-                trim_key: "'",
-                trim_value: "<>"
             ],
-            want: Ok(value!({"zork": "zoog",
+            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
+                             "nonk": "nink"}))
+        }
+
+        multiple_chars {
+            args: func_args! [
+                value: r#""zork one" -- "zoog\"zink\"zork"  ||    nonk          -- nink"#,
+                field_split: "--",
+                separator: "||",
+            ],
+            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              "nonk": "nink"}))
         }
     ];
