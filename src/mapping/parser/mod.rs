@@ -209,14 +209,14 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
 fn query_function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
     let name = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
     let signature = FunctionSignature::from_str(name)?;
-    let arguments = function_arguments_from_pairs(pairs, &signature)?;
+    let arguments = function_arguments_from_pairs(pairs, signature)?;
 
     signature.into_boxed_function(arguments)
 }
 
 fn function_arguments_from_pairs(
     mut pairs: Pairs<Rule>,
-    signature: &FunctionSignature,
+    signature: FunctionSignature,
 ) -> Result<ArgumentList> {
     let mut arguments = ArgumentList::new();
 
@@ -231,15 +231,16 @@ fn function_arguments_from_pairs(
 
         pairs
             .map(|pair| pair.into_inner().next().unwrap())
-            .map(|pair| match pair.as_rule() {
-                Rule::positional_item => {
-                    index += 1;
-                    positional_item_from_pair(pair, &mut arguments, index - 1, signature)
+            .try_for_each(|pair| -> Result<()> {
+                match pair.as_rule() {
+                    Rule::positional_item => {
+                        index += 1;
+                        positional_item_from_pair(pair, &mut arguments, index - 1, signature)
+                    }
+                    Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
+                    _ => unexpected_parser_sytax!(pair),
                 }
-                Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
-                _ => unexpected_parser_sytax!(pair),
-            })
-            .collect::<Result<()>>()?;
+            })?;
     }
 
     // check invalid arity
@@ -258,28 +259,26 @@ fn function_arguments_from_pairs(
         .iter()
         .filter(|p| p.required)
         .filter(|p| !arguments.keywords().contains(&p.keyword))
-        .map(|p| {
+        .try_for_each(|p| -> Result<_> {
             Err(format!(
                 "required argument '{}' missing for function '{}'",
                 p.keyword,
                 signature.as_str()
             ))
-        })
-        .collect::<Result<_>>()?;
+        })?;
 
     // check unknown argument keywords
     arguments
         .keywords()
         .iter()
         .filter(|k| !signature.parameters().iter().any(|p| &p.keyword == *k))
-        .map(|k| {
+        .try_for_each(|k| -> Result<_> {
             Err(format!(
                 "unknown argument keyword '{}' for function '{}'",
                 k,
                 signature.as_str()
             ))
-        })
-        .collect::<Result<_>>()?;
+        })?;
 
     Ok(arguments)
 }
@@ -288,7 +287,7 @@ fn positional_item_from_pair(
     pair: Pair<Rule>,
     list: &mut ArgumentList,
     index: usize,
-    signature: &FunctionSignature,
+    signature: FunctionSignature,
 ) -> Result<()> {
     let parameter = signature.parameters().get(index).cloned().ok_or(format!(
         "unknown positional argument '{}' for function: '{}'",
@@ -346,7 +345,7 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
 fn keyword_item_from_pair(
     pair: Pair<Rule>,
     list: &mut ArgumentList,
-    signature: &FunctionSignature,
+    signature: FunctionSignature,
 ) -> Result<()> {
     let mut pairs = pair.into_inner();
     let keyword = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
