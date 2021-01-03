@@ -50,7 +50,8 @@ impl Expression for AppendFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let array_type_def = self.items
+        let array_type_def = self
+            .items
             .type_def(state)
             .fallible_unless(Kind::Array)
             .with_inner_type(None);
