@@ -2,13 +2,14 @@ use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone, Copy)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum AwsCloudWatchLogsSubscriptionMessageType {
     ControlMessage,
     DataMessage,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AwsCloudWatchLogEvent {
     pub id: String,
     #[serde(with = "ts_milliseconds")]
@@ -17,7 +18,7 @@ pub struct AwsCloudWatchLogEvent {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AwsCloudWatchLogsSubscriptionMessage {
     pub owner: String,
     pub message_type: AwsCloudWatchLogsSubscriptionMessageType,
