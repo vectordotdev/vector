@@ -7,11 +7,11 @@ RUN tar -xvf vector-0*-$(cat /etc/apk/arch)-unknown-linux-musl*.tar.gz --strip-c
 
 FROM gcr.io/distroless/static
 
-COPY --from=builder /vector/bin/vector /usr/bin/vector
-COPY --from=builder /vector/config /etc/vector
+COPY --from=builder /vector/bin/* /usr/local/bin/
+COPY --from=builder /vector/config/vector.toml /etc/vector/vector.toml
 VOLUME /var/lib/vector/
 
 # Smoke test
 RUN ["vector", "--version"]
 
-ENTRYPOINT ["/usr/bin/vector"]
+ENTRYPOINT ["/usr/local/bin/vector"]
