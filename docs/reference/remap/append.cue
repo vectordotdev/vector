@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: push: {
+remap: functions: append: {
 	arguments: [
 		{
 			name:        "value"
@@ -10,34 +10,32 @@ remap: functions: push: {
 		},
 		{
 			name:        "item"
-			description: "The item to push"
+			description: "The items to append"
 			required:    true
-			type: ["any"]
+			type: ["array"]
 		},
 	]
 	return: ["array"]
 	category: "Array"
 	description: """
-		Adds the specified item to the end of an array and returns the resulting array. The item
-		can be of any VRL type and is added even if an item with the same value is already present
+		Adds the specified array to the end of an array and returns the resulting array. The items
+		can be of any VRL type and are added even if items with the same value are already present
 		in the array.
 
-		The `push` function does *not* change the array in place. In this example, the `push`
+		The `append` function does *not* change the array in place. In this example, the `append`
 		function would return an array with `apple`, `orange`, and `banana`, but the value of
 		`fruits` would be unchanged:
 
 		```js
 		.fruits = ["apple", "orange"]
-		push(.fruits, "banana")
-		.fruits
-		["apple", "orange"]
+		append(.fruits, ["banana"])
 		```
 
 		In order to change the value of `fruits`, you would need to store the resulting array in
 		the field:
 
 		```js
-		.fruits = push(.fruits, "banana")
+		.fruits = append(.fruits, ["banana"])
 		```
 		"""
 	examples: [
@@ -45,13 +43,13 @@ remap: functions: push: {
 			title: "Mixed array"
 			input: {
 				kitchen_sink: [72.5, false, [1, 2, 3]]
-				item: "booper"
+				items: ["booper", "bopper"]
 			}
 			source: """
-				.kitchen_sink = push(.kitchen_sink, .item)
+				.kitchen_sink = append(.kitchen_sink, .items)
 				"""
 			output: {
-				kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
+				kitchen_sink: [72.5, false, [1, 2, 3], "booper", "bopper"]
 			}
 		},
 	]
