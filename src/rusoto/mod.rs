@@ -82,7 +82,7 @@ impl ProvideAwsCredentials for CustomChainProvider {
             Err(error_1) => match self.chain_provider.credentials().await {
                 Ok(creds) => Ok(creds),
                 Err(error_2) => Err(CredentialsError::new(format!(
-                    "Failed creting AWS credentials. Errors: {:?}",
+                    "Failed creating AWS credentials. Errors: {:?}",
                     [error_1, error_2]
                 ))),
             },
