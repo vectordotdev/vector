@@ -27,6 +27,8 @@ use std::{
 use super::{DataDirOpenError, Error};
 use crate::buffers::Acker;
 
+const MAX_UNCOMPACTED: f64 = 0.5;
+
 #[derive(Copy, Clone, Debug)]
 struct Key(pub usize);
 
@@ -155,8 +157,10 @@ pub struct Reader {
     blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
     current_size: Arc<AtomicUsize>,
     ack_counter: Arc<AtomicUsize>,
+    uncompacted_size: usize,
     unacked_sizes: VecDeque<usize>,
     buffer: Vec<Vec<u8>>,
+    max_size: usize,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -215,6 +219,7 @@ impl Stream for Reader {
 impl Drop for Reader {
     fn drop(&mut self) {
         self.delete_acked();
+        self.compact();
     }
 }
 
@@ -239,14 +244,26 @@ impl Reader {
 
             self.delete_offset = new_offset;
 
-            self.db.compact(&Key(0), &Key(self.delete_offset));
-
             let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
             self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
+
+            self.uncompacted_size += size_deleted;
+            if self.uncompacted_size as f64 > self.max_size as f64 * MAX_UNCOMPACTED {
+                self.compact();
+            }
         }
 
         for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
             task.notify();
+        }
+    }
+
+    fn compact(&mut self) {
+        if self.uncompacted_size > 0 {
+            self.uncompacted_size = 0;
+
+            debug!("Compacting disk buffer");
+            self.db.compact(&Key(0), &Key(self.delete_offset));
         }
     }
 }
@@ -278,6 +295,9 @@ impl super::DiskBuffer for Buffer {
 
         let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
         let current_size = Arc::new(AtomicUsize::new(initial_size));
+        // We don't know what the real size is, but ,all things equal, it should have
+        // uniform distribution and one half of max is right in the middle of it.
+        let uncompacted_size = (initial_size as f64 * MAX_UNCOMPACTED * 0.5) as usize;
 
         let write_notifier = Arc::new(AtomicTask::new());
 
@@ -305,6 +325,8 @@ impl super::DiskBuffer for Buffer {
             delete_offset: head,
             current_size,
             ack_counter,
+            max_size,
+            uncompacted_size,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
         };
