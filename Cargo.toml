@@ -227,7 +227,7 @@ built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
-approx = "0.3.0"
+approx = "0.4.0"
 criterion = "0.3"
 tempfile = "3.0.6"
 libc = "0.2.80"
