@@ -35,6 +35,7 @@ anyhow = "1"
 [features]
 
 default = [
+    "append",
     "assert",
     "ceil",
     "compact",
@@ -95,6 +96,7 @@ default = [
     "uuid_v4",
 ]
 
+append = []
 assert = []
 ceil = []
 compact = []

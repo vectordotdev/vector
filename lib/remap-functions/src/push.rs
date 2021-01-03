@@ -83,7 +83,7 @@ mod tests {
     ];
 
     test_function![
-        append => Push;
+        push => Push;
 
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],

@@ -1,5 +1,7 @@
 mod util;
 
+#[cfg(feature = "append")]
+mod append;
 #[cfg(feature = "assert")]
 mod assert;
 #[cfg(feature = "ceil")]
@@ -123,6 +125,8 @@ mod uuid_v4;
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
+#[cfg(feature = "append")]
+pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "ceil")]
@@ -238,6 +242,8 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
+        #[cfg(feature = "append")]
+        Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
