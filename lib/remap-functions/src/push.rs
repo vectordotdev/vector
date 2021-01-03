@@ -1,11 +1,11 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Append;
+pub struct Push;
 
-impl Function for Append {
+impl Function for Push {
     fn identifier(&self) -> &'static str {
-        "append"
+        "push"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -27,17 +27,17 @@ impl Function for Append {
         let value = arguments.required("value")?.boxed();
         let item = arguments.required("item")?.boxed();
 
-        Ok(Box::new(AppendFn { value, item }))
+        Ok(Box::new(PushFn { value, item }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct AppendFn {
+struct PushFn {
     value: Box<dyn Expression>,
     item: Box<dyn Expression>,
 }
 
-impl Expression for AppendFn {
+impl Expression for PushFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let mut list = self.value.execute(state, object)?.try_array()?;
         let item = self.item.execute(state, object)?;
@@ -66,7 +66,7 @@ mod tests {
 
     test_type_def![
         value_array_infallible {
-            expr: |_| AppendFn {
+            expr: |_| PushFn {
                 value: Array::from(vec!["foo", "bar"]).boxed(),
                 item: Literal::from("baz").boxed(),
             },
@@ -74,7 +74,7 @@ mod tests {
         }
 
         value_non_array_fallible {
-            expr: |_| AppendFn {
+            expr: |_| PushFn {
                 value: Literal::from(27).boxed(),
                 item: Literal::from("foo").boxed(),
             },
@@ -83,7 +83,7 @@ mod tests {
     ];
 
     test_function![
-        append => Append;
+        append => Push;
 
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],
