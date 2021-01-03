@@ -49,6 +49,17 @@ components: sinks: blackhole: {
 				unit: null
 			}
 		}
+		rate: {
+			common:      false
+			description: "Rates the amount of events that the sink can consume per second."
+			required:    false
+			warnings: []
+			type: uint: {
+				default: null
+				examples: [1000]
+				unit: null
+			}
+		}
 	}
 
 	input: {
