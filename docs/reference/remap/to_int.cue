@@ -8,7 +8,7 @@ remap: functions: to_int: {
 				* If a string, it must be the string representation of an integer or else an error
 					is raised.
 				* If a Boolean, returns `0` for `false` and `1` for `true`.
-				* If a timestamp, returns the [Unix timestamp](\(urls.unix_timestamp)).
+				* If a timestamp, returns the [Unix timestamp](\(urls.unix_timestamp)) in seconds.
 				"""
 			required:    true
 			type: ["integer", "float", "boolean", "string", "timestamp"]
