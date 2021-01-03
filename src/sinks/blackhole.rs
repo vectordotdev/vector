@@ -128,7 +128,10 @@ mod tests {
 
     #[tokio::test]
     async fn blackhole() {
-        let config = BlackholeConfig { print_amount: 10 };
+        let config = BlackholeConfig {
+            print_amount: 10,
+            rate: None,
+        };
         let mut sink = BlackholeSink::new(config, Acker::Null);
 
         let (_input_lines, events) = random_events_with_stream(100, 10);

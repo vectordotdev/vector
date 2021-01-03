@@ -1233,8 +1233,22 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
-        old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink(
+            "out1",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
+        old_config.add_sink(
+            "out2",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let mut new_config = Config::builder();
         let (_trigger_new, source) = MockSourceConfig::new();
@@ -1247,7 +1261,14 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+        new_config.add_sink(
+            "out1",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
@@ -1275,8 +1296,22 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
-        old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink(
+            "out1",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
+        old_config.add_sink(
+            "out2",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let mut new_config = Config::builder();
         new_config.add_source("in", StdinConfig::default());
@@ -1288,7 +1323,14 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
+        new_config.add_sink(
+            "out1",
+            &["trans"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
@@ -1319,8 +1361,22 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        old_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
-        old_config.add_sink("out2", &["trans2"], BlackholeConfig { print_amount: 1000 });
+        old_config.add_sink(
+            "out1",
+            &["trans1"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
+        old_config.add_sink(
+            "out2",
+            &["trans2"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let mut new_config = Config::builder();
         new_config.add_source("in", StdinConfig::default());
@@ -1332,7 +1388,14 @@ mod transient_state_tests {
                 ..JsonParserConfig::default()
             },
         );
-        new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
+        new_config.add_sink(
+            "out1",
+            &["trans1"],
+            BlackholeConfig {
+                print_amount: 1000,
+                rate: None,
+            },
+        );
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
