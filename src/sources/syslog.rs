@@ -647,12 +647,16 @@ mod test {
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
+        let event = event_from_str(&"host".to_string(), None, &raw).unwrap();
 
         let mut expected = Event::from(msg);
         {
+            let value = event.as_log().get("timestamp").unwrap();
+            let year = value.as_timestamp().unwrap().naive_local().year();
+
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
-                chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
+                chrono::Local.ymd(year, 2, 13).and_hms(20, 7, 26).into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().host_key(), "74794bfb6795");
             expected.insert(log_schema().source_type_key(), "syslog");
@@ -663,10 +667,7 @@ mod test {
             expected.insert("procid", 8539);
         }
 
-        assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
-            expected
-        );
+        assert_eq!(event, expected);
     }
 
     #[test]
@@ -676,12 +677,16 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
+        let event = event_from_str(&"host".to_string(), None, &raw).unwrap();
 
         let mut expected = Event::from(msg);
         {
+            let value = event.as_log().get("timestamp").unwrap();
+            let year = value.as_timestamp().unwrap().naive_local().year();
+
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
-                chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
+                chrono::Local.ymd(year, 2, 13).and_hms(21, 31, 56).into();
             expected.insert(log_schema().timestamp_key(), expected_date);
             expected.insert(log_schema().source_type_key(), "syslog");
             expected.insert("host", "74794bfb6795");
@@ -695,10 +700,7 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
-            expected
-        );
+        assert_eq!(event, expected);
     }
 
     #[test]
