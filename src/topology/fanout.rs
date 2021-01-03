@@ -1,14 +1,13 @@
 use crate::Event;
-use futures::compat::Future01CompatExt;
-use futures01::{future, sync::mpsc, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures::{future, Sink, Stream};
+use std::{
+    fmt,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::sync::mpsc;
 
-type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
-
-pub struct Fanout {
-    sinks: Vec<(String, Option<RouterSink>)>,
-    i: usize,
-    control_channel: mpsc::UnboundedReceiver<ControlMessage>,
-}
+type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 
 pub enum ControlMessage {
     Add(String, RouterSink),
@@ -17,11 +16,28 @@ pub enum ControlMessage {
     Replace(String, Option<RouterSink>),
 }
 
+impl fmt::Debug for ControlMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ControlMessage::")?;
+        match self {
+            Self::Add(name, _) => write!(f, "Add({:?})", name),
+            Self::Remove(name) => write!(f, "Remove({:?})", name),
+            Self::Replace(name, _) => write!(f, "Replace({:?})", name),
+        }
+    }
+}
+
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
+
+pub struct Fanout {
+    sinks: Vec<(String, Option<Pin<RouterSink>>)>,
+    i: usize,
+    control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+}
 
 impl Fanout {
     pub fn new() -> (Self, ControlChannel) {
-        let (control_tx, control_rx) = mpsc::unbounded();
+        let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         let fanout = Self {
             sinks: vec![],
@@ -38,7 +54,7 @@ impl Fanout {
             "Duplicate output name in fanout"
         );
 
-        self.sinks.push((name, Some(sink)));
+        self.sinks.push((name, Some(sink.into())));
     }
 
     fn remove(&mut self, name: &str) {
@@ -48,7 +64,7 @@ impl Fanout {
         let (_name, removed) = self.sinks.remove(i);
 
         if let Some(mut removed) = removed {
-            tokio::spawn(future::poll_fn(move || removed.close()).compat());
+            tokio::spawn(future::poll_fn(move |cx| removed.as_mut().poll_close(cx)));
         }
 
         if self.i > i {
@@ -58,14 +74,14 @@ impl Fanout {
 
     fn replace(&mut self, name: String, sink: Option<RouterSink>) {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &name) {
-            *existing = sink
+            *existing = sink.map(Into::into);
         } else {
             panic!("Tried to replace a sink that's not already present");
         }
     }
 
-    pub fn process_control_messages(&mut self) {
-        while let Ok(Async::Ready(Some(message))) = self.control_channel.poll() {
+    pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
+        while let Poll::Ready(Some(message)) = Pin::new(&mut self.control_channel).poll_next(cx) {
             match message {
                 ControlMessage::Add(name, sink) => self.add(name, sink),
                 ControlMessage::Remove(name) => self.remove(&name),
@@ -87,92 +103,89 @@ impl Fanout {
         }
     }
 
-    fn poll_sinks(&mut self, close: bool) -> Poll<(), ()> {
-        self.process_control_messages();
+    fn poll_sinks<F>(&mut self, cx: &mut Context<'_>, poll: F) -> Poll<Result<(), ()>>
+    where
+        F: Fn(&mut Pin<RouterSink>, &mut Context<'_>) -> Poll<Result<(), ()>>,
+    {
+        self.process_control_messages(cx);
 
-        let mut poll_result = Async::Ready(());
+        let mut poll_result = Poll::Ready(Ok(()));
 
-        // Cannot remove a sink while iterating over them, so just make
-        // note of sink error and handle them later.
-        let mut errors = vec![];
-
-        for (i, (_name, sink)) in self.sinks.iter_mut().enumerate() {
+        let mut i = 0;
+        while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink {
-                let result = if close {
-                    sink.close()
-                } else {
-                    sink.poll_complete()
-                };
+                match poll(sink, cx) {
+                    Poll::Pending => poll_result = Poll::Pending,
+                    Poll::Ready(Ok(())) => (),
+                    Poll::Ready(Err(())) => {
+                        self.handle_sink_error(i)?;
+                        continue;
+                    }
+                }
+            }
+            i += 1;
+        }
 
-                match result {
-                    Ok(Async::Ready(())) => {}
-                    Ok(Async::NotReady) => poll_result = Async::NotReady,
-                    Err(()) => errors.push(i),
+        poll_result
+    }
+}
+
+impl Sink<Event> for Fanout {
+    type Error = ();
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
+        let this = self.get_mut();
+
+        this.process_control_messages(cx);
+
+        while let Some((_, sink)) = this.sinks.get_mut(this.i) {
+            match sink.as_mut() {
+                Some(sink) => match sink.as_mut().poll_ready(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(Ok(())) => this.i += 1,
+                    Poll::Ready(Err(())) => this.handle_sink_error(this.i)?,
+                },
+                // process_control_messages ended because control channel returned
+                // Pending so it's fine to return Pending here since the control
+                // channel will notify current task when it receives a message.
+                None => return Poll::Pending,
+            }
+        }
+
+        this.i = 0;
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), ()> {
+        let mut i = 1;
+        while let Some((_, sink)) = self.sinks.get_mut(i) {
+            if let Some(sink) = sink.as_mut() {
+                if sink.as_mut().start_send(item.clone()).is_err() {
+                    self.handle_sink_error(i)?;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+
+        if let Some((_, sink)) = self.sinks.first_mut() {
+            if let Some(sink) = sink.as_mut() {
+                if sink.as_mut().start_send(item).is_err() {
+                    self.handle_sink_error(0)?;
                 }
             }
         }
 
-        // Must handle the last sink error first, or else the indices of
-        // all but the first will be wrong.
-        errors.reverse();
-        for i in errors {
-            self.handle_sink_error(i)?;
-        }
-
-        Ok(poll_result)
-    }
-}
-
-impl Sink for Fanout {
-    type SinkItem = Event;
-    type SinkError = ();
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        self.process_control_messages();
-
-        if self.sinks.is_empty() {
-            return Ok(AsyncSink::Ready);
-        }
-
-        while self.i < self.sinks.len() - 1 {
-            let (_name, sink) = &mut self.sinks[self.i];
-            match sink.as_mut() {
-                Some(sink) => match sink.start_send(item.clone()) {
-                    Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
-                    Ok(AsyncSink::Ready) => self.i += 1,
-                    Err(()) => self.handle_sink_error(self.i)?,
-                },
-                // process_control_messages ended because control channel returned
-                // NotReady so it's fine to return NotReady here since the control
-                // channel will notify current task when it receives a message.
-                None => return Ok(AsyncSink::NotReady(item)),
-            }
-        }
-
-        let (_name, sink) = &mut self.sinks[self.i];
-        match sink.as_mut() {
-            Some(sink) => match sink.start_send(item) {
-                Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
-                Ok(AsyncSink::Ready) => self.i += 1,
-                Err(()) => self.handle_sink_error(self.i)?,
-            },
-            // process_control_messages ended because control channel returned
-            // NotReady so it's fine to return NotReady here since the control
-            // channel will notify current task when it receives a message.
-            None => return Ok(AsyncSink::NotReady(item)),
-        }
-
-        self.i = 0;
-
-        Ok(AsyncSink::Ready)
+        Ok(())
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.poll_sinks(false)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
+        self.poll_sinks(cx, |sink, cx| sink.as_mut().poll_flush(cx))
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.poll_sinks(true)
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
+        self.poll_sinks(cx, |sink, cx| sink.as_mut().poll_close(cx))
     }
 }
 
