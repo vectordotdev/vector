@@ -83,14 +83,16 @@ impl Expression for ParseKeyValueFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .merge_optional(self.field_split.as_ref().map(|field_split| {
-                field_split
-                    .type_def(state)
-            }))
-            .merge_optional(self.separator.as_ref().map(|separator| {
-                separator
-                    .type_def(state)
-            }))
+            .merge_optional(
+                self.field_split
+                    .as_ref()
+                    .map(|field_split| field_split.type_def(state)),
+            )
+            .merge_optional(
+                self.separator
+                    .as_ref()
+                    .map(|separator| separator.type_def(state)),
+            )
             .into_fallible(true)
             .with_constraint(value::Kind::Map)
     }
@@ -111,7 +113,9 @@ fn parse_line<'a>(
 /// Parses the separator between the key/value pairs.
 /// If the separator is a space, we parse as many as we can,
 /// If it is not a space eat any whitespace before our separator as well as the separator.
-fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+/// These lifetimes are actually needed.
+#[allow(clippy::needless_lifetimes)]
+fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
     move |input| {
         if separator == " " {
             map(many1(tag(separator)), |_| " ")(input)
@@ -122,6 +126,8 @@ fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a st
 }
 
 /// Parse a single `key=value` tuple.
+/// These lifetimes are actually needed.
+#[allow(clippy::needless_lifetimes)]
 fn parse_key_value<'a>(
     field_split: &'a str,
     separator: &'a str,
@@ -156,7 +162,9 @@ fn parse_delimited(delimiter: char) -> impl Fn(&str) -> IResult<&str, &str> {
 
 /// An undelimited value is all the text until our separator, or if it is the last value in the line,
 /// just take the rest of the string.
-fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+/// These lifetimes are actually needed.
+#[allow(clippy::needless_lifetimes)]
+fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
     move |input| map(alt((take_until(separator), rest)), |s: &str| s.trim())(input)
 }
 
@@ -167,7 +175,9 @@ fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a 
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
 ///    the next separator or the eof.
 ///
-fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, Value> {
+/// These lifetimes are actually needed.
+#[allow(clippy::needless_lifetimes)]
+fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, Value> {
     move |input| {
         map(
             alt((parse_delimited('"'), parse_undelimited(separator))),
@@ -178,7 +188,9 @@ fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, V
 
 /// Parses the key.
 /// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
-fn parse_key<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+/// These lifetimes are actually needed.
+#[allow(clippy::needless_lifetimes)]
+fn parse_key<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
     move |input| alt((parse_delimited('"'), parse_undelimited(separator)))(input)
 }
 
@@ -203,13 +215,20 @@ mod test {
                 "",
                 vec![
                     ("ook".to_string(), "pook".into()),
-                    ("@timestamp".to_string(), "2020-12-31T12:43:22.2322232Z".into()),
+                    (
+                        "@timestamp".to_string(),
+                        "2020-12-31T12:43:22.2322232Z".into()
+                    ),
                     ("key#hash".to_string(), "value".into()),
                     ("key=with=special=characters".to_string(), "value".into()),
                     ("key".to_string(), "with special=characters".into()),
                 ]
             )),
-            parse_line(r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#, "=", " ")
+            parse_line(
+                r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#,
+                "=",
+                " "
+            )
         );
     }
 
