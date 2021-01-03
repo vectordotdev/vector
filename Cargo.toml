@@ -222,7 +222,7 @@ atty = "0.2"
 nix = "0.19.0"
 
 [build-dependencies]
-prost-build = "0.6.1"
+prost-build = "0.7.0"
 built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
