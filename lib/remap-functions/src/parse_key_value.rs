@@ -86,14 +86,12 @@ impl Expression for ParseKeyValueFn {
             .merge_optional(self.field_split.as_ref().map(|field_split| {
                 field_split
                     .type_def(state)
-                    .fallible_unless(value::Kind::Bytes)
             }))
             .merge_optional(self.separator.as_ref().map(|separator| {
                 separator
                     .type_def(state)
-                    .fallible_unless(value::Kind::Bytes)
             }))
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Map)
     }
 }
@@ -232,6 +230,7 @@ mod test {
                 separator: None,
             },
             def: TypeDef {
+                fallible: true,
                 kind: Kind::Map,
                 ..Default::default()
             },
@@ -257,6 +256,7 @@ mod test {
                 separator: None,
             },
             def: TypeDef {
+                fallible: true,
                 kind: Kind::Map,
                 ..Default::default()
             },
