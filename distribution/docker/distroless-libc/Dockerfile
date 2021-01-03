@@ -1,14 +1,13 @@
-FROM alpine:3.12 AS builder
+FROM debian:buster-slim AS builder
 
-WORKDIR /vector
-
-COPY vector-*-unknown-linux-musl*.tar.gz ./
-RUN tar -xvf vector-0*-$(cat /etc/apk/arch)-unknown-linux-musl*.tar.gz --strip-components=2
+COPY vector-*.deb ./
+RUN dpkg -i vector-*-$(dpkg --print-architecture).deb
 
 FROM gcr.io/distroless/cc-debian10
 
-COPY --from=builder /vector/bin/vector /usr/bin/vector
-COPY --from=builder /vector/config /etc/vector
+COPY --from=builder /usr/bin/vector /usr/bin/vector
+COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
+COPY --from=builder /etc/vector /etc/vector
 VOLUME /var/lib/vector/
 
 # Smoke test
