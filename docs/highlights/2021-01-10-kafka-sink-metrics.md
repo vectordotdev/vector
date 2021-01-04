@@ -4,7 +4,7 @@ $schema: ".schema.json"
 title: "The `kafka` sink now supports metrics"
 description: "Send metric events to Kafka"
 author_github: "https://github.com/binarylogic"
-featured: true
+featured: false
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
