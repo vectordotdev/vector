@@ -6,7 +6,7 @@ remap: functions: is_nullish: {
 			name:        "value"
 			description: #"The value to check for "nullishness", i.e. a useless value."#
 			required:    true
-			type: ["string", "null"]
+			type: ["any"]
 		},
 	]
 	return: ["boolean"]
@@ -18,10 +18,10 @@ remap: functions: is_nullish: {
 		* `null`
 		* A single dash (`"-"`)
 		* Any string that contains only whitespace characters as defined by the the [Unicode
-		  definition of the `White_Space` property](\(urls.unicode_whitespace)).
+		  definition of the `White_Space` property](\(urls.unicode_whitespace)). That includes
+		  empty strings (`""`), common characters like `"\n"`, "\r", and others.
 
-		If your use case requires a different conception of nullish, we recommend using more
-		specific checks.
+		All values of any other type return `false`.
 		"""#
 	examples: [
 		{
