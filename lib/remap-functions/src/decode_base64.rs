@@ -70,8 +70,13 @@ mod test {
     test_function![
         decode_base64 => DecodeBase64;
 
-        string_value {
+        string_value_with_padding {
             args: func_args![value: value!("c29tZSBzdHJpbmcgdmFsdWU=")],
+            want: Ok(value!("some string value")),
+        }
+
+        string_value_no_padding {
+            args: func_args![value: value!("c29tZSBzdHJpbmcgdmFsdWU")],
             want: Ok(value!("some string value")),
         }
 
