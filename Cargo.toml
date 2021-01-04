@@ -35,26 +35,26 @@ depends = ""
 [workspace]
 members = [
   ".",
-  "lib/shared",
   "lib/file-source",
-  "lib/tracing-limit",
-  "lib/vector-wasm",
-  "lib/k8s-test-framework",
   "lib/k8s-e2e-tests",
+  "lib/k8s-test-framework",
   "lib/prometheus-parser",
-  "lib/vector-api-client",
-  "lib/remap-lang",
   "lib/remap-cli",
   "lib/remap-functions",
+  "lib/remap-lang",
+  "lib/shared",
+  "lib/tracing-limit",
+  "lib/vector-api-client",
+  "lib/vector-wasm",
 ]
 
 [dependencies]
 # Internal libs
-shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
-tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+shared = { path = "lib/shared" }
+tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 
 # Tokio / Futures
