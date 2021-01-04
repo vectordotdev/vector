@@ -286,7 +286,7 @@ jobs:
       - name: "Install Vector"
         shell: cmd
         run: |
-          msiexec /quiet /i target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi
+          msiexec /quiet /i D:\a\vector\vector\target\artifacts\vector-${{ env.VECTOR_VERSION }}-x64.msi
       - name: "Run Vector"
         shell: cmd
         run: |
