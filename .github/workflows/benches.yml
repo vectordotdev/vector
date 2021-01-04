@@ -49,6 +49,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
