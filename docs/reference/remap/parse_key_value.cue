@@ -38,7 +38,7 @@ remap: functions: parse_key_value: {
 					"""#
 			}
 			source: #"""
-					. = parse_key_value(.message, field_delimiter=" ", key_value_delimiter="=")
+					. = parse_key_value(.message)
 				"""#
 			output: {
 				level:  "info"
@@ -46,6 +46,28 @@ remap: functions: parse_key_value: {
 				tag:    "stopping_fetchers"
 				id:     "ConsumerFetcherManager-1382721708341"
 				module: "kafka.consumer.ConsumerFetcherManager"
+			}
+		},
+		{
+			title: "Custom delimiters"
+			input: {
+				message: #"""
+					path:"/cart_link", host:store.app.com, fwd: "102.30.171.16", dyno: web.1 connect:0ms, service:87ms, status:304, bytes:632, protocol:https
+					"""#
+			}
+			source: #"""
+					. = parse_key_value(.message, field_delimiter=",", key_value_delimiter=":")
+				"""#
+			output: {
+				path:     "/cart_link"
+				host:     "store.app.com"
+				fwd:      "102.30.171.16"
+				dyno:     "web.1"
+				connect:  "0ms"
+				service:  "87ms"
+				status:   "304"
+				bytes:    "632"
+				protocol: "https"
 			}
 		},
 	]
