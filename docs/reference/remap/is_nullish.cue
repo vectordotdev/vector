@@ -4,7 +4,7 @@ remap: functions: is_nullish: {
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check for "nullishness", i.e. a useless value."#
+			description: #"The value to check for "nullishness," i.e. a useless value."#
 			required:    true
 			type: ["any"]
 		},

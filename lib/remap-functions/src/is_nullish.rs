@@ -149,5 +149,17 @@ mod tests {
             args: func_args![value: value!("hello world")],
             want: Ok(value!(false)),
         }
+
+        // Shows that a non-string/null literal returns false
+        integer {
+            args: func_args![value: value!(427)],
+            want: Ok(value!(false)),
+        }
+
+        // Shows that a non-literal type returns false
+        array {
+            args: func_args![value: array![1, 2, 3]],
+            want: Ok(value!(false)),
+        }
     ];
 }
