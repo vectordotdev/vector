@@ -236,7 +236,7 @@ impl SyslogMessageRFC5424 {
             host: "hogwarts".to_owned(),
             source_type: "syslog".to_owned(),
             appname: "harry".to_owned(),
-            procid: thread_rng().gen_range(0, 32768),
+            procid: thread_rng().gen_range(0..32768),
             structured_data,
             message: msg,
         }
@@ -306,7 +306,7 @@ fn random_structured_data(
     max_children: usize,
     field_len: usize,
 ) -> StructuredData {
-    let amount = thread_rng().gen_range(0, max_children);
+    let amount = thread_rng().gen_range(0..max_children);
 
     random_maps(max_map_size, field_len)
         .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately

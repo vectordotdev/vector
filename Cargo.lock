@@ -4819,7 +4819,7 @@ dependencies = [
  "rand_isaac",
  "rand_jitter",
  "rand_os",
- "rand_pcg 0.1.2",
+ "rand_pcg",
  "rand_xorshift",
  "winapi 0.3.9",
 ]
@@ -4835,7 +4835,18 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc 0.2.0",
- "rand_pcg 0.2.1",
+]
+
+[[package]]
+name = "rand"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a76330fb486679b4ace3670f117bbc9e16204005c4bde9c4bd372f45bed34f12"
+dependencies = [
+ "libc",
+ "rand_chacha 0.3.0",
+ "rand_core 0.6.0",
+ "rand_hc 0.3.0",
 ]
 
 [[package]]
@@ -4856,6 +4867,16 @@ checksum = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.6.0",
 ]
 
 [[package]]
@@ -4883,13 +4904,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_distr"
-version = "0.3.0"
+name = "rand_core"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e9532ada3929fb8b2e9dbe28d1e06c9b2cc65813f074fcb6bd5fbefeff9d56"
+checksum = "a8b34ba8cfb21243bd8df91854c830ff0d785fff2e82ebd4434c2644cb9ada18"
+dependencies = [
+ "getrandom 0.2.0",
+]
+
+[[package]]
+name = "rand_distr"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da9e8f32ad24fb80d07d2323a9a2ce8b30d68a62b8cb4df88119ff49a698f038"
 dependencies = [
  "num-traits",
- "rand 0.7.3",
+ "rand 0.8.0",
 ]
 
 [[package]]
@@ -4908,6 +4938,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_hc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3190ef7066a446f2e7f42e239d161e905420ccab01eb967c9eb27d21b2322a73"
+dependencies = [
+ "rand_core 0.6.0",
 ]
 
 [[package]]
@@ -4952,15 +4991,6 @@ checksum = "abf9b09b01790cfe0364f52bf32995ea3c39f4d2dd011eac241d2914146d0b44"
 dependencies = [
  "autocfg 0.1.7",
  "rand_core 0.4.2",
-]
-
-[[package]]
-name = "rand_pcg"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
-dependencies = [
- "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -7364,7 +7394,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "pulsar",
- "rand 0.7.3",
+ "rand 0.8.0",
  "rand_distr",
  "rdkafka",
  "regex",
