@@ -77,15 +77,16 @@ impl Default for CustomChainProvider {
 #[async_trait]
 impl ProvideAwsCredentials for CustomChainProvider {
     async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
-        if let Ok(creds) = self.web_provider.credentials().await {
-            return Ok(creds);
+        match self.web_provider.credentials().await {
+            Ok(creds) => Ok(creds),
+            Err(error_1) => match self.chain_provider.credentials().await {
+                Ok(creds) => Ok(creds),
+                Err(error_2) => Err(CredentialsError::new(format!(
+                    "Failed creating AWS credentials. Errors: {:?}",
+                    [error_1, error_2]
+                ))),
+            },
         }
-        if let Ok(creds) = self.chain_provider.credentials().await {
-            return Ok(creds);
-        }
-        Err(CredentialsError::new(
-            "Couldn't find AWS credentials in environment, credentials file, or IAM role.",
-        ))
     }
 }
 

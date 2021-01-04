@@ -203,6 +203,7 @@ pub fn random_string(len: usize) -> String {
     thread_rng()
         .sample_iter(&Alphanumeric)
         .take(len)
+        .map(char::from)
         .collect::<String>()
 }
 
@@ -211,7 +212,7 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
-    let size = thread_rng().gen_range(0, max_size);
+    let size = thread_rng().gen_range(0..max_size);
 
     (0..size)
         .map(move |_| (random_string(field_len), random_string(field_len)))

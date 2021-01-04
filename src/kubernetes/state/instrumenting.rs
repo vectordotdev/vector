@@ -71,7 +71,7 @@ mod tests {
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use once_cell::sync::OnceCell;
-    use std::sync::{Mutex, MutexGuard};
+    use tokio::sync::{Mutex, MutexGuard};
 
     fn prepare_test() -> (
         Writer<mock::Writer<Pod>>,
@@ -136,19 +136,16 @@ mod tests {
     /// Guarantees only one test will run at a time.
     /// This is required because we assert on a global state, and we don't
     /// want interference.
-    fn tests_lock() -> MutexGuard<'static, ()> {
+    async fn tests_lock() -> MutexGuard<'static, ()> {
         static INSTANCE: OnceCell<Mutex<()>> = OnceCell::new();
-        INSTANCE
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .unwrap_or_else(|err| err.into_inner())
+        INSTANCE.get_or_init(|| Mutex::new(())).lock().await
     }
 
     #[tokio::test]
     async fn add() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
@@ -179,7 +176,7 @@ mod tests {
     async fn update() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
@@ -210,7 +207,7 @@ mod tests {
     async fn delete() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
@@ -241,7 +238,7 @@ mod tests {
     async fn resync() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
@@ -268,7 +265,7 @@ mod tests {
     async fn request_maintenance_without_maintenance() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, _events_rx, _actions_tx) = prepare_test();
         let before = get_metric_value("maintenance_requested");
@@ -281,7 +278,7 @@ mod tests {
     async fn request_maintenance_with_maintenance() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (events_tx, _events_rx) = mpsc::channel(0);
         let (_actions_tx, actions_rx) = mpsc::channel(0);
@@ -304,7 +301,7 @@ mod tests {
     async fn perform_maintenance() {
         trace_init();
         let _ = crate::metrics::init();
-        let _guard = tests_lock();
+        let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
