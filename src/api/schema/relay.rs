@@ -49,17 +49,13 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
                 let after = after.map(|after| after.saturating_add(1)).unwrap_or(0);
                 let before = before.unwrap_or(iter_len);
 
-                if after > before {
-                    (0, 0)
-                } else {
-                    match (first, last) {
-                        // First
-                        (Some(first), _) => (after, (after.saturating_add(first)).min(before)),
-                        // Last
-                        (_, Some(last)) => ((before.saturating_sub(last)).max(after), before),
-                        // Default page size
-                        _ => (after, default_page_size.min(before)),
-                    }
+                match (first, last) {
+                    // First
+                    (Some(first), _) => (after, (after.saturating_add(first)).min(before)),
+                    // Last
+                    (_, Some(last)) => ((before.saturating_sub(last)).max(after), before),
+                    // Default page size
+                    _ => (after, default_page_size.min(before)),
                 }
             };
 
