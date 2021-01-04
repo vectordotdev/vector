@@ -33,7 +33,7 @@ components: sinks: loki: {
 			}
 			request: {
 				enabled:                    true
-				concurrency:                5
+				concurrency:                1
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -158,6 +158,15 @@ components: sinks: loki: {
 				either assigning each Vector instance with a unique label
 				or deploying a centralized Vector which will ensure no logs
 				will get sent out-of-order.
+				"""
+		}
+
+		concurrency: {
+			title: "Concurrency"
+			body: """
+				To make sure logs arrive at Loki in a correct order,
+				the `loki` sink only sends one request at a time.
+				Setting `request.concurrency` will not have any effects.
 				"""
 		}
 
