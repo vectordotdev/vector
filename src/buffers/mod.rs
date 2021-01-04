@@ -1,11 +1,16 @@
 use crate::{config::Resource, sink::BoundedSink, Event};
-use futures::{compat::Sink01CompatExt, Sink, SinkExt, TryStreamExt};
-use futures01::{task::AtomicTask, AsyncSink, Poll, Sink as Sink01, StartSend, Stream};
+use futures::{compat::Sink01CompatExt, Sink, TryStreamExt};
+use futures01::{task::AtomicTask, Stream};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
 };
 use tokio::{stream::StreamExt, sync::mpsc};
 
@@ -65,12 +70,7 @@ impl BufferInputCloner {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = BoundedSink::new(tx.clone());
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(
-                        DropWhenFull {
-                            inner: inner.compat(),
-                        }
-                        .sink_compat(),
-                    )
+                    Box::new(DropWhenFull::new(inner))
                 } else {
                     Box::new(inner)
                 }
@@ -78,15 +78,11 @@ impl BufferInputCloner {
 
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
+                let inner = writer.clone().sink_compat();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(
-                        DropWhenFull {
-                            inner: writer.clone(),
-                        }
-                        .sink_compat(),
-                    )
+                    Box::new(DropWhenFull::new(inner))
                 } else {
-                    Box::new(writer.clone().sink_compat())
+                    Box::new(inner)
                 }
             }
         }
@@ -190,36 +186,75 @@ impl Acker {
 
 pub struct DropWhenFull<S> {
     inner: S,
+    drop: bool,
 }
 
-impl<S: Sink01> Sink01 for DropWhenFull<S> {
-    type SinkItem = S::SinkItem;
-    type SinkError = S::SinkError;
+impl<S> DropWhenFull<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner, drop: false }
+    }
+}
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        match self.inner.start_send(item) {
-            Ok(AsyncSink::NotReady(_)) => {
-                debug!(
-                    message = "Shedding load; dropping event.",
-                    internal_log_rate_secs = 10
-                );
-                Ok(AsyncSink::Ready)
+impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
+    type Error = S::Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.as_mut().poll_ready(cx) {
+            Poll::Ready(Ok(())) => {
+                self.get_mut().drop = false;
+                Poll::Ready(Ok(()))
             }
-            other => other,
+            Poll::Pending => {
+                self.get_mut().drop = true;
+                Poll::Ready(Ok(()))
+            }
+            error => error,
         }
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.poll_complete()
+    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        if self.drop {
+            debug!(
+                message = "Shedding load; dropping event.",
+                internal_log_rate_secs = 10
+            );
+            Ok(())
+        } else {
+            self.as_mut().start_send(item)
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.as_mut().poll_close(cx)
+    }
+}
+
+impl<S> Deref for DropWhenFull<S> {
+    type Target = S;
+
+    fn deref(&self) -> &S {
+        &self.inner
+    }
+}
+
+impl<S> DerefMut for DropWhenFull<S> {
+    fn deref_mut(&mut self) -> &mut S {
+        &mut self.inner
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
+    use crate::sink::BoundedSink;
     use futures::compat::Future01CompatExt;
-    use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
+    use futures01::{future, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
+    use tokio::sync::mpsc;
     use tokio01_test::task::MockTask;
 
     #[tokio::test]
@@ -227,7 +262,7 @@ mod test {
         future::lazy(|| {
             let (tx, mut rx) = mpsc::channel(2);
 
-            let mut tx = DropWhenFull { inner: tx };
+            let mut tx = DropWhenFull::new(BoundedSink::new(tx));
 
             assert_eq!(tx.start_send(1), Ok(AsyncSink::Ready));
             assert_eq!(tx.start_send(2), Ok(AsyncSink::Ready));
