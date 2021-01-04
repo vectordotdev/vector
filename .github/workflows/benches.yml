@@ -65,7 +65,6 @@ jobs:
           test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
       - run: unzip target/criterion.zip
         continue-on-error: true
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
