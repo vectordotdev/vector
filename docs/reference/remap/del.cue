@@ -12,9 +12,9 @@ remap: functions: del: {
 	return: ["any"]
 	category: "Event"
 	description: #"""
-		Removed the field specified by the given path from the event object. If the field exists,
-		the field's value is returned by the delete operation; if the field does not exist, `null`
-		is returned.
+		Removes the field specified by the given path from the event object. If the field exists,
+		the field's value is returned by the delete operation, while `null` is returned if the field
+		doesn't exist.
 		"""#
 	examples: [
 		{
@@ -23,12 +23,20 @@ remap: functions: del: {
 				"field1": 1
 				"field2": 2
 			}
-			source: #"""
-				del(.field1)
-				"""#
+			source: "del(.field1)"
 			output: {
 				"field2": 2
 			}
 		},
+		{
+			title: "Rename field"
+			input: {
+				old_field: "please rename me"
+			}
+			source: ".new_field = del(.old_field)"
+			output: {
+				new_field: "please rename me"
+			}
+		}
 	]
 }
