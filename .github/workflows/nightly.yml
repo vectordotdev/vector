@@ -80,7 +80,7 @@ jobs:
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
-          PASS_FEATURES: "default-cmake"
+          PASS_FEATURES: "default"
         run: make package-aarch64-unknown-linux-gnu-all
       - uses: actions/upload-artifact@v1
         with:
