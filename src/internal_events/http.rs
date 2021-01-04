@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use std::error::Error;
 
 #[derive(Debug)]
 pub struct HTTPEventsReceived {
@@ -34,7 +35,7 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
             message = "Received bad request.",
             code = ?self.error_code,
             error_message = ?self.error_message,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -50,7 +51,7 @@ impl InternalEvent for HTTPEventMissingMessage {
     fn emit_logs(&self) {
         warn!(
             message = "Event missing the message key; dropping event.",
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         );
     }
 
@@ -72,5 +73,26 @@ impl InternalEvent for HTTPEventEncoded {
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct HTTPDecompressError<'a> {
+    pub error: &'a dyn Error,
+    pub encoding: &'a str,
+}
+
+impl<'a> InternalEvent for HTTPDecompressError<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Failed decompressing payload.",
+            encoding= %self.encoding,
+            error = %self.error,
+            internal_log_rate_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("parse_errors_total", 1);
     }
 }

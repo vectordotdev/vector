@@ -22,7 +22,7 @@ remap: functions: split: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Splits the given string whenever a given pattern is matched. If `limit` is specified, after `limit` has been reached
 		the remainder of the string is returned unsplit.

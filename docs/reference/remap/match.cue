@@ -16,7 +16,7 @@ remap: functions: match: {
 		},
 	]
 	return: ["boolean"]
-	category: "text"
+	category: "String"
 	description: """
 		Determines whether a string matches the provided pattern.
 		"""
@@ -29,16 +29,18 @@ remap: functions: match: {
 			source: ".has_teapot = match(.phrase, /teapot/)"
 			output: {
 				has_teapot: true
+				phrase:     "I'm a little teapot"
 			}
 		},
 		{
 			title: "Unsuccessful match"
 			input: {
-				phrase: "life is but a dream"
+				phrase: "Life is but a dream"
 			}
 			source: ".has_teapot = match(.phrase, /teapot/)"
 			output: {
 				has_teapot: false
+				phrase:     "Life is but a dream"
 			}
 		},
 	]

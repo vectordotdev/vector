@@ -9,7 +9,7 @@ components: transforms: ansi_stripper: {
 
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 
@@ -28,7 +28,13 @@ components: transforms: ansi_stripper: {
 		}
 
 		requirements: []
-		warnings: [transforms.add_fields.support.warnings[0]]
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new [`remap` transform's `strip_ansi_escape_codes`
+			function](\(urls.vector_remap_transform)#strip_ansi_escape_codes). The `remap` transform provides a
+			simple syntax for robust data transformation. Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

@@ -2,7 +2,7 @@ package metadata
 
 remap: functions: now: {
 	arguments: []
-	category: "text"
+	category: "Timestamp"
 	return: ["timestamp"]
 	description: #"""
 		Returns the current timestamp in the Utc timezone.

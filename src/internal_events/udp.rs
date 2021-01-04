@@ -60,7 +60,7 @@ impl InternalEvent for UdpSendIncomplete {
             data_size = self.data_size,
             sent = self.sent,
             dropped = self.data_size - self.sent,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         );
     }
 

@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [[bin]]
-name = "trl"
+name = "vrl"
 path = "src/main.rs"
 
 [dependencies]

@@ -19,7 +19,7 @@ releases: "0.9.0": {
 		},
 		{
 			title:       "Vector Observability"
-			description: "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly beleive in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
+			description: "Did you know this release includes a new hidden `internal` source that emits metrics reflecting Vector's own internal state? 👀 We didn't highlight this source because we have not finished instrumenting Vector and we'll be changing the internal schema used.\n\nFun fact, we took an event-driven approach to Vector's internal observability, which we strongly believe in. We want Vector to be a good example of our own advice. Checkout the [Event-Driven Observability RFC][urls.pr_2093]."
 		},
 	]
 

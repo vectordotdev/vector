@@ -22,7 +22,7 @@ remap: functions: truncate: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Truncates a string after a given number of characters. If `limit` is larger than the length of the string,
 		the string is returned unchanged.

@@ -16,7 +16,7 @@ remap: functions: format_timestamp: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "Timestamp"
 	description: #"""
 		Formats a `timestamp` as a given string.
 		The format string used is specified by the [Chrono library](https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html).

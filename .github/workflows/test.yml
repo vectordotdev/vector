@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.5.0
+      - uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -253,7 +253,7 @@ jobs:
       - name: Check helm lint
         if: needs.changes.outputs.helm == 'true'
         run: make check-helm-lint
-      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
+      - name: Check that generated Kubernetes YAMLs don't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
       - name: Check events

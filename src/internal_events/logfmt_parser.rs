@@ -30,7 +30,7 @@ impl<'a> InternalEvent for LogfmtParserConversionFailed<'a> {
             message = "Could not convert types.",
             name = %self.name,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 

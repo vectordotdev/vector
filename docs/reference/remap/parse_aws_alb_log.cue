@@ -10,7 +10,7 @@ remap: functions: parse_aws_alb_log: {
 		},
 	]
 	return: ["map"]
-	category: "parse"
+	category: "Parse"
 	description: #"""
 		Parses a Elastic Load Balancer Access log into it's constituent components.
 		"""#

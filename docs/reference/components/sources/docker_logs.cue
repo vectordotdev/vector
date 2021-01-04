@@ -224,6 +224,14 @@ components: sources: docker_logs: {
 				default: 1
 			}
 		}
+		host_key: {
+			category:    "Context"
+			common:      false
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			required:    false
+			warnings: []
+			type: string: default: "host"
+		}
 	}
 
 	output: logs: {
@@ -268,6 +276,7 @@ components: sources: docker_logs: {
 					required:    true
 					type: timestamp: {}
 				}
+				host: fields._local_host
 				"*": {
 					description: "Each container label is inserted with it's exact key/value pair."
 					required:    true
@@ -302,6 +311,7 @@ components: sources: docker_logs: {
 				image:                _image
 				message:              _message
 				stream:               _stream
+				host:                 _values.local_host
 			}
 		},
 	]

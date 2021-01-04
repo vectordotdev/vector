@@ -12,6 +12,8 @@ mod unix_stream;
 
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
+#[cfg(feature = "sources-prometheus")]
+pub(crate) use self::http::decode;
 #[cfg(feature = "sources-utils-http")]
 pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;
