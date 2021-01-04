@@ -27,12 +27,12 @@ impl Function for ParseKeyValue {
                 required: true,
             },
             Parameter {
-                keyword: "field_split",
+                keyword: "key_value_delimiter",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
             Parameter {
-                keyword: "separator",
+                keyword: "field_delimiter",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
@@ -41,13 +41,13 @@ impl Function for ParseKeyValue {
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
-        let field_split = arguments.optional("field_split").map(Expr::boxed);
-        let separator = arguments.optional("separator").map(Expr::boxed);
+        let key_value_delimiter = arguments.optional("key_value_delimiter").map(Expr::boxed);
+        let field_delimiter = arguments.optional("field_delimiter").map(Expr::boxed);
 
         Ok(Box::new(ParseKeyValueFn {
             value,
-            field_split,
-            separator,
+            key_value_delimiter,
+            field_delimiter,
         }))
     }
 }
@@ -55,8 +55,8 @@ impl Function for ParseKeyValue {
 #[derive(Debug, Clone)]
 pub(crate) struct ParseKeyValueFn {
     value: Box<dyn Expression>,
-    field_split: Option<Box<dyn Expression>>,
-    separator: Option<Box<dyn Expression>>,
+    key_value_delimiter: Option<Box<dyn Expression>>,
+    field_delimiter: Option<Box<dyn Expression>>,
 }
 
 impl Expression for ParseKeyValueFn {
@@ -64,18 +64,18 @@ impl Expression for ParseKeyValueFn {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
-        let field_split = match &self.field_split {
+        let key_value_delimiter = match &self.key_value_delimiter {
             Some(s) => String::from_utf8_lossy(&s.execute(state, object)?.try_bytes()?).to_string(),
             None => "=".to_string(),
         };
 
-        let separator = match &self.separator {
+        let field_delimiter = match &self.field_delimiter {
             Some(s) => String::from_utf8_lossy(&s.execute(state, object)?.try_bytes()?).to_string(),
             None => " ".to_string(),
         };
 
         let (_, values) =
-            parse_line(&value, &field_split, &separator).map_err(|e| e.to_string())?;
+            parse_line(&value, &key_value_delimiter, &field_delimiter).map_err(|e| e.to_string())?;
 
         Ok(values.into_iter().collect::<BTreeMap<_, _>>().into())
     }
@@ -84,14 +84,14 @@ impl Expression for ParseKeyValueFn {
         self.value
             .type_def(state)
             .merge_optional(
-                self.field_split
+                self.key_value_delimiter
                     .as_ref()
-                    .map(|field_split| field_split.type_def(state)),
+                    .map(|key_value_delimiter| key_value_delimiter.type_def(state)),
             )
             .merge_optional(
-                self.separator
+                self.field_delimiter
                     .as_ref()
-                    .map(|separator| separator.type_def(state)),
+                    .map(|field_delimiter| field_delimiter.type_def(state)),
             )
             .into_fallible(true)
             .with_constraint(value::Kind::Map)
@@ -101,26 +101,26 @@ impl Expression for ParseKeyValueFn {
 /// Parse the line as a separated list of key value pairs.
 fn parse_line<'a>(
     input: &'a str,
-    field_split: &'a str,
-    separator: &'a str,
+    key_value_delimiter: &'a str,
+    field_delimiter: &'a str,
 ) -> IResult<&'a str, Vec<(String, Value)>> {
     separated_list1(
-        parse_separator(separator),
-        parse_key_value(field_split, separator),
+        parse_field_delimiter(field_delimiter),
+        parse_key_value(key_value_delimiter, field_delimiter),
     )(input)
 }
 
-/// Parses the separator between the key/value pairs.
-/// If the separator is a space, we parse as many as we can,
-/// If it is not a space eat any whitespace before our separator as well as the separator.
+/// Parses the field_delimiter between the key/value pairs.
+/// If the field_delimiter is a space, we parse as many as we can,
+/// If it is not a space eat any whitespace before our field_delimiter as well as the field_delimiter.
 /// These lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
-fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
+fn parse_field_delimiter<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
     move |input| {
-        if separator == " " {
-            map(many1(tag(separator)), |_| " ")(input)
+        if field_delimiter == " " {
+            map(many1(tag(field_delimiter)), |_| " ")(input)
         } else {
-            preceded(space0, tag(separator))(input)
+            preceded(space0, tag(field_delimiter))(input)
         }
     }
 }
@@ -129,15 +129,15 @@ fn parse_separator<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, 
 /// These lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
 fn parse_key_value<'a>(
-    field_split: &'a str,
-    separator: &'a str,
+    key_value_delimiter: &'a str,
+    field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value)> {
     move |input| {
         map(
             tuple((
-                preceded(space0, parse_key(field_split)),
-                preceded(space0, tag(field_split)),
-                preceded(space0, parse_value(separator)),
+                preceded(space0, parse_key(key_value_delimiter)),
+                preceded(space0, tag(key_value_delimiter)),
+                preceded(space0, parse_value(field_delimiter)),
             )),
             |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
         )(input)
@@ -160,12 +160,12 @@ fn parse_delimited(delimiter: char) -> impl Fn(&str) -> IResult<&str, &str> {
     }
 }
 
-/// An undelimited value is all the text until our separator, or if it is the last value in the line,
+/// An undelimited value is all the text until our field_delimiter, or if it is the last value in the line,
 /// just take the rest of the string.
 /// These lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
-fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
-    move |input| map(alt((take_until(separator), rest)), |s: &str| s.trim())(input)
+fn parse_undelimited<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
+    move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
 }
 
 /// Parses the value.
@@ -173,14 +173,14 @@ fn parse_undelimited<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str
 ///
 /// 1. Parse as a delimited field - currently the delimiter is hardcoded to a `"`.
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
-///    the next separator or the eof.
+///    the next field_delimiter or the eof.
 ///
 /// These lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
-fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, Value> {
+fn parse_value<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> IResult<&str, Value> {
     move |input| {
         map(
-            alt((parse_delimited('"'), parse_undelimited(separator))),
+            alt((parse_delimited('"'), parse_undelimited(field_delimiter))),
             Into::into,
         )(input)
     }
@@ -190,8 +190,8 @@ fn parse_value<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, Valu
 /// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
 /// These lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
-fn parse_key<'a>(separator: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
-    move |input| alt((parse_delimited('"'), parse_undelimited(separator)))(input)
+fn parse_key<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> IResult<&str, &str> {
+    move |input| alt((parse_delimited('"'), parse_undelimited(field_delimiter)))(input)
 }
 
 #[cfg(test)]
@@ -245,8 +245,8 @@ mod test {
         value_string {
             expr: |_| ParseKeyValueFn {
                 value: Literal::from("foo").boxed(),
-                field_split: None,
-                separator: None,
+                key_value_delimiter: None,
+                field_delimiter: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -258,8 +258,8 @@ mod test {
         value_non_string {
             expr: |_| ParseKeyValueFn {
                 value: Literal::from(1).boxed(),
-                field_split: None,
-                separator: None,
+                key_value_delimiter: None,
+                field_delimiter: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -271,8 +271,8 @@ mod test {
         optional_value_string {
             expr: |_| ParseKeyValueFn {
                 value: Literal::from("ook").boxed(),
-                field_split: Some(Literal::from("=").boxed()),
-                separator: None,
+                key_value_delimiter: Some(Literal::from("=").boxed()),
+                field_delimiter: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -284,8 +284,8 @@ mod test {
         optional_value_non_string {
             expr: |_| ParseKeyValueFn {
                 value: Literal::from("ook").boxed(),
-                field_split: Some(Literal::from(1).boxed()),
-                separator: None,
+                key_value_delimiter: Some(Literal::from(1).boxed()),
+                field_delimiter: None,
             },
             def: TypeDef {
                 fallible: true,
@@ -331,7 +331,7 @@ mod test {
         spaces {
             args: func_args! [
                 value: r#""zork one" : "zoog\"zink\"zork"        nonk          : nink"#,
-                field_split: ":",
+                key_value_delimiter: ":",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              "nonk": "nink"}))
@@ -340,8 +340,8 @@ mod test {
         delimited {
             args: func_args! [
                 value: r#""zork one":"zoog\"zink\"zork", nonk:nink"#,
-                field_split: ":",
-                separator: ",",
+                key_value_delimiter: ":",
+                field_delimiter: ",",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              "nonk": "nink"}))
@@ -350,8 +350,8 @@ mod test {
         delimited_with_spaces {
             args: func_args! [
                 value: r#""zork one" : "zoog\"zink\"zork"  ,      nonk          : nink"#,
-                field_split: ":",
-                separator: ",",
+                key_value_delimiter: ":",
+                field_delimiter: ",",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              "nonk": "nink"}))
@@ -360,8 +360,8 @@ mod test {
         multiple_chars {
             args: func_args! [
                 value: r#""zork one" -- "zoog\"zink\"zork"  ||    nonk          -- nink"#,
-                field_split: "--",
-                separator: "||",
+                key_value_delimiter: "--",
+                field_delimiter: "||",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              "nonk": "nink"}))

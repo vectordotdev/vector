@@ -1492,7 +1492,7 @@
   inputs = []
   type = "remap"
   source = '''
-    . = parse_key_value(.message, field_split = "=", separator = " ")
+    . = parse_key_value(.message, key_value_delimiter = "=", field_delimiter = " ")
   '''
 [[tests]]
   name = "remap_function_parse_key_value"

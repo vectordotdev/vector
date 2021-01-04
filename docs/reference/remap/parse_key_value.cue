@@ -9,14 +9,14 @@ remap: functions: parse_key_value: {
 			type: ["string"]
 		},
 		{
-			name:        "field_split"
+			name:        "key_value_delimiter"
 			description: "The string that separates the key from the value."
 			required:    false
 			default:     "="
 			type: ["string"]
 		},
 		{
-			name:        "separator"
+			name:        "field_delimiter"
 			description: "The string that separates each key/value pair."
 			required:    false
 			default:     " "
@@ -27,7 +27,7 @@ remap: functions: parse_key_value: {
 	category: "Parse"
 	description: """
 		Parses a string in key value format.
-		Fields can be delimited with a `"`. `"` within a delimited field can be escaped by `\\`.
+		Keys and values can be wrapped with a `"`. `"` characters within a delimited field can be escaped by `\\`.
 		"""
 	examples: [
 		{
@@ -38,7 +38,7 @@ remap: functions: parse_key_value: {
 					"""#
 			}
 			source: #"""
-					. = parse_key_value(.message, field_split=" ", separator="=")
+					. = parse_key_value(.message, field_delimiter=" ", key_value_delimiter="=")
 				"""#
 			output: {
 				level:  "info"
