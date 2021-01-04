@@ -160,3 +160,20 @@ jobs:
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
+
+  master-failure:
+    name: master-failure
+    if: failure() && github.ref == 'refs/heads/master'
+    needs:
+      - cancel-previous
+      - build-x86_64-unknown-linux-gnu
+      - compute-k8s-test-plan
+      - test-e2e-kubernetes
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Master k8s e2e tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
