@@ -11,7 +11,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserFailedParse {
         warn!(
             message = "Event failed to parse as a CloudWatch Logs subscirption JSON message.",
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 

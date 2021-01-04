@@ -27,8 +27,10 @@ impl Config {
 
         let token = std::fs::read_to_string(token_file).context(Token)?;
 
-        let mut tls_options = TlsOptions::default();
-        tls_options.ca_file = Some(root_ca_file.into());
+        let tls_options = TlsOptions {
+            ca_file: Some(root_ca_file.into()),
+            ..Default::default()
+        };
 
         Ok(Self {
             base,

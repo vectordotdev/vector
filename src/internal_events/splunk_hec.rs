@@ -27,7 +27,7 @@ impl InternalEvent for SplunkEventEncodeError {
         error!(
             message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         );
     }
 
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for SplunkMissingKeys<'a> {
             message = "Failed to render template for {}, leaving empty.",
             self.field,
             missing_keys = ?self.keys,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 
@@ -86,7 +86,7 @@ mod source {
             debug!(
                 message = "Received one request.",
                 path = %self.path,
-                rate_limit_secs = 10
+                internal_log_rate_secs = 10
             );
         }
 
@@ -105,7 +105,7 @@ mod source {
             error!(
                 message = "Invalid request body.",
                 error = ?self.error,
-                rate_limit_secs = 10
+                internal_log_rate_secs = 10
             );
         }
 
@@ -122,7 +122,7 @@ mod source {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
-                rate_limit_secs = 10
+                internal_log_rate_secs = 10
             );
         }
 

@@ -14,7 +14,7 @@ impl<'a> InternalEvent for StatsdInvalidMetricReceived<'a> {
             message = "Invalid metric received; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 

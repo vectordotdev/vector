@@ -23,7 +23,7 @@ impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
         warn!(
             message = "Field not found; dropping event.",
             missing_field = ?self.missing_field,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 

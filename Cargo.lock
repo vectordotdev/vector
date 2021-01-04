@@ -87,9 +87,9 @@ checksum = "ee67c11feeac938fae061b232e38e0b6d94f97a9df10e6271319325ac4c56a86"
 
 [[package]]
 name = "approx"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0e60b75072ecd4168020818c0107f2857bb6c4e64252d8d3983f6263b40a5c3"
+checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
 dependencies = [
  "num-traits",
 ]
@@ -641,7 +641,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "ct-logs",
- "dirs-next",
+ "dirs-next 1.0.2",
  "futures-core",
  "futures-util",
  "hex",
@@ -1295,7 +1295,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e86d73f2a0b407b5768d10a8c720cf5d2df49a9efc10ca09176d201ead4b7fb"
 dependencies = [
  "bitflags",
- "crossterm_winapi",
+ "crossterm_winapi 0.6.2",
+ "lazy_static",
+ "libc",
+ "mio 0.7.6",
+ "parking_lot 0.11.1",
+ "signal-hook",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "crossterm"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi 0.7.0",
  "lazy_static",
  "libc",
  "mio 0.7.6",
@@ -1309,6 +1325,15 @@ name = "crossterm_winapi"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2265c3f8e080075d9b6417aa72293fc71662f34b4af2612d8d1b074d29510db"
+dependencies = [
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0da8964ace4d3e4a044fd027919b2237000b24315a37c916f61809f1ff2140b9"
 dependencies = [
  "winapi 0.3.9",
 ]
@@ -1479,6 +1504,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b937cd1fbd1f194ac842196bd2529f21618088ee6d8bff6a46ece611451c96b"
+dependencies = [
+ "cfg-if 1.0.0",
+ "num_cpus",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1579,6 +1614,16 @@ name = "dirs-next"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf36e65a80337bea855cd4ef9b8401ffce06a7baedf2e85ec467b1ac3f6e82b6"
+dependencies = [
+ "cfg-if 1.0.0",
+ "dirs-sys-next",
+]
+
+[[package]]
+name = "dirs-next"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if 1.0.0",
  "dirs-sys-next",
@@ -1832,7 +1877,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "crc",
- "dashmap",
+ "dashmap 4.0.1",
  "flate2",
  "futures 0.3.8",
  "glob 0.3.0",
@@ -2906,6 +2951,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3573,7 +3627,7 @@ dependencies = [
  "atomic-shim",
  "crossbeam-epoch 0.9.1",
  "crossbeam-utils 0.8.1",
- "dashmap",
+ "dashmap 3.11.10",
  "indexmap",
  "metrics",
  "parking_lot 0.11.1",
@@ -4804,7 +4858,7 @@ dependencies = [
  "rand_isaac",
  "rand_jitter",
  "rand_os",
- "rand_pcg 0.1.2",
+ "rand_pcg",
  "rand_xorshift",
  "winapi 0.3.9",
 ]
@@ -4820,7 +4874,18 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc 0.2.0",
- "rand_pcg 0.2.1",
+]
+
+[[package]]
+name = "rand"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a76330fb486679b4ace3670f117bbc9e16204005c4bde9c4bd372f45bed34f12"
+dependencies = [
+ "libc",
+ "rand_chacha 0.3.0",
+ "rand_core 0.6.0",
+ "rand_hc 0.3.0",
 ]
 
 [[package]]
@@ -4841,6 +4906,16 @@ checksum = "f4c8ed856279c9737206bf725bf36935d8666ead7aa69b52be55af369d193402"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.6.0",
 ]
 
 [[package]]
@@ -4868,13 +4943,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_distr"
-version = "0.3.0"
+name = "rand_core"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e9532ada3929fb8b2e9dbe28d1e06c9b2cc65813f074fcb6bd5fbefeff9d56"
+checksum = "a8b34ba8cfb21243bd8df91854c830ff0d785fff2e82ebd4434c2644cb9ada18"
+dependencies = [
+ "getrandom 0.2.0",
+]
+
+[[package]]
+name = "rand_distr"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da9e8f32ad24fb80d07d2323a9a2ce8b30d68a62b8cb4df88119ff49a698f038"
 dependencies = [
  "num-traits",
- "rand 0.7.3",
+ "rand 0.8.0",
 ]
 
 [[package]]
@@ -4893,6 +4977,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_hc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3190ef7066a446f2e7f42e239d161e905420ccab01eb967c9eb27d21b2322a73"
+dependencies = [
+ "rand_core 0.6.0",
 ]
 
 [[package]]
@@ -4937,15 +5030,6 @@ checksum = "abf9b09b01790cfe0364f52bf32995ea3c39f4d2dd011eac241d2914146d0b44"
 dependencies = [
  "autocfg 0.1.7",
  "rand_core 0.4.2",
-]
-
-[[package]]
-name = "rand_pcg"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
-dependencies = [
- "rand_core 0.5.1",
 ]
 
 [[package]]
@@ -5253,7 +5337,7 @@ checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
 [[package]]
 name = "rlua"
 version = "0.17.1-alpha.0"
-source = "git+https://github.com/kyren/rlua#25bd7e6bffef9597466a98bfca80a3056c9e6320"
+source = "git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320#25bd7e6bffef9597466a98bfca80a3056c9e6320"
 dependencies = [
  "bitflags",
  "bstr",
@@ -5959,6 +6043,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "nom 6.0.1",
+ "serde",
  "snafu",
  "tracing 0.1.22",
 ]
@@ -6994,7 +7079,7 @@ checksum = "5d4e6c82bb967df89f20b875fa8835fab5d5622c6a5efa574a1f0b6d0aa6e8f6"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm",
+ "crossterm 0.18.2",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -7298,11 +7383,11 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "crossterm",
+ "crossterm 0.19.0",
  "db-key",
  "derivative 2.1.1",
  "derive_is_enum_variant",
- "dirs-next",
+ "dirs-next 2.0.0",
  "dyn-clone",
  "evmap",
  "exitcode",
@@ -7325,7 +7410,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "inventory",
- "itertools 0.9.0",
+ "itertools 0.10.0",
  "jemallocator",
  "k8s-openapi",
  "lazy_static",
@@ -7367,7 +7452,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "pulsar",
- "rand 0.7.3",
+ "rand 0.8.0",
  "rand_distr",
  "rdkafka",
  "regex",

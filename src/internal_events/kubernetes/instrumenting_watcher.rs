@@ -18,7 +18,7 @@ pub struct WatchRequestInvocationFailed<E> {
 
 impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
     fn emit_logs(&self) {
-        error!(message = "Watch invocation failed.", error = ?self.error, rate_limit_secs = 5);
+        error!(message = "Watch invocation failed.", error = ?self.error, internal_log_rate_secs = 5);
     }
 
     fn emit_metrics(&self) {
@@ -42,7 +42,7 @@ pub struct WatchStreamErrored<E> {
 
 impl<E: Debug> InternalEvent for WatchStreamErrored<E> {
     fn emit_logs(&self) {
-        error!(message = "Watch stream errored.", error = ?self.error, rate_limit_secs = 5);
+        error!(message = "Watch stream errored.", error = ?self.error, internal_log_rate_secs = 5);
     }
 
     fn emit_metrics(&self) {

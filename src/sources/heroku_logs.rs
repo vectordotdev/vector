@@ -217,7 +217,7 @@ fn line_to_event(line: String) -> Event {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
         Event::from(line)
     };

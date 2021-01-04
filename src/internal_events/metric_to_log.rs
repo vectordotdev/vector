@@ -12,7 +12,7 @@ impl<'a> InternalEvent for MetricToLogFailedSerialize {
         warn!(
             message = "Metric failed to serialize as JSON.",
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         )
     }
 

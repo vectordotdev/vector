@@ -104,7 +104,6 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
       CHANNEL="test" \
       BASE="$BASE_TAG" \
       TAG="$VERSION_TAG" \
-      PUSH="" \
       scripts/build-docker.sh
 
     # Prepare the container image for the deployment command.
