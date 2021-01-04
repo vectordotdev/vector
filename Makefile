@@ -1081,7 +1081,7 @@ release-commit: ## Commits release changes
 
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
-	@scripts/release-docker.sh
+	@scripts/build-docker.sh
 
 .PHONY: release-github
 release-github: ## Release to Github

@@ -111,10 +111,9 @@ impl Function {
             .enumerate()
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
-            .map(|(i, p)| {
+            .try_for_each(|(i, p)| -> Result<_> {
                 Err(E::Function(ident.to_owned(), Error::Required(p.keyword.to_owned(), i)).into())
-            })
-            .collect::<Result<_>>()?;
+            })?;
 
         let function = definition.compile(list)?;
         Ok(Self { function, ident })

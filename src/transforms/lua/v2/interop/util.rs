@@ -2,7 +2,7 @@ use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use rlua::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub fn timestamp_to_table<'a>(ctx: LuaContext<'a>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
+pub fn timestamp_to_table(ctx: LuaContext<'_>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
     let table = ctx.create_table()?;
     table.set("year", ts.year())?;
     table.set("month", ts.month())?;
@@ -62,7 +62,7 @@ where
     Ok(set)
 }
 
-pub fn table_is_array<'a>(t: &LuaTable<'a>) -> LuaResult<bool> {
+pub fn table_is_array(t: &LuaTable<'_>) -> LuaResult<bool> {
     Ok(t.len()? > 0)
 }
 

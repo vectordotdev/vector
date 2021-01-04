@@ -113,7 +113,9 @@ impl<'a> Iterator for PathIter<'a> {
                     _ => Invalid,
                 },
                 Index(i) => match c {
-                    Some(c) if c >= '0' && c <= '9' => Index(10 * i + (c as usize - '0' as usize)),
+                    Some(c) if ('0'..='9').contains(&c) => {
+                        Index(10 * i + (c as usize - '0' as usize))
+                    }
                     Some(']') => {
                         res = Some(Some(PathComponent::Index(i)));
                         ClosingBracket
@@ -126,7 +128,7 @@ impl<'a> Iterator for PathIter<'a> {
                     Some(c) => Key(c.to_string()),
                 },
                 OpeningBracket => match c {
-                    Some(c) if c >= '0' && c <= '9' => Index(c as usize - '0' as usize),
+                    Some(c) if ('0'..='9').contains(&c) => Index(c as usize - '0' as usize),
                     _ => Invalid,
                 },
                 ClosingBracket => match c {
