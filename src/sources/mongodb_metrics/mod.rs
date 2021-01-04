@@ -69,8 +69,6 @@ enum BuildError {
     CommandBuildInfoMongoError { source: MongoError },
     #[snafu(display("failed to parse `buildInfo` response: {:?}", source))]
     CommandBuildInfoParseError { source: bson::de::Error },
-    #[snafu(display("only `Mongod` supported right now, current: `{:?}`", node_type))]
-    UnsupportedNodeType { node_type: NodeType },
 }
 
 #[derive(Debug)]
