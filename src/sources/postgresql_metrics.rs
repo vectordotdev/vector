@@ -215,11 +215,7 @@ impl DatnameFilter {
     }
 
     fn remove_empty(mut names: HashSet<String>) -> (bool, Vec<String>) {
-        let empty = "".to_owned();
-        let null = names.contains(&empty);
-        if null {
-            names.remove(&empty);
-        }
+        let null = names.remove(&"".to_owned());
         (null, names.into_iter().collect())
     }
 
