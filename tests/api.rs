@@ -956,15 +956,8 @@ mod tests {
                 );
 
                 // The # of `edges` results should be 2, except the last page
-                let edges = components
-                    .edges
-                    .into_iter()
-                    .flatten()
-                    .map(Option::unwrap)
-                    .collect::<Vec<_>>();
-
                 assert_eq!(
-                    edges.len(),
+                    components.edges.iter().flatten().count(),
                     match i {
                         2 => 1,
                         _ => 2,
