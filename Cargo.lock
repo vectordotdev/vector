@@ -979,7 +979,7 @@ version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "615f6e27d000a2bffbc7f2f6a8669179378fa27ee4d0a509e985dfc0a7defb40"
 dependencies = [
- "getrandom 0.2.0",
+ "getrandom 0.2.1",
  "lazy_static",
  "proc-macro-hack",
  "tiny-keccak",
@@ -1576,9 +1576,9 @@ dependencies = [
 
 [[package]]
 name = "derivative"
-version = "2.1.1"
+version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"
+checksum = "eaed5874effa6cde088c644ddcdcb4ffd1511391c5be4fdd7a5ccd02c7e4a183"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.8",
@@ -2224,13 +2224,13 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee8025cf36f917e6a52cce185b7c7177689b838b7ec138364e50cc2277a56cf4"
+checksum = "4060f4657be78b8e766215b02b18a2e862d83745545de804638e2b545e81aee6"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
- "wasi 0.9.0+wasi-snapshot-preview1",
+ "wasi 0.10.0+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -3539,9 +3539,9 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maxminddb"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fbfc54d66f57716c4bf6611403b89d6428b742fc422616b1b5a32220cee1834"
+checksum = "46e726b02f46b503921729f640c8e9b98167b87f7b640ce44fbd879ed23bc4b7"
 dependencies = [
  "log",
  "serde",
@@ -3683,7 +3683,7 @@ version = "0.5.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80db40007b46085d83469f71912d95526791038200e1c00afc6a5494d7dc8a4f"
 dependencies = [
- "getrandom 0.2.0",
+ "getrandom 0.2.1",
  "rpassword",
  "scrypt",
 ]
@@ -3798,7 +3798,7 @@ dependencies = [
  "bitflags",
  "bson",
  "chrono",
- "derivative 2.1.1",
+ "derivative 2.1.3",
  "err-derive",
  "futures 0.3.8",
  "futures-intrusive",
@@ -4128,7 +4128,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "226b45a5c2ac4dd696ed30fa6b94b057ad909c7b7fc2e0d0808192bced894066"
 dependencies = [
- "derivative 2.1.1",
+ "derivative 2.1.3",
  "num_enum_derive",
 ]
 
@@ -4918,7 +4918,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8b34ba8cfb21243bd8df91854c830ff0d785fff2e82ebd4434c2644cb9ada18"
 dependencies = [
- "getrandom 0.2.0",
+ "getrandom 0.2.1",
 ]
 
 [[package]]
@@ -6565,9 +6565,9 @@ dependencies = [
 
 [[package]]
 name = "tinytemplate"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d3dc76004a03cec1c5932bca4cdc2e39aaa798e3f82363dd94f9adf6098c12f"
+checksum = "a2ada8616fad06a2d0c455adc530de4ef57605a8120cc65da9653e0e9623ca74"
 dependencies = [
  "serde",
  "serde_json",
@@ -7337,7 +7337,7 @@ dependencies = [
  "criterion",
  "crossterm 0.19.0",
  "db-key",
- "derivative 2.1.1",
+ "derivative 2.1.3",
  "derive_is_enum_variant",
  "dirs-next 2.0.0",
  "dyn-clone",
@@ -7966,9 +7966,9 @@ checksum = "b07db065a5cf61a7e4ba64f29e67db906fb1787316516c4e6e5ff0fea1efcd8a"
 
 [[package]]
 name = "yaml-rust"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f0c922f1a334134dc2f7a8b67dc5d25f0735263feec974345ff706bcf20b0d"
+checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
 dependencies = [
  "linked-hash-map",
 ]
