@@ -79,7 +79,7 @@ components: sources: postgresql_metrics: {
 			type: string: default: "postgresql"
 		}
 		included_databases: {
-			description: "A list of databases to match against `datname` column for which you want to collect logs from."
+			description: "A list of databases to match against `datname` column for which you want to collect metrics from."
 			common:      false
 			required:    false
 			type: array: {
@@ -88,7 +88,7 @@ components: sources: postgresql_metrics: {
 			}
 		}
 		excluded_databases: {
-			description: "A list of databases to match against `datname` column for which you don't want to collect logs from."
+			description: "A list of databases to match against `datname` column for which you don't want to collect metrics from."
 			common:      false
 			required:    false
 			type: array: {
@@ -120,9 +120,8 @@ components: sources: postgresql_metrics: {
 		privileges: {
 			title: "Required Privileges"
 			body: """
-				PostgreSQL Metrics component collect metrics by making queries
-				to PostgreSQL Server. You need to be sure that provided user
-				allowed to make select queries for statistics views:
+				PostgreSQL Metrics component collects metrics by making queries to the configured PostgreSQL server.
+				Ensure the configured user is allowed to make the following select queries:
 
 				- `pg_stat_database`
 				- `pg_stat_database_conflicts`
@@ -160,7 +159,7 @@ components: sources: postgresql_metrics: {
 		}
 
 		up: {
-			description:       "If the PostgreSQL server is up or not."
+			description:       "Whether the PostgreSQL server is up or not."
 			type:              "gauge"
 			default_namespace: "postgresql"
 			tags:              _postgresql_metrics_tags
