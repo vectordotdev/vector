@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
@@ -9,6 +8,7 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateError},
+    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -124,7 +124,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -281,7 +281,15 @@ impl Sink<Event> for KafkaSink {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
             error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
-        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
+
+        let timestamp_ms = match &item {
+            Event::Log(log) => log
+                .get(log_schema().timestamp_key())
+                .and_then(|v| v.as_timestamp()),
+            Event::Metric(metric) => metric.timestamp.as_ref(),
+        }
+        .map(|ts| ts.timestamp_millis());
+        let (key, body) = encode_event(item, &self.key_field, &self.encoding);
 
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -290,10 +298,8 @@ impl Sink<Event> for KafkaSink {
         let flush_signal = Arc::clone(&self.flush_signal);
         self.delivery_fut.push(Box::pin(async move {
             let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
-            if let Some(Value::Timestamp(timestamp)) =
-                item.as_log().get(log_schema().timestamp_key())
-            {
-                record = record.timestamp(timestamp.timestamp_millis());
+            if let Some(timestamp) = timestamp_ms {
+                record = record.timestamp(timestamp);
             }
 
             debug!(message = "Sending event.", count = 1);
@@ -399,19 +405,30 @@ fn encode_event(
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
         .as_ref()
-        .and_then(|f| event.as_log().get(f))
-        .map(|v| v.as_bytes().to_vec())
+        .and_then(|f| match &event {
+            Event::Log(log) => log.get(f).map(|value| value.as_bytes().to_vec()),
+            Event::Metric(metric) => metric
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.get(f))
+                .map(|value| value.clone().into_bytes()),
+        })
         .unwrap_or_default();
 
     encoding.apply_rules(&mut event);
 
-    let body = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
-        Encoding::Text => event
-            .as_log()
-            .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
-            .unwrap_or_default(),
+    let body = match event {
+        Event::Log(log) => match encoding.codec() {
+            Encoding::Json => serde_json::to_vec(&log).unwrap(),
+            Encoding::Text => log
+                .get(log_schema().message_key())
+                .map(|v| v.as_bytes().to_vec())
+                .unwrap_or_default(),
+        },
+        Event::Metric(metric) => match encoding.codec() {
+            Encoding::Json => serde_json::to_vec(&metric).unwrap(),
+            Encoding::Text => metric.to_string().into_bytes(),
+        },
     };
 
     (key, body)
@@ -420,7 +437,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{Metric, MetricKind, MetricValue};
     use std::collections::BTreeMap;
 
     #[test]
@@ -429,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_text() {
+    fn kafka_encode_event_log_text() {
         crate::test_util::trace_init();
         let key = "";
         let message = "hello world".to_string();
@@ -444,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_json() {
+    fn kafka_encode_event_log_json() {
         crate::test_util::trace_init();
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
@@ -466,7 +483,50 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_apply_rules() {
+    fn kafka_encode_event_metric_text() {
+        let metric = Metric {
+            name: "kafka-metric".to_owned(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 0.0 },
+        };
+        let (key_bytes, bytes) = encode_event(
+            metric.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Text),
+        );
+
+        assert_eq!("", String::from_utf8_lossy(&key_bytes));
+        assert_eq!(metric.to_string(), String::from_utf8_lossy(&bytes));
+    }
+
+    #[test]
+    fn kafka_encode_event_metric_json() {
+        let metric = Metric {
+            name: "kafka-metric".to_owned(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 0.0 },
+        };
+        let (key_bytes, bytes) = encode_event(
+            metric.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Json),
+        );
+
+        assert_eq!("", String::from_utf8_lossy(&key_bytes));
+        assert_eq!(
+            serde_json::to_string(&metric).unwrap(),
+            String::from_utf8_lossy(&bytes)
+        );
+    }
+
+    #[test]
+    fn kafka_encode_event_log_apply_rules() {
         crate::test_util::trace_init();
         let mut event = Event::from("hello");
         event.as_mut_log().insert("key", "value");

@@ -74,9 +74,9 @@ tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.13.0-alpha.13" }
-metrics-util = { version = "0.4.0-alpha.10" }
-metrics-tracing-context = { version = "0.1.0-alpha.7" }
+metrics = "0.13.0-alpha.13"
+metrics-util = "0.4.0-alpha.10"
+metrics-tracing-context = "0.1.0-alpha.7"
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
@@ -110,12 +110,12 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "2.4.3", optional = true }
 async-graphql-warp = { version = "2.4.3", optional = true }
-itertools = { version = "0.9.0", optional = true }
+itertools = { version = "0.10.0", optional = true }
 
 # API client
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
-crossterm = { version = "0.18.2", optional = true }
+crossterm = { version = "0.19.0", optional = true }
 tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Remap Lang
@@ -125,8 +125,8 @@ remap-functions = { path = "lib/remap-functions" }
 # External libs
 derivative = "2.1.1"
 chrono = { version = "0.4.19", features = ["serde"] }
-rand = { version = "0.7.3", features = ["small_rng"] }
-rand_distr = "0.3.0"
+rand = { version = "0.8.0", features = ["small_rng"] }
+rand_distr = "0.4.0"
 regex = "1.3.9"
 bytes = { version = "0.5.6", features = ["serde"] }
 stream-cancel = "0.6.2"
@@ -153,12 +153,12 @@ seahash = { version = "4.0.1", optional = true }
 semver = { version = "0.11.0", features = ["serde"] }
 jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
-rlua = { git = "https://github.com/kyren/rlua", optional = true }
+rlua = { git = "https://github.com/kyren/rlua", rev = "25bd7e6bffef9597466a98bfca80a3056c9e6320", optional = true }
 num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.3.0"
-grok = { version = "~1.0.1" }
-nom = { version = "6.0.1" }
+grok = "~1.0.1"
+nom = "6.0.1"
 pest = "2.1.3"
 pest_derive = "2.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -195,12 +195,12 @@ hex = "0.4.2"
 heim = { version = "0.1.0-rc.1", optional = true, features = ["full"] }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
-anyhow = { version = "1.0.36" }
+anyhow = "1.0.37"
 snap = { version = "1.0.3", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = { version = "0.12.0", optional = true }
-dirs-next = { version = "1", optional = true }
+dirs-next = { version = "2.0.0", optional = true }
 fakedata_generator = "0.2.4"
 
 # For WASM
@@ -227,7 +227,7 @@ built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
-approx = "0.3.0"
+approx = "0.4.0"
 criterion = "0.3"
 tempfile = "3.0.6"
 libc = "0.2.80"

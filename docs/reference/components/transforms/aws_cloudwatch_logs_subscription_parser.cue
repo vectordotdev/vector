@@ -10,7 +10,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "batch"
 	}
 
@@ -35,7 +35,13 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			This component has been deprecated in favor of the new [`remap` transform's
+			`parse_aws_cloudwatch_log_subscription_message` function](\(urls.vector_remap_transform)#parse_aws_cloudwatch_log_subscription_message).
+			The `remap` transform provides a simple syntax for robust data transformation. Let us know what you think!
+			""",
+		]
 		notices: []
 	}
 

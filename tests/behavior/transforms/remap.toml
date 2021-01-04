@@ -1461,3 +1461,29 @@
     "result[1].fruit.equals" = "peaches"
     "result[1].veg.equals" = "peas"
     "result[1].0.equals" = "peaches and peas"
+
+[transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = parse_aws_cloudwatch_log_subscription_message(.message)
+  '''
+[[tests]]
+  name = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+  [tests.input]
+    insert_at = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+    type = "log"
+    [tests.input.log_fields]
+      message = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1600110003794,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+    [[tests.outputs.conditions]]
+      "result.owner.equals" = "CloudwatchLogs"
+      "result.message_type.equals" = "CONTROL_MESSAGE"
+      "result.log_group.equals" = ""
+      "result.log_stream.equals" = ""
+      "result.subscription_filters.length_eq" = 0
+      "result.log_events.length_eq" = 1
+      "result.log_events[0].id.equals" = ""
+      "result.log_events[0].timestamp.equals" = "2020-09-14T19:00:03.794Z"
+      "result.log_events[0].message.equals" = "CWL CONTROL MESSAGE: Checking health of destination Firehose."
