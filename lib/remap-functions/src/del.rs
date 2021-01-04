@@ -10,34 +10,34 @@ impl Function for Del {
 
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
-            keyword: "field",
+            keyword: "path",
             accepts: |_| true,
             required: true,
         }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let field = arguments.required_path("field")?;
+        let path = arguments.required_path("path")?;
 
-        Ok(Box::new(DelFn { field }))
+        Ok(Box::new(DelFn { path }))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DelFn {
-    field: Path,
+    path: Path,
 }
 
 impl DelFn {
     #[cfg(test)]
-    fn new(field: Path) -> Self {
-        Self { field }
+    fn new(path: Path) -> Self {
+        Self { path }
     }
 }
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        match object.remove_and_get(self.field.as_ref(), false) {
+        match object.remove_and_get(self.path.as_ref(), false) {
             Ok(Some(val)) => Ok(val),
             _ => Ok(Value::Null),
         }
