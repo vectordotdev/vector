@@ -35,6 +35,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "lib/codec",
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
