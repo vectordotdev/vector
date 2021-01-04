@@ -11,7 +11,7 @@ impl<'a> InternalEvent for PulsarEncodeEventFailed<'a> {
         error!(
             message = "Event encode failed; dropping event.",
             error = %self.error,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         );
     }
 

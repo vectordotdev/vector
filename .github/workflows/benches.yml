@@ -5,6 +5,18 @@ on:
   push:
     branches:
       - master
+    paths:
+      - ".github/workflows/benches.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain"
   workflow_dispatch:
 
 env:
@@ -19,7 +31,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
+      - uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -68,6 +80,9 @@ jobs:
         with:
           name: "criterion"
           path: "./target/criterion.zip"
+      - name: Upload criterion data to S3
+        run: scripts/upload-benchmarks-s3.sh
+      # note: should run last to flag regressions
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:

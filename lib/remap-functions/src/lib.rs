@@ -52,6 +52,8 @@ mod ok;
 mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_duration")]
@@ -60,6 +62,10 @@ mod parse_duration;
 mod parse_grok;
 #[cfg(feature = "parse_json")]
 mod parse_json;
+#[cfg(feature = "parse_regex")]
+mod parse_regex;
+#[cfg(feature = "parse_regex_all")]
+mod parse_regex_all;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -165,6 +171,8 @@ pub use ok::OK;
 pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_duration")]
@@ -173,6 +181,10 @@ pub use parse_duration::ParseDuration;
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
+#[cfg(feature = "parse_regex")]
+pub use parse_regex::ParseRegex;
+#[cfg(feature = "parse_regex_all")]
+pub use parse_regex_all::ParseRegexAll;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -248,6 +260,10 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "parse_regex")]
+        Box::new(ParseRegex),
+        #[cfg(feature = "parse_regex_all")]
+        Box::new(ParseRegexAll),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "floor")]
@@ -278,6 +294,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
+        #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+        Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]

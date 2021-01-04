@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
@@ -9,6 +8,7 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateError},
+    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -124,7 +124,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -132,8 +132,16 @@ impl SinkConfig for KafkaSinkConfig {
     }
 }
 
+/// Used to determine the options to set in configs, since both Kafka consumers and producers have
+/// unique options, they use the same struct, and the error if given the wrong options.
+#[derive(Debug, PartialOrd, PartialEq)]
+enum KafkaRole {
+    Consumer,
+    Producer,
+}
+
 impl KafkaSinkConfig {
-    fn to_rdkafka(&self) -> crate::Result<ClientConfig> {
+    fn to_rdkafka(&self, kafka_role: KafkaRole) -> crate::Result<ClientConfig> {
         let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
@@ -143,49 +151,71 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
-        if let Some(queue_buffering_max_ms) = self.batch.timeout_secs {
-            // Delay in milliseconds to wait for messages in the producer queue to accumulate before
-            // constructing message batches (MessageSets) to transmit to brokers. A higher value
-            // allows larger and more effective (less overhead, improved compression) batches of
-            // messages to accumulate at the expense of increased message delivery latency.
-            // Type: float
-            let key = "queue.buffering.max.ms";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
+        // All batch options are producer only.
+        if kafka_role == KafkaRole::Producer {
+            if let Some(value) = self.batch.timeout_secs {
+                // Delay in milliseconds to wait for messages in the producer queue to accumulate before
+                // constructing message batches (MessageSets) to transmit to brokers. A higher value
+                // allows larger and more effective (less overhead, improved compression) batches of
+                // messages to accumulate at the expense of increased message delivery latency.
+                // Type: float
+                let key = "queue.buffering.max.ms";
+                if let Some(val) = self.librdkafka_options.get(key) {
+                    return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
                                     The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
-                                    Please delete one.", key, queue_buffering_max_ms, val).into());
+                                    Please delete one.", key, value, val).into());
+                }
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "timeout_secs",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
+                client_config.set(key, &(value * 1000).to_string());
             }
-            client_config.set(key, &(queue_buffering_max_ms * 1000).to_string());
-        }
-        if let Some(batch_num_messages) = self.batch.max_events {
-            // Maximum number of messages batched in one MessageSet. The total MessageSet size is
-            // also limited by batch.size and message.max.bytes.
-            // Type: integer
-            let key = "batch.num.messages";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
+            if let Some(value) = self.batch.max_events {
+                // Maximum number of messages batched in one MessageSet. The total MessageSet size is
+                // also limited by batch.size and message.max.bytes.
+                // Type: integer
+                let key = "batch.num.messages";
+                if let Some(val) = self.librdkafka_options.get(key) {
+                    return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
                                     The config already sets this as `librdkafka_options.batch.num.messages={}`.\
-                                    Please delete one.", key, batch_num_messages, val).into());
+                                    Please delete one.", key, value, val).into());
+                }
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "max_events",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
+                client_config.set(key, &value.to_string());
             }
-            client_config.set(key, &batch_num_messages.to_string());
-        }
-        if let Some(batch_size) = self.batch.max_bytes {
-            // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
-            // framing overhead. This limit is applied after the first message has been added to the
-            // batch, regardless of the first message's size, this is to ensure that messages that
-            // exceed batch.size are produced. The total MessageSet size is also limited by
-            // batch.num.messages and message.max.bytes.
-            // Type: integer
-            let key = "batch.size";
-            if let Some(val) = self.librdkafka_options.get(key) {
-                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
+            if let Some(value) = self.batch.max_bytes {
+                // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
+                // framing overhead. This limit is applied after the first message has been added to the
+                // batch, regardless of the first message's size, this is to ensure that messages that
+                // exceed batch.size are produced. The total MessageSet size is also limited by
+                // batch.num.messages and message.max.bytes.
+                // Type: integer
+                let key = "batch.size";
+                if let Some(val) = self.librdkafka_options.get(key) {
+                    return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
                                     The config already sets this as `librdkafka_options.batch.size={}`.\
-                                    Please delete one.", key, batch_size, val).into());
+                                    Please delete one.", key, value, val).into());
+                }
+                debug!(
+                    librdkafka_option = key,
+                    batch_option = "max_bytes",
+                    value,
+                    "Applying batch option as librdkafka option."
+                );
+                client_config.set(key, &value.to_string());
             }
-            client_config.set(key, &batch_size.to_string());
         }
 
         for (key, value) in self.librdkafka_options.iter() {
+            debug!(option = %key, value = %value, "Setting librdkafka option.");
             client_config.set(key.as_str(), value.as_str());
         }
 
@@ -195,7 +225,8 @@ impl KafkaSinkConfig {
 
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
-        let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
+        let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
+        let producer = producer_config.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer: Arc::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
@@ -250,7 +281,15 @@ impl Sink<Event> for KafkaSink {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
             error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
-        let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
+
+        let timestamp_ms = match &item {
+            Event::Log(log) => log
+                .get(log_schema().timestamp_key())
+                .and_then(|v| v.as_timestamp()),
+            Event::Metric(metric) => metric.timestamp.as_ref(),
+        }
+        .map(|ts| ts.timestamp_millis());
+        let (key, body) = encode_event(item, &self.key_field, &self.encoding);
 
         let seqno = self.seq_head;
         self.seq_head += 1;
@@ -259,10 +298,8 @@ impl Sink<Event> for KafkaSink {
         let flush_signal = Arc::clone(&self.flush_signal);
         self.delivery_fut.push(Box::pin(async move {
             let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
-            if let Some(Value::Timestamp(timestamp)) =
-                item.as_log().get(log_schema().timestamp_key())
-            {
-                record = record.timestamp(timestamp.timestamp_millis());
+            if let Some(timestamp) = timestamp_ms {
+                record = record.timestamp(timestamp);
             }
 
             debug!(message = "Sending event.", count = 1);
@@ -275,7 +312,7 @@ impl Sink<Event> for KafkaSink {
                     Err((error, future_record))
                         if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
                     {
-                        debug!(message = "The rdkafka queue full.", %error, %seqno, rate_limit_secs = 1);
+                        debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
                         let _ = flush_signal.notified().await;
                     }
@@ -332,7 +369,8 @@ impl Sink<Event> for KafkaSink {
 }
 
 async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
-    let client = config.to_rdkafka().unwrap();
+    trace!("Healthcheck started.");
+    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplate)?
         .render_string(&Event::from(""))
@@ -356,7 +394,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
             .map(|_| ())
     })
     .await??;
-
+    trace!("Healthcheck completed.");
     Ok(())
 }
 
@@ -367,19 +405,30 @@ fn encode_event(
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
         .as_ref()
-        .and_then(|f| event.as_log().get(f))
-        .map(|v| v.as_bytes().to_vec())
+        .and_then(|f| match &event {
+            Event::Log(log) => log.get(f).map(|value| value.as_bytes().to_vec()),
+            Event::Metric(metric) => metric
+                .tags
+                .as_ref()
+                .and_then(|tags| tags.get(f))
+                .map(|value| value.clone().into_bytes()),
+        })
         .unwrap_or_default();
 
     encoding.apply_rules(&mut event);
 
-    let body = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
-        Encoding::Text => event
-            .as_log()
-            .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
-            .unwrap_or_default(),
+    let body = match event {
+        Event::Log(log) => match encoding.codec() {
+            Encoding::Json => serde_json::to_vec(&log).unwrap(),
+            Encoding::Text => log
+                .get(log_schema().message_key())
+                .map(|v| v.as_bytes().to_vec())
+                .unwrap_or_default(),
+        },
+        Event::Metric(metric) => match encoding.codec() {
+            Encoding::Json => serde_json::to_vec(&metric).unwrap(),
+            Encoding::Text => metric.to_string().into_bytes(),
+        },
     };
 
     (key, body)
@@ -388,7 +437,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{Metric, MetricKind, MetricValue};
     use std::collections::BTreeMap;
 
     #[test]
@@ -397,7 +446,8 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_text() {
+    fn kafka_encode_event_log_text() {
+        crate::test_util::trace_init();
         let key = "";
         let message = "hello world".to_string();
         let (key_bytes, bytes) = encode_event(
@@ -411,7 +461,8 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_json() {
+    fn kafka_encode_event_log_json() {
+        crate::test_util::trace_init();
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
@@ -432,7 +483,51 @@ mod tests {
     }
 
     #[test]
-    fn kafka_encode_event_apply_rules() {
+    fn kafka_encode_event_metric_text() {
+        let metric = Metric {
+            name: "kafka-metric".to_owned(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 0.0 },
+        };
+        let (key_bytes, bytes) = encode_event(
+            metric.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Text),
+        );
+
+        assert_eq!("", String::from_utf8_lossy(&key_bytes));
+        assert_eq!(metric.to_string(), String::from_utf8_lossy(&bytes));
+    }
+
+    #[test]
+    fn kafka_encode_event_metric_json() {
+        let metric = Metric {
+            name: "kafka-metric".to_owned(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 0.0 },
+        };
+        let (key_bytes, bytes) = encode_event(
+            metric.clone().into(),
+            &None,
+            &EncodingConfig::from(Encoding::Json),
+        );
+
+        assert_eq!("", String::from_utf8_lossy(&key_bytes));
+        assert_eq!(
+            serde_json::to_string(&metric).unwrap(),
+            String::from_utf8_lossy(&bytes)
+        );
+    }
+
+    #[test]
+    fn kafka_encode_event_log_apply_rules() {
+        crate::test_util::trace_init();
         let mut event = Event::from("hello");
         event.as_mut_log().insert("key", "value");
 
@@ -474,6 +569,7 @@ mod integration_test {
 
     #[tokio::test]
     async fn healthcheck() {
+        crate::test_util::trace_init();
         let topic = format!("test-{}", random_string(10));
 
         let config = KafkaSinkConfig {
@@ -494,30 +590,35 @@ mod integration_test {
 
     #[tokio::test]
     async fn kafka_happy_path_plaintext() {
+        crate::test_util::trace_init();
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::None).await;
     }
 
     #[tokio::test]
     async fn kafka_happy_path_gzip() {
+        crate::test_util::trace_init();
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Gzip).await;
     }
 
     #[tokio::test]
     async fn kafka_happy_path_lz4() {
+        crate::test_util::trace_init();
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Lz4).await;
     }
 
     #[tokio::test]
     async fn kafka_happy_path_snappy() {
+        crate::test_util::trace_init();
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Snappy).await;
     }
 
     #[tokio::test]
     async fn kafka_happy_path_zstd() {
+        crate::test_util::trace_init();
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd).await;
     }
 
-    fn kafka_batch_options_overrides(
+    async fn kafka_batch_options_overrides(
         batch: BatchConfig,
         librdkafka_options: HashMap<String, String>,
     ) -> crate::Result<KafkaSink> {
@@ -538,11 +639,15 @@ mod integration_test {
             librdkafka_options,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
+        config.clone().to_rdkafka(KafkaRole::Consumer)?;
+        config.clone().to_rdkafka(KafkaRole::Producer)?;
+        super::healthcheck(config.clone()).await?;
         KafkaSink::new(config, acker)
     }
 
     #[tokio::test]
     async fn kafka_batch_options_max_bytes_errors_on_double_set() {
+        crate::test_util::trace_init();
         assert!(kafka_batch_options_overrides(
             BatchConfig {
                 max_bytes: Some(1000),
@@ -556,11 +661,29 @@ mod integration_test {
             .into_iter()
             .collect()
         )
+        .await
         .is_err())
     }
 
     #[tokio::test]
+    async fn kafka_batch_options_actually_sets() {
+        crate::test_util::trace_init();
+        kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: None,
+                max_events: Some(10),
+                max_size: None,
+                timeout_secs: Some(2),
+            },
+            indexmap::indexmap! {}.into_iter().collect(),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
     async fn kafka_batch_options_max_events_errors_on_double_set() {
+        crate::test_util::trace_init();
         assert!(kafka_batch_options_overrides(
             BatchConfig {
                 max_bytes: None,
@@ -574,11 +697,13 @@ mod integration_test {
             .into_iter()
             .collect()
         )
+        .await
         .is_err())
     }
 
     #[tokio::test]
     async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
+        crate::test_util::trace_init();
         assert!(kafka_batch_options_overrides(
             BatchConfig {
                 max_bytes: None,
@@ -592,11 +717,13 @@ mod integration_test {
             .into_iter()
             .collect()
         )
+        .await
         .is_err())
     }
 
     #[tokio::test]
     async fn kafka_happy_path_tls() {
+        crate::test_util::trace_init();
         kafka_happy_path(
             "localhost:9092",
             None,
@@ -611,6 +738,7 @@ mod integration_test {
 
     #[tokio::test]
     async fn kafka_happy_path_tls_with_key() {
+        crate::test_util::trace_init();
         kafka_happy_path(
             "localhost:9092",
             None,
@@ -625,6 +753,7 @@ mod integration_test {
 
     #[tokio::test]
     async fn kafka_happy_path_sasl() {
+        crate::test_util::trace_init();
         kafka_happy_path(
             "localhost:9093",
             Some(KafkaSaslConfig {

@@ -5,8 +5,10 @@ use crate::{
 };
 use std::{
     cmp::Ordering,
-    collections::{hash_map::DefaultHasher, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
+    mem::discriminant,
+    ops::Deref,
 };
 
 #[derive(Clone, Debug)]
@@ -17,8 +19,9 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(&metric.value).hash(state);
+        discriminant(&metric.value).hash(state);
         metric.name.hash(state);
+        metric.namespace.hash(state);
         metric.kind.hash(state);
 
         if let Some(tags) = &metric.tags {
@@ -47,15 +50,42 @@ impl Hash for MetricEntry {
 
 impl PartialEq for MetricEntry {
     fn eq(&self, other: &Self) -> bool {
-        let mut state = DefaultHasher::new();
-        self.hash(&mut state);
-        let hash1 = state.finish();
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.name == other.name
+            && self.namespace == other.namespace
+            && self.kind == other.kind
+            && self.tags == other.tags
+            && discriminant(&self.value) == discriminant(&other.value)
+            && match (&self.value, &other.value) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => buckets1 == buckets2,
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => quantiles1 == quantiles2,
+                _ => true,
+            }
+    }
+}
 
-        let mut state = DefaultHasher::new();
-        other.hash(&mut state);
-        let hash2 = state.finish();
-
-        hash1 == hash2
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
     }
 }
 
@@ -134,18 +164,19 @@ impl Batch for MetricBuffer {
         } else {
             let item = item.into_metric();
 
-            match &item.value {
-                MetricValue::Counter { value } if item.kind.is_absolute() => {
-                    let new = MetricEntry(item.clone());
+            match (item.kind, &item.value) {
+                (MetricKind::Absolute, MetricValue::Counter { value }) => {
+                    let value = *value;
+                    let item = MetricEntry(item);
                     if let Some(MetricEntry(Metric {
                         value: MetricValue::Counter { value: value0, .. },
                         ..
-                    })) = self.state.get(&new)
+                    })) = self.state.get(&item)
                     {
                         // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
-                            name: item.name.to_string(),
+                            name: item.name.clone(),
                             namespace: item.namespace.clone(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
@@ -162,12 +193,12 @@ impl Batch for MetricBuffer {
                         } else {
                             self.metrics.insert(delta);
                         }
-                        self.state.replace(new);
+                        self.state.replace(item);
                     } else {
-                        self.state.insert(new);
+                        self.state.insert(item);
                     }
                 }
-                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
                     let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
@@ -193,14 +224,13 @@ impl Batch for MetricBuffer {
                         self.metrics.insert(MetricEntry(initial));
                     }
                 }
-                _metric if item.kind.is_absolute() => {
-                    let new = MetricEntry(item);
-                    self.metrics.replace(new);
+                (MetricKind::Absolute, _) => {
+                    self.metrics.replace(MetricEntry(item));
                 }
                 _ => {
-                    let new = MetricEntry(item.clone());
+                    let new = MetricEntry(item);
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
+                        existing.add(&new);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         self.metrics.insert(new);
@@ -298,12 +328,6 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
-        let mut buffer = buffer.to_owned();
-        buffer.sort_by_key(|k| format!("{:?}", k));
-        buffer
-    }
-
     fn rebuffer(events: Vec<Metric>) -> Vec<Vec<Metric>> {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let mut buffer = MetricBuffer::new(batch_size);
@@ -322,7 +346,15 @@ mod test {
         if !buffer.is_empty() {
             result.push(buffer.finish())
         }
+
+        // Sort each batch to provide a predictable result ordering
         result
+            .into_iter()
+            .map(|mut batch| {
+                batch.sort_by_key(|k| format!("{:?}", k));
+                batch
+            })
+            .collect()
     }
 
     #[test]
@@ -342,12 +374,8 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 2);
-        assert_eq!(buffer[0].len(), 6);
-        assert_eq!(buffer[1].len(), 2);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_counter(0, "production", Incremental, 6.0),
                 sample_counter(0, "staging", Incremental, 0.0),
@@ -359,12 +387,14 @@ mod test {
         );
 
         assert_eq!(
-            sorted(&buffer[1].clone()),
+            buffer[1],
             [
                 sample_counter(2, "production", Incremental, 2.0),
                 sample_counter(3, "production", Incremental, 3.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 2);
     }
 
     #[test]
@@ -380,11 +410,8 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_counter(0, "production", Incremental, 0.0),
                 sample_counter(1, "production", Incremental, 2.0),
@@ -392,6 +419,8 @@ mod test {
                 sample_counter(3, "production", Incremental, 6.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -407,11 +436,8 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_gauge(1, Absolute, 2.0),
                 sample_gauge(2, Absolute, 4.0),
@@ -419,6 +445,8 @@ mod test {
                 sample_gauge(4, Absolute, 8.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -438,11 +466,8 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 5);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
@@ -451,6 +476,8 @@ mod test {
                 sample_gauge(5, Absolute, 50.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -466,9 +493,9 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
+        assert_eq!(buffer[0], [sample_set(0, &[0, 1, 2, 3])]);
 
-        assert_eq!(sorted(&buffer[0].clone()), [sample_set(0, &[0, 1, 2, 3])]);
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -484,10 +511,8 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_distribution_histogram(2, 50),
                 sample_distribution_histogram(3, 10),
@@ -495,6 +520,8 @@ mod test {
                 sample_distribution_histogram(5, 10),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -523,16 +550,16 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_histogram(2, Absolute, 1.0, 2, 10.0),
                 sample_aggregated_histogram(3, Absolute, 1.0, 3, 10.0),
                 sample_aggregated_histogram(4, Absolute, 1.0, 4, 10.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -548,15 +575,15 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
                 sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -570,16 +597,16 @@ mod test {
 
         let buffer = rebuffer(events);
 
-        assert_eq!(buffer.len(), 1);
-
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
                 sample_aggregated_summary(2),
                 sample_aggregated_summary(3),
                 sample_aggregated_summary(4),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
