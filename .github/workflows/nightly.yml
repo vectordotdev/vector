@@ -72,6 +72,21 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
+  build-aarch64-unknown-linux-gnu-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default"
+        run: make package-aarch64-unknown-linux-gnu-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
+
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: ubuntu-latest
     steps:
@@ -353,6 +368,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
@@ -375,6 +391,10 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -562,6 +582,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
