@@ -61,15 +61,15 @@ macro_rules! gauge {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("invalid endpoint: {:?}", source))]
+    #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: PgError },
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
     #[snafu(display("failed to create tls connector: {}", source))]
     TlsFailed { source: ErrorStack },
-    #[snafu(display("failed to connect ({}): {:?}", endpoint, source))]
+    #[snafu(display("failed to connect ({}): {}", endpoint, source))]
     ConnectionFailed { source: PgError, endpoint: String },
-    #[snafu(display("failed to get PostgreSQL version ({}): {:?}", endpoint, source))]
+    #[snafu(display("failed to get PostgreSQL version ({}): {}", endpoint, source))]
     VersionFailed { source: PgError, endpoint: String },
 }
 
@@ -144,7 +144,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
         .await?;
 
         let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
+            out.sink_map_err(|error| error!(message = "Error sending postgresql metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
