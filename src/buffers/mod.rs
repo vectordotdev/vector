@@ -1,12 +1,13 @@
-use crate::{config::Resource, Event};
-use futures::{compat::Sink01CompatExt, Sink};
-use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink as Sink01, StartSend, Stream};
+use crate::{config::Resource, sink::BoundedSink, Event};
+use futures::{compat::Sink01CompatExt, Sink, SinkExt, TryStreamExt};
+use futures01::{task::AtomicTask, AsyncSink, Poll, Sink as Sink01, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use tokio::{stream::StreamExt, sync::mpsc};
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -62,13 +63,16 @@ impl BufferInputCloner {
     pub fn get(&self) -> Box<dyn Sink<Event, Error = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
-                let inner = tx
-                    .clone()
-                    .sink_map_err(|error| error!(message = "Sender error.", %error));
+                let inner = BoundedSink::new(tx.clone());
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull { inner }.sink_compat())
+                    Box::new(
+                        DropWhenFull {
+                            inner: inner.compat(),
+                        }
+                        .sink_compat(),
+                    )
                 } else {
-                    Box::new(inner.sink_compat())
+                    Box::new(inner)
                 }
             }
 
@@ -115,7 +119,7 @@ impl BufferConfig {
             } => {
                 let (tx, rx) = mpsc::channel(*max_events);
                 let tx = BufferInputCloner::Memory(tx, *when_full);
-                let rx = Box::new(rx);
+                let rx = Box::new(rx.map(Ok).compat());
                 Ok((tx, rx, Acker::Null))
             }
 

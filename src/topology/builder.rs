@@ -14,7 +14,7 @@ use crate::{
 };
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
-    future, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{Future as Future01, Stream as Stream01};
 use std::{
@@ -119,12 +119,14 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = futures01::sync::mpsc::channel(100);
+        let (input_tx, input_rx) = mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
         let filtered = input_rx
+            .map(Ok)
+            .compat()
             .filter(move |event| filter_event_type(event, input_type))
             .inspect(|_| emit!(EventProcessed));
         let transform = match transform {
