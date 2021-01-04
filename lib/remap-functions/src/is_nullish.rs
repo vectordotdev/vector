@@ -43,7 +43,7 @@ impl Expression for IsNullishFn {
                 }
             }
             Value::Null => Ok(true.into()),
-            _ => Err("input must be a string or null".into()),
+            _ => Ok(false.into()),
         }
     }
 
@@ -52,7 +52,7 @@ impl Expression for IsNullishFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes | Kind::Null)
+            .into_fallible(false)
             .with_constraint(Kind::Boolean)
     }
 }
@@ -68,7 +68,6 @@ mod tests {
                 value: Literal::from("some string").boxed(),
             },
             def: TypeDef {
-                fallible: false,
                 kind: value::Kind::Boolean,
                 ..Default::default()
             },
@@ -79,31 +78,31 @@ mod tests {
                 value: Literal::from(()).boxed(),
             },
             def: TypeDef {
-                fallible: false,
                 kind: value::Kind::Boolean,
                 ..Default::default()
             },
         }
 
+        // Show that non-string/null literal is infallible
         integer_fallible {
             expr: |_| IsNullishFn {
                 value: lit!(42).boxed(),
             },
             def: TypeDef {
-                fallible: true,
                 kind: value::Kind::Boolean,
                 ..Default::default()
             },
         }
 
+        // Show that non-literal is infallible
         array_fallible {
             expr: |_| IsNullishFn {
                 value: array!["foo"].boxed(),
             },
             def: TypeDef {
-                fallible: true,
                 kind: value::Kind::Boolean,
-                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed())
+                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+                ..Default::default()
             },
         }
     ];
