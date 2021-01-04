@@ -4557,10 +4557,9 @@ dependencies = [
 
 [[package]]
 name = "portpicker"
-version = "0.1.0"
-source = "git+https://github.com/timberio/portpicker-rs?rev=d15829e906516720881584ff3301a0dd04218fbb#d15829e906516720881584ff3301a0dd04218fbb"
+version = "1.0.0"
 dependencies = [
- "rand 0.7.3",
+ "rand 0.8.0",
 ]
 
 [[package]]
