@@ -137,15 +137,15 @@ impl Batch for LokiBuffer {
         let streams_json = self
             .streams
             .into_iter()
-            .map(|(stream, mut events)| {
+            .map(|(labels, mut events)| {
                 // Sort events by timestamp
                 events.sort_by_key(|e| e.timestamp);
 
-                let stream = stream.into_iter().collect::<HashMap<_, _>>();
+                let labels = labels.into_iter().collect::<HashMap<_, _>>();
                 let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
 
                 (
-                    to_raw_value(&stream).expect("JSON encoding should never fail"),
+                    to_raw_value(&labels).expect("JSON encoding should never fail"),
                     events,
                 )
             })

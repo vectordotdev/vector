@@ -55,6 +55,13 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum OurOfOrderAction {
+    Drop,
+    RewriteTimestamp,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum Encoding {
@@ -158,8 +165,10 @@ impl HttpSink for LokiConfig {
             if let Ok(value) = template.render_string(&event) {
                 labels.push((key.clone(), value));
             }
+        }
 
-            if self.remove_label_fields {
+        if self.remove_label_fields {
+            for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
                         event.as_mut_log().remove(&field);
