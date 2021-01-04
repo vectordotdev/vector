@@ -15,16 +15,13 @@ remap: functions: is_nullish: {
 		Determines whether the provided value should be considered "nullish," that is, to indicate
 		the absence of a meaningful value. The following are considered nullish in VRL:
 
-		* An empty string (`""`)
-		* A string that only contains whitespace
-		* A single dash (`"-"`)
-		* Newline (`"\n"`)
-		* Carriage return (`"\r"`)
 		* `null`
+		* A single dash (`"-"`)
+		* Any string that contains only whitespace characters as defined by the the [Unicode
+		  definition of the `White_Space` property](\(urls.unicode_whitespace)).
 
 		If your use case requires a different conception of nullish, we recommend using more
-		specific checks. If only empty string is considered nullish in your domain, for example,
-		then a check like `.field == ""` would suffice.
+		specific checks.
 		"""#
 	examples: [
 		{
