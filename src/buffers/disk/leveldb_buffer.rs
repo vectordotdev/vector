@@ -262,7 +262,7 @@ impl Reader {
         if self.uncompacted_size > 0 {
             self.uncompacted_size = 0;
 
-            debug!("Compacting disk buffer");
+            debug!("Compacting disk buffer.");
             self.db.compact(&Key(0), &Key(self.delete_offset));
         }
     }
