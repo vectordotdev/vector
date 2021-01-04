@@ -23,7 +23,7 @@ default = [
 
 aws_cloudwatch_logs_subscription = [
     "chrono/serde",
-    "serde",
+    "serde/derive",
 ]
 
 conversion = [
