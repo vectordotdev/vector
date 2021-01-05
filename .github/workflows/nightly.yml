@@ -287,6 +287,10 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
     steps:
       - uses: actions/checkout@v1
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          sudo: false
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
         shell: bash
