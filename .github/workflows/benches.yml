@@ -50,7 +50,10 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: |
+          echo $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          cat $GITHUB_PATH
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
       - run: bash scripts/environment/prepare.sh
