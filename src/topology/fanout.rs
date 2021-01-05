@@ -192,7 +192,7 @@ impl Sink<Event> for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{test_util::collect_ready, Event};
+    use crate::{sink::BoundedSink, test_util::collect_ready, Event};
     use futures::{stream, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
@@ -614,7 +614,7 @@ mod tests {
 
     fn channel<T>(capacity: usize) -> (BoundedSink<T>, mpsc::Receiver<T>) {
         let (sender, recv) = mpsc::channel(capacity);
-        (BoundedSink { sender }, recv)
+        (BoundedSink::new(sender), recv)
     }
 
     struct UnboundedSink<T> {
@@ -628,29 +628,6 @@ mod tests {
         }
         fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
             self.sender.send(item)
-        }
-        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-        fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-    }
-
-    struct BoundedSink<T> {
-        sender: mpsc::Sender<T>,
-    }
-
-    impl<T> Sink<T> for BoundedSink<T> {
-        type Error = ();
-        fn poll_ready(
-            mut self: Pin<&mut Self>,
-            cx: &mut Context<'_>,
-        ) -> Poll<Result<(), Self::Error>> {
-            self.sender.poll_ready(cx).map_err(|_| ())
-        }
-        fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-            self.sender.try_send(item).map_err(|_| ())
         }
         fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))

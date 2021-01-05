@@ -21,12 +21,13 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
-use futures01::{Future, Stream as Stream01};
+use futures::{compat::Future01CompatExt, future, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures01::Future;
 use std::{
     collections::{HashMap, HashSet},
     future::ready,
     panic::AssertUnwindSafe,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
 use tokio::{
@@ -40,7 +41,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
     buffers::BufferInputCloner,
-    Arc<Mutex<Option<Box<dyn Stream01<Item = Event, Error = ()> + Send>>>>,
+    Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
     buffers::Acker,
 );
 
