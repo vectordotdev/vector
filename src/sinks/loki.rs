@@ -111,8 +111,10 @@ impl SinkConfig for LokiConfig {
             ..self.clone()
         };
 
+        let sink = LokiSink::new(config.clone());
+
         let sink = PartitionHttpSink::new(
-            config.clone(),
+            sink,
             PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
@@ -140,8 +142,35 @@ pub struct PartitionKey {
     tenant_id: Option<String>,
 }
 
+impl LokiSink {
+    fn new(config: LokiConfig) -> Self {
+        Self {
+            endpoint: config.endpoint,
+            encoding: config.encoding,
+            tenant_id: config.tenant_id,
+            labels: config.labels,
+            remove_label_fields: config.remove_label_fields,
+            remove_timestamp: config.remove_timestamp,
+            auth: config.auth,
+        }
+    }
+}
+
+struct LokiSink {
+    endpoint: UriSerde,
+    encoding: EncodingConfig<Encoding>,
+
+    tenant_id: Option<Template>,
+    labels: HashMap<String, Template>,
+
+    remove_label_fields: bool,
+    remove_timestamp: bool,
+
+    auth: Option<Auth>,
+}
+
 #[async_trait::async_trait]
-impl HttpSink for LokiConfig {
+impl HttpSink for LokiSink {
     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
@@ -276,12 +305,13 @@ mod tests {
         "#,
         )
         .unwrap();
+        let sink = LokiSink::new(config);
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = config.encode_event(e1).unwrap().into_parts().0;
+        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -312,12 +342,13 @@ mod tests {
         "#,
         )
         .unwrap();
+        let sink = LokiSink::new(config);
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = config.encode_event(e1).unwrap().into_parts().0;
+        let record = sink.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
