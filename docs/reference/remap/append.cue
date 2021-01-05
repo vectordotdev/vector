@@ -9,7 +9,7 @@ remap: functions: append: {
 			type: ["array"]
 		},
 		{
-			name:        "item"
+			name:        "items"
 			description: "The items to append"
 			required:    true
 			type: ["array"]
@@ -18,25 +18,9 @@ remap: functions: append: {
 	return: ["array"]
 	category: "Array"
 	description: """
-		Adds the specified array to the end of an array and returns the resulting array. The items
-		can be of any VRL type and are added even if items with the same value are already present
-		in the array.
-
-		The `append` function does *not* change the array in place. In this example, the `append`
-		function would return an array with `apple`, `orange`, and `banana`, but the value of
-		`fruits` would be unchanged:
-
-		```js
-		.fruits = ["apple", "orange"]
-		append(.fruits, ["banana"])
-		```
-
-		In order to change the value of `fruits`, you would need to store the resulting array in
-		the field:
-
-		```js
-		.fruits = append(.fruits, ["banana"])
-		```
+		Adds each item from an array to the end of another array. The expression
+		`append([1, 2, 3], [4, 5, 6])`, for example, would produce the array `[1, 2, 3, 4, 5, 6]`.
+		The items in both arrays can be of any VRL type.
 		"""
 	examples: [
 		{
