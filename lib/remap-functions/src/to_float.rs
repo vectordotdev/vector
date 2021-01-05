@@ -116,10 +116,7 @@ mod tests {
     #[test]
     fn to_float() {
         let cases = vec![
-            (
-                Ok(Value::Float(20.5)),
-                ToFloatFn::new(lit!(20.5).boxed()),
-            ),
+            (Ok(Value::Float(20.5)), ToFloatFn::new(lit!(20.5).boxed())),
             (
                 Ok(Value::Float(20.0)),
                 ToFloatFn::new(Literal::from(value!(20)).boxed()),
