@@ -77,7 +77,8 @@ jobs:
           mkdir -p target/criterion
           # build benchmarks on all CPUs, including isolated benchmarking CPU
           taskset -c "0-$(nproc)" make bench CARGO_BENCH_FLAGS="--no-run"
-          # run benchmarks on isolated CPU
+          # run benchmarks on isolated CPU and with address randomization
+          # disabled
           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
