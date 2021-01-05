@@ -192,4 +192,10 @@ fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
     stream::iter_ok(random_lines(size)).map(Event::from)
 }
 
-criterion_group!(benches, benchmark_buffers);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_buffers
+);
