@@ -51,6 +51,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: |
+          env
+          echo "$HOME"
           echo $GITHUB_PATH
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           cat $GITHUB_PATH
