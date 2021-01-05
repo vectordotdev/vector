@@ -1,6 +1,9 @@
 use crate::{config::Resource, sink::BoundedSink, Event};
-use futures::{compat::Sink01CompatExt, Sink, TryStreamExt};
-use futures01::{task::AtomicTask, Stream};
+use futures::{
+    compat::{Sink01CompatExt, Stream01CompatExt},
+    Sink, Stream,
+};
+use futures01::task::AtomicTask;
 use serde::{Deserialize, Serialize};
 use std::{
     ops::{Deref, DerefMut},
@@ -103,7 +106,7 @@ impl BufferConfig {
     ) -> Result<
         (
             BufferInputCloner,
-            Box<dyn Stream<Item = Event, Error = ()> + Send>,
+            Box<dyn Stream<Item = Event> + Send>,
             Acker,
         ),
         String,
@@ -115,7 +118,7 @@ impl BufferConfig {
             } => {
                 let (tx, rx) = mpsc::channel(*max_events);
                 let tx = BufferInputCloner::Memory(tx, *when_full);
-                let rx = Box::new(rx.map(Ok).compat());
+                let rx = Box::new(rx);
                 Ok((tx, rx, Acker::Null))
             }
 
@@ -132,7 +135,11 @@ impl BufferConfig {
                 let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
                     .map_err(|error| error.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
-                let rx = Box::new(rx);
+                let rx = Box::new(
+                    rx.compat()
+                        .take_while(|event| event.is_ok())
+                        .map(|event| event.unwrap()),
+                );
                 Ok((tx, rx, acker))
             }
         }

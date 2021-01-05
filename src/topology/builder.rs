@@ -13,8 +13,7 @@ use crate::{
     Pipeline,
 };
 use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
+    compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{Future as Future01, Stream as Stream01};
 use std::{
@@ -183,7 +182,7 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", name, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
             }
         };
 
@@ -216,12 +215,9 @@ pub async fn build_pieces(
                 .expect("Task started but input has been taken.");
 
             sink.run(
-                (&mut rx)
-                    .filter(|event| filter_event_type(event, input_type))
-                    .compat()
-                    .take_while(|e| ready(e.is_ok()))
-                    .take_until_if(tripwire)
-                    .map(|x| x.unwrap()),
+                rx.by_ref()
+                    .filter(|event| ready(filter_event_type(event, input_type)))
+                    .take_until_if(tripwire),
             )
             .await
             .map(|_| {
