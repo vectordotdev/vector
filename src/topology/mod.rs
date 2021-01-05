@@ -22,14 +22,17 @@ use crate::{
     trigger::DisabledTrigger,
 };
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
-use futures01::{sync::mpsc, Future, Stream as Stream01};
+use futures01::{Future, Stream as Stream01};
 use std::{
     collections::{HashMap, HashSet},
     future::ready,
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
-use tokio::time::{delay_until, interval, Duration, Instant};
+use tokio::{
+    sync::mpsc,
+    time::{delay_until, interval, Duration, Instant},
+};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
@@ -58,7 +61,7 @@ pub async fn start_validated(
     diff: ConfigDiff,
     mut pieces: Pieces,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    let (abort_tx, abort_rx) = mpsc::unbounded();
+    let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
@@ -623,7 +626,7 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                    let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
                 }
             }
         }
@@ -637,7 +640,7 @@ impl RunningTopology {
                 // Sink may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(sink_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
                         .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
@@ -647,7 +650,7 @@ impl RunningTopology {
                 // Transform may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(transform_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(
+                        .send(fanout::ControlMessage::Add(
                             transform_name.clone(),
                             input.get(),
                         ))
@@ -664,8 +667,8 @@ impl RunningTopology {
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[&input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[&input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -695,19 +698,19 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
             }
         }
 
         for input in inputs_to_add {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+            let _ = self.outputs[input].send(fanout::ControlMessage::Replace(
                 name.to_string(),
                 Some(tx.get()),
             ));
@@ -730,8 +733,8 @@ impl RunningTopology {
 
         for input in old_inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Replace(name.to_string(), None));
         }
     }
 
@@ -751,7 +754,7 @@ fn handle_errors<T>(
         .flatten()
         .or_else(move |()| {
             error!("An error occurred that vector couldn't handle.");
-            let _ = abort_tx.unbounded_send(());
+            let _ = abort_tx.send(());
             Err(())
         })
 }
@@ -828,7 +831,7 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology, temp_dir, wait_for_tcp};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::StreamExt;
     use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
     use tokio::time::delay_for;
@@ -1092,8 +1095,7 @@ mod reload_tests {
         old_address: SocketAddr,
         new_address: SocketAddr,
     ) {
-        let (mut topology, crash) = start_topology(old_config, false).await;
-        let mut crash = crash.compat();
+        let (mut topology, mut crash) = start_topology(old_config, false).await;
 
         // Wait for sink to come online
         wait_for_tcp(old_address).await;

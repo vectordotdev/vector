@@ -44,8 +44,8 @@ mod tests {
             (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
-                Ok(()),
-                Err(r#"remap error: value error: expected "boolean", got "string""#),
+                Err(r#"remap error: if-statement error: conditional error: expected "boolean", got "string""#),
+                Ok(().into()),
             ),
             (r#".foo = (null || "bar")"#, Ok(()), Ok("bar".into())),
             (r#"!false"#, Ok(()), Ok(true.into())),

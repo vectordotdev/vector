@@ -72,8 +72,8 @@ struct RedactFn {
 
 impl Expression for RedactFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
-        let mut input = String::from_utf8_lossy(&bytes).into_owned();
+        let value = self.value.execute(state, object)?;
+        let mut input = value.try_bytes_utf8_lossy()?.into_owned();
 
         for filter in &self.filters {
             match filter {

@@ -13,8 +13,8 @@ use crate::{
     Pipeline,
 };
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
-    future, FutureExt, StreamExt, TryFutureExt,
+    compat::{Future01CompatExt, Stream01CompatExt},
+    future, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use futures01::{Future as Future01, Stream as Stream01};
 use std::{
@@ -79,10 +79,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
-            .map(Ok)
-            .forward(output.sink_compat())
-            .map_ok(|_| TaskOutput::Source);
+        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -142,12 +139,12 @@ pub async fn build_pieces(
                     })
                     .flatten()
                     .boxed();
-                transformed.forward(output)
+                transformed.forward(output.compat())
             }
             Transform::Task(t) => {
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
                     t.transform(Box::new(filtered));
-                transformed.forward(output)
+                transformed.forward(output.compat())
             }
         }
         .map(|_| {

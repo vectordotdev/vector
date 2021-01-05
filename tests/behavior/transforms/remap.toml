@@ -1487,3 +1487,32 @@
       "result.log_events[0].id.equals" = ""
       "result.log_events[0].timestamp.equals" = "2020-09-14T19:00:03.794Z"
       "result.log_events[0].message.equals" = "CWL CONTROL MESSAGE: Checking health of destination Firehose."
+
+[transforms.remap_function_parse_key_value]
+  inputs = []
+  type = "remap"
+  source = '''
+    . = parse_key_value(.message, key_value_delimiter = "=", field_delimiter = " ")
+  '''
+[[tests]]
+  name = "remap_function_parse_key_value"
+  [tests.input]
+    insert_at = "remap_function_parse_key_value"
+    type = "log"
+    [tests.input.log_fields]
+      message = '''
+	path="/cart_link" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd="108.30.189.26" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https
+	'''
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_key_value"
+    [[tests.outputs.conditions]]
+    "path.equals" = "/cart_link"
+    "host.equals" = "lumberjack-store.herokuapp.com"
+    "request_id.equals" = "6ad70ccd-40db-477c-afce-f7e3719a886b"
+    "fwd.equals" = "108.30.189.26"
+    "dyno.equals" = "web.1"
+    "connect.equals" = "0ms"
+    "service.equals" = "73ms"
+    "status.equals" = "304"
+    "bytes.equals" = "656"
+    "protocol.equals" = "https"
