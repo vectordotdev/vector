@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{path, state, Expression, Object, Result, TypeDef, Value};
+use crate::{path, state, value::Kind, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -74,10 +74,17 @@ impl Expression for Path {
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        state.path_query_type(self).cloned().unwrap_or(TypeDef {
+        let mut type_def = state.path_query_type(self).cloned().unwrap_or(TypeDef {
             fallible: true,
             ..Default::default()
-        })
+        });
+
+        // Root path is always a map
+        if self.path.is_root() {
+            type_def.kind = Kind::Map;
+        }
+
+        type_def
     }
 }
 
@@ -131,6 +138,15 @@ mod tests {
             expr: |_| Path::from("foo"),
             def: TypeDef {
                 fallible: true,
+                ..Default::default()
+            },
+        }
+
+        root_path {
+            expr: |_| Path::from(path::Path::root()),
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Map,
                 ..Default::default()
             },
         }
