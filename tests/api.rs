@@ -970,7 +970,7 @@ mod tests {
             }
 
             // Now use the last 'after' cursor as the 'before'
-            for i in 0..2 {
+            for i in 0..3 {
                 let components = client
                     .components_connection_query(None, cursor, None, Some(2))
                     .await
@@ -986,13 +986,19 @@ mod tests {
                 assert_eq!(
                     (page_info.has_previous_page, page_info.has_next_page),
                     match i {
-                        1 => (false, true),
-                        _ => (true, true),
+                        0 => (true, true),
+                        _ => (false, true),
                     }
                 );
 
-                // The # of `edges` results should be 2
-                assert_eq!(components.edges.iter().flatten().count(), 2);
+                // The # of `edges` results should be 2, and zero for the last iteration
+                assert_eq!(
+                    components.edges.iter().flatten().count(),
+                    match i {
+                        2 => 0,
+                        _ => 2,
+                    }
+                );
 
                 // Set the before cursor for the next iteration
                 cursor = page_info.start_cursor;
