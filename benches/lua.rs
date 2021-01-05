@@ -193,5 +193,5 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = bench_field_filter
+    targets = bench_add_fields, bench_field_filter
 );
