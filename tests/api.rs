@@ -895,31 +895,31 @@ mod tests {
             let conf = r#"
                 [api]
                   enabled = true
-    
+
                 [sources.gen1]
                   type = "generator"
                   format = "shuffle"
                   lines = ["1"]
                   interval = 0.1
-                  
+
                 [sources.gen2]
                   type = "generator"
                   format = "shuffle"
                   lines = ["2"]
                   interval = 0.1
-                  
+
                 [sources.gen3]
                   type = "generator"
                   format = "shuffle"
                   lines = ["3"]
                   interval = 0.1
-                  
+
                 [sources.gen4]
                   type = "generator"
                   format = "shuffle"
                   lines = ["4"]
                   interval = 0.1
-    
+
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["gen1", "gen2", "gen3", "gen4"]
