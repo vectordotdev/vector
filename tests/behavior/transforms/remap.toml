@@ -46,44 +46,6 @@
       "b[1].equals" = "<null>"
       "b[2].equals" = "two"
 
-[transforms.push_to_array]
-  inputs = []
-  type = "remap"
-  source = """
-    .fruits = push(.fruits, .fruit)
-  """
-[[tests]]
-  name = "push_to_array"
-  [tests.input]
-    insert_at = "push_to_array"
-    type = "log"
-    [tests.input.log_fields]
-      fruits = ["apple", "orange", "banana"]
-      fruit = "mango"
-  [[tests.outputs]]
-    extract_from = "push_to_array"
-    [[tests.outputs.conditions]]
-      "fruits.equals" = ["apple", "orange", "banana", "mango"]
-
-[transforms.append_to_array]
-  inputs = []
-  type = "remap"
-  source = """
-    .fruits = append(.fruits1, .fruits2)
-  """
-[[tests]]
-  name = "append_to_array"
-  [tests.input]
-    insert_at = "append_to_array"
-    type = "log"
-    [tests.input.log_fields]
-      fruits1 = ["apple", "orange"]
-      fruits2 = ["banana", "mango"]
-  [[tests.outputs]]
-    extract_from = "append_to_array"
-    [[tests.outputs.conditions]]
-      "fruits.equals" = ["apple", "orange", "banana", "mango"]
-
 [transforms.remap_arithmetic]
   inputs = []
   type = "remap"
@@ -1499,3 +1461,41 @@
     "result[1].fruit.equals" = "peaches"
     "result[1].veg.equals" = "peas"
     "result[1].0.equals" = "peaches and peas"
+
+[transforms.remap_function_push_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .fruits = push(.fruits, .fruit)
+  """
+[[tests]]
+  name = "remap_function_push_to_array"
+  [tests.input]
+    insert_at = "remap_function_push_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits = ["apple", "orange", "banana"]
+      fruit = "mango"
+  [[tests.outputs]]
+    extract_from = "remap_function_push_to_array"
+    [[tests.outputs.conditions]]
+      "fruits.equals" = ["apple", "orange", "banana", "mango"]
+
+[transforms.remap_function_append_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .fruits = append(.fruits1, .fruits2)
+  """
+[[tests]]
+  name = "append_to_array"
+  [tests.input]
+    insert_at = "append_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits1 = ["apple", "orange"]
+      fruits2 = ["banana", "mango"]
+  [[tests.outputs]]
+    extract_from = "append_to_array"
+    [[tests.outputs.conditions]]
+      "fruits.equals" = ["apple", "orange", "banana", "mango"]
