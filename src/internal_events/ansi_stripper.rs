@@ -11,7 +11,7 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
         debug!(
             message = "Field does not exist.",
             field = %self.field,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -30,7 +30,7 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
         debug!(
             message = "Field value must be a string.",
             field = %self.field,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -51,7 +51,7 @@ impl InternalEvent for ANSIStripperFailed<'_> {
             message = "Could not strip ANSI escape sequences.",
             field = %self.field,
             error = ?self.error,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
     }
 

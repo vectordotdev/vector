@@ -9,7 +9,7 @@ pub(crate) enum SocketMode {
 }
 
 impl SocketMode {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
             Self::Udp => "udp",

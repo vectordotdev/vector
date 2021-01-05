@@ -132,7 +132,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(&self) -> &'static str {
+    fn content_type(self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
@@ -407,7 +407,7 @@ fn encode_event(
             warn!(
                 message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
             );
         })
         .ok()?;

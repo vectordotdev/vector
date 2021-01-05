@@ -15,7 +15,7 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
             msg_count = %self.msg_count,
             frame_id = %self.frame_id,
             drain_token = %self.drain_token,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -34,7 +34,7 @@ impl InternalEvent for HerokuLogplexRequestReadError {
         error!(
             message = "Error reading request body.",
             error = ?self.error,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 

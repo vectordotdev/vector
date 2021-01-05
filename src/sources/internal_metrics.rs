@@ -103,10 +103,10 @@ mod tests {
         gauge!("foo", 2.0);
         counter!("bar", 3);
         counter!("bar", 4);
-        histogram!("baz", 5);
-        histogram!("baz", 6);
-        histogram!("quux", 7, "host" => "foo");
-        histogram!("quux", 8, "host" => "foo");
+        histogram!("baz", 5.0);
+        histogram!("baz", 6.0);
+        histogram!("quux", 7.0, "host" => "foo");
+        histogram!("quux", 8.0, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 

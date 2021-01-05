@@ -23,7 +23,7 @@ remap: functions: merge: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "Map"
 	description: #"""
 		Merges the `from` map provided into the `to` path specified, which must specify an existing map.
 		If a key exists in both maps, the field from the `from` map is chosen.

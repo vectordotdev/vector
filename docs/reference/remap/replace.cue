@@ -30,7 +30,7 @@ remap: functions: replace: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Replaces any matches of pattern with the provided string. Pattern can be either a fixed string or a regular expression.
 

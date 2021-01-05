@@ -11,7 +11,7 @@ impl InternalEvent for GrokParserFailedMatch<'_> {
         warn!(
             message = "Grok pattern failed to match.",
             field = &super::truncate_string_at(self.value, 60)[..],
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 
@@ -51,7 +51,7 @@ impl<'a> InternalEvent for GrokParserConversionFailed<'a> {
             message = "Could not convert types.",
             name = %self.name,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 

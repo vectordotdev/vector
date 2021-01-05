@@ -22,24 +22,34 @@ impl Function for ParseGrok {
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
+            Parameter {
+                keyword: "remove_empty",
+                accepts: |v| matches!(v, Value::Boolean(_)),
+                required: false,
+            },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        let patternbytes = arguments
+        let pattern = arguments
             .required_literal("pattern")?
             .as_value()
             .clone()
-            .try_bytes()?;
-
-        let patternstr = String::from_utf8_lossy(&patternbytes).into_owned();
+            .try_bytes_utf8_lossy()?
+            .into_owned();
 
         let mut grok = grok::Grok::with_patterns();
-        let pattern = Arc::new(grok.compile(&patternstr, true).map_err(|e| e.to_string())?);
+        let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| e.to_string())?);
 
-        Ok(Box::new(ParseGrokFn { value, pattern }))
+        let remove_empty = arguments.optional("remove_empty").map(Expr::boxed);
+
+        Ok(Box::new(ParseGrokFn {
+            value,
+            pattern,
+            remove_empty,
+        }))
     }
 }
 
@@ -48,18 +58,27 @@ struct ParseGrokFn {
     value: Box<dyn Expression>,
     // Wrapping pattern in an Arc, as cloning the pattern could otherwise be expensive.
     pattern: Arc<grok::Pattern>,
+    remove_empty: Option<Box<dyn Expression>>,
 }
 
 impl ParseGrokFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, pattern: String) -> Result<Self> {
+    fn new(
+        value: Box<dyn Expression>,
+        pattern: String,
+        remove_empty: Option<Box<dyn Expression>>,
+    ) -> Result<Self> {
         let mut grok = grok::Grok::with_patterns();
         let pattern = Arc::new(
             grok.compile(&pattern, true)
                 .map_err(|e| Error::from(e.to_string()))?,
         );
 
-        Ok(Self { value, pattern })
+        Ok(Self {
+            value,
+            pattern,
+            remove_empty,
+        })
     }
 }
 
@@ -67,13 +86,19 @@ impl Expression for ParseGrokFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
+        let remove_empty = match &self.remove_empty {
+            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            None => false,
+        };
 
         match self.pattern.match_against(&value) {
             Some(matches) => {
                 let mut result = BTreeMap::new();
 
                 for (name, value) in matches.iter() {
-                    result.insert(name.to_string(), Value::from(value));
+                    if !remove_empty || !value.is_empty() {
+                        result.insert(name.to_string(), Value::from(value));
+                    }
                 }
 
                 Ok(Value::from(result))
@@ -102,7 +127,8 @@ mod test {
                 grok::Grok::with_patterns()
                     .compile("%{LOGLEVEL:level}", true)
                     .unwrap()
-            )
+            ),
+            remove_empty: Some(Literal::from(false).boxed()),
         },
         def: TypeDef {
             kind: value::Kind::Array,
@@ -149,6 +175,7 @@ mod test {
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                         .to_string(),
+                    None,
                 )
                 .unwrap(),
             ),
@@ -159,6 +186,7 @@ mod test {
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                         .to_string(),
+                    None,
                 )
                 .unwrap(),
             ),
@@ -173,6 +201,34 @@ mod test {
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                         .to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                map!["message": "2020-10-02T23:22:12.223222Z"],
+                Ok(Value::from(
+                    map!["timestamp": "2020-10-02T23:22:12.223222Z",
+                         "level": ""
+                    ],
+                )),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                map!["message": "2020-10-02T23:22:12.223222Z"],
+                Ok(Value::from(
+                    map!["timestamp": "2020-10-02T23:22:12.223222Z",
+                    ],
+                )),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
+                    Some(Literal::from(true).boxed()),
                 )
                 .unwrap(),
             ),

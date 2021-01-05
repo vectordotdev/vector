@@ -21,6 +21,24 @@ td="$(mktemp -d)"
 cp -av "target/artifacts/." "$td"
 ls "$td"
 
+td_nightly="$(mktemp -d)"
+cp -av "target/artifacts/." "$td_nightly"
+
+for f in "$td_nightly"/*; do
+    a="$(echo "$f" | sed -r -e "s/$VERSION/nightly/")"
+    mv "$f" "$a"
+done
+ls "$td_nightly"
+
+td_latest="$(mktemp -d)"
+cp -av "target/artifacts/." "$td_latest"
+
+for f in "$td_latest"/*; do
+    a="$(echo "$f" | sed -r -e "s/$VERSION/latest/")"
+    mv "$f" "$a"
+done
+ls "$td_latest"
+
 #
 # A helper function for verifying a published artifact.
 #
@@ -38,27 +56,27 @@ verify_artifact() {
 if [[ "$CHANNEL" == "nightly" ]]; then
   # Add nightly files with the $DATE for posterity
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$DATE"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
+  aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Add "latest" nightly files
   echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/latest"
   aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/latest"
-  aws s3 cp "$td" "s3://packages.timber.io/vector/nightly/latest" --recursive --sse --acl public-read
+  aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/latest" --recursive --sse --acl public-read
   echo "Uploaded archives"
 
   # Verify that the files exist and can be downloaded
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/$DATE/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/nightly/$DATE/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
+    "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
+    "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
+    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
@@ -66,24 +84,34 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   # shellcheck disable=SC2001
   VERSION_MAJOR_X="$(echo "$VERSION" | sed 's/\.[0-9]*\.[0-9]*$/.X/g')"
 
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
     # Upload the specific version
     echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
     aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
   done
-  echo "Uploaded archives"
+
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
+    # Delete anything that isn't the current version
+    echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
+    aws s3 rm "s3://packages.timber.io/vector/$i/" --exclude "*$VERSION_EXACT*"
+    echo "Deleted old versioned artifacts"
+  done
+
+  echo "Uploading artifacts to s3://packages.timber.io/vector/latest/"
+  aws s3 cp "$td_latest" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
+  echo "Uploaded latest archives"
 
   # Verify that the files exist and can be downloaded
   sleep "$VERIFY_TIMEOUT"
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
     verify_artifact \
       "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
       "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   done
   verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
+    "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td_latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #
@@ -91,3 +119,5 @@ fi
 #
 
 rm -rf "$td"
+rm -rf "$td_nightly"
+rm -rf "$td_latest"

@@ -9,7 +9,7 @@ components: transforms: coercer: {
 
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
 	}
 

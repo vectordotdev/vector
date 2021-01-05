@@ -40,16 +40,16 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    fn default_message_key() -> String {
+    pub fn default_message_key() -> String {
         String::from("message")
     }
-    fn default_timestamp_key() -> String {
+    pub fn default_timestamp_key() -> String {
         String::from("timestamp")
     }
-    fn default_host_key() -> String {
+    pub fn default_host_key() -> String {
         String::from("host")
     }
-    fn default_source_type_key() -> String {
+    pub fn default_source_type_key() -> String {
         String::from("source_type")
     }
 

@@ -6,7 +6,7 @@ pub mod proto {
     pub use metric_metadata::MetricType;
 
     impl MetricType {
-        pub fn as_str(&self) -> &'static str {
+        pub fn as_str(self) -> &'static str {
             match self {
                 MetricType::Counter => "counter",
                 MetricType::Gauge => "gauge",

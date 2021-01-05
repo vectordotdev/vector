@@ -193,6 +193,9 @@ pub enum Error {
     #[error("unable to integer divide value type {0} by {1}")]
     IntDiv(Kind, Kind),
 
+    #[error("unable to divide by zero")]
+    DivideByZero,
+
     #[error("unable to add value type {1} to {0}")]
     Add(Kind, Kind),
 
@@ -447,6 +450,13 @@ macro_rules! value_impl {
             pub fn unwrap_null(self) -> () {
                 self.try_null().expect("null")
             }
+
+            pub fn try_bytes_utf8_lossy<'a>(&'a self) -> Result<std::borrow::Cow<'a, str>, Error> {
+                match self.as_bytes() {
+                    Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
+                    None => Err(Error::Expected(Kind::Bytes, self.kind())),
+                }
+            }
         }
     };
 }
@@ -489,9 +499,15 @@ impl Value {
     pub fn try_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Div(self.kind(), rhs.kind());
 
+        let rhs = f64::try_from(&rhs).map_err(|_| err())?;
+
+        if rhs == 0.0 {
+            return Err(Error::DivideByZero);
+        }
+
         let value = match self {
-            Value::Integer(lhv) => (lhv as f64 / f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv / f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv as f64 / rhs).into(),
+            Value::Float(lhv) => (lhv / rhs).into(),
             _ => return Err(err()),
         };
 
@@ -501,9 +517,15 @@ impl Value {
     pub fn try_int_div(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::IntDiv(self.kind(), rhs.kind());
 
+        let rhs = i64::try_from(&rhs).map_err(|_| err())?;
+
+        if rhs == 0 {
+            return Err(Error::DivideByZero);
+        }
+
         let value = match &self {
-            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (*lhv as i64 / i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv / rhs).into(),
+            Value::Float(lhv) => (*lhv as i64 / rhs).into(),
             _ => return Err(err()),
         };
 
@@ -984,21 +1006,25 @@ impl Value {
 
         let mut handle_field = |field: &Field, new| {
             let key = field.as_str().to_owned();
-            let mut map = BTreeMap::default();
+
+            // `handle_field` is used to update map values, if the current value
+            // isn't a map, we need to make it one.
+            if !matches!(self, Value::Map(_)) {
+                *self = BTreeMap::default().into()
+            }
+
+            let map = match self {
+                Value::Map(map) => map,
+                _ => unreachable!(),
+            };
 
             match rest.first() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
-                None => match self {
-                    Value::Map(map) => {
-                        map.insert(key, new);
-                        return;
-                    }
-                    _ => {
-                        map.insert(key, new);
-                        return *self = map.into();
-                    }
-                },
+                None => {
+                    map.insert(key, new);
+                    return;
+                }
                 // If there are more segments to traverse, insert an empty map
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
@@ -1011,8 +1037,6 @@ impl Value {
             map.get_mut(field.as_str())
                 .unwrap()
                 .insert_by_segments(rest, new);
-
-            *self = map.into();
         };
 
         match segment {

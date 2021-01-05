@@ -51,10 +51,10 @@ impl Expression for AssertFn {
             Ok(Value::Null)
         } else {
             let message = match self.message.as_ref() {
-                Some(message) => {
-                    let bytes = message.execute(state, object)?.try_bytes()?;
-                    String::from_utf8_lossy(&bytes).into_owned()
-                }
+                Some(message) => message
+                    .execute(state, object)?
+                    .try_bytes_utf8_lossy()?
+                    .into_owned(),
                 None => {
                     // If Expression implemented Display, we could could return the expression here.
                     "evaluated to false".to_string()

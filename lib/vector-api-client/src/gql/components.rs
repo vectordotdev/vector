@@ -67,12 +67,60 @@ impl ComponentsSubscriptionExt for crate::SubscriptionClient {
     }
 }
 
+impl components_query::ComponentsQueryComponentsOn {
+    pub fn processed_events_total(&self) -> i64 {
+        match self {
+            components_query::ComponentsQueryComponentsOn::Source(s) => s
+                .metrics
+                .processed_events_total
+                .as_ref()
+                .map(|p| p.processed_events_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsOn::Transform(t) => t
+                .metrics
+                .processed_events_total
+                .as_ref()
+                .map(|p| p.processed_events_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsOn::Sink(s) => s
+                .metrics
+                .processed_events_total
+                .as_ref()
+                .map(|p| p.processed_events_total as i64)
+                .unwrap_or(0),
+        }
+    }
+
+    pub fn processed_bytes_total(&self) -> i64 {
+        match self {
+            components_query::ComponentsQueryComponentsOn::Source(s) => s
+                .metrics
+                .processed_bytes_total
+                .as_ref()
+                .map(|p| p.processed_bytes_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsOn::Transform(t) => t
+                .metrics
+                .processed_bytes_total
+                .as_ref()
+                .map(|p| p.processed_bytes_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsOn::Sink(s) => s
+                .metrics
+                .processed_bytes_total
+                .as_ref()
+                .map(|p| p.processed_bytes_total as i64)
+                .unwrap_or(0),
+        }
+    }
+}
+
 impl std::fmt::Display for components_query::ComponentsQueryComponentsOn {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let res = match self {
-            components_query::ComponentsQueryComponentsOn::Source => "source",
-            components_query::ComponentsQueryComponentsOn::Transform => "transform",
-            components_query::ComponentsQueryComponentsOn::Sink => "sink",
+            components_query::ComponentsQueryComponentsOn::Source(_) => "source",
+            components_query::ComponentsQueryComponentsOn::Transform(_) => "transform",
+            components_query::ComponentsQueryComponentsOn::Sink(_) => "sink",
         };
 
         write!(f, "{}", res)

@@ -51,8 +51,8 @@ pub(crate) struct SplitFn {
 
 impl Expression for SplitFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
+        let value = self.value.execute(state, object)?;
+        let string = value.try_bytes_utf8_lossy()?;
         let limit: usize = self
             .limit
             .as_ref()
@@ -67,13 +67,13 @@ impl Expression for SplitFn {
             .execute(state, object)
             .and_then(|pattern| match pattern {
                 Value::Regex(pattern) => Ok(pattern
-                    .splitn(value.as_ref(), limit as usize)
+                    .splitn(string.as_ref(), limit as usize)
                     .collect::<Vec<_>>()
                     .into()),
                 Value::Bytes(bytes) => {
                     let pattern = String::from_utf8_lossy(&bytes);
 
-                    Ok(value
+                    Ok(string
                         .splitn(limit, pattern.as_ref())
                         .collect::<Vec<_>>()
                         .into())
