@@ -301,7 +301,11 @@ jobs:
       - name: "Install Vector"
         shell: cmd
         run: |
-          msiexec /quiet /i D:\a\vector\vector\target\artifacts\vector-${{ env.VECTOR_VERSION }}-x64.msi
+          msiexec /quiet /i D:\a\vector\vector\target\artifacts\vector-${{ env.VECTOR_VERSION }}-x64.msi /L*V "C:\package.log"
+      - name: "dump install log"
+        shell: cmd
+        run: |
+          type C:\package.log
       - name: "Run Vector"
         shell: cmd
         run: |
