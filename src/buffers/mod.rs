@@ -4,9 +4,9 @@ use futures::{
     Sink, Stream,
 };
 use futures01::task::AtomicTask;
+use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use std::{
-    ops::{Deref, DerefMut},
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -191,7 +191,9 @@ impl Acker {
     }
 }
 
+#[pin_project]
 pub struct DropWhenFull<S> {
+    #[pin]
     inner: S,
     drop: bool,
 }
@@ -205,21 +207,22 @@ impl<S> DropWhenFull<S> {
 impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     type Error = S::Error;
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.as_mut().poll_ready(cx) {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = self.project();
+        match this.inner.poll_ready(cx) {
             Poll::Ready(Ok(())) => {
-                self.get_mut().drop = false;
+                *this.drop = false;
                 Poll::Ready(Ok(()))
             }
             Poll::Pending => {
-                self.get_mut().drop = true;
+                *this.drop = true;
                 Poll::Ready(Ok(()))
             }
             error => error,
         }
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         if self.drop {
             debug!(
                 message = "Shedding load; dropping event.",
@@ -227,30 +230,16 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
             );
             Ok(())
         } else {
-            self.as_mut().start_send(item)
+            self.project().inner.start_send(item)
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.as_mut().poll_close(cx)
-    }
-}
-
-impl<S> Deref for DropWhenFull<S> {
-    type Target = S;
-
-    fn deref(&self) -> &S {
-        &self.inner
-    }
-}
-
-impl<S> DerefMut for DropWhenFull<S> {
-    fn deref_mut(&mut self) -> &mut S {
-        &mut self.inner
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }
 
@@ -258,34 +247,39 @@ impl<S> DerefMut for DropWhenFull<S> {
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
     use crate::sink::BoundedSink;
-    use futures::compat::Future01CompatExt;
-    use futures01::{future, task::AtomicTask, Async, AsyncSink, Sink, Stream};
-    use std::sync::{atomic::AtomicUsize, Arc};
+    use futures::{future, Sink, Stream};
+    use futures01::task::AtomicTask;
+    use std::{
+        sync::{atomic::AtomicUsize, Arc},
+        task::Poll,
+    };
     use tokio::sync::mpsc;
     use tokio01_test::task::MockTask;
 
     #[tokio::test]
     async fn drop_when_full() {
-        future::lazy(|| {
-            let (tx, mut rx) = mpsc::channel(2);
+        future::lazy(|cx| {
+            let (tx, rx) = mpsc::channel(3);
 
-            let mut tx = DropWhenFull::new(BoundedSink::new(tx));
+            let mut tx = Box::pin(DropWhenFull::new(BoundedSink::new(tx)));
 
-            assert_eq!(tx.start_send(1), Ok(AsyncSink::Ready));
-            assert_eq!(tx.start_send(2), Ok(AsyncSink::Ready));
-            assert_eq!(tx.start_send(3), Ok(AsyncSink::Ready));
-            assert_eq!(tx.start_send(4), Ok(AsyncSink::Ready));
+            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
+            assert_eq!(tx.as_mut().start_send(1), Ok(()));
+            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
+            assert_eq!(tx.as_mut().start_send(2), Ok(()));
+            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
+            assert_eq!(tx.as_mut().start_send(3), Ok(()));
+            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
+            assert_eq!(tx.as_mut().start_send(4), Ok(()));
 
-            assert_eq!(rx.poll(), Ok(Async::Ready(Some(1))));
-            assert_eq!(rx.poll(), Ok(Async::Ready(Some(2))));
-            assert_eq!(rx.poll(), Ok(Async::Ready(Some(3))));
-            assert_eq!(rx.poll(), Ok(Async::NotReady));
+            let mut rx = Box::pin(rx);
 
-            future::ok::<(), ()>(())
+            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(1)));
+            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(2)));
+            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(3)));
+            assert_eq!(rx.as_mut().poll_next(cx), Poll::Pending);
         })
-        .compat()
-        .await
-        .unwrap();
+        .await;
     }
 
     #[test]
