@@ -94,7 +94,10 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: |
+          echo $GITHUB_PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          cat $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
