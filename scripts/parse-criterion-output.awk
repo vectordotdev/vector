@@ -46,8 +46,9 @@
 BEGIN {
   # match time:   [1.8272 s 1.8391 s 1.8498 s]
   measurement_regex = "\\[(.+ .+) (.+ .+) (.+ .+)\\]"
-  # match change: [+0.1481% +0.8758% +1.5410%] (p = 0.01 < 0.05)
+  # match time change: [+0.1481% +0.8758% +1.5410%] (p = 0.01 < 0.05)
   time_change_regex = "\\[(.+) (.+) (.+)\\] \\(p = (.+) [<>] .+\\)"
+  # match thrpt change: [+0.1481% +0.8758% +1.5410%]
   thrpt_change_regex = "\\[(.+) (.+) (.+)\\]"
 }
 
