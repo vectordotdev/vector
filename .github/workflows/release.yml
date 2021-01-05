@@ -268,12 +268,9 @@ jobs:
           rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   osx-verify:
-    runs-on: ${{ matrix.macos_version }}
+    runs-on: macos-10.15
     needs:
       - build-x86_64-apple-darwin-packages
-    strategy:
-      matrix:
-        macos_version: ["macos-10.15","macos-11.0"]
     steps:
       - name: checkout
         uses: actions/checkout@v1
@@ -305,7 +302,7 @@ jobs:
       - name: "Run Vector"
         shell: cmd
         run: |
-          C:\Program Files\Vector\bin\vector --version
+          'C:\Program Files\Vector\bin\vector --version'
 
   release-docker:
     runs-on: ubuntu-latest
