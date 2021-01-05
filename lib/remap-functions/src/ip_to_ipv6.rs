@@ -39,12 +39,12 @@ impl IpToIpv6Fn {
 
 impl Expression for IpToIpv6Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let ip = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
-            String::from_utf8_lossy(&bytes)
-                .parse()
-                .map_err(|err| format!("unable to parse IP address: {}", err))?
-        };
+        let ip: IpAddr = self
+            .value
+            .execute(state, object)?
+            .try_bytes_utf8_lossy()?
+            .parse()
+            .map_err(|err| format!("unable to parse IP address: {}", err))?;
 
         match ip {
             IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),

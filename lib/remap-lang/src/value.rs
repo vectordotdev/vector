@@ -450,6 +450,13 @@ macro_rules! value_impl {
             pub fn unwrap_null(self) -> () {
                 self.try_null().expect("null")
             }
+
+            pub fn try_bytes_utf8_lossy<'a>(&'a self) -> Result<std::borrow::Cow<'a, str>, Error> {
+                match self.as_bytes() {
+                    Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
+                    None => Err(Error::Expected(Kind::Bytes, self.kind())),
+                }
+            }
         }
     };
 }
