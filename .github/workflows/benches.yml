@@ -52,10 +52,10 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: |
           env
-          echo "$HOME"
-          echo $GITHUB_PATH
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          cat $GITHUB_PATH
+          sudo echo "$HOME"
+          sudo echo $GITHUB_PATH
+          sudo echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          sudo cat $GITHUB_PATH
         shell: bash
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
