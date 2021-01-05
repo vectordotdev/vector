@@ -24,6 +24,7 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
+  AWS_REGION: us-east-1
 
 jobs:
   cancel-previous:
@@ -82,6 +83,9 @@ jobs:
           path: "./target/criterion.zip"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
       # note: should run last to flag regressions
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
