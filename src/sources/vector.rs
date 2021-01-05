@@ -138,7 +138,7 @@ mod test {
     };
     use futures::stream;
     use std::net::SocketAddr;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {
@@ -184,7 +184,7 @@ mod test {
 
         sink.run(stream::iter(events.clone())).await.unwrap();
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
 
         let output = collect_ready(rx).await;
         assert_eq!(events, output);

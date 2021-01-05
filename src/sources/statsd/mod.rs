@@ -194,7 +194,7 @@ mod test {
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::io::AsyncWriteExt;
     use tokio::sync::mpsc;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {
@@ -296,18 +296,18 @@ mod test {
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
         // Give some time for the topology to start
-        delay_for(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
 
         for _ in 0..100 {
             sender.send(
                 b"foo:1|c|#a,b:b\nbar:42|g\nfoo:1|c|#a,b:c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\n"
             ).await.unwrap();
             // Space things out slightly to try to avoid dropped packets
-            delay_for(Duration::from_millis(10)).await;
+            sleep(Duration::from_millis(10)).await;
         }
 
         // Give packets some time to flow through
-        delay_for(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
 
         let client = hyper::Client::new();
         let response = client
@@ -355,7 +355,7 @@ mod test {
         // Flush test
         {
             // Wait for flush to happen
-            delay_for(Duration::from_millis(2000)).await;
+            sleep(Duration::from_millis(2000)).await;
 
             let response = client
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -376,7 +376,7 @@ mod test {
 
             sender.send(b"set:0|s\nset:1|s\n").await.unwrap();
             // Give packets some time to flow through
-            delay_for(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(100)).await;
 
             let response = client
                 .get(format!("http://{}/metrics", out_addr).parse().unwrap())

@@ -6,7 +6,7 @@ use openssl::{
 use snafu::{ResultExt, Snafu};
 use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::net::TcpStream;
-use tokio_openssl::{HandshakeError, SslStream};
+use tokio_openssl::SslStream;
 
 #[cfg(feature = "sources-utils-tls")]
 mod incoming;
@@ -76,7 +76,7 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: HandshakeError<TcpStream> },
+    Handshake { source: openssl::error::Error },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]

@@ -27,6 +27,7 @@ use tokio::{
     sync::mpsc,
     time::{timeout, Duration},
 };
+use tokio_stream::wrappers::ReceiverStream;
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -79,7 +80,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
+        let pump = ReceiverStream::new(rx)
             .map(Ok)
             .forward(output.sink_compat())
             .map_ok(|_| TaskOutput::Source);

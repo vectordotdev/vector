@@ -121,7 +121,7 @@ impl GeneratorConfig {
             }
 
             if let Some(interval) = &mut interval {
-                interval.next().await;
+                interval.tick().await;
             }
 
             let event = self.format.generate_event(n);

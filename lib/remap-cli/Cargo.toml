@@ -10,7 +10,7 @@ name = "vrl"
 path = "src/main.rs"
 
 [dependencies]
-bytes = "0.5.6"
+bytes = "1.0.0"
 remap = { package = "remap-lang", path = "../remap-lang" }
 remap-functions = { path = "../remap-functions" }
 serde_json = "1"

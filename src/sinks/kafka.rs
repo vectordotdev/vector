@@ -331,7 +331,7 @@ impl Sink<Event> for KafkaSink {
 
         while !this.delivery_fut.is_empty() || !this.in_flight.is_empty() {
             while let Poll::Ready(Some(item)) = this.in_flight.poll_next_unpin(cx) {
-                this.flush_signal.notify();
+                this.flush_signal.notify_waiters();
                 match item {
                     (seqno, Ok(result)) => {
                         match result {

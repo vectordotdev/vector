@@ -39,7 +39,7 @@ use std::{
     sync::{Arc, Mutex},
     task::Poll,
 };
-use tokio::time::{self, delay_for, Duration, Instant};
+use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -265,7 +265,7 @@ fn respond_after(
     stats: Arc<Mutex<Statistics>>,
 ) -> BoxFuture<'static, Result<Response, Error>> {
     Box::pin(async move {
-        delay_for(Duration::from_secs_f64(delay)).await;
+        sleep(Duration::from_secs_f64(delay)).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
         stats.end_request(Instant::now(), matches!(response, Ok(Response::Ok)));
         response
@@ -630,7 +630,7 @@ async fn all_tests() {
     // The first delay takes just slightly longer than all the rest,
     // which causes the first test to run differently than all the
     // others. Throw in a dummy delay to take up this delay "slack".
-    delay_for(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(1)).await;
     time::advance(Duration::from_millis(1)).await;
 
     // Then run all the tests

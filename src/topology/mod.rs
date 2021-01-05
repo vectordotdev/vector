@@ -29,7 +29,8 @@ use std::{
     panic::AssertUnwindSafe,
     sync::{Arc, Mutex},
 };
-use tokio::time::{delay_until, interval, Duration, Instant};
+use tokio::time::{interval, sleep_until, Duration, Instant};
+use tokio_stream::wrappers::IntervalStream;
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
@@ -150,7 +151,7 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = delay_until(deadline).map(move |_| {
+        let timeout = sleep_until(deadline).map(move |_| {
             // Remove all tasks that have shutdown.
             check_handles2.retain(|_name, handles| {
                 retain(handles, |handle| {
@@ -169,7 +170,7 @@ impl RunningTopology {
         });
 
         // Reports in intervals which components are still running.
-        let reporter = interval(Duration::from_secs(5))
+        let reporter = IntervalStream::new(interval(Duration::from_secs(5)))
             .inspect(move |_| {
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_name, handles| {
@@ -236,7 +237,7 @@ impl RunningTopology {
         // Issue: https://github.com/timberio/vector/issues/3035
         if cfg!(windows) {
             // This value is guess work.
-            tokio::time::delay_for(Duration::from_millis(200)).await;
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
         // Now let's actually build the new pieces.
@@ -831,7 +832,7 @@ mod reload_tests {
     use futures::{compat::Stream01CompatExt, StreamExt};
     use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
-    use tokio::time::delay_for;
+    use tokio::time::sleep;
 
     #[tokio::test]
     async fn topology_reuse_old_port() {
@@ -1099,7 +1100,7 @@ mod reload_tests {
         wait_for_tcp(old_address).await;
 
         // Give topology some time to run
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         assert!(topology
             .reload_config_and_respawn(new_config)
@@ -1107,7 +1108,7 @@ mod reload_tests {
             .unwrap());
 
         // Give old time to shutdown if it didn't, and new one to come online.
-        delay_for(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(2)).await;
 
         tokio::select! {
             _ = wait_for_tcp(new_address) => {}//Success

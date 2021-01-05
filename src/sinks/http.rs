@@ -303,7 +303,7 @@ mod tests {
         },
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes::buf::BufExt;
+    use bytes::Buf;
     use flate2::read::GzDecoder;
     use futures::{stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};

@@ -55,7 +55,7 @@ use std::{
 };
 use tokio::{
     sync::oneshot,
-    time::{delay_for, Delay, Duration},
+    time::{sleep, Duration, Sleep},
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
@@ -180,7 +180,7 @@ where
     batch: StatefulBatch<B>,
     partitions: HashMap<K, StatefulBatch<B>>,
     timeout: Duration,
-    lingers: HashMap<K, Delay>,
+    lingers: HashMap<K, Sleep>,
     closing: bool,
 }
 
@@ -248,7 +248,7 @@ where
             let batch = self.batch.fresh();
             self.partitions.insert(partition.clone(), batch);
 
-            let delay = delay_for(self.timeout);
+            let delay = sleep(self.timeout);
             self.lingers.insert(partition.clone(), delay);
         };
 
@@ -547,7 +547,7 @@ mod tests {
                 _ => unreachable!(),
             };
 
-            delay_for(duration).await;
+            sleep(duration).await;
             Ok::<(), Infallible>(())
         });
 

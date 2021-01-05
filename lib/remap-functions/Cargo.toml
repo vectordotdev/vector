@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 remap = { package = "remap-lang", path = "../remap-lang" }
 
-bytes = { version = "0.5.6", optional = true }
+bytes = { version = "1.0.0", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
 grok = { version = "1", optional = true }

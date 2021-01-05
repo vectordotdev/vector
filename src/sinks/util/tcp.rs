@@ -32,7 +32,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{io::AsyncRead, net::TcpStream, time::delay_for};
+use tokio::{io::AsyncRead, net::TcpStream, time::sleep};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -154,7 +154,7 @@ impl TcpConnector {
                 }
                 Err(error) => {
                     emit!(TcpSocketConnectionFailed { error });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }

@@ -6,9 +6,10 @@ pub mod transform;
 use crate::api::schema::components::state::component_by_name;
 use crate::config::Config;
 use async_graphql::{Interface, Object, Subscription};
+use async_stream::stream;
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
-use tokio::stream::{Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -72,24 +73,28 @@ pub struct ComponentsSubscription;
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
     async fn component_added(&self) -> impl Stream<Item = Component> {
-        COMPONENT_CHANGED
-            .subscribe()
-            .into_stream()
-            .filter_map(|c| match c {
-                Ok(ComponentChanged::Added(c)) => Some(c),
-                _ => None,
-            })
+        let mut rx = COMPONENT_CHANGED.subscribe();
+        stream! {
+            loop {
+                match rx.recv().await {
+                    Ok(ComponentChanged::Added(c)) => yield c,
+                    _ => {},
+                }
+            }
+        }
     }
 
     /// Subscribes to all removed components
     async fn component_removed(&self) -> impl Stream<Item = Component> {
-        COMPONENT_CHANGED
-            .subscribe()
-            .into_stream()
-            .filter_map(|c| match c {
-                Ok(ComponentChanged::Removed(c)) => Some(c),
-                _ => None,
-            })
+        let mut rx = COMPONENT_CHANGED.subscribe();
+        stream! {
+            loop {
+                match rx.recv().await {
+                    Ok(ComponentChanged::Removed(c)) => yield c,
+                    _ => {},
+                }
+            }
+        }
     }
 }
 

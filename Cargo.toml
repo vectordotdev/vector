@@ -60,9 +60,11 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "udp", "signal", "sync", "time", "stream"] }
-tokio-openssl = "0.4.0"
-tokio-util = { version = "0.3.1", features = ["codec"] }
+tokio = { version = "1.0.0", features = ["full"] }
+tokio-compat-02 = "0.2.0"
+tokio-openssl = "0.6.0"
+tokio-util = { version = "0.6.0", features = ["codec", "time"] }
+tokio-stream =  "0.1.1"
 async-trait = "0.1"
 
 # Tracing
@@ -100,8 +102,8 @@ serde_json = { version = "1.0.33", features = ["raw_value"] }
 serde_yaml = "0.8.13"
 
 # Prost
-prost = "0.6.1"
-prost-types = "0.6.1"
+prost = "0.7.0"
+prost-types = "0.7.0"
 
 # GCP
 goauth = { version = "0.8.1", optional = true }
@@ -128,14 +130,15 @@ chrono = { version = "0.4.19", features = ["serde"] }
 rand = { version = "0.8.0", features = ["small_rng"] }
 rand_distr = "0.4.0"
 regex = "1.3.9"
-bytes = { version = "0.5.6", features = ["serde"] }
+bytes05 = { package = "bytes", version = "0.5.6", features = ["serde"] }
+bytes = { version = "1.0.0", features = ["serde"] }
 stream-cancel = "0.6.2"
-hyper = "0.13"
-hyper-openssl = "0.8"
+hyper = { version = "0.14", features = ["full"] }
+hyper-openssl = "0.9"
 openssl = "0.10.32"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
-async-compression = { version = "0.3.7", features = ["tokio-02", "gzip", "zstd"] }
+async-compression = { version = "0.3.7", features = ["tokio", "gzip", "zstd"] }
 structopt = "0.3.21"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
@@ -174,7 +177,7 @@ maxminddb = { version = "0.17.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0"}
 colored = "2.0"
 warp = { version = "0.2.5", default-features = false, optional = true }
-evmap = { version = "10.0.2", features = ["bytes"], optional = true }
+evmap = { git = "https://github.com/lukesteensen/evmap.git", rev = "45ba973c22715a68c5e99efad4b072421f7ad40b", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
@@ -222,7 +225,7 @@ atty = "0.2"
 nix = "0.19.0"
 
 [build-dependencies]
-prost-build = "0.6.1"
+prost-build = "0.7.0"
 built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
@@ -347,11 +350,11 @@ sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-statsd = ["tokio-util/net", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
 sources-utils-fake = []
 sources-utils-http = ["sources-utils-tls", "warp", "snap"]
@@ -486,7 +489,7 @@ sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
-sinks-statsd = ["tokio-util/udp"]
+sinks-statsd = ["tokio-util/net"]
 sinks-vector = []
 sinks-pulsar = ["avro-rs", "pulsar"]
 

@@ -9,7 +9,8 @@ use bytes::Bytes;
 use futures::{executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
-use tokio::sync::mpsc::channel;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -78,7 +79,7 @@ where
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
 
-    let (mut sender, receiver) = channel(1024);
+    let (mut sender, receiver) = mpsc::channel(1024);
 
     // Start the background thread
     thread::spawn(move || {
@@ -96,7 +97,7 @@ where
         let mut out =
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
-        let res = receiver
+        let res = ReceiverStream::new(receiver)
             .take_until(shutdown)
             .map_err(|error| emit!(StdinReadFailed { error }))
             .map_ok(move |line| {

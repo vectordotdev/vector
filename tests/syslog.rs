@@ -113,7 +113,7 @@ async fn test_unix_stream_syslog() {
     stream.shutdown(std::net::Shutdown::Both).unwrap();
 
     // Otherwise some lines will be lost
-    tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Shut down server
     topology.stop().compat().await.unwrap();

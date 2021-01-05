@@ -6,7 +6,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use flate2::read::{DeflateDecoder, GzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};

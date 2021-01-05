@@ -551,7 +551,7 @@ mod test {
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
-        tokio::time::delay_for(tokio::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         (addr, source_handle)
     }

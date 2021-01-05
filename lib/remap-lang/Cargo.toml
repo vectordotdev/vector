@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 bitflags = "1"
-bytes = "0.5.6"
+bytes = "1.0.0"
 chrono = "0.4"
 dyn-clone = "1"
 paste = "1"

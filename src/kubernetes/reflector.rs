@@ -16,7 +16,7 @@ use k8s_openapi::{
 use snafu::Snafu;
 use std::convert::Infallible;
 use std::time::Duration;
-use tokio::{select, time::delay_for};
+use tokio::{select, time::sleep};
 
 /// Watches remote Kubernetes resources and maintains a local representation of
 /// the remote state. "Reflects" the remote state locally.
@@ -128,7 +128,7 @@ where
 
             // For the next pause duration we won't get any updates.
             // This is better than flooding k8s api server with requests.
-            delay_for(self.pause_between_requests).await;
+            sleep(self.pause_between_requests).await;
         }
     }
 

@@ -6,6 +6,7 @@ use futures::{
     FutureExt, StreamExt, TryStreamExt,
 };
 use std::time::Duration;
+use tokio_stream::wrappers::IntervalStream;
 
 /// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
@@ -151,7 +152,7 @@ where
 fn make_timer_msgs_stream(timers: Vec<Timer>) -> BoxStream<'static, Result<Message, ()>> {
     let streams = timers.into_iter().map(|timer| {
         let period = Duration::from_secs(timer.interval_seconds);
-        tokio::time::interval(period).map(move |_| Ok(Message::Timer(timer)))
+        IntervalStream::new(tokio::time::interval(period)).map(move |_| Ok(Message::Timer(timer)))
     });
     stream::select_all(streams).boxed()
 }

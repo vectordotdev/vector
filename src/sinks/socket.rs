@@ -96,7 +96,7 @@ mod test {
     };
     use tokio::{
         net::TcpListener,
-        time::{delay_for, timeout, Duration},
+        time::{sleep, timeout, Duration},
     };
     use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -366,7 +366,7 @@ mod test {
         // Disconnect
         if cfg!(windows) {
             // Gives Windows time to release the addr port.
-            delay_for(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(1)).await;
         }
 
         // Second listener

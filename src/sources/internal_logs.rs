@@ -3,9 +3,9 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::RecvError;
+use tokio::sync::broadcast::error::RecvError;
 
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -39,23 +39,26 @@ impl SourceConfig for InternalLogsConfig {
     }
 }
 
-async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-    let mut subscriber = crate::trace::subscribe()
-        .ok_or_else(|| error!("Tracing is not initialized."))?
-        .take_until(shutdown);
+async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
+    let mut rx = crate::trace::subscribe().ok_or_else(|| error!("Tracing is not initialized."))?;
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
-
-    while let Some(receive) = subscriber.next().await {
-        match receive {
-            Ok(event) => out.send(event).await?,
-            Err(RecvError::Lagged(_)) => (),
-            Err(RecvError::Closed) => break,
+    loop {
+        tokio::select! {
+            receive = rx.recv() => {
+                match receive {
+                    Ok(event) => out.send(event).await?,
+                    Err(RecvError::Lagged(_)) => (),
+                    Err(RecvError::Closed) => break,
+                }
+            }
+            _ = &mut shutdown => break,
         }
     }
+
     Ok(())
 }
 
@@ -63,7 +66,7 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
 mod tests {
     use super::*;
     use crate::{config::GlobalOptions, test_util::collect_ready};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generates_config() {
@@ -88,11 +91,11 @@ mod tests {
             .await
             .unwrap();
         tokio::spawn(source);
-        delay_for(Duration::from_millis(1)).await;
+        sleep(Duration::from_millis(1)).await;
 
         error!(message = ERROR_TEXT);
 
-        delay_for(Duration::from_millis(1)).await;
+        sleep(Duration::from_millis(1)).await;
         let logs = collect_ready(rx).await;
 
         assert_eq!(logs.len(), 1);

@@ -337,7 +337,7 @@ mod tests {
     };
 
     use tempfile::tempdir;
-    use tokio::time::{delay_for, timeout, Duration};
+    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -369,7 +369,7 @@ mod tests {
     }
 
     async fn sleep_500_millis() {
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
     #[test]
@@ -1498,7 +1498,7 @@ mod tests {
 
         for _ in 0..10 {
             // Wait for remove grace period to end.
-            delay_for(Duration::from_secs(remove_after + 1)).await;
+            sleep(Duration::from_secs(remove_after + 1)).await;
 
             if File::open(&path).is_err() {
                 break;

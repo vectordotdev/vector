@@ -10,7 +10,7 @@ use crate::{
     },
     template::Template,
 };
-use async_compression::tokio_02::write::GzipEncoder;
+use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
@@ -517,7 +517,7 @@ mod tests {
         }
 
         // wait for file to go idle and be closed
-        tokio::time::delay_for(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // trigger another write
         let last_line = "i should go at the end";
@@ -525,7 +525,7 @@ mod tests {
         input.push(String::from(last_line));
 
         // wait for another flush
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);

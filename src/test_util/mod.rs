@@ -35,8 +35,9 @@ use tokio::{
     runtime,
     sync::{mpsc, oneshot},
     task::JoinHandle,
-    time::{delay_for, Duration, Instant},
+    time::{sleep, Duration, Instant},
 };
+use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 pub mod stats;
@@ -147,7 +148,8 @@ pub async fn send_lines_tls(
 
     let config = connector.build().configure().unwrap();
 
-    let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
+    let stream = tokio_openssl::SslStream::new(config, stream).unwrap();
+    stream.connect().await.unwrap();
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);
@@ -227,7 +229,7 @@ pub fn random_maps(
 }
 
 pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
-    rx.take(n).collect().await
+    ReceiverStream::new(rx).take(n).collect().await
 }
 
 pub async fn collect_ready01<S>(rx: S) -> Result<Vec<S::Item>, ()>
@@ -286,8 +288,7 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 }
 
 pub fn runtime() -> runtime::Runtime {
-    runtime::Builder::new()
-        .threaded_scheduler()
+    runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -301,7 +302,7 @@ where
 {
     let started = Instant::now();
     while !f().await {
-        delay_for(Duration::from_millis(5)).await;
+        sleep(Duration::from_millis(5)).await;
         if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
@@ -350,7 +351,7 @@ where
     while started.elapsed() < until {
         match f().await {
             Ok(res) => return res,
-            Err(_) => tokio::time::delay_for(retry).await,
+            Err(_) => tokio::time::sleep(retry).await,
         }
     }
     panic!("Timeout")

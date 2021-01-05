@@ -10,7 +10,7 @@ mod uptime;
 
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
-use tokio::stream::{Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt};
 
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use filter::*;

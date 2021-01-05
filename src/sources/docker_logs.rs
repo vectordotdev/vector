@@ -448,7 +448,7 @@ impl DockerLogsSource {
     async fn run(mut self) {
         loop {
             tokio::select! {
-                value = self.main_recv.next() => {
+                value = self.main_recv.recv() => {
                     match value {
                         Some(message) => {
                             match message {
@@ -579,7 +579,7 @@ impl EventStreamBuilder {
         let this = self.clone();
         tokio::spawn(async move {
             if let Some(duration) = backoff {
-                tokio::time::delay_for(duration).await;
+                tokio::time::sleep(duration).await;
             }
             match this
                 .core

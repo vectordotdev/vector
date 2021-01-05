@@ -182,7 +182,7 @@ mod tests {
     use crate::{test_util::collect_ready01, Event};
     use futures::compat::Future01CompatExt;
     use futures01::{stream, sync::mpsc, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
@@ -223,7 +223,7 @@ mod tests {
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
 
         let collect_a = tokio::spawn(rx_a.collect().compat());
@@ -310,7 +310,7 @@ mod tests {
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
         fanout_control
             .unbounded_send(ControlMessage::Remove("c".to_string()))
@@ -344,7 +344,7 @@ mod tests {
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
         fanout_control
             .unbounded_send(ControlMessage::Remove("b".to_string()))
@@ -378,7 +378,7 @@ mod tests {
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
 
         fanout_control
@@ -454,7 +454,7 @@ mod tests {
         fanout.replace("a".to_string(), None);
 
         tokio::spawn(async move {
-            delay_for(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(100)).await;
             cc.send(ControlMessage::Replace("a".to_string(), Some(tx_a2)))
                 .compat()
                 .await
@@ -533,7 +533,7 @@ mod tests {
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
 
         // Start collecting from all at once
         let collectors = rx_channels

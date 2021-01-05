@@ -97,10 +97,9 @@ impl Application {
 
         let mut rt = {
             let threads = root_opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
-            runtime::Builder::new()
-                .threaded_scheduler()
+            runtime::Builder::new_multi_thread()
                 .enable_all()
-                .core_threads(threads)
+                .worker_threads(threads)
                 .build()
                 .expect("Unable to create async runtime")
         };

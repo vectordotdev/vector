@@ -13,7 +13,7 @@ k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
 reqwest = { version = "0.10", features = ["json"] }
 serde_json = "1"
-tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+tokio = { version = "1.0.0", features = ["full"] }
 
 [features]
 e2e-tests = []

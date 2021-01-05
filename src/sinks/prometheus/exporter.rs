@@ -343,7 +343,7 @@ mod integration_tests {
         trace_init();
 
         prometheus_scrapes_metrics().await;
-        time::delay_for(time::Duration::from_millis(500)).await;
+        time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
     }
 
@@ -362,7 +362,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
@@ -397,7 +397,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;
@@ -412,7 +412,7 @@ mod integration_tests {
         );
 
         // Wait a bit for expired metrics
-        time::delay_for(time::Duration::from_secs(3)).await;
+        time::sleep(time::Duration::from_secs(3)).await;
 
         let (name1, event) = create_metric_set(Some(name1), vec!["6", "7"]);
         tx.send(event).expect("Failed to send.");
@@ -420,7 +420,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;

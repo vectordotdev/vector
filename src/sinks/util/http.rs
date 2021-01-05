@@ -498,7 +498,7 @@ mod test {
             }
         });
 
-        tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
         let (body, _rest) = rx.into_future().compat().await.unwrap();

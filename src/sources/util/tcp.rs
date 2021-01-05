@@ -13,7 +13,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     net::{TcpListener, TcpStream},
-    time::delay_for,
+    time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing_futures::Instrument;
@@ -91,7 +91,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
             let tripwire = shutdown.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
-                delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
+                sleep(Duration::from_secs(shutdown_timeout_secs)).await;
             }
             .shared();
 

@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
     time::{self, Duration},
 };
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use crate::paths_provider::PathsProvider;
 
@@ -143,17 +143,17 @@ where
         // We have to do a lot of cloning here to convince the compiler that we aren't going to get
         // away with anything, but none of it should have any perf impact.
         let mut shutdown = shutdown.shared();
-        let shutdown2 = shutdown.clone();
+        let mut shutdown2 = shutdown.clone();
         let emitter = self.emitter.clone();
         let checkpointer = Arc::new(checkpointer);
         let sleep_duration = self.glob_minimum_cooldown;
         self.handle.spawn(async move {
             let mut done = false;
             loop {
-                let sleep = tokio::time::delay_for(sleep_duration);
-                match select(shutdown2.clone(), sleep).await {
-                    Either::Left((_, _)) => done = true,
-                    Either::Right((_, _)) => {}
+                let sleep = tokio::time::sleep(sleep_duration);
+                tokio::select! {
+                    _ = &mut shutdown2 => done = true,
+                    _ = sleep => {},
                 }
 
                 let emitter = emitter.clone();
@@ -376,7 +376,7 @@ where
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {
-                    delay_for(Duration::from_millis(backoff as u64)).await;
+                    sleep(Duration::from_millis(backoff as u64)).await;
                 }
             };
             futures::pin_mut!(sleep);

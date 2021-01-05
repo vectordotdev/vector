@@ -156,7 +156,7 @@ fn s3_object_decoder(
     content_type: Option<&str>,
     body: rusoto_s3::StreamingBody,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio_02::bufread;
+    use async_compression::tokio::bufread;
 
     let r = tokio::io::BufReader::new(body.into_async_read());
 

@@ -6,22 +6,20 @@ use super::{
 };
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
-use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::{
     future::Future,
-    mem::MaybeUninit,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
 use tokio::{
-    io::{self, AsyncRead, AsyncWrite},
+    io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
 };
-use tokio_openssl::{HandshakeError, SslStream};
+use tokio_openssl::SslStream;
 
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
@@ -110,7 +108,7 @@ pub struct MaybeTlsIncomingStream<S> {
 
 enum StreamState<S> {
     Accepted(MaybeTlsStream<S>),
-    Accepting(BoxFuture<'static, Result<SslStream<S>, HandshakeError<S>>>),
+    Accepting(BoxFuture<'static, Result<SslStream<S>, openssl::error::Error>>),
     AcceptError(String),
 }
 
@@ -207,23 +205,9 @@ impl AsyncRead for MaybeTlsIncomingStream<TcpStream> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         self.poll_io(cx, |s, cx| s.poll_read(cx, buf))
-    }
-
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
-        // Both, TcpStream & SslStream return false
-        // We can not use `poll_io` here, because need Context for polling handshake
-        false
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_io(cx, |s, cx| s.poll_read_buf(cx, buf))
     }
 }
 
@@ -238,13 +222,5 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
         self.poll_io(cx, |s, cx| s.poll_shutdown(cx))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_io(cx, |s, cx| s.poll_write_buf(cx, buf))
     }
 }

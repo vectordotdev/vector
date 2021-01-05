@@ -172,7 +172,7 @@ mod tests {
         test_util::next_addr,
         Event,
     };
-    use bytes::buf::BufExt;
+    use bytes::Buf;
     use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;

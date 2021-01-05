@@ -443,7 +443,7 @@ mod tests {
 
                 let topology = from_str_config(conf).await;
 
-                tokio::time::delay_for(tokio::time::Duration::from_millis(500)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
                 let server = api::Server::start(topology.config());
                 let client = new_subscription_client(server.addr()).await;
@@ -564,7 +564,7 @@ mod tests {
             });
 
             // After a short delay, update the config to include `gen2`
-            tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
             let conf = r#"
                 [api]
@@ -654,7 +654,7 @@ mod tests {
             });
 
             // After a short delay, update the config to remove `gen2`
-            tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
             // New configuration that will be reloaded
             conf = r#"
@@ -835,7 +835,7 @@ mod tests {
             let server = api::Server::start(topology.config());
 
             // Short delay to ensure logs are picked up
-            tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
             let client = make_client(server.addr());
             let res = client.file_source_metrics_query().await;

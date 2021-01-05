@@ -24,7 +24,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{net::UdpSocket, sync::oneshot, time::delay_for};
+use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
@@ -127,7 +127,7 @@ impl UdpConnector {
                 }
                 Err(error) => {
                     emit!(UdpSocketConnectionFailed { error });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }
