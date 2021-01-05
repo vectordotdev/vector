@@ -80,6 +80,8 @@ jobs:
         with:
           name: "criterion"
           path: "./target/criterion.zip"
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         env:
