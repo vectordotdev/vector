@@ -38,9 +38,11 @@ impl Expression for DecodeBase64Fn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        // Always fallible due to the possibility of decoding errors that VRL can't detect in
+        // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Bytes)
     }
 }
@@ -51,11 +53,11 @@ mod test {
     use value::Kind;
 
     test_type_def![
-        value_string_infallible {
+        value_string_fallible {
             expr: |_| DecodeBase64Fn {
                 value: Literal::from("foo").boxed(),
             },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_non_string_fallible {
