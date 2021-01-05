@@ -1,8 +1,7 @@
 use crate::{config::Resource, sink::BoundedSink, Event};
-use futures::{
-    compat::{Sink01CompatExt, Stream01CompatExt},
-    Sink, Stream,
-};
+#[cfg(feature = "leveldb")]
+use futures::compat::{Sink01CompatExt, Stream01CompatExt};
+use futures::{Sink, Stream};
 use futures01::task::AtomicTask;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,9 @@ use std::{
     },
     task::{Context, Poll},
 };
-use tokio::{stream::StreamExt, sync::mpsc};
+#[cfg(feature = "leveldb")]
+use tokio::stream::StreamExt;
+use tokio::sync::mpsc;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
