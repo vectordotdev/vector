@@ -67,16 +67,16 @@ mod tests {
     test_type_def![
         value_array_infallible {
             expr: |_| PushFn {
-                value: Array::from(vec!["foo", "bar"]).boxed(),
-                item: Literal::from("baz").boxed(),
+                value: array!["foo", "bar"].boxed(),
+                item: lit!("baz").boxed(),
             },
             def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         value_non_array_fallible {
             expr: |_| PushFn {
-                value: Literal::from(27).boxed(),
-                item: Literal::from("foo").boxed(),
+                value: lit!(27).boxed(),
+                item: lit!("foo").boxed(),
             },
             def: TypeDef { kind: Kind::Array, fallible: true, ..Default::default() },
         }
