@@ -82,6 +82,9 @@ jobs:
           path: "./target/criterion.zip"
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         env:
