@@ -1,5 +1,6 @@
 use crate::{config::Resource, Event};
-use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures::{compat::Sink01CompatExt, Sink};
+use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink as Sink01, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{
@@ -58,27 +59,30 @@ pub enum BufferInputCloner {
 }
 
 impl BufferInputCloner {
-    pub fn get(&self) -> Box<dyn Sink<SinkItem = Event, SinkError = ()> + Send> {
+    pub fn get(&self) -> Box<dyn Sink<Event, Error = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull { inner })
+                    Box::new(DropWhenFull { inner }.sink_compat())
                 } else {
-                    Box::new(inner)
+                    Box::new(inner.sink_compat())
                 }
             }
 
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull {
-                        inner: writer.clone(),
-                    })
+                    Box::new(
+                        DropWhenFull {
+                            inner: writer.clone(),
+                        }
+                        .sink_compat(),
+                    )
                 } else {
-                    Box::new(writer.clone())
+                    Box::new(writer.clone().sink_compat())
                 }
             }
         }
@@ -184,7 +188,7 @@ pub struct DropWhenFull<S> {
     inner: S,
 }
 
-impl<S: Sink> Sink for DropWhenFull<S> {
+impl<S: Sink01> Sink01 for DropWhenFull<S> {
     type SinkItem = S::SinkItem;
     type SinkError = S::SinkError;
 

@@ -53,15 +53,15 @@ impl IpSubnetFn {
 
 impl Expression for IpSubnetFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value: IpAddr = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
-            String::from_utf8_lossy(&bytes)
-                .parse()
-                .map_err(|err| format!("unable to parse IP address: {}", err))?
-        };
+        let value: IpAddr = self
+            .value
+            .execute(state, object)?
+            .try_bytes_utf8_lossy()?
+            .parse()
+            .map_err(|err| format!("unable to parse IP address: {}", err))?;
 
-        let bytes = self.subnet.execute(state, object)?.try_bytes()?;
-        let mask = String::from_utf8_lossy(&bytes);
+        let mask = self.subnet.execute(state, object)?;
+        let mask = mask.try_bytes_utf8_lossy()?;
 
         let mask = if mask.starts_with('/') {
             // The parameter is a subnet.

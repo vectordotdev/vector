@@ -1,9 +1,9 @@
-FROM debian:buster-slim AS builder
+FROM alpine:3.12 AS builder
 
 WORKDIR /vector
 
-COPY vector-*-x86_64-unknown-linux-musl.tar.gz ./
-RUN tar -xvf vector-*-x86_64-unknown-linux-musl.tar.gz --strip-components=2
+COPY vector-*-unknown-linux-musl*.tar.gz ./
+RUN tar -xvf vector-0*-$(cat /etc/apk/arch)-unknown-linux-musl*.tar.gz --strip-components=2
 
 FROM gcr.io/distroless/static
 

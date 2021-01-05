@@ -38,10 +38,7 @@ pub trait WatchRequestBuilder {
     type Object: Metadata<Ty = ObjectMeta> + DeserializeOwned;
 
     /// Build a watch request.
-    fn build<'a>(
-        &self,
-        watch_optional: WatchOptional<'a>,
-    ) -> Result<Request<Vec<u8>>, RequestError>;
+    fn build(&self, watch_optional: WatchOptional<'_>) -> Result<Request<Vec<u8>>, RequestError>;
 }
 
 impl<F, T> WatchRequestBuilder for F
@@ -59,10 +56,7 @@ where
 {
     type Object = T;
 
-    fn build<'a>(
-        &self,
-        watch_optional: WatchOptional<'a>,
-    ) -> Result<Request<Vec<u8>>, RequestError> {
+    fn build(&self, watch_optional: WatchOptional<'_>) -> Result<Request<Vec<u8>>, RequestError> {
         let (request, _) = (self)(watch_optional)?;
         Ok(request)
     }
@@ -92,10 +86,7 @@ where
 {
     type Object = T;
 
-    fn build<'a>(
-        &self,
-        watch_optional: WatchOptional<'a>,
-    ) -> Result<Request<Vec<u8>>, RequestError> {
+    fn build(&self, watch_optional: WatchOptional<'_>) -> Result<Request<Vec<u8>>, RequestError> {
         let (request, _) = (self.1)(self.0.as_ref(), watch_optional)?;
         Ok(request)
     }

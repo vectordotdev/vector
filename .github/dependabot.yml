@@ -8,11 +8,17 @@ updates:
       time: "04:00" # UTC
     reviewers:
       - "fanatid"
-      - "hoverbear"
     assignees:
       - "fanatid"
-      - "hoverbear"
     labels:
       - "domain: deps"
     commit-message:
       prefix: "chore(deps)"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "domain: ci"
+    commit-message:
+      prefix: "chore(ci)"

@@ -76,6 +76,7 @@
 /docs/reference/remap/merge.cue @FungusHumungus
 /docs/reference/remap/parse_grok.cue @FungusHumungus
 /docs/reference/remap/parse_aws_alb_log.cue @fanatid
+/docs/reference/remap/parse_aws_cloudwatch_log_subscription_message.cue @fanatid
 /docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
 
 /distribution/ @hoverbear @jamtur01
@@ -104,6 +105,7 @@
 /lib/remap-functions/src/log.rs @FungusHumungus
 /lib/remap-functions/src/merge.rs @FungusHumungus
 /lib/remap/functions/src/parse_aws_alb_log.rs @fanatid
+/lib/remap/functions/src/parse_aws_cloudwatch_log_subscription_message.rs @fanatid
 /lib/remap/functions/src/parse_aws_vpc_flow_log.rs @fanatid
 /lib/remap-functions/src/parse_grok.rs @FungusHumungus
 

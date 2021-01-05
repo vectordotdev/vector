@@ -50,9 +50,8 @@ impl Expression for ToIntFn {
             Bytes(v) => Conversion::Integer
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
-            Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
-                Err("unable to convert value to integer".into())
-            }
+            Timestamp(v) => Ok(v.timestamp().into()),
+            Array(_) | Map(_) | Regex(_) => Err("unable to convert value to integer".into()),
         }
     }
 
@@ -61,7 +60,14 @@ impl Expression for ToIntFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null)
+            .fallible_unless(
+                Kind::Integer
+                    | Kind::Float
+                    | Kind::Bytes
+                    | Kind::Boolean
+                    | Kind::Timestamp
+                    | Kind::Null,
+            )
             .with_constraint(Kind::Integer)
     }
 }
@@ -69,32 +75,33 @@ impl Expression for ToIntFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, Utc};
     use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
-            expr: |_| ToIntFn { value: Literal::from(true).boxed() },
+            expr: |_| ToIntFn { value: lit!(true).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         integer_infallible {
-            expr: |_| ToIntFn { value: Literal::from(1).boxed() },
+            expr: |_| ToIntFn { value: lit!(1).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToIntFn { value: Literal::from(1.0).boxed() },
+            expr: |_| ToIntFn { value: lit!(1.0).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         null_infallible {
-            expr: |_| ToIntFn { value: Literal::from(()).boxed() },
+            expr: |_| ToIntFn { value: lit!(null).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToIntFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         map_fallible {
@@ -109,7 +116,7 @@ mod tests {
 
         timestamp_infallible {
             expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
     ];
 
@@ -126,6 +133,15 @@ mod tests {
             (
                 map!["foo": 20.5],
                 Ok(Value::Integer(20)),
+                ToIntFn::new(Box::new(Path::from("foo"))),
+            ),
+            (
+                map![
+                    "foo": DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                            .unwrap()
+                            .with_timezone(&Utc),
+                ],
+                Ok(Value::Integer(1571227200)),
                 ToIntFn::new(Box::new(Path::from("foo"))),
             ),
         ];

@@ -1007,6 +1007,9 @@ package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
+.PHONY: package-aarch64-unknown-linux-gnu-all
+package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu # Build all aarch64 GNU packages
+
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
 package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
 
@@ -1081,7 +1084,7 @@ release-commit: ## Commits release changes
 
 .PHONY: release-docker
 release-docker: ## Release to Docker Hub
-	@scripts/release-docker.sh
+	@scripts/build-docker.sh
 
 .PHONY: release-github
 release-github: ## Release to Github

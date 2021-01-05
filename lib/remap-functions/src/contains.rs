@@ -80,8 +80,8 @@ impl Expression for ContainsFn {
         };
 
         let value = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
-            let string = String::from_utf8_lossy(&bytes);
+            let value = self.value.execute(state, object)?;
+            let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
                 true => string.into_owned(),
