@@ -32,10 +32,9 @@ impl Expression for DecodeBase64Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_bytes()?;
 
-        match base64::decode(value) {
-            Ok(v) => Ok(Value::from(v)),
-            Err(_) => Err("unable to decode value to base64".into()),
-        }
+        base64::decode(value)
+            .map(Into::into)
+            .map_err(|_| "unable to decode value to base64".into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

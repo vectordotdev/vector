@@ -51,7 +51,7 @@ impl Expression for EncodeBase64Fn {
             _ => base64::STANDARD,
         };
 
-        Ok(Value::from(base64::encode_config(value, config)))
+        Ok(base64::encode_config(value, config).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
