@@ -50,13 +50,11 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: |
-          echo "/root/.cargo/bin" >> $GITHUB_PATH
-          cat $GITHUB_PATH
-        shell: bash
+        # rustup is installed as the root user but for some reason `$HOME` is
+        # not set here on the self-hosted runner and I (Jesse) could not
+        # determine how to get it to be set
+      - run: echo "/root/.cargo/bin" >> $GITHUB_PATH
       - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-      - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
