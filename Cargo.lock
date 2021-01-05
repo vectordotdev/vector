@@ -1587,8 +1587,7 @@ dependencies = [
 
 [[package]]
 name = "derive_is_enum_variant"
-version = "0.1.1"
-source = "git+https://github.com/timberio/derive_is_enum_variant?rev=e4550f8ca1366823b8366f0126a7d00ee8ffb080#e4550f8ca1366823b8366f0126a7d00ee8ffb080"
+version = "1.0.0"
 dependencies = [
  "heck",
  "proc-macro2 1.0.24",
@@ -4557,10 +4556,9 @@ dependencies = [
 
 [[package]]
 name = "portpicker"
-version = "0.1.0"
-source = "git+https://github.com/timberio/portpicker-rs?rev=d15829e906516720881584ff3301a0dd04218fbb#d15829e906516720881584ff3301a0dd04218fbb"
+version = "1.0.0"
 dependencies = [
- "rand 0.7.3",
+ "rand 0.8.0",
 ]
 
 [[package]]

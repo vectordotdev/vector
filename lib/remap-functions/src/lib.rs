@@ -66,6 +66,8 @@ mod parse_duration;
 mod parse_grok;
 #[cfg(feature = "parse_json")]
 mod parse_json;
+#[cfg(feature = "parse_key_value")]
+mod parse_key_value;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -189,6 +191,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
+#[cfg(feature = "parse_key_value")]
+pub use parse_key_value::ParseKeyValue;
 #[cfg(feature = "parse_regex")]
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
@@ -316,6 +320,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
+        #[cfg(feature = "parse_key_value")]
+        Box::new(ParseKeyValue),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]

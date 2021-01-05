@@ -84,12 +84,12 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
 }
 
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port().unwrap();
+    let port = pick_unused_port();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port().unwrap();
+    let port = pick_unused_port();
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 

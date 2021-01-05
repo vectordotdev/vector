@@ -450,6 +450,13 @@ macro_rules! value_impl {
             pub fn unwrap_null(self) -> () {
                 self.try_null().expect("null")
             }
+
+            pub fn try_bytes_utf8_lossy<'a>(&'a self) -> Result<std::borrow::Cow<'a, str>, Error> {
+                match self.as_bytes() {
+                    Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
+                    None => Err(Error::Expected(Kind::Bytes, self.kind())),
+                }
+            }
         }
     };
 }
@@ -999,21 +1006,25 @@ impl Value {
 
         let mut handle_field = |field: &Field, new| {
             let key = field.as_str().to_owned();
-            let mut map = BTreeMap::default();
+
+            // `handle_field` is used to update map values, if the current value
+            // isn't a map, we need to make it one.
+            if !matches!(self, Value::Map(_)) {
+                *self = BTreeMap::default().into()
+            }
+
+            let map = match self {
+                Value::Map(map) => map,
+                _ => unreachable!(),
+            };
 
             match rest.first() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
-                None => match self {
-                    Value::Map(map) => {
-                        map.insert(key, new);
-                        return;
-                    }
-                    _ => {
-                        map.insert(key, new);
-                        return *self = map.into();
-                    }
-                },
+                None => {
+                    map.insert(key, new);
+                    return;
+                }
                 // If there are more segments to traverse, insert an empty map
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
@@ -1026,8 +1037,6 @@ impl Value {
             map.get_mut(field.as_str())
                 .unwrap()
                 .insert_by_segments(rest, new);
-
-            *self = map.into();
         };
 
         match segment {
