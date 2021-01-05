@@ -38,13 +38,12 @@ jobs:
 
   bench:
     name: Bench - Linux
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, benchmarks]
     # Allow benchmarks show regressions until we can refine the thresholds for
     # regression to reduce false positives.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -53,6 +52,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
         continue-on-error: true
@@ -68,9 +69,6 @@ jobs:
           test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
       - run: unzip target/criterion.zip
         continue-on-error: true
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - name: Run benchmarks
         run: |
