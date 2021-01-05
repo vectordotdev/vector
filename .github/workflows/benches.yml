@@ -54,7 +54,7 @@ jobs:
           env
           sudo echo "$HOME"
           sudo echo $GITHUB_PATH
-          sudo echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          sudo bash -c 'echo "$HOME/.cargo/bin" >> $GITHUB_PATH'
           sudo cat $GITHUB_PATH
         shell: bash
       - name: Setup tmate session
