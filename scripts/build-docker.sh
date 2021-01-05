@@ -14,6 +14,7 @@ CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
+PUSH="${PUSH:-}"
 REPO="${REPO:-"timberio/vector"}"
 
 #
@@ -38,7 +39,10 @@ build() {
       --tag "$TAG" \
       target/artifacts \
       -f "$DOCKERFILE"
-      docker push "$TAG"
+
+      if [ -n "$PUSH" ]; then
+        docker push "$TAG"
+      fi
   fi
 }
 
