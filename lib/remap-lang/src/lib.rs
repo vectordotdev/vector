@@ -40,7 +40,7 @@ mod tests {
         #[rustfmt::skip]
         let cases = vec![
             (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
-            (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            (r#"foo = null || "bar""#, Ok(()), Ok("bar".into())),
             (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
@@ -56,11 +56,11 @@ mod tests {
             //     r#".a.b.(c | d) == .e."f.g"[2].(h | i)"#,
             //     Ok(Value::Boolean(false)),
             // ),
-            ("$bar = true\n.foo = $bar", Ok(()), Ok(Value::Boolean(true))),
+            ("bar = true\n.foo = bar", Ok(()), Ok(Value::Boolean(true))),
             (
                 r#"{
-                    $foo = "foo"
-                    .foo = $foo + "bar"
+                    foo = "foo"
+                    .foo = foo + "bar"
                     .foo
                 }"#,
                 Ok(()),
@@ -105,13 +105,13 @@ mod tests {
                 Ok(()), Ok(4.into()),
             ),
             (
-                r#"if ($foo = true; $foo) { $foo } else { false }"#,
+                r#"if (foo = true; foo) { foo } else { false }"#,
                 Ok(()), Ok(true.into())
             ),
             (
-                r#"if ($foo = "sproink"
-                       $foo == "sproink") {
-                      $foo
+                r#"if (foo = "sproink"
+                       foo == "sproink") {
+                      foo
                    } else {
                      false
                    }"#,
@@ -168,18 +168,18 @@ mod tests {
             (
                 r#"
                     .foo.bar = "baz"
-                    $foo = .foo
+                    foo = .foo
                     .foo.bar
                 "#,
                 Ok(()),
                 Ok("baz".into()),
             ),
-            ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
-            ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
-            ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
+            ("foo = .foo\nfoo.bar", Ok(()), Ok("baz".into())),
+            ("foo = .foo.qux\nfoo[1]", Ok(()), Ok(2.into())),
+            ("foo = .foo.qux\nfoo[2].quux", Ok(()), Ok(true.into())),
             (
-                "$foo[0] = true",
-                Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
+                "foo[0] = true",
+                Err(r#"remap error: parser error: path in variable assignment unsupported, use "foo" without ".[0]""#),
                 Ok(().into()),
             ),
             (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(value!(["foo", "bar", "baz"]))),
@@ -247,7 +247,7 @@ mod tests {
                 Ok("bar".into()),
             ),
             (
-                r#"$foo = 1;$nork = $foo + 3;$nork"#,
+                r#"foo = 1;nork = foo + 3;nork"#,
                 Ok(()),
                 Ok(4.into()),
             ),
@@ -258,8 +258,8 @@ mod tests {
                 r#"
                     .result = {
                         .foo = true
-                        $bar = 5
-                        { "foo": .foo, "bar": $bar, "baz": "qux" }
+                        bar = 5
+                        { "foo": .foo, "bar": bar, "baz": "qux" }
                     }
 
                     { "result": .result }
