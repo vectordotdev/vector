@@ -66,6 +66,7 @@ default = [
     "parse_duration",
     "parse_grok",
     "parse_json",
+    "parse_key_value",
     "parse_syslog",
     "parse_regex",
     "parse_regex_all",
@@ -128,6 +129,7 @@ parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
+parse_key_value = ["nom"]
 parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_url = ["url"]
