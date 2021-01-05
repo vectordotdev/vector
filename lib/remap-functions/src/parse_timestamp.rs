@@ -83,8 +83,8 @@ mod tests {
     remap::test_type_def![
         value_string_infallible {
             expr: |_| ParseTimestampFn {
-                value: Literal::from("<timestamp>").boxed(),
-                format: Literal::from("<format>").boxed(),
+                value: lit!("<timestamp>").boxed(),
+                format: lit!("<format>").boxed(),
             },
             def: TypeDef {
                 fallible: false,
@@ -96,7 +96,7 @@ mod tests {
         value_timestamp_infallible {
             expr: |_| ParseTimestampFn {
                 value: Literal::from(chrono::Utc::now()).boxed(),
-                format: Literal::from("<format>").boxed(),
+                format: lit!("<format>").boxed(),
             },
             def: TypeDef {
                 fallible: false,
@@ -107,8 +107,8 @@ mod tests {
 
         value_wrong_type_fallible {
             expr: |_| ParseTimestampFn {
-                value: Literal::from(12345).boxed(),
-                format: Literal::from("<format>").boxed(),
+                value: lit!(12345).boxed(),
+                format: lit!("<format>").boxed(),
             },
             def: TypeDef {
                 fallible: true,

@@ -96,7 +96,7 @@ mod tests {
 
     test_type_def![value_string {
         expr: |_| ParseJsonFn {
-            value: Literal::from("foo").boxed(),
+            value: lit!("foo").boxed(),
         },
         def: TypeDef {
             fallible: true,

@@ -73,27 +73,27 @@ mod tests {
 
     remap::test_type_def![
         boolean_infallible {
-            expr: |_| ToFloatFn { value: Literal::from(true).boxed() },
+            expr: |_| ToFloatFn { value: lit!(true).boxed() },
             def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         integer_infallible {
-            expr: |_| ToFloatFn { value: Literal::from(1).boxed() },
+            expr: |_| ToFloatFn { value: lit!(1).boxed() },
             def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToFloatFn { value: Literal::from(1.0).boxed() },
+            expr: |_| ToFloatFn { value: lit!(1.0).boxed() },
             def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         null_infallible {
-            expr: |_| ToFloatFn { value: Literal::from(()).boxed() },
+            expr: |_| ToFloatFn { value: lit!(null).boxed() },
             def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         string_fallible {
-            expr: |_| ToFloatFn { value: Literal::from("foo").boxed() },
+            expr: |_| ToFloatFn { value: lit!("foo").boxed() },
             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
@@ -118,7 +118,7 @@ mod tests {
         let cases = vec![
             (
                 Ok(Value::Float(20.5)),
-                ToFloatFn::new(Literal::from(value!(20.5)).boxed()),
+                ToFloatFn::new(lit!(20.5).boxed()),
             ),
             (
                 Ok(Value::Float(20.0)),

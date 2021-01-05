@@ -100,7 +100,7 @@ mod tests {
         }
 
         string_fallible {
-            expr: |_| ToIntFn { value: Literal::from("foo").boxed() },
+            expr: |_| ToIntFn { value: lit!("foo").boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 

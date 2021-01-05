@@ -73,27 +73,27 @@ mod tests {
 
     remap::test_type_def![
         boolean_infallible {
-            expr: |_| ToBoolFn { value: Literal::from(true).boxed() },
+            expr: |_| ToBoolFn { value: lit!(true).boxed() },
             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         integer_infallible {
-            expr: |_| ToBoolFn { value: Literal::from(1).boxed() },
+            expr: |_| ToBoolFn { value: lit!(1).boxed() },
             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToBoolFn { value: Literal::from(1.0).boxed() },
+            expr: |_| ToBoolFn { value: lit!(1.0).boxed() },
             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         null_infallible {
-            expr: |_| ToBoolFn { value: Literal::from(()).boxed() },
+            expr: |_| ToBoolFn { value: lit!(null).boxed() },
             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         string_fallible {
-            expr: |_| ToBoolFn { value: Literal::from("foo").boxed() },
+            expr: |_| ToBoolFn { value: lit!("foo").boxed() },
             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
@@ -113,7 +113,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToBoolFn { value: Literal::from("foo".to_owned()).boxed() },
+            expr: |_| ToBoolFn { value: lit!("foo").boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,

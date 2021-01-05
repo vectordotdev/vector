@@ -86,17 +86,17 @@ mod tests {
         }
 
         integer_infallible {
-            expr: |_| ToTimestampFn { value: Literal::from(1).boxed() },
+            expr: |_| ToTimestampFn { value: lit!(1).boxed() },
             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed() },
+            expr: |_| ToTimestampFn { value: lit!(1.0).boxed() },
             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         null_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(()).boxed() },
+            expr: |_| ToTimestampFn { value: lit!(null).boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -105,7 +105,7 @@ mod tests {
         }
 
         string_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from("foo").boxed() },
+            expr: |_| ToTimestampFn { value: lit!("foo").boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
@@ -132,7 +132,7 @@ mod tests {
         }
 
         boolean_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(true).boxed() },
+            expr: |_| ToTimestampFn { value: lit!(true).boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Timestamp,
