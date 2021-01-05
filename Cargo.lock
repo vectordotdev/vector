@@ -1587,8 +1587,7 @@ dependencies = [
 
 [[package]]
 name = "derive_is_enum_variant"
-version = "0.1.1"
-source = "git+https://github.com/timberio/derive_is_enum_variant?rev=e4550f8ca1366823b8366f0126a7d00ee8ffb080#e4550f8ca1366823b8366f0126a7d00ee8ffb080"
+version = "1.0.0"
 dependencies = [
  "heck",
  "proc-macro2 1.0.24",
