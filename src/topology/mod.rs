@@ -623,7 +623,7 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                    let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
                 }
             }
         }
@@ -637,7 +637,7 @@ impl RunningTopology {
                 // Sink may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(sink_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
                         .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
@@ -647,7 +647,7 @@ impl RunningTopology {
                 // Transform may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(transform_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(
+                        .send(fanout::ControlMessage::Add(
                             transform_name.clone(),
                             input.get(),
                         ))
@@ -664,8 +664,8 @@ impl RunningTopology {
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[&input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[&input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -695,19 +695,19 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
             }
         }
 
         for input in inputs_to_add {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+            let _ = self.outputs[input].send(fanout::ControlMessage::Replace(
                 name.to_string(),
                 Some(tx.get()),
             ));
@@ -730,8 +730,8 @@ impl RunningTopology {
 
         for input in old_inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Replace(name.to_string(), None));
         }
     }
 
