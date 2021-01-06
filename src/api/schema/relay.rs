@@ -1,10 +1,89 @@
+use async_graphql::static_assertions::_core::fmt::Formatter;
 use async_graphql::{
-    connection::{self, Connection, Edge, EmptyFields},
+    connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result,
 };
 
+/// Base64 invalid states, used by `Base64Cursor`.
+pub enum Base64CursorError {
+    /// Invalid cursor. This can happen if the base64 string is valid, but its contents don't
+    /// conform to the `name:index` pattern.
+    Invalid,
+    /// Decoding error. If this happens, the string isn't valid base64.
+    DecodeError(base64::DecodeError),
+}
+
+impl std::fmt::Display for Base64CursorError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Invalid cursor")
+    }
+}
+
+/// Base64 cursor implementation
+pub struct Base64Cursor {
+    name: &'static str,
+    index: usize,
+}
+
+impl Base64Cursor {
+    fn new(index: usize) -> Self {
+        Self {
+            name: "Cursor",
+            index,
+        }
+    }
+
+    /// Returns a base64 string representation of the cursor
+    fn encode(&self) -> String {
+        base64::encode_config(
+            format!("{}:{}", self.name, self.index),
+            base64::URL_SAFE_NO_PAD,
+        )
+    }
+
+    /// Decodes a base64 string into a cursor result
+    fn decode(s: &str) -> Result<Self, Base64CursorError> {
+        let bytes = base64::decode_config(s, base64::URL_SAFE_NO_PAD)
+            .map_err(Base64CursorError::DecodeError)?;
+
+        let cursor = String::from_utf8(bytes).map_err(|_| Base64CursorError::Invalid)?;
+        let index = cursor
+            .split(':')
+            .last()
+            .map(|s| s.parse::<usize>())
+            .ok_or(Base64CursorError::Invalid)?
+            .map_err(|_| Base64CursorError::Invalid)?;
+
+        Ok(Self::new(index))
+    }
+
+    /// Increment and return the index. Uses saturating_add to avoid overflow issues.
+    fn increment(&self) -> usize {
+        self.index.saturating_add(1)
+    }
+}
+
+impl From<Base64Cursor> for usize {
+    fn from(cursor: Base64Cursor) -> Self {
+        cursor.index
+    }
+}
+
+/// Makes the `Base64Cursor` compatible with Relay connections
+impl CursorType for Base64Cursor {
+    type Error = Base64CursorError;
+
+    fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
+        Base64Cursor::decode(s)
+    }
+
+    fn encode_cursor(&self) -> String {
+        self.encode()
+    }
+}
+
 /// Relay connection result
-pub type ConnectionResult<T> = Result<Connection<usize, T, EmptyFields, EmptyFields>>;
+pub type ConnectionResult<T> = Result<Connection<Base64Cursor, T, EmptyFields, EmptyFields>>;
 
 /// Relay-compliant connection parameters to page results by cursor/page size
 pub struct Params {
@@ -37,7 +116,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
     p: Params,
     default_page_size: usize,
 ) -> ConnectionResult<T> {
-    connection::query::<usize, T, _, _, _, _>(
+    connection::query::<Base64Cursor, T, _, _, _, _>(
         p.after,
         p.before,
         p.first,
@@ -46,8 +125,8 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
             let iter_len = iter.len();
 
             let (start, end) = {
-                let after = after.map(|after| after.saturating_add(1)).unwrap_or(0);
-                let before = before.unwrap_or(iter_len);
+                let after = after.map(|a| a.increment()).unwrap_or(0);
+                let before: usize = before.map(|b| b.into()).unwrap_or(iter_len);
 
                 match (first, last) {
                     // First
@@ -64,7 +143,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
                 (start..end)
                     .into_iter()
                     .zip(iter.skip(start))
-                    .map(|(cursor, node)| Edge::new(cursor, node)),
+                    .map(|(cursor, node)| Edge::new(Base64Cursor::new(cursor), node)),
             );
             Ok(connection)
         },

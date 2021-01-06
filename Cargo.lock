@@ -7276,6 +7276,7 @@ dependencies = [
  "atty",
  "avro-rs",
  "base64 0.13.0",
+ "bincode",
  "bloom",
  "bollard",
  "built",
