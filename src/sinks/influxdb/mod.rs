@@ -309,19 +309,16 @@ pub(in crate::sinks) fn encode_uri(
 #[allow(dead_code)]
 pub mod test_util {
     use super::*;
-    use chrono::offset::TimeZone;
+    use chrono::{offset::TimeZone, Utc};
     use std::fs::File;
     use std::io::Read;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
 
-    static DATABASE_NUM: AtomicUsize = AtomicUsize::new(0);
-
     pub(crate) fn next_database() -> String {
-        format!("testdb{}", DATABASE_NUM.fetch_add(1, Ordering::Relaxed))
+        format!("testdb{}", Utc::now().timestamp_nanos())
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
