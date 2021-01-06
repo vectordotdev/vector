@@ -1,10 +1,8 @@
 //! A watcher based on the k8s API.
 
 use super::{
-    client::Client,
-    stream as k8s_stream,
-    watch_request_builder::WatchRequestBuilder,
-    watcher::{self, Watcher},
+    client::Client, stream as k8s_stream, watch_request_builder::WatchRequestBuilder,
+    watcher::Watcher,
 };
 use crate::internal_events::kubernetes::api_watcher as internal_events;
 use futures::{
@@ -53,7 +51,7 @@ where
                     k8s_stream::Error<BodyError>,
                 >,
             > + 'static,
-        watcher::invocation::Error<invocation::Error>,
+        invocation::Error,
     > {
         // Prepare request.
         let request = self
@@ -75,13 +73,7 @@ where
         // Handle response status code.
         let status = response.status();
         if status != StatusCode::OK {
-            let source = invocation::Error::BadStatus { status };
-            let err = if status == StatusCode::GONE {
-                watcher::invocation::Error::desync(source)
-            } else {
-                watcher::invocation::Error::other(source)
-            };
-            return Err(err);
+            return Err(invocation::Error::BadStatus { status });
         }
 
         // Stream response body.
@@ -105,8 +97,7 @@ where
     fn watch<'a>(
         &'a mut self,
         watch_optional: WatchOptional<'a>,
-    ) -> BoxFuture<'a, Result<Self::Stream, watcher::invocation::Error<Self::InvocationError>>>
-    {
+    ) -> BoxFuture<'a, Result<Self::Stream, Self::InvocationError>> {
         Box::pin(async move {
             self.invoke(watch_optional)
                 .await
@@ -144,11 +135,5 @@ pub mod invocation {
             /// The status from the HTTP response.
             status: StatusCode,
         },
-    }
-
-    impl From<Error> for watcher::invocation::Error<Error> {
-        fn from(source: Error) -> Self {
-            watcher::invocation::Error::other(source)
-        }
     }
 }

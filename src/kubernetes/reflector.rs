@@ -1,16 +1,13 @@
 //! Watch and cache the remote Kubernetes API resources.
 
-use super::{
-    resource_version, state,
-    watcher::{self, Watcher},
-};
+use super::{resource_version, state, watcher::Watcher};
 use crate::internal_events::kubernetes::reflector as internal_events;
 use futures::{
     pin_mut,
     stream::{Stream, StreamExt},
 };
 use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
+    apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
     Metadata, WatchOptional, WatchResponse,
 };
 use snafu::Snafu;
@@ -81,14 +78,7 @@ where
             let invocation_result = self.issue_request().await;
             let stream = match invocation_result {
                 Ok(val) => val,
-                Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(internal_events::DesyncReceived { error: source });
-                    // We got desynced, reset the state and retry fetching.
-                    self.resource_version.reset();
-                    self.state_writer.resync().await;
-                    continue;
-                }
-                Err(watcher::invocation::Error::Other { source }) => {
+                Err(source) => {
                     // Not a desync, fail everything.
                     error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
@@ -117,7 +107,16 @@ where
                 if let Some(item) = val {
                     // A new item arrived from the watch response stream
                     // first - process it.
-                    self.process_stream_item(item).await?;
+                    match self.process_stream_item(item).await {
+                        Err(Error::Desync) => {
+                            emit!(internal_events::DesyncReceived {});
+                            // We got desynced, reset the state and retry fetching.
+                            self.resource_version.reset();
+                            self.state_writer.resync().await;
+                            break;
+                        }
+                        x => x?,
+                    }
                 } else {
                     // Response stream has ended.
                     // Break the watch reading loop so the flow can
@@ -135,8 +134,7 @@ where
     /// Prepare and execute a watch request.
     async fn issue_request(
         &mut self,
-    ) -> Result<<W as Watcher>::Stream, watcher::invocation::Error<<W as Watcher>::InvocationError>>
-    {
+    ) -> Result<<W as Watcher>::Stream, <W as Watcher>::InvocationError> {
         let watch_optional = WatchOptional {
             field_selector: self.field_selector.as_deref(),
             label_selector: self.label_selector.as_deref(),
@@ -160,8 +158,8 @@ where
         let response = item.map_err(|source| Error::Streaming { source })?;
 
         // Unpack the event.
-        let event = match response {
-            WatchResponse::Ok(event) => event,
+        match response {
+            WatchResponse::Ok(event) => self.process_event(event).await,
             WatchResponse::Other(_) => {
                 // Even though we could parse the response, we didn't
                 // get the data we expected on the wire.
@@ -171,34 +169,18 @@ where
                 // TODO: add more details on the data here if we
                 // encounter these messages in practice.
                 warn!(message = "Got unexpected data in the watch response.");
-                return Ok(());
+                Ok(())
             }
-        };
-
-        // Prepare a resource version candidate so we can update (aka commit) it
-        // later.
-        let resource_version_candidate = match resource_version::Candidate::from_watch_event(&event)
-        {
-            Some(val) => val,
-            None => {
-                // This event doesn't have a resource version, this means
-                // it's not something we care about.
-                return Ok(());
-            }
-        };
-
-        // Process the event.
-        self.process_event(event).await;
-
-        // Record the resourse version for this event, so when we resume
-        // it won't be redelivered.
-        self.resource_version.update(resource_version_candidate);
-
-        Ok(())
+        }
     }
 
     /// Translate received watch event to the state update.
-    async fn process_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
+    async fn process_event(
+        &mut self,
+        event: WatchEvent<<W as Watcher>::Object>,
+    ) -> Result<(), Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>> {
+        let resource_version_candidate = resource_version::Candidate::from_watch_event(&event);
+
         match event {
             WatchEvent::Added(object) => {
                 trace!(message = "Got an object event.", event = "added");
@@ -214,10 +196,29 @@ where
             }
             WatchEvent::Bookmark { .. } => {
                 trace!(message = "Got an object event.", event = "bookmark");
-                // noop
             }
-            _ => unreachable!("Other event types should never reach this code."),
+            WatchEvent::ErrorStatus(Status {
+                code: Some(410), ..
+            }) => {
+                return Err(Error::Desync);
+            }
+            // May want to add additional handling for these errors if encountered in practice
+            WatchEvent::ErrorStatus(status) => {
+                warn!(message = "Received watch status error", ?status);
+                return Ok(());
+            }
+            WatchEvent::ErrorOther(raw) => {
+                warn!(message = "Received watch raw error", ?raw);
+                return Ok(());
+            }
+        };
+
+        // Record the resource version for this event, so when we resume it won't be redelivered
+        if let Some(resource_version) = resource_version_candidate {
+            self.resource_version.update(resource_version);
         }
+
+        Ok(())
     }
 }
 
@@ -241,6 +242,11 @@ where
         /// The underlying stream error.
         source: S,
     },
+
+    /// Desync error signals that the server went out of sync and the resource
+    /// version specified in the call can no longer be used.
+    #[snafu(display("stream desync"))]
+    Desync,
 }
 
 #[cfg(test)]
@@ -255,6 +261,7 @@ mod tests {
         test_util::trace_init,
     };
     use futures::{channel::mpsc, SinkExt, StreamExt};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
@@ -300,11 +307,8 @@ mod tests {
     // A type alias to add expressiveness.
     type StateSnapshot = Vec<Pod>;
 
-    // A helper enum to encode expected mock watcher invocation.
-    enum ExpInvRes {
-        Stream(Vec<WatchEvent<Pod>>),
-        Desync,
-    }
+    // A type alias for the expected response
+    type ExpInvRes = Vec<WatchEvent<Pod>>;
 
     // A simple test, to serve as a bare-bones example for adding further tests.
     #[tokio::test]
@@ -367,18 +371,18 @@ mod tests {
             (
                 vec![],
                 None,
-                ExpInvRes::Stream(vec![
+                vec![
                     WatchEvent::Added(make_pod("uid0", "10")),
                     WatchEvent::Added(make_pod("uid1", "15")),
-                ]),
+                ],
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
-                ExpInvRes::Stream(vec![
+                vec![
                     WatchEvent::Modified(make_pod("uid0", "20")),
                     WatchEvent::Added(make_pod("uid2", "25")),
-                ]),
+                ],
             ),
             (
                 vec![
@@ -387,9 +391,9 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("25".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Bookmark {
+                vec![WatchEvent::Bookmark {
                     resource_version: "50".into(),
-                }]),
+                }],
             ),
             (
                 vec![
@@ -398,10 +402,10 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("50".to_owned()),
-                ExpInvRes::Stream(vec![
+                vec![
                     WatchEvent::Deleted(make_pod("uid2", "55")),
                     WatchEvent::Modified(make_pod("uid0", "60")),
-                ]),
+                ],
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid0", "60"), make_pod("uid1", "15")];
@@ -419,28 +423,35 @@ mod tests {
             (
                 vec![],
                 None,
-                ExpInvRes::Stream(vec![
+                vec![
                     WatchEvent::Added(make_pod("uid0", "10")),
                     WatchEvent::Added(make_pod("uid1", "15")),
-                ]),
+                ],
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
-                ExpInvRes::Desync,
+                vec![WatchEvent::ErrorStatus(Status {
+                    code: Some(410),
+                    details: None,
+                    message: None,
+                    metadata: Default::default(),
+                    reason: None,
+                    status: None,
+                })],
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
-                ExpInvRes::Stream(vec![
+                vec![
                     WatchEvent::Added(make_pod("uid20", "1000")),
                     WatchEvent::Added(make_pod("uid21", "1005")),
-                ]),
+                ],
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Modified(make_pod("uid21", "1010"))]),
+                vec![WatchEvent::Modified(make_pod("uid21", "1010"))],
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -921,21 +932,6 @@ mod tests {
                 // Assert the resource version passed with watch invocation.
                 assert_eq!(watch_optional.resource_version, expected_resource_version);
 
-                // Determine the requested action from the test scenario.
-                let responses = match expected_invocation_response {
-                    // Stream is requested, continue with the current flow.
-                    ExpInvRes::Stream(responses) => responses,
-                    // Desync is requested, complete the invocation with the desync.
-                    ExpInvRes::Desync => {
-                        // Send the desync action to mock watcher.
-                        watcher_invocations_tx
-                            .send(mock_watcher::ScenarioActionInvocation::ErrDesync)
-                            .await
-                            .unwrap();
-                        continue;
-                    }
-                };
-
                 // Prepare channels for use in stream of the watch mock.
                 let (mut watch_stream_tx, watch_stream_rx) = mpsc::channel(0);
 
@@ -945,7 +941,17 @@ mod tests {
                     .await
                     .unwrap();
 
-                for response in responses {
+                let mut desync = false;
+
+                for response in expected_invocation_response {
+                    // In the event of a desync the reflector will not wait for further messages
+                    desync = matches!(
+                        response,
+                        WatchEvent::ErrorStatus(Status {
+                            code: Some(410), ..
+                        })
+                    );
+
                     // Wait for watcher to request next item from the stream.
                     assert_eq!(
                         watcher_events_rx.next().await.unwrap(),
@@ -959,19 +965,25 @@ mod tests {
                         )))
                         .await
                         .unwrap();
+
+                    if desync {
+                        break;
+                    }
                 }
 
-                // Wait for watcher to request next item from the stream.
-                assert_eq!(
-                    watcher_events_rx.next().await.unwrap(),
-                    mock_watcher::ScenarioEvent::Stream
-                );
+                if !desync {
+                    // Wait for watcher to request next item from the stream.
+                    assert_eq!(
+                        watcher_events_rx.next().await.unwrap(),
+                        mock_watcher::ScenarioEvent::Stream
+                    );
 
-                // Send the notification that the stream is over.
-                watch_stream_tx
-                    .send(mock_watcher::ScenarioActionStream::Done)
-                    .await
-                    .unwrap();
+                    // Send the notification that the stream is over.
+                    watch_stream_tx
+                        .send(mock_watcher::ScenarioActionStream::Done)
+                        .await
+                        .unwrap();
+                }
 
                 // Advance the time to scroll pass the delay till next
                 // invocation.

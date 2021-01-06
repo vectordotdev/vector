@@ -1,6 +1,6 @@
 //! A watcher that adds instrumentation.
 
-use super::watcher::{self, Watcher};
+use super::watcher::Watcher;
 use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
 use k8s_openapi::{WatchOptional, WatchResponse};
@@ -38,8 +38,7 @@ where
     fn watch<'a>(
         &'a mut self,
         watch_optional: WatchOptional<'a>,
-    ) -> BoxFuture<'a, Result<Self::Stream, watcher::invocation::Error<Self::InvocationError>>>
-    {
+    ) -> BoxFuture<'a, Result<Self::Stream, Self::InvocationError>> {
         Box::pin(self.inner.watch(watch_optional).map(|result| {
             result
                 .map(|stream| {

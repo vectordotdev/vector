@@ -2,7 +2,7 @@
 
 #![cfg(test)]
 
-use super::watcher::{self, Watcher};
+use super::watcher::Watcher;
 use async_stream::try_stream;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
@@ -26,8 +26,6 @@ where
     /// Return successfully and prepare the stream with responses from the
     /// passed [`Receiver`].
     Ok(Receiver<ScenarioActionStream<T>>),
-    /// Return a desync error.
-    ErrDesync,
     /// Return an "other" (i.e. non-desync) error.
     ErrOther,
 }
@@ -85,8 +83,7 @@ where
     fn watch<'a>(
         &'a mut self,
         watch_optional: WatchOptional<'a>,
-    ) -> BoxFuture<'a, Result<Self::Stream, watcher::invocation::Error<Self::InvocationError>>>
-    {
+    ) -> BoxFuture<'a, Result<Self::Stream, Self::InvocationError>> {
         let mut stream_events_tx = self.events_tx.clone();
         Box::pin(async move {
             self.events_tx
@@ -122,12 +119,7 @@ where
                         >;
                     Ok(stream)
                 }
-                ScenarioActionInvocation::ErrDesync => {
-                    Err(watcher::invocation::Error::desync(InvocationError))
-                }
-                ScenarioActionInvocation::ErrOther => {
-                    Err(watcher::invocation::Error::other(InvocationError))
-                }
+                ScenarioActionInvocation::ErrOther => Err(InvocationError),
             }
         })
     }

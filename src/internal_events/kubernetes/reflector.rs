@@ -3,14 +3,11 @@ use metrics::counter;
 
 /// Emitted when reflector gets a desync from the watch command.
 #[derive(Debug)]
-pub struct DesyncReceived<E> {
-    /// The underlying error.
-    pub error: E,
-}
+pub struct DesyncReceived {}
 
-impl<E: std::fmt::Debug> InternalEvent for DesyncReceived<E> {
+impl InternalEvent for DesyncReceived {
     fn emit_logs(&self) {
-        warn!(message = "Handling desync.", error = ?self.error);
+        info!(message = "Handling desync.");
     }
 
     fn emit_metrics(&self) {
