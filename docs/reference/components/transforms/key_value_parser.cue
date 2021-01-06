@@ -36,10 +36,10 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
-			function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
-			simple syntax for robust data transformation. Let us know what you think!
-			""",
+				This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
+				function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
+				simple syntax for robust data transformation. Let us know what you think!
+				""",
 		]
 		notices: [
 			"""
@@ -82,8 +82,8 @@ components: transforms: key_value_parser: {
 		overwrite_target: {
 			common: false
 			description: """
-					If `target_field` is set and the log contains a field of the same name
-					as the target, it will only be overwritten if this is set to `true`.
+				If `target_field` is set and the log contains a field of the same name
+				as the target, it will only be overwritten if this is set to `true`.
 				"""
 			required: false
 			type: bool: default: false
@@ -102,10 +102,10 @@ components: transforms: key_value_parser: {
 		target_field: {
 			common: false
 			description: """
-					If this setting is present, the parsed JSON will be inserted into the
-					log as a sub-object with this name.
-					If a field with the same name already exists, the parser will fail and
-					produce an error.
+				If this setting is present, the parsed JSON will be inserted into the
+				log as a sub-object with this name.
+				If a field with the same name already exists, the parser will fail and
+				produce an error.
 				"""
 			required: false
 			type: string: {
@@ -117,8 +117,8 @@ components: transforms: key_value_parser: {
 		trim_key: {
 			common: false
 			description: """
-					Removes characters from the beginning and end of a key until a character that is not listed.
-					ex: `<key>=value` would result in `key: value` with this option set to `<>`.
+				Removes characters from the beginning and end of a key until a character that is not listed.
+				ex: `<key>=value` would result in `key: value` with this option set to `<>`.
 				"""
 			required: false
 			type: string: {
@@ -130,8 +130,8 @@ components: transforms: key_value_parser: {
 		trim_value: {
 			common: false
 			description: """
-					Removes characters from the beginning and end of a value until a character that is not listed.
-					ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.
+				Removes characters from the beginning and end of a value until a character that is not listed.
+				ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.
 				"""
 			required: false
 			type: string: {
@@ -152,9 +152,9 @@ components: transforms: key_value_parser: {
 		description: {
 			title: "Description"
 			body: """
-					The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
-					json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
-					splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
+				The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
+				json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
+				splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
 				"""
 		}
 	}

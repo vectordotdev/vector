@@ -238,7 +238,7 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_repo]: https://github.com/timberio/vector
-[urls.vector_roadmap]: https://github.com/timberio/vector/milestones?direction=asc&sort=due_date&state=open
+[urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev

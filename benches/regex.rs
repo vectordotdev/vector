@@ -67,9 +67,9 @@ fn http_access_log_lines() -> impl Iterator<Item = String> {
                 rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), // IP
                 year.sample(&mut rng), mday.sample(&mut rng), // date
                 hour.sample(&mut rng), minsec.sample(&mut rng), minsec.sample(&mut rng), // time
-                (&mut rng).sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
+                (&mut rng).sample_iter(&Alphanumeric).take(url_size).map(char::from).collect::<String>(), // URL
                 code.sample(&mut rng), size.sample(&mut rng),
-                (&mut rng).sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
+                (&mut rng).sample_iter(&Alphanumeric).take(browser_size).map(char::from).collect::<String>(),
         )
     })
 }

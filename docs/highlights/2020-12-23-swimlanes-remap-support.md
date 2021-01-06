@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-12-23"
 $schema: ".schema.json"
-title: "Remap support for the `swimlanes` transform"
+title: "Remap support for the `swimlanes` transform (routing)"
 description: "Use VRL to specify conditions for routing events into multiple channels"
 author_github: "https://github.com/lucperkins"
 pr_numbers: []
@@ -25,19 +25,19 @@ Previously, the `swimlanes` transform required you to specify conditions using
 The example configuration below shows the same `swimlanes` transform using the
 old system (`check_fields`) and the new system (`remap`):
 
-```toml
-[transforms.split_events]
-type = "swimlanes"
-inputs = ["http-server-logs"]
+```dff
+ [transforms.split_events]
+ type = "swimlanes"
+ inputs = ["http-server-logs"]
 
-# Using check_fields
-lanes.success.type = "check_fields"
-lanes.success.status_code.eq = 200
-lanes.success.severity.eq = "info"
+ # Using check_fields
+-lanes.success.type = "check_fields"
+-lanes.success.status_code.eq = 200
+-lanes.success.severity.eq = "info"
 
-# Using remap
-lanes.success.type = "remap"
-lanes.success.source = '.status_code == 200 && .severity == "info"'
+ # Using remap
++lanes.success.type = "remap"
++lanes.success.source = '.status_code == 200 && .severity == "info"'
 ```
 
 [swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes

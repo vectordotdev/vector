@@ -8,7 +8,7 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use std::io::{stdout, Write};
+use std::io::stdout;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},

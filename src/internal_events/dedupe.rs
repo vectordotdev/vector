@@ -10,7 +10,7 @@ impl InternalEvent for DedupeEventDiscarded {
     fn emit_logs(&self) {
         warn!(
             message = "Encountered duplicate event; discarding.",
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
         trace!(message = "Encountered duplicate event; discarding.", event = ?self.event);
     }

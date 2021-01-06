@@ -33,16 +33,15 @@ impl Function for ParseGrok {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        let patternbytes = arguments
+        let pattern = arguments
             .required_literal("pattern")?
             .as_value()
             .clone()
-            .try_bytes()?;
-
-        let patternstr = String::from_utf8_lossy(&patternbytes).into_owned();
+            .try_bytes_utf8_lossy()?
+            .into_owned();
 
         let mut grok = grok::Grok::with_patterns();
-        let pattern = Arc::new(grok.compile(&patternstr, true).map_err(|e| e.to_string())?);
+        let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| e.to_string())?);
 
         let remove_empty = arguments.optional("remove_empty").map(Expr::boxed);
 

@@ -442,7 +442,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in group template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -454,7 +454,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in stream template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -464,7 +464,9 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
+        .map_err(
+            |error| error!(message = "Could not encode event.", %error, internal_log_rate_secs = 5),
+        )
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
@@ -891,10 +893,12 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
         sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -951,10 +955,12 @@ mod integration_tests {
         });
         let _ = sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1023,10 +1029,12 @@ mod integration_tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some((now - Duration::days(30)).timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some((now - Duration::days(30)).timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1067,10 +1075,12 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
         sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = group_name;
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: group_name,
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1117,10 +1127,12 @@ mod integration_tests {
         let mut events = events.map(Ok);
         let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = group_name;
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: group_name,
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1173,10 +1185,12 @@ mod integration_tests {
             .collect::<Vec<_>>();
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = format!("{}-0", stream_name);
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: format!("{}-0", stream_name),
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
@@ -1194,10 +1208,12 @@ mod integration_tests {
 
         assert_eq!(output_lines, expected_output);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = format!("{}-1", stream_name);
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: format!("{}-1", stream_name),
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();

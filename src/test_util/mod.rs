@@ -84,12 +84,12 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
 }
 
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port().unwrap();
+    let port = pick_unused_port();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port().unwrap();
+    let port = pick_unused_port();
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
@@ -203,6 +203,7 @@ pub fn random_string(len: usize) -> String {
     thread_rng()
         .sample_iter(&Alphanumeric)
         .take(len)
+        .map(char::from)
         .collect::<String>()
 }
 
@@ -211,7 +212,7 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
-    let size = thread_rng().gen_range(0, max_size);
+    let size = thread_rng().gen_range(0..max_size);
 
     (0..size)
         .map(move |_| (random_string(field_len), random_string(field_len)))
@@ -515,10 +516,7 @@ impl CountReceiver<Event> {
 pub async fn start_topology(
     mut config: Config,
     require_healthy: impl Into<Option<bool>>,
-) -> (
-    RunningTopology,
-    futures01::sync::mpsc::UnboundedReceiver<()>,
-) {
+) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
     let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())

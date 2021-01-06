@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, SinkDescription, SinkHealthcheckOptions,
-    SourceDescription, TransformDescription,
+    component::ExampleError, default_data_dir, GlobalOptions, SinkDescription,
+    SinkHealthcheckOptions, SourceDescription, TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -94,10 +94,9 @@ fn generate_example(
         })
         .collect();
 
-    let globals = {
-        let mut globals = GlobalOptions::default();
-        globals.data_dir = crate::config::default_data_dir();
-        globals
+    let globals = GlobalOptions {
+        data_dir: default_data_dir(),
+        ..Default::default()
     };
     let mut config = Config::default();
 
@@ -292,9 +291,10 @@ fn generate_example(
     };
     if let Some(sources) = config.sources {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sources = Some(sources);
-            sub
+            Config {
+                sources: Some(sources),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sources: {}", e)),
@@ -302,9 +302,10 @@ fn generate_example(
     }
     if let Some(transforms) = config.transforms {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.transforms = Some(transforms);
-            sub
+            Config {
+                transforms: Some(transforms),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal transforms: {}", e)),
@@ -312,9 +313,10 @@ fn generate_example(
     }
     if let Some(sinks) = config.sinks {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sinks = Some(sinks);
-            sub
+            Config {
+                sinks: Some(sinks),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sinks: {}", e)),
