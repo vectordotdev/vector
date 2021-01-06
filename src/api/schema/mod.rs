@@ -2,6 +2,7 @@ pub mod components;
 mod health;
 mod meta;
 mod metrics;
+mod relay;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 

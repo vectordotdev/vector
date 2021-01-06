@@ -887,4 +887,128 @@ mod tests {
             );
         })
     }
+
+    #[test]
+    fn api_graphql_components_connection() {
+        metrics_test("tests::api_graphql_components_connection", async {
+            // Config with a total of 5 components
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.gen1]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["1"]
+                  interval = 0.1
+
+                [sources.gen2]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["2"]
+                  interval = 0.1
+
+                [sources.gen3]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["3"]
+                  interval = 0.1
+
+                [sources.gen4]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["4"]
+                  interval = 0.1
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["gen1", "gen2", "gen3", "gen4"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(&conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = make_client(server.addr());
+
+            // Test after/first with a page size of 2, exhausting all results
+            let mut cursor: Option<String> = None;
+            for i in 0..3 {
+                // The components connection contains a `pageInfo` and `edges` -- we need
+                // both to assertion the result set matches expectations
+                let components = client
+                    .components_connection_query(cursor.clone(), None, Some(2), None)
+                    .await
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .components;
+
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
+
+                let page_info = components.page_info;
+
+                // Check prev/next paging is accurate
+                assert_eq!(
+                    (page_info.has_previous_page, page_info.has_next_page),
+                    match i {
+                        0 => (false, true),
+                        2 => (true, false),
+                        _ => (true, true),
+                    }
+                );
+
+                // The # of `edges` results should be 2, except the last page
+                assert_eq!(
+                    components.edges.iter().flatten().count(),
+                    match i {
+                        2 => 1,
+                        _ => 2,
+                    }
+                );
+
+                // Set the after cursor for the next iteration
+                cursor = page_info.end_cursor;
+            }
+
+            // Now use the last 'after' cursor as the 'before'
+            for i in 0..3 {
+                let components = client
+                    .components_connection_query(None, cursor, None, Some(2))
+                    .await
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .components;
+
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
+
+                let page_info = components.page_info;
+
+                // Check prev/next paging. Since we're using a `before` cursor, the last
+                // record won't be included, and therefore `has_next_page` will always be true.
+                assert_eq!(
+                    (page_info.has_previous_page, page_info.has_next_page),
+                    match i {
+                        0 => (true, true),
+                        _ => (false, true),
+                    }
+                );
+
+                // The # of `edges` results should be 2, and zero for the last iteration
+                assert_eq!(
+                    components.edges.iter().flatten().count(),
+                    match i {
+                        2 => 0,
+                        _ => 2,
+                    }
+                );
+
+                // Set the before cursor for the next iteration
+                cursor = page_info.start_cursor;
+            }
+        });
+    }
 }
