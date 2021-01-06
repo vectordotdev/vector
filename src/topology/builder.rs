@@ -13,8 +13,7 @@ use crate::{
     Pipeline,
 };
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
-    future, FutureExt, StreamExt, TryFutureExt,
+    compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{Future as Future01, Stream as Stream01};
 use std::{
@@ -79,10 +78,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
-            .map(Ok)
-            .forward(output.sink_compat())
-            .map_ok(|_| TaskOutput::Source);
+        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -122,12 +118,14 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = futures01::sync::mpsc::channel(100);
+        let (input_tx, input_rx) = mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
         let filtered = input_rx
+            .map(Ok)
+            .compat()
             .filter(move |event| filter_event_type(event, input_type))
             .inspect(|_| emit!(EventProcessed));
         let transform = match transform {
@@ -142,12 +140,12 @@ pub async fn build_pieces(
                     })
                     .flatten()
                     .boxed();
-                transformed.forward(output)
+                transformed.forward(output.compat())
             }
             Transform::Task(t) => {
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
                     t.transform(Box::new(filtered));
-                transformed.forward(output)
+                transformed.forward(output.compat())
             }
         }
         .map(|_| {
@@ -184,7 +182,7 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", name, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
             }
         };
 
@@ -217,12 +215,9 @@ pub async fn build_pieces(
                 .expect("Task started but input has been taken.");
 
             sink.run(
-                (&mut rx)
-                    .filter(|event| filter_event_type(event, input_type))
-                    .compat()
-                    .take_while(|e| ready(e.is_ok()))
-                    .take_until_if(tripwire)
-                    .map(|x| x.unwrap()),
+                rx.by_ref()
+                    .filter(|event| ready(filter_event_type(event, input_type)))
+                    .take_until_if(tripwire),
             )
             .await
             .map(|_| {
