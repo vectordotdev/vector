@@ -7,6 +7,8 @@ set -o pipefail
 #
 #   Builds and pulls down the Vector Nginx Integration test environment
 
+set -x
+
 # Echo usage if something isn't right.
 usage() {
     echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|pdoman} ]  [-t The container enclosure to use {pod|network} ]" 1>&2; exit 1;
@@ -15,14 +17,12 @@ usage() {
 while getopts a:t:e: flag
 do
     case "${flag}" in
-        a) ACTION=${OPTARG}
-          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
-        t) CONTAINER_TOOL=${OPTARG}
-          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
-        e) CONTAINER_ENCLOSURE=${OPTARG}
-         [[ ${CONTAINER_ENCLOSURE} == "pod" || ${CONTAINER_ENCLOSURE} == "network" ]] && usage;;
+        a) ACTION=${OPTARG};;
+        t) CONTAINER_TOOL=${OPTARG};;
+        e) CONTAINER_ENCLOSURE=${OPTARG};;
         :)
-         echo "ERROR: Option -$OPTARG requires an argument" usage
+         echo "ERROR: Option -$OPTARG requires an argument"
+         usage
          ;;
         *)
           echo "ERROR: Invalid option -$OPTARG"

@@ -7,19 +7,21 @@ set -o pipefail
 #
 #  Sets up Vector integration test environments
 
+set -x
+
 # Echo usage if something isn't right.
 usage() {
     echo "Usage: $0 [-i Name of integration suite ] [-a Action to run {stop|start} ] [-t The container tool to use]" 1>&2; exit 1;
 }
 
-while getopts "i:a:t:" o;
+while getopts i:a:t: o;
 do
     case "${o}" in
         i) INTEGRATION=${OPTARG};;
         a) ACTION=${OPTARG}
-          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
+          ;;
         t) CONTAINER_TOOL=${OPTARG}
-          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
+          ;;
         :)
           echo "ERROR: Option -$OPTARG requires an argument"
           usage
@@ -39,6 +41,7 @@ fi
 
 INTEGRATION="${INTEGRATION:-"none"}"
 ACTION="${ACTION:-"stop"}"
+CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
 
 case $CONTAINER_TOOL in
   "podman")
