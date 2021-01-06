@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, LookupBuf, Value},
+    event::{Event, LookupBuf},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
@@ -9,7 +9,6 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateError},
-    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -287,7 +286,7 @@ impl Sink<Event> for KafkaSink {
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
-                .and_then(|v| v.as_timestamp()),
+                .and_then(|v| Some(v.as_timestamp())),
             Event::Metric(metric) => metric.timestamp.as_ref(),
         }
         .map(|ts| ts.timestamp_millis());
@@ -417,7 +416,7 @@ fn encode_event(
             Event::Metric(metric) => metric
                 .tags
                 .as_ref()
-                .and_then(|tags| tags.get(f))
+                .and_then(|tags| tags.get(&f.to_string()))
                 .map(|value| value.clone().into_bytes()),
         })
         .unwrap_or_default();
