@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 // New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
-const MAX_PAYLOAD_SIZE: usize = 1_000_000 as usize;
+const MAX_PAYLOAD_SIZE: usize = 1_000_000_usize;
 
 #[derive(Debug, Snafu)]
 enum BuildError {

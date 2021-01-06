@@ -114,7 +114,7 @@ impl TransformConfig for Ec2Metadata {
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
         let namespace = self.namespace.clone().and_then(|namespace| {
-            if namespace == "" {
+            if namespace.is_empty() {
                 None
             } else {
                 Some(namespace)

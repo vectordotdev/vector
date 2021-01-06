@@ -250,7 +250,7 @@ impl SyslogDecoder {
         src: &mut BytesMut,
     ) -> Option<Result<Option<String>, LinesCodecError>> {
         if let Some(&first_byte) = src.get(0) {
-            if 49 <= first_byte && first_byte <= 57 {
+            if (49..=57).contains(&first_byte) {
                 // First character is non zero number so we can assume that
                 // octet count framing is used.
                 trace!("Octet counting encoded event detected.");
@@ -680,15 +680,19 @@ mod test {
         crate::test_util::trace_init();
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
+        let event = event_from_str(&"host".to_string(), None, &raw).unwrap();
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
+            let value = event.as_log().get("timestamp").unwrap();
+            let year = value.as_timestamp().unwrap().naive_local().year();
+
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
-                chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
+                chrono::Local.ymd(year, 2, 13).and_hms(20, 7, 26).into();
             expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert(log_schema().source_type_key().clone(), "syslog");
@@ -699,10 +703,7 @@ mod test {
             expected.insert("procid", 8539);
         }
 
-        assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
-            expected
-        );
+        assert_eq!(event, expected);
     }
 
     #[test]
@@ -713,15 +714,19 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
+        let event = event_from_str(&"host".to_string(), None, &raw).unwrap();
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
         {
+            let value = event.as_log().get("timestamp").unwrap();
+            let year = value.as_timestamp().unwrap().naive_local().year();
+
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
-                chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
+                chrono::Local.ymd(year, 2, 13).and_hms(21, 31, 56).into();
             expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
@@ -738,10 +743,7 @@ mod test {
             );
         }
 
-        assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
-            expected
-        );
+        assert_eq!(event, expected);
     }
 
     #[test]

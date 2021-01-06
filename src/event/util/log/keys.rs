@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
 #[deprecated(since = "0.12.0", note = "Please use Event/Value keys instead.")]
-pub fn keys<'a>(fields: &'a BTreeMap<String, Value>) -> impl Iterator<Item = String> + 'a {
+pub fn keys(fields: &BTreeMap<String, Value>) -> impl Iterator<Item = String> + '_ {
     all_fields(fields).map(|(k, _)| k)
 }
 

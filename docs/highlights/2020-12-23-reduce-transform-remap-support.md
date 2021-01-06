@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-12-23"
 $schema: ".schema.json"
-title: "Remap support for the `reduce` transform"
+title: "Remap support for the `reduce` transform (multi-line logs)"
 description: "Use VRL to specify conditions for reducing multi-log lines into a single log event"
 author_github: "https://github.com/lucperkins"
 pr_numbers: []
@@ -27,20 +27,20 @@ Previously, the `reduce` transform required you to specify conditions using
 The example configuration below shows the same `reduce` transform using the old
 system (`check_fields`) and the new system (`remap`):
 
-```toml
-[transforms.merge_stack_trace]
-type = "reduce"
-inputs = ["jvm-logs"]
-merge_strategies.message = "concat_newline"
+```diff
+ [transforms.merge_stack_trace]
+ type = "reduce"
+ inputs = ["jvm-logs"]
+ merge_strategies.message = "concat_newline"
 
-# Using check_fields
-starts_when.type = "check_fields"
-starts_when.message.regex = "/^\\w.*/"
-starts_when.severity.eq = "info"
+ # Using check_fields
+-starts_when.type = "check_fields"
+-starts_when.message.regex = "/^\\w.*/"
+-starts_when.severity.eq = "info"
 
-# Using remap
-starts_when.type = "remap"
-starts_when.source = 'match(.message, /^\\w.*/) && .severity == "info"'
+ # Using remap
++starts_when.type = "remap"
++starts_when.source = 'match(.message, /^\\w.*/) && .severity == "info"'
 ```
 
 [reduce]: https://vector.dev/docs/reference/transforms/reduce

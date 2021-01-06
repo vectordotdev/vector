@@ -108,6 +108,16 @@ mod tests {
                 Ok(()),
             ),
             (
+                value!({foo: {bar: "baz"}}),
+                vec![
+                    Field(Regular("bar".to_owned())),
+                    Field(Regular("baz".to_owned())),
+                ],
+                true.into(),
+                value!({foo: {bar: "baz"}, bar: {baz: true}}),
+                Ok(()),
+            ),
+            (
                 value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),

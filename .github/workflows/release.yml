@@ -73,6 +73,21 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
+  build-aarch64-unknown-linux-gnu-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default"
+        run: make package-aarch64-unknown-linux-gnu-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
+
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: ubuntu-latest
     steps:
@@ -195,7 +210,6 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
 
-
   deb-verify:
     needs:
       - build-x86_64-unknown-linux-gnu-packages
@@ -253,15 +267,48 @@ jobs:
       - run: |
           rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
+  osx-verify:
+    runs-on: macos-10.15
+    needs:
+      - build-x86_64-apple-darwin-packages
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name:  vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
+          path: target/artifacts
+      - run: |
+          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+
   release-docker:
     runs-on: ubuntu-latest
     needs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - deb-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.CI_DOCKER_USERNAME }}
+          password: ${{ secrets.CI_DOCKER_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: all
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+        with:
+          version: latest
+          install: true
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
@@ -272,18 +319,23 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
           path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
+          path: target/artifacts
       - env:
-          DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
-          DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
-          PLATFORM: "linux/amd64,linux/arm64"
+          PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7"
         run: |
-          ./scripts/upgrade-docker.sh
           make release-docker
 
   release-s3:
@@ -292,12 +344,14 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
       - rpm-verify
+      - osx-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -312,6 +366,10 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -368,12 +426,14 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - deb-verify
       - rpm-verify
+      - osx-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -388,6 +448,10 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -594,12 +658,14 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - deb-verify
       - rpm-verify
+      - osx-verify
       - release-docker
       - release-s3
       - release-cloudsmith
