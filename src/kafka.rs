@@ -1,5 +1,6 @@
+use crate::internal_events::KafkaStatistics;
 use crate::tls::TlsOptions;
-use rdkafka::ClientConfig;
+use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::path::PathBuf;
@@ -93,3 +94,24 @@ fn pathbuf_to_string(path: &PathBuf) -> crate::Result<&str> {
     path.to_str()
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub(crate) struct KafkaStatisticsConfig {
+    interval_ms: u64,
+}
+
+impl KafkaStatisticsConfig {
+    pub(crate) fn apply(&self, client: &mut ClientConfig) {
+        client.set("statistics.interval.ms", &self.interval_ms.to_string());
+    }
+}
+
+pub(crate) struct KafkaStatisticsContext;
+
+impl ClientContext for KafkaStatisticsContext {
+    fn stats(&self, stats: Statistics) {
+        emit!(KafkaStatistics::new(&stats));
+    }
+}
+
+impl ConsumerContext for KafkaStatisticsContext {}

@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    kafka::{KafkaAuthConfig, KafkaCompression},
+    kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsConfig},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -59,6 +59,7 @@ pub struct KafkaSinkConfig {
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     message_timeout_ms: u64,
+    statistics: Option<KafkaStatisticsConfig>,
     #[serde(default)]
     librdkafka_options: HashMap<String, String>,
 }
@@ -149,6 +150,10 @@ impl KafkaSinkConfig {
             .set("message.timeout.ms", &self.message_timeout_ms.to_string());
 
         self.auth.apply(&mut client_config)?;
+
+        if let Some(statistics) = &self.statistics {
+            statistics.apply(&mut client_config);
+        }
 
         // All batch options are producer only.
         if kafka_role == KafkaRole::Producer {

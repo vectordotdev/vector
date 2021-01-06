@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
-    kafka::KafkaAuthConfig,
+    kafka::{KafkaAuthConfig, KafkaStatisticsConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -49,6 +49,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+    statistics: Option<KafkaStatisticsConfig>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -209,7 +210,9 @@ fn kafka_source(
     }))
 }
 
-fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
+fn create_consumer(
+    config: &KafkaSourceConfig,
+) -> crate::Result<StreamConsumer<KafkaStatisticsContext>> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -229,13 +232,19 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 
     config.auth.apply(&mut client_config)?;
 
+    if let Some(statistics) = &config.statistics {
+        statistics.apply(&mut client_config);
+    }
+
     if let Some(librdkafka_options) = &config.librdkafka_options {
         for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }
     }
 
-    let consumer: StreamConsumer = client_config.create().context(KafkaCreateError)?;
+    let consumer = client_config
+        .create_with_context::<_, StreamConsumer<_>>(KafkaStatisticsContext)
+        .context(KafkaCreateError)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeError)?;
 
