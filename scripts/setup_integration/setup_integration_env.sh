@@ -18,25 +18,23 @@ while getopts i:a:t: o;
 do
     case "${o}" in
         i) INTEGRATION=${OPTARG};;
-        a) ACTION=${OPTARG}
-          ;;
-        t) CONTAINER_TOOL=${OPTARG}
-          ;;
+        a) ACTION=${OPTARG};;
+        t) CONTAINER_TOOL=${OPTARG};;
         :)
-          echo "ERROR: Option -$OPTARG requires an argument"
-          usage
-          ;;
+        echo "ERROR: Option -$OPTARG requires an argument"
+        usage
+        ;;
         *)
-          echo "ERROR: Invalid option -$OPTARG"
-          usage
-          ;;
+        echo "ERROR: Invalid option -$OPTARG"
+        usage
+        ;;
     esac
 done
 shift $((OPTIND-1))
 
 # Check required switches exist
 if [ -z "${INTEGRATION}" ] || [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ]; then
-    usage
+  usage
 fi
 
 INTEGRATION="${INTEGRATION:-"none"}"
