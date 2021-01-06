@@ -98,4 +98,10 @@ fn create_event(json: Value) -> LogEvent {
     output.into_iter().next().unwrap().into_log()
 }
 
-criterion_group!(benches, benchmark_event);
+criterion_group!(
+    name = benches;
+    // encapsulates inherent CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_event
+);
