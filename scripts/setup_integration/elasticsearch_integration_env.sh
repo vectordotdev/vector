@@ -19,13 +19,13 @@ do
         t) CONTAINER_TOOL=${OPTARG};;
         e) CONTAINER_ENCLOSURE=${OPTARG};;
         :)
-         echo "ERROR: Option -$OPTARG requires an argument"
-         usage
-         ;;
+        echo "ERROR: Option -$OPTARG requires an argument"
+        usage
+        ;;
         *)
-          echo "ERROR: Invalid option -$OPTARG"
-          usage
-          ;;
+        echo "ERROR: Invalid option -$OPTARG"
+        usage
+        ;;
     esac
 done
 shift $((OPTIND-1))
