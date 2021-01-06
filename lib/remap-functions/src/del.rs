@@ -50,7 +50,7 @@ impl Expression for DelFn {
         // of infallible fields for now, but we'll circle back to this in
         // the near future to potentially improve this situation.
         //
-        // see tracking issue: <TODO>
+        // see tracking issue: https://github.com/timberio/vector/issues/5887
         Ok(object
             .remove(self.path.as_ref(), false)
             .ok()
@@ -70,6 +70,7 @@ impl Expression for DelFn {
 mod tests {
     use super::*;
     use crate::map;
+    use std::str::FromStr;
 
     #[test]
     fn del() {
@@ -109,6 +110,12 @@ mod tests {
                 map!["exists": 127],
                 Ok(value!(127)),
                 DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Array field exists
+                map!["exists": value!([1, 2, 3])],
+                Ok(value!(2)),
+                DelFn::new(remap::Path::from_str(".exists[1]").unwrap().into()),
             ),
         ];
 

@@ -29,6 +29,24 @@ remap: functions: del: {
 			}
 		},
 		{
+			title: "Delete existing only"
+			input: {
+				"user_id": 1
+			}
+			source: #"""
+				.user.id = if exists(.user_id) {
+                    del(.user_id)
+				} else {
+                    "unknown"
+				}
+				"""#
+			output: {
+				user: {
+					"id": 1
+				}
+			}
+		},
+		{
 			title: "Rename field"
 			input: {
 				old_field: "please rename me"
