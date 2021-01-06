@@ -12,12 +12,25 @@ set -x
 while getopts a:t:e: flag
 do
     case "${flag}" in
-        a) action=${OPTARG};;
-        t) tool=${OPTARG};;
-        e) enclosure=${OPTARG};;
-
+        a) ACTION=${OPTARG};;
+        t) CONTAINER_TOOL=${OPTARG};;
+        e) CONTAINER_ENCLOSURE=${OPTARG};;
+        :)
+         echo "ERROR: Option -$OPTARG requires an argument"          usage
+         ;;
+        *)
+          echo "ERROR: Invalid option -$OPTARG"
+          usage
+          ;;
     esac
 done
+shift $((OPTIND-1))
+
+# Check required switches exist
+if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ] || [ -z "${CONTAINER_ENCLOSURE}" ]; then
+    usage
+fi
+
 
 ACTION="${action:-"stop"}"
 CONTAINER_TOOL="${tool:-"podman"}"

@@ -15,7 +15,6 @@ do
         a) action=${OPTARG};;
         t) tool=${OPTARG};;
         e) enclosure=${OPTARG};;
-
     esac
 done
 
