@@ -1,7 +1,6 @@
-use async_graphql::static_assertions::_core::fmt::Formatter;
 use async_graphql::{
     connection::{self, Connection, CursorType, Edge, EmptyFields},
-    Result,
+    Result, SimpleObject,
 };
 
 /// Base64 invalid states, used by `Base64Cursor`.
@@ -14,7 +13,7 @@ pub enum Base64CursorError {
 }
 
 impl std::fmt::Display for Base64CursorError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Invalid cursor")
     }
 }
@@ -82,8 +81,15 @@ impl CursorType for Base64Cursor {
     }
 }
 
+/// Additional fields to attach to the connection
+#[derive(SimpleObject)]
+pub struct ConnectionFields {
+    /// Total result set count
+    total_count: usize,
+}
+
 /// Relay connection result
-pub type ConnectionResult<T> = Result<Connection<Base64Cursor, T, EmptyFields, EmptyFields>>;
+pub type ConnectionResult<T> = Result<Connection<Base64Cursor, T, ConnectionFields, EmptyFields>>;
 
 /// Relay-compliant connection parameters to page results by cursor/page size
 pub struct Params {
@@ -116,7 +122,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
     p: Params,
     default_page_size: usize,
 ) -> ConnectionResult<T> {
-    connection::query::<Base64Cursor, T, _, _, _, _>(
+    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _>(
         p.after,
         p.before,
         p.first,
@@ -138,7 +144,13 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
                 }
             };
 
-            let mut connection = Connection::new(start > 0, end < iter_len);
+            let mut connection = Connection::with_additional_fields(
+                start > 0,
+                end < iter_len,
+                ConnectionFields {
+                    total_count: iter_len,
+                },
+            );
             connection.append(
                 (start..end)
                     .into_iter()
