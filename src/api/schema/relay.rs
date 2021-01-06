@@ -134,6 +134,9 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
                 let after = after.map(|a| a.increment()).unwrap_or(0);
                 let before: usize = before.map(|b| b.into()).unwrap_or(iter_len);
 
+                // Calculate start/end based on the provided first/last. Note that async-graphql disallows
+                // providing both (returning an error), so we can safely assume we have, at most, one of
+                // first or last.
                 match (first, last) {
                     // First
                     (Some(first), _) => (after, (after.saturating_add(first)).min(before)),
