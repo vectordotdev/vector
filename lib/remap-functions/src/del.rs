@@ -37,10 +37,25 @@ impl DelFn {
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        match object.remove_and_get(self.path.as_ref(), false) {
-            Ok(Some(val)) => Ok(val),
-            _ => Ok(Value::Null),
-        }
+        // TODO: we're silencing the result of the `remove` call here, to make
+        // this function infallible.
+        //
+        // This isn't correct though, since, while deleting Vector log
+        // fields is infallible, deleting metric fields is not.
+        //
+        // For example, if you try to delete `.name` in a metric event, the
+        // call returns an error, since this is an infallible field.
+        //
+        // After some debating, we've decided to _silently ignore_ deletions
+        // of infallible fields for now, but we'll circle back to this in
+        // the near future to potentially improve this situation.
+        //
+        // see tracking issue: <TODO>
+        Ok(object
+            .remove(self.path.as_ref(), false)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

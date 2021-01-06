@@ -55,11 +55,5 @@ pub trait Object: std::fmt::Debug {
     ///
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well.
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String>;
-
-    /// Remove the given path from the object and return the value if it exists.
-    ///
-    /// If `compact` is true, after deletion, if an empty object or array is
-    /// left behind, it should be removed as well.
-    fn remove_and_get(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String>;
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String>;
 }

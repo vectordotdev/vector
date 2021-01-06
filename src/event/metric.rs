@@ -10,6 +10,7 @@ use std::{
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
+    iter::FromIterator,
 };
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -517,12 +518,14 @@ impl Object for Metric {
                 Ok(self.timestamp.map(Into::into))
             }
             [Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
-            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags.as_ref().map(|tags| {
-                tags.iter()
-                    .map(|(name, value)| (name.clone(), value.clone().into()))
-                    .collect::<BTreeMap<_, _>>()
-                    .into()
-            })),
+            [Segment::Field(tags)] if tags.as_str() == "tags" => {
+                Ok(self.tags.as_ref().map(|tags| {
+                    tags.iter()
+                        .map(|(name, value)| (name.clone(), value.clone().into()))
+                        .collect::<BTreeMap<_, _>>()
+                        .into()
+                }))
+            }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
@@ -559,37 +562,11 @@ impl Object for Metric {
         Ok(result)
     }
 
-    fn remove(&mut self, path: &remap::Path, _compact: bool) -> Result<(), String> {
-        if path.is_root() {
-            return Err(MetricPathError::SetPathError.to_string());
-        }
-
-        match path.segments() {
-            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
-                self.namespace = None;
-                Ok(())
-            }
-            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
-                self.timestamp = None;
-                Ok(())
-            }
-            [Segment::Field(tags)] if tags.as_str() == "tags" => {
-                self.tags = None;
-                Ok(())
-            }
-            [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
-                self.delete_tag(field.as_str());
-                Ok(())
-            }
-            _ => Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_SET,
-            }
-            .to_string()),
-        }
-    }
-
-    fn remove_and_get(&mut self, path: &Path, _: bool) -> Result<Option<remap::Value>, String> {
+    fn remove(
+        &mut self,
+        path: &remap::Path,
+        _compact: bool,
+    ) -> Result<Option<remap::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -601,15 +578,10 @@ impl Object for Metric {
             [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 Ok(self.timestamp.take().map(Into::into))
             }
-            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self
-                .tags
-                .take()
-                .map(|tags| {
-                    tags.into_iter()
-                        .map(|(name, value)| (name, value.into()))
-                        .collect::<BTreeMap<_, _>>()
-                })
-                .map(Into::into)),
+            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags.take().map(|map| {
+                let iter = map.into_iter().map(|(k, v)| (k, v.into()));
+                remap::Value::from_iter(iter)
+            })),
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.delete_tag(field.as_str()).map(Into::into))
             }
@@ -1012,12 +984,18 @@ mod test {
         };
 
         assert_eq!(
-            Ok(
-                ["name", "namespace", "timestamp", "tags", "tags.tig", "kind", "type"]
-                    .iter()
-                    .map(|path| Path::from_str(path).expect("invalid path"))
-                    .collect()
-            ),
+            Ok([
+                "name",
+                "namespace",
+                "timestamp",
+                "tags",
+                "tags.tig",
+                "kind",
+                "type"
+            ]
+            .iter()
+            .map(|path| Path::from_str(path).expect("invalid path"))
+            .collect()),
             metric.paths()
         );
     }
@@ -1068,7 +1046,7 @@ mod test {
             assert_eq!(Ok(Some(new.clone())), metric.get(&path));
 
             if delete {
-                assert_eq!(Ok(Some(new)), metric.remove_and_get(&path, true));
+                assert_eq!(Ok(Some(new)), metric.remove(&path, true));
                 assert_eq!(Ok(None), metric.get(&path));
             }
         }
