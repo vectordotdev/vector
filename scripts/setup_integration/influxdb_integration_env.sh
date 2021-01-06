@@ -66,7 +66,7 @@ start_docker () {
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 }
 
-stop () {
+stop_podman () {
   "${CONTAINER_TOOL}" rm --force vector_influxdb_v1 vector_influxdb_v1_tls vector_influxdb_v2 2>/dev/null; true
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-influxdb 2>/dev/null; true
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-influxdb 2>/dev/null; true
