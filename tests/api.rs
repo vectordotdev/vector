@@ -295,64 +295,91 @@ mod tests {
 
             let client = make_client(server.addr());
 
-            let res = client.component_links_query().await.unwrap();
+            let res = client
+                .component_links_query(None, None, None, None)
+                .await
+                .unwrap();
+
             let data = res.data.unwrap();
+            let sources = data
+                .sources
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
+
+            let transforms = data
+                .transforms
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
+
+            let sinks = data
+                .sinks
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
 
             // should be a single source named "in1"
-            assert!(data.sources.len() == 1);
-            assert!(data.sources[0].name == "in1");
+            assert!(sources.len() == 1);
+            assert!(sources[0].node.name == "in1");
 
             // "in1" source should link to exactly one transform named "t1"
-            assert!(data.sources[0].transforms.len() == 1);
-            assert!(data.sources[0].transforms[0].name == "t1");
+            assert!(sources[0].node.transforms.len() == 1);
+            assert!(sources[0].node.transforms[0].name == "t1");
 
             // "in1" source should link to exactly one sink named "out2"
-            assert!(data.sources[0].sinks.len() == 1);
-            assert!(data.sources[0].sinks[0].name == "out1");
+            assert!(sources[0].node.sinks.len() == 1);
+            assert!(sources[0].node.sinks[0].name == "out1");
 
             // there should be 2 transforms
-            assert!(data.transforms.len() == 2);
+            assert!(transforms.len() == 2);
 
             // get a reference to "t1" and "t2"
-            let mut t1 = &data.transforms[0];
-            let mut t2 = &data.transforms[1];
+            let mut t1 = &transforms[0];
+            let mut t2 = &transforms[1];
 
             // swap if needed
-            if t1.name == "t2" {
-                t1 = &data.transforms[1];
-                t2 = &data.transforms[0];
+            if t1.node.name == "t2" {
+                t1 = &transforms[1];
+                t2 = &transforms[0];
             }
 
             // "t1" transform should link to exactly one source named "in1"
-            assert!(t1.sources.len() == 1);
-            assert!(t1.sources[0].name == "in1");
+            assert!(t1.node.sources.len() == 1);
+            assert!(t1.node.sources[0].name == "in1");
 
             // "t1" transform should link to exactly one transform named "t2"
-            assert!(t1.transforms.len() == 1);
-            assert!(t1.transforms[0].name == "t2");
+            assert!(t1.node.transforms.len() == 1);
+            assert!(t1.node.transforms[0].name == "t2");
 
             // "t1" transform should NOT link to any sinks
-            assert!(t1.sinks.is_empty());
+            assert!(t1.node.sinks.is_empty());
 
             // "t2" transform should link to exactly one sink named "out1"
-            assert!(t2.sinks.len() == 1);
-            assert!(t2.sinks[0].name == "out1");
+            assert!(t2.node.sinks.len() == 1);
+            assert!(t2.node.sinks[0].name == "out1");
 
             // "t2" transform should NOT link to any sources or transforms
-            assert!(t2.sources.is_empty());
-            assert!(t2.transforms.is_empty());
+            assert!(t2.node.sources.is_empty());
+            assert!(t2.node.transforms.is_empty());
 
             // should be a single sink named "out1"
-            assert!(data.sinks.len() == 1);
-            assert!(data.sinks[0].name == "out1");
+            assert!(sinks.len() == 1);
+            assert!(sinks[0].node.name == "out1");
 
             // "out1" sink should link to exactly one source named "in1"
-            assert!(data.sinks[0].sources.len() == 1);
-            assert!(data.sinks[0].sources[0].name == "in1");
+            assert!(sinks[0].node.sources.len() == 1);
+            assert!(sinks[0].node.sources[0].name == "in1");
 
             // "out1" sink should link to exactly one transform named "t2"
-            assert!(data.sinks[0].transforms.len() == 1);
-            assert!(data.sinks[0].transforms[0].name == "t2");
+            assert!(sinks[0].node.transforms.len() == 1);
+            assert!(sinks[0].node.transforms[0].name == "t2");
 
             assert_eq!(res.errors, None);
         })
@@ -838,11 +865,13 @@ mod tests {
             tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
 
             let client = make_client(server.addr());
-            let res = client.file_source_metrics_query().await;
+            let res = client
+                .file_source_metrics_query(None, None, None, None)
+                .await;
 
-            match &res.unwrap().data.unwrap().sources[0].metrics.on {
-                file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOn::FileSourceMetrics(
-                    file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOnFileSourceMetrics { files, .. },
+            match &res.unwrap().data.unwrap().sources.edges.into_iter().flatten().next().unwrap().unwrap().node.metrics.on {
+                file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOn::FileSourceMetrics(
+                    file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOnFileSourceMetrics { files, .. },
                 ) => {
                     assert_eq!(files[0].name, path);
                     assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());

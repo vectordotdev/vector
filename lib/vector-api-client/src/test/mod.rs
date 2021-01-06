@@ -28,6 +28,7 @@ pub struct ErrorsTotalSubscription;
     response_derives = "Debug"
 )]
 pub struct ComponentErrorsTotalsSubscription;
+
 /// File source metrics query
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
@@ -57,8 +58,20 @@ pub struct ComponentsConnectionQuery;
 
 #[async_trait]
 pub trait TestQueryExt {
-    async fn component_links_query(&self) -> crate::QueryResult<ComponentLinksQuery>;
-    async fn file_source_metrics_query(&self) -> crate::QueryResult<FileSourceMetricsQuery>;
+    async fn component_links_query(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i64>,
+        last: Option<i64>,
+    ) -> crate::QueryResult<ComponentLinksQuery>;
+    async fn file_source_metrics_query(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i64>,
+        last: Option<i64>,
+    ) -> crate::QueryResult<FileSourceMetricsQuery>;
     async fn component_by_name_query(&self, name: &str)
         -> crate::QueryResult<ComponentByNameQuery>;
     async fn components_connection_query(
@@ -72,14 +85,36 @@ pub trait TestQueryExt {
 
 #[async_trait]
 impl TestQueryExt for crate::Client {
-    async fn component_links_query(&self) -> QueryResult<ComponentLinksQuery> {
-        let request_body = ComponentLinksQuery::build_query(component_links_query::Variables);
+    async fn component_links_query(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i64>,
+        last: Option<i64>,
+    ) -> QueryResult<ComponentLinksQuery> {
+        let request_body = ComponentLinksQuery::build_query(component_links_query::Variables {
+            after,
+            before,
+            first,
+            last,
+        });
         self.query::<ComponentLinksQuery>(&request_body).await
     }
 
-    async fn file_source_metrics_query(&self) -> QueryResult<FileSourceMetricsQuery> {
+    async fn file_source_metrics_query(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i64>,
+        last: Option<i64>,
+    ) -> QueryResult<FileSourceMetricsQuery> {
         let request_body =
-            FileSourceMetricsQuery::build_query(file_source_metrics_query::Variables);
+            FileSourceMetricsQuery::build_query(file_source_metrics_query::Variables {
+                after,
+                before,
+                first,
+                last,
+            });
         self.query::<FileSourceMetricsQuery>(&request_body).await
     }
 
