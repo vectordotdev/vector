@@ -1041,7 +1041,7 @@ fn default_certs() -> Option<DockerTlsConfig> {
     })
 }
 
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, DockerError> {
+fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
@@ -1056,6 +1056,7 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
                 Some("http") => {
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
                 }
                 Some("https") => {
                     let tls = tls
@@ -1069,9 +1070,12 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
                         DEFAULT_TIMEOUT,
                         API_DEFAULT_VERSION,
                     )
+                    .map_err(Into::into)
                 }
+                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
                 // unix socket on unix, named pipe on windows
-                _ => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION),
+                None => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                    .map_err(Into::into),
             }
         }
     }
