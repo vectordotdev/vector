@@ -444,7 +444,11 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::{Metric, MetricKind, MetricValue}, config::log_schema, log_event};
+    use crate::{
+        config::log_schema,
+        event::{Metric, MetricKind, MetricValue},
+        log_event,
+    };
     use std::collections::BTreeMap;
 
     #[test]
