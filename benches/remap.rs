@@ -15,7 +15,13 @@ use vector::{
     test_util::runtime,
 };
 
-criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.02);
+    targets = benchmark_remap, upcase, downcase, parse_json
+);
 criterion_main!(benches);
 
 bench_function! {
