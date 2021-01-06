@@ -50,18 +50,23 @@ impl Expression for AppendFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let array_type_def = self
+        let items_type = self
             .items
             .type_def(state)
             .fallible_unless(Kind::Array)
-            .with_inner_type(None);
+            .with_inner_type(self.items.type_def(state).inner_type_def);
 
         self.value
             .type_def(state)
             .fallible_unless(Kind::Array)
-            .merge(array_type_def)
+            .merge(items_type)
             .with_constraint(Kind::Array)
-            .with_inner_type(None)
+            .with_inner_type(
+                self.items
+                    .type_def(state)
+                    .merge(self.value.type_def(state))
+                    .inner_type_def,
+            )
     }
 }
 
@@ -76,7 +81,14 @@ mod tests {
                 value: array!["foo", "bar", 142].boxed(),
                 items: array!["baq", "baz", true].boxed(),
             },
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Boolean | Kind::Bytes | Kind::Integer,
+                    ..Default::default()
+                }.boxed())
+            },
         }
 
         value_non_array_fallible {
@@ -84,7 +96,14 @@ mod tests {
                 value: lit!(27).boxed(),
                 items: array![1, 2, 3].boxed(),
             },
-            def: TypeDef { kind: Kind::Array, fallible: true, ..Default::default() },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Integer,
+                    ..Default::default()
+                }.boxed())
+            },
         }
 
         items_non_array_fallible {
@@ -92,7 +111,14 @@ mod tests {
                 value: array![1, 2, 3].boxed(),
                 items: lit!(27).boxed(),
             },
-            def: TypeDef { kind: Kind::Array, fallible: true, ..Default::default() },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Integer,
+                    ..Default::default()
+                }.boxed())
+            },
         }
     ];
 
