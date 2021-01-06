@@ -9,27 +9,19 @@ set -uo pipefail
 
 set -x
 
-while getopts a: flag
+while getopts a:t:e: flag
 do
     case "${flag}" in
         a) action=${OPTARG};;
+        t) tool=${OPTARG};;
+        e) enclosure=${OPTARG};;
+
     esac
 done
 
 ACTION="${action:-"stop"}"
-CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
-
-case $CONTAINER_TOOL in
-  "podman")
-    CONTAINER_ENCLOSURE="pod"
-    ;;
-  "docker")
-    CONTAINER_ENCLOSURE="network"
-    ;;
-  *)
-    CONTAINER_ENCLOSURE="unknown"
-    ;;
-esac
+CONTAINER_TOOL="${tool:-"podman"}"
+CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
 
 #
 # Functions
@@ -47,17 +39,16 @@ start_docker () {
 	-v $(PWD)/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
-stop () {
-	${CONTAINER_TOOL} rm --force vector_nginx 2>/dev/null; true
-  if [ $CONTAINER_TOOL == "podman" ]
-  then
+stop_podman () {
   	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} stop vector-test-integration-nginx 2>/dev/null; true
   	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm --force vector-test-integration-nginx 2>/dev/null; true
-  else
-	  ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-nginx 2>/dev/null; true
-fi
+}
+
+stop_docker () {
+	${CONTAINER_TOOL} rm --force vector_nats 2>/dev/null; true
+	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-nginx 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Nginx integration tests environment"
 
-$ACTION
+${ACTION}_${CONTAINER_TOOL}

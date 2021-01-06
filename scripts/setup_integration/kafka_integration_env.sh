@@ -9,27 +9,19 @@ set -uo pipefail
 
 set -x
 
-while getopts a: flag
+while getopts a:t:e: flag
 do
     case "${flag}" in
         a) action=${OPTARG};;
+        t) tool=${OPTARG};;
+        e) enclosure=${OPTARG};;
+
     esac
 done
 
 ACTION="${action:-"stop"}"
-CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
-
-case $CONTAINER_TOOL in
-  "podman")
-    CONTAINER_ENCLOSURE="pod"
-    ;;
-  "docker")
-    CONTAINER_ENCLOSURE="network"
-    ;;
-  *)
-    CONTAINER_ENCLOSURE="unknown"
-    ;;
-esac
+CONTAINER_TOOL="${tool:-"podman"}"
+CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
 
 #
 # Functions
@@ -65,17 +57,17 @@ start_docker () {
 	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka
 }
 
-stop () {
+stop_podman () {
 	${CONTAINER_TOOL} rm --force vector_kafka vector_zookeeper 2>/dev/null; true
-  if [ $CONTAINER_TOOL == "podman" ]
-  then
-    ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} stop vector-test-integration-kafka 2>/dev/null; true
-    ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm --force vector-test-integration-kafka 2>/dev/null; true
-  else
-  	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-kafka 2>/dev/null; true
-  fi
+  ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} stop vector-test-integration-kafka 2>/dev/null; true
+  ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm --force vector-test-integration-kafka 2>/dev/null; true
+}
+
+stop_docker () {
+  ${CONTAINER_TOOL} rm --force vector_kafka vector_zookeeper 2>/dev/null; true
+  ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-kafka 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Kafka integration tests environment"
 
-$ACTION
+${ACTION}_${CONTAINER_TOOL}

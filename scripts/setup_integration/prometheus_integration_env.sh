@@ -9,27 +9,19 @@ set -uo pipefail
 
 set -x
 
-while getopts a: flag
+while getopts a:t:e: flag
 do
     case "${flag}" in
         a) action=${OPTARG};;
+        t) tool=${OPTARG};;
+        e) enclosure=${OPTARG};;
+
     esac
 done
 
 ACTION="${action:-"stop"}"
-CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
-
-case $CONTAINER_TOOL in
-  "podman")
-    CONTAINER_ENCLOSURE="pod"
-    ;;
-  "docker")
-    CONTAINER_ENCLOSURE="network"
-    ;;
-  *)
-    CONTAINER_ENCLOSURE="unknown"
-    ;;
-esac
+CONTAINER_TOOL="${tool:-"podman"}"
+CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
 
 #
 # Functions
@@ -47,4 +39,4 @@ stop () {
 
 echo "Running $ACTION action for Prometheus integration tests environment"
 
-$ACTION
+${ACTION}
