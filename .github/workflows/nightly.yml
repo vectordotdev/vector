@@ -302,7 +302,7 @@ jobs:
         run: |
           echo "C:\Program Files\Vector\bin" >> $GITHUB_PATH
       - name: "Run Vector"
-         run: | 
+        run: | 
           vector --version
 
   release-docker:
