@@ -174,10 +174,7 @@ impl ArgumentList {
 }
 
 fn literal_to_enum_variant(literal: Literal, variants: &[&'static str]) -> Result<String> {
-    let variant = literal
-        .into_value()
-        .try_bytes()
-        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
+    let variant = literal.into_value().try_bytes_utf8_lossy()?.into_owned();
 
     if variants.contains(&variant.as_str()) {
         Ok(variant)

@@ -307,14 +307,17 @@ impl<'a> Parser<'a> {
                 Box::new(conditional),
                 Box::new(true_expression),
                 Box::new(false_expression),
-            ));
+                &self.compiler_state,
+            )?);
         }
 
-        Ok(Expr::from(IfStatement::new(
+        IfStatement::new(
             Box::new(conditional),
             Box::new(true_expression),
             Box::new(false_expression),
-        )))
+            &self.compiler_state,
+        )
+        .map(Into::into)
     }
 
     fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {

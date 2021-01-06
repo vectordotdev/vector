@@ -1,6 +1,5 @@
 use crate::{buffers::Acker, event::Event};
-use futures::{future::BoxFuture, FutureExt};
-use futures01::Stream as Stream01;
+use futures::{future::BoxFuture, FutureExt, Stream};
 use pin_project::pin_project;
 use std::{
     fmt,
@@ -13,7 +12,7 @@ pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Box<dyn Stream01<Item = Event, Error = ()> + Send>, Acker),
+    Sink(Pin<Box<dyn Stream<Item = Event> + Send>>, Acker),
     Healthcheck,
 }
 
