@@ -306,25 +306,25 @@ test-integration: test-integration-nginx test-integration-prometheus test-integr
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/aws_integration_env.sh -a stop
-	@scripts/test_scripts/aws_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i aws -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i aws -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/aws_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i aws -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-clickhouse
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/clickhouse_integration_env.sh -a stop
-	@scripts/test_scripts/clickhouse_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i clickhouse -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i clickhouse -a start -t ${CONTAINER_TOOL}
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/clickhouse_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i clickhouse -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-docker-logs
@@ -335,147 +335,147 @@ test-integration-docker-logs: ## Runs Docker Logs integration tests
 .PHONY: test-integration-elasticsearch
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/elasticsearch_integration_env.sh -a stop
-	@scripts/test_scripts/elasticsearch_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i elasticsearch -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i elasticsearch -a start -t ${CONTAINER_TOOL}
 	sleep 60 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/elasticsearch_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i elasticsearch -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-gcp
 test-integration-gcp: ## Runs GCP integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/gcp_integration_env.sh -a stop
-	@scripts/test_scripts/gcp_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i gcp -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i gcp -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
 	 --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/gcp_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i gcp -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-humio
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/humio_integration_env.sh -a stop
-	@scripts/test_scripts/humio_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i humio -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i humio -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::" -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/humio_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i humio -a stop -t ${CONTAINER_TOOL}
 endif
 .PHONY: test-integration-influxdb
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/influxdb_integration_env.sh -a stop
-	@scripts/test_scripts/influxdb_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/influxdb_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-kafka
 test-integration-kafka: ## Runs Kafka integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/kafka_integration_env.sh -a stop
-	@scripts/test_scripts/kafka_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/kafka_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-loki
 test-integration-loki: ## Runs Loki integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/loki_integration_env.sh -a stop
-	@scripts/test_scripts/loki_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i loki -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i loki -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/loki_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i loki -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-mongodb_metrics
 test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/mongodb_metrics_integration_env.sh -a stop
-	@scripts/test_scripts/mongodb_metrics_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i mongodb_metrics -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i mongodb_metrics -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/mongodb_metrics_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i mongodb_metrics -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-nats
 test-integration-nats: ## Runs NATS integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/nats_integration_env.sh -a stop
-	@scripts/test_scripts/nats_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i nats -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i nats -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/nats_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i nats -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-nginx
 test-integration-nginx: ## Runs nginx integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/nginx_integration_env.sh -a stop
-	@scripts/test_scripts/nginx_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i nginx -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i nginx -a start -t ${CONTAINER_TOOL}
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/nginx_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i nginx -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-prometheus
 test-integration-prometheus: ## Runs Prometheus integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/influxdb_integration_env.sh -a stop
-	@scripts/test_scripts/prometheus_integration_env.sh -a stop
-	@scripts/test_scripts/influxdb_integration_env.sh -a start_${CONTAINER_TOOL}
-	@scripts/test_scripts/prometheus_integration_env.sh -a start
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i prometheus -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a start -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/prometheus_integration_env.sh -a start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/influxdb_integration_env.sh -a stop
-	@scripts/test_scripts/prometheus_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i prometheus -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-pulsar
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/pulsar_integration_env.sh -a stop
-	@scripts/test_scripts/pulsar_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i pulsar -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i pulsar -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/pulsar_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i pulsar -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-integration-splunk
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/splunk_integration_env.sh -a stop
-	@scripts/test_scripts/splunk_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i splunk -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i splunk -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/splunk_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i splunk -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-e2e-kubernetes
@@ -485,13 +485,13 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 .PHONY: test-shutdown
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
-	@scripts/test_scripts/kafka_integration_env.sh -a stop
-	@scripts/test_scripts/kafka_integration_env.sh -a start_${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a stop -t ${CONTAINER_TOOL}
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a start -t ${CONTAINER_TOOL}
 	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
-	@scripts/test_scripts/kafka_integration_env.sh -a stop
+	@scripts/setup_integration/setup_integration_env.sh -i kafka -a stop -t ${CONTAINER_TOOL}
 endif
 
 .PHONY: test-cli
