@@ -59,19 +59,8 @@ impl Expression for DelFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
         TypeDef {
-            fallible: false,
-            kind: Kind::Bytes
-                | Kind::Integer
-                | Kind::Float
-                | Kind::Boolean
-                | Kind::Map
-                | Kind::Array
-                | Kind::Timestamp
-                | Kind::Regex
-                | Kind::Null,
+            kind: value::Kind::all(),
             ..Default::default()
         }
     }

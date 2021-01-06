@@ -519,11 +519,9 @@ impl Object for Metric {
             }
             [Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
             [Segment::Field(tags)] if tags.as_str() == "tags" => {
-                Ok(self.tags.as_ref().map(|tags| {
-                    tags.iter()
-                        .map(|(name, value)| (name.clone(), value.clone().into()))
-                        .collect::<BTreeMap<_, _>>()
-                        .into()
+                Ok(self.tags.as_ref().map(|map| {
+                    let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
+                    remap::Value::from_iter(iter)
                 }))
             }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {

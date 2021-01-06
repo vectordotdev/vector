@@ -46,25 +46,6 @@
       "b[1].equals" = "<null>"
       "b[2].equals" = "two"
 
-[transforms.append_to_array]
-  inputs = []
-  type = "remap"
-  source = """
-    .fruits = append(.fruits, .fruit)
-  """
-[[tests]]
-  name = "append_to_array"
-  [tests.input]
-    insert_at = "append_to_array"
-    type = "log"
-    [tests.input.log_fields]
-      fruits = ["apple", "orange", "banana"]
-      fruit = "mango"
-  [[tests.outputs]]
-    extract_from = "append_to_array"
-    [[tests.outputs.conditions]]
-      "fruits.equals" = ["apple", "orange", "banana", "mango"]
-
 [transforms.remap_arithmetic]
   inputs = []
   type = "remap"
@@ -169,27 +150,6 @@
       "baz.exists" = false
       "buz.first.exists" = false
       "buz.second.equals" = "buz second value"
-
-[transforms.remap_rename_fields]
-  inputs = []
-  type = "remap"
-  source = """
-    .bar = del(.foo.second)
-    .buz = .foo
-  """
-[[tests]]
-  name = "remap_rename_fields"
-  [tests.input]
-    insert_at = "remap_rename_fields"
-    type = "log"
-    [tests.input.log_fields]
-      "foo.first" = "foo first value"
-      "foo.second" = "foo second value"
-  [[tests.outputs]]
-    extract_from = "remap_rename_fields"
-    [[tests.outputs.conditions]]
-      "bar.equals" = "foo second value"
-      "buz.first.equals" = "foo first value"
 
 [transforms.remap_coercion]
   inputs = []
