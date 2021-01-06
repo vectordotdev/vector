@@ -85,7 +85,7 @@ mod tests {
                 value: Literal::from(3).boxed(),
             },
             def: TypeDef {
-                fallible: false,
+                fallible: true,
                 kind: Kind::Bytes,
                 ..Default::default()
             },
@@ -234,6 +234,11 @@ mod tests {
         invalid_severity_negative_int {
             args: func_args![value: value!(-1)],
             want: Err("function call error: facility code -1 not valid"),
+        }
+
+        invalid_severity_non_int {
+            args: func_args![value: value!("nope")],
+            want: Err(r#"function call error: value error: expected "integer", got "string""#),
         }
     ];
 }
