@@ -58,8 +58,8 @@ start_docker () {
 }
 
 stop_podman () {
-    "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-nginx 2>/dev/null; true
-    "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-nginx 2>/dev/null; true
+  "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-nginx 2>/dev/null; true
+  "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-nginx 2>/dev/null; true
 }
 
 stop_docker () {

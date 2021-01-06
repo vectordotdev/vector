@@ -59,8 +59,8 @@ stop_podman () {
 }
 
 stop_docker () {
-    "${CONTAINER_TOOL}" rm --force vector_clickhouse 2>/dev/null; true
-    "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm vector-test-integration-clickhouse 2>/dev/null; true
+  "${CONTAINER_TOOL}" rm --force vector_clickhouse 2>/dev/null; true
+  "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm vector-test-integration-clickhouse 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Clickhouse integration tests environment"
