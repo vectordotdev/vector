@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -o pipefail
 
 # elasticsearch_integration_env.sh
 #
@@ -7,17 +7,23 @@ set -uo pipefail
 #
 #   Builds and pulls down the Vector Elasticsearch Integration test environment
 
-set -x
+# Echo usage if something isn't right.
+usage() {
+    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|pdoman} ]  [-t The container enclosure to use {pod|network} ]" 1>&2; exit 1;
+}
 
 while getopts a:t:e: flag
 do
     case "${flag}" in
-        a) ACTION=${OPTARG};;
-        t) CONTAINER_TOOL=${OPTARG};;
-        e) CONTAINER_ENCLOSURE=${OPTARG};;
+        a) ACTION=${OPTARG}
+          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
+        t) CONTAINER_TOOL=${OPTARG}
+          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
+        e) CONTAINER_ENCLOSURE=${OPTARG}
+         [[ ${CONTAINER_ENCLOSURE} == "pod" || ${CONTAINER_ENCLOSURE} == "network" ]] && usage;;
         :)
-         echo "ERROR: Option -$OPTARG requires an argument"          usage
-          ;;
+         echo "ERROR: Option -$OPTARG requires an argument" usage
+         ;;
         *)
           echo "ERROR: Invalid option -$OPTARG"
           usage
@@ -25,7 +31,6 @@ do
     esac
 done
 shift $((OPTIND-1))
-
 # Check required switches exist
 if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ] || [ -z "${CONTAINER_ENCLOSURE}" ]; then
     usage

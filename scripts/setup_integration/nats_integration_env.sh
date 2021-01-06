@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -o pipefail
 
 # nats_integration_env.sh
 #
@@ -7,7 +7,10 @@ set -uo pipefail
 #
 #   Builds and pulls down the Vector NATS Integration test environment
 
-set -x
+# Echo usage if something isn't right.
+usage() {
+    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|pdoman} ]  [-t The container enclosure to use {pod|network} ]" 1>&2; exit 1;
+}
 
 while getopts a:t:e: flag
 do

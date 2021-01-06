@@ -16,8 +16,10 @@ while getopts "i:a:t:" o;
 do
     case "${o}" in
         i) INTEGRATION=${OPTARG};;
-        a) ACTION=${OPTARG};;
-        t) CONTAINER_TOOL=${OPTARG};;
+        a) ACTION=${OPTARG}
+          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
+        t) CONTAINER_TOOL=${OPTARG}
+          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
         :)
           echo "ERROR: Option -$OPTARG requires an argument"
           usage

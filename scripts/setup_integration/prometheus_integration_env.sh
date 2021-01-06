@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -o pipefail
 
 # prometheus_integration_env.sh
 #
@@ -7,13 +7,18 @@ set -uo pipefail
 #
 #   Builds and pulls down the Vector Prometheus Integration test environment
 
-set -x
+# Echo usage if something isn't right.
+usage() {
+    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|podman} ]" 1>&2; exit 1;
+}
 
 while getopts a:t: flag
 do
     case "${flag}" in
-        a) ACTION=${OPTARG};;
-        t) CONTAINER_TOOL=${OPTARG};;
+        a) ACTION=${OPTARG}
+          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
+        t) CONTAINER_TOOL=${OPTARG}
+          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
         :)
           echo "ERROR: Option -$OPTARG requires an argument"
           usage
