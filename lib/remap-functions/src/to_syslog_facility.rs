@@ -34,37 +34,34 @@ impl Expression for ToSyslogFacilityFn {
 
         // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
         let code = match value {
-            0 => Ok("kern"),
-            1 => Ok("user"),
-            2 => Ok("mail"),
-            3 => Ok("daemon"),
-            4 => Ok("auth"),
-            5 => Ok("syslog"),
-            6 => Ok("lpr"),
-            7 => Ok("news"),
-            8 => Ok("uucp"),
-            9 => Ok("cron"),
-            10 => Ok("authpriv"),
-            11 => Ok("ftp"),
-            12 => Ok("ntp"),
-            13 => Ok("security"),
-            14 => Ok("console"),
-            15 => Ok("solaris-cron"),
-            16 => Ok("local0"),
-            17 => Ok("local1"),
-            18 => Ok("local2"),
-            19 => Ok("local3"),
-            20 => Ok("local4"),
-            21 => Ok("local5"),
-            22 => Ok("local6"),
-            23 => Ok("local7"),
-            _ => Err(Error::from(format!("facility code {} not valid", value))),
+            0 => "kern",
+            1 => "user",
+            2 => "mail",
+            3 => "daemon",
+            4 => "auth",
+            5 => "syslog",
+            6 => "lpr",
+            7 => "news",
+            8 => "uucp",
+            9 => "cron",
+            10 => "authpriv",
+            11 => "ftp",
+            12 => "ntp",
+            13 => "security",
+            14 => "console",
+            15 => "solaris-cron",
+            16 => "local0",
+            17 => "local1",
+            18 => "local2",
+            19 => "local3",
+            20 => "local4",
+            21 => "local5",
+            22 => "local6",
+            23 => "local7",
+            _ => return Err(Error::from(format!("facility code {} not valid", value))),
         };
 
-        match code {
-            Ok(code) => Ok(Value::from(code)),
-            Err(e) => Err(e),
-        }
+        Ok(code.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -72,7 +69,7 @@ impl Expression for ToSyslogFacilityFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Integer)
+            .into_fallible(true)
             .with_constraint(Kind::Bytes)
     }
 }
