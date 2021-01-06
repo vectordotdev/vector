@@ -50,12 +50,22 @@ impl Expression for PushFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
+        let item_type = self
+            .item
+            .type_def(state)
+            .into_fallible(false);
+
         self.value
             .type_def(state)
             .fallible_unless(Kind::Array)
-            .merge(self.item.type_def(state))
+            .merge(item_type)
             .with_constraint(Kind::Array)
-            .with_inner_type(None)
+            .with_inner_type(
+                self.item
+                    .type_def(state)
+                    .merge(self.value.type_def(state))
+                    .inner_type_def,
+            )
     }
 }
 
@@ -67,10 +77,17 @@ mod tests {
     test_type_def![
         value_array_infallible {
             expr: |_| PushFn {
-                value: array!["foo", "bar"].boxed(),
-                item: lit!("baz").boxed(),
+                value: array!["foo", "bar", 127, 42.5].boxed(),
+                item: lit!(47).boxed(),
             },
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    kind: Kind::Bytes | Kind::Float | Kind::Integer,
+                    ..Default::default()
+                }.boxed())
+            },
         }
 
         value_non_array_fallible {
