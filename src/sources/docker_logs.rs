@@ -1055,12 +1055,20 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
                 Some("http") => {
-                    let host = host.replacen("http://", "", 1);
+                    let host = host
+                        .parse::<Uri>()
+                        .unwrap()
+                        .authority()
+                        .ok_or_else(|| "URL has no host.".to_owned());
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
                 }
                 Some("https") => {
-                    let host = host.replacen("https://", "", 1);
+                    let host = host
+                        .parse::<Uri>()
+                        .unwrap()
+                        .authority()
+                        .ok_or_else(|| "URL has no host.".to_owned());
                     let tls = tls
                         .or_else(default_certs)
                         .ok_or(DockerError::NoCertPathError)?;
@@ -1074,7 +1082,6 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
                     )
                     .map_err(Into::into)
                 }
-                // unix socket on unix, named pipe on windows
                 Some("unix") | Some("npipe") | None => {
                     Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
