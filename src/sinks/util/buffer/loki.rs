@@ -47,8 +47,14 @@ impl From<&LokiEvent> for LokiEncodedEvent {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct PartitionKey {
+    tenant_id: Option<String>,
+}
+
 #[derive(Debug)]
 pub struct LokiBuffer {
+    partition: Option<PartitionKey>,
     num_bytes: usize,
     num_items: usize,
     streams: HashMap<Labels, Vec<LokiEncodedEvent>>,

@@ -43,6 +43,8 @@ pub struct LokiConfig {
     remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     remove_timestamp: bool,
+    #[serde(default = "default_action")]
+    out_of_order: OurOfOrderAction,
 
     auth: Option<Auth>,
 
@@ -55,11 +57,15 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum OurOfOrderAction {
     Drop,
     RewriteTimestamp,
+}
+
+fn default_action() -> OurOfOrderAction {
+    OurOfOrderAction::RewriteTimestamp
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -142,6 +148,19 @@ pub struct PartitionKey {
     tenant_id: Option<String>,
 }
 
+struct LokiSink {
+    endpoint: UriSerde,
+    encoding: EncodingConfig<Encoding>,
+
+    tenant_id: Option<Template>,
+    labels: HashMap<String, Template>,
+
+    remove_label_fields: bool,
+    remove_timestamp: bool,
+
+    auth: Option<Auth>,
+}
+
 impl LokiSink {
     fn new(config: LokiConfig) -> Self {
         Self {
@@ -154,19 +173,6 @@ impl LokiSink {
             auth: config.auth,
         }
     }
-}
-
-struct LokiSink {
-    endpoint: UriSerde,
-    encoding: EncodingConfig<Encoding>,
-
-    tenant_id: Option<Template>,
-    labels: HashMap<String, Template>,
-
-    remove_label_fields: bool,
-    remove_timestamp: bool,
-
-    auth: Option<Auth>,
 }
 
 #[async_trait::async_trait]
