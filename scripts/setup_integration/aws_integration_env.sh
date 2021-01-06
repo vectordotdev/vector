@@ -70,13 +70,13 @@ start_docker () {
 }
 
 stop_podman () {
-	"${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
+  "${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-aws 2>/dev/null; true
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-aws 2>/dev/null; true
 }
 
 stop_docker () {
-	"${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
+  "${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm vector-test-integration-aws 2>/dev/null; true
 }
 

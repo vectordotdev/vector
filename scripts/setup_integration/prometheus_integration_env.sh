@@ -44,13 +44,13 @@ CONTAINER_TOOL="${tool:-"podman"}"
 #
 
 start () {
-	"${CONTAINER_TOOL}" run -d --name vector_prometheus --net=host \
+  "${CONTAINER_TOOL}" run -d --name vector_prometheus --net=host \
 	 --volume "$(PWD)"/tests/data:/etc/vector:ro \
 	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
 }
 
 stop () {
-	"${CONTAINER_TOOL}" rm --force vector_prometheus 2>/dev/null; true
+  "${CONTAINER_TOOL}" rm --force vector_prometheus 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Prometheus integration tests environment"
