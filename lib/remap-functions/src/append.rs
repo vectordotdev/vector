@@ -50,13 +50,23 @@ impl Expression for AppendFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let items_type = self.items.type_def(state).fallible_unless(Kind::Array);
+        let items_type = self
+            .items
+            .type_def(state)
+            .fallible_unless(Kind::Array)
+            .with_inner_type(self.items.type_def(state).inner_type_def);
 
         self.value
             .type_def(state)
             .fallible_unless(Kind::Array)
             .merge(items_type)
             .with_constraint(Kind::Array)
+            .with_inner_type(
+                self.items
+                    .type_def(state)
+                    .merge(self.value.type_def(state))
+                    .inner_type_def,
+            )
     }
 }
 

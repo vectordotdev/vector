@@ -57,6 +57,12 @@ impl Expression for PushFn {
             .fallible_unless(Kind::Array)
             .merge(item_type)
             .with_constraint(Kind::Array)
+            .with_inner_type(
+                self.item
+                    .type_def(state)
+                    .merge(self.value.type_def(state))
+                    .inner_type_def,
+            )
     }
 }
 
