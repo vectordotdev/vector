@@ -7,6 +7,7 @@ mod arithmetic;
 mod array;
 mod assignment;
 mod block;
+mod for_loop;
 pub(crate) mod function;
 mod if_statement;
 mod literal;
@@ -21,6 +22,7 @@ pub use arithmetic::Arithmetic;
 pub use array::Array;
 pub use assignment::{Assignment, Target};
 pub use block::Block;
+pub use for_loop::ForLoop;
 pub use function::Function;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
@@ -52,6 +54,9 @@ pub enum Error {
 
     #[error("if-statement error")]
     IfStatement(#[from] if_statement::Error),
+
+    #[error("for-loop error")]
+    ForLoop(#[from] for_loop::Error),
 }
 
 pub trait Expression: Send + Sync + fmt::Debug + dyn_clone::DynClone {
@@ -166,6 +171,7 @@ expression_dispatch![
     Not,
     Path,
     Variable,
+    ForLoop,
 ];
 
 impl<T: Into<Value>> From<T> for Expr {

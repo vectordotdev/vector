@@ -125,6 +125,7 @@ impl fmt::Display for Rule {
             regex_flags,
             regex_inner,
             rule_ident,
+            for_loop: "for-loop",
             rule_path,
             rule_string_inner,
             string,

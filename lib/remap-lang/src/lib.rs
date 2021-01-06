@@ -281,6 +281,51 @@ mod tests {
                     "g": r#"{"1": Integer(1), "true": Boolean(true)}"#,
                 })),
             ),
+            (
+                r#"
+                    $result = ""
+                    for $value in ["foo", "bar"] {
+                        $result = $result + $value
+                    }
+                    $result
+                "#,
+                Ok(()),
+                Ok(value!("foobar")),
+            ),
+            (
+                r#"
+                    $count = 0
+                    $result = ""
+                    for $index, $value in ["foo", "bar"] {
+                        $count = $count + $index + 1
+                        $result = $result + $value
+                    }
+                    $result + " " + $count
+                "#,
+                Ok(()),
+                Ok(value!("foobar 3")),
+            ),
+            (
+                r#"
+                    $keys = ""
+                    $values = ""
+                    for $key, $value in { "foo": "bar", "baz": true } {
+                        $keys = $keys + $key
+                        $values = $values + $value
+                    }
+
+                    $keys + " " + $values
+                "#,
+                Ok(()),
+                Ok(value!("bazfoo truebar")),
+            ),
+            (
+                r#"
+                    for $value in { "foo": "bar" } { true }
+                "#,
+                Err("remap error: for-loop error: iterating over a map requires two variables, one for the key and one for the value"),
+                Ok(().into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

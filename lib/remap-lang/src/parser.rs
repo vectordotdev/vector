@@ -2,8 +2,8 @@
 
 use crate::{
     expression::{
-        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not,
-        Path, Target, Variable,
+        self, Arithmetic, Array, Assignment, Block, ForLoop, Function, IfStatement, Literal, Map,
+        Noop, Not, Path, Target, Variable,
     },
     path, state, Error as E, Expr, Expression, Function as Fn, Operator, Result, Value,
 };
@@ -160,7 +160,7 @@ impl<'a> Parser<'a> {
 
         for pair in pairs {
             match pair.as_rule() {
-                R::assignment | R::boolean_expr | R::block | R::if_statement => {
+                R::assignment | R::boolean_expr | R::block | R::if_statement | R::for_loop => {
                     expressions.push(self.expression_from_pair(pair)?)
                 }
                 R::EOI => (),
@@ -191,6 +191,7 @@ impl<'a> Parser<'a> {
             R::boolean_expr => self.boolean_expr_from_pairs(pair.into_inner()),
             R::block => self.block_from_pairs(pair.into_inner()),
             R::if_statement => self.if_statement_from_pairs(pair.into_inner()),
+            R::for_loop => self.for_loop_from_pairs(pair.into_inner()),
             _ => Err(e(R::expression)),
         }
     }
@@ -325,6 +326,32 @@ impl<'a> Parser<'a> {
         }
 
         self.block_from_pairs(pairs)
+    }
+
+    /// Parse for-loop expressions.
+    fn for_loop_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
+        // First pair has to be a variable target
+        let pair = pairs.next().ok_or(R::for_loop)?;
+        let var1 = self.variable_from_pair(pair)?;
+
+        // Second variable is optional, because iterating an array does not
+        // require a second variable (it might, in which case we use the first
+        // for the index and the second for the value).
+        let mut pair = pairs.next().ok_or(R::for_loop)?;
+        let mut var2: Option<Variable> = None;
+        if let R::variable = pair.as_rule() {
+            var2 = Some(self.variable_from_pair(pair)?);
+            pair = pairs.next().ok_or(R::for_loop)?;
+        }
+
+        // Array or map collection.
+        let collection = self.expression_from_pair(pair)?;
+
+        // Block expression.
+        let pair = pairs.next().ok_or(R::for_loop)?;
+        let expression = self.expression_from_pair(pair)?;
+
+        ForLoop::new(collection, var1, var2, expression, &self.compiler_state).map(Into::into)
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.

@@ -2,7 +2,7 @@
 
 program     = _{ SOI ~ NEWLINE* ~ expressions ~ NEWLINE* ~ EOI }
 expressions = _{ (expression ~ (EOE+ ~ expression)*)+ ~ EOE? }
-expression  = _{ assignment | if_statement | boolean_expr | block }
+expression  = _{ assignment | if_statement | for_loop | boolean_expr | block }
 
 // Program Rules ---------------------------------------------------------------
 
@@ -15,6 +15,8 @@ rule_string_inner = _{ SOI ~ string_inner ~ EOI }
 assignment   = { target ~ "=" ~ expression }
 if_statement = { "if" ~ if_condition ~ block ~ ("else if" ~ if_condition ~ block)* ~ ("else" ~ block)? }
 if_condition = { boolean_expr | ("(" ~ expressions ~ ")") }
+
+for_loop = { "for" ~ variable ~ ("," ~ variable)? ~ "in" ~ expression ~ block}
 
 // Primary ---------------------------------------------------------------------
 
