@@ -1041,6 +1041,13 @@ fn default_certs() -> Option<DockerTlsConfig> {
     })
 }
 
+fn get_authority(url: &str) -> crate::Result<String> {
+    url.parse::<Uri>()
+        .ok()
+        .and_then(|uri| uri.authority().map(<_>::to_string))
+        .ok_or_else(|| "URL has no host.".into())
+}
+
 fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
@@ -1055,20 +1062,12 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
                 Some("http") => {
-                    let host = host
-                        .parse::<Uri>()
-                        .unwrap()
-                        .authority()
-                        .ok_or_else(|| "URL has no host.".to_owned());
+                    let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
                         .map_err(Into::into)
                 }
                 Some("https") => {
-                    let host = host
-                        .parse::<Uri>()
-                        .unwrap()
-                        .authority()
-                        .ok_or_else(|| "URL has no host.".to_owned());
+                    let host = get_authority(&host)?;
                     let tls = tls
                         .or_else(default_certs)
                         .ok_or(DockerError::NoCertPathError)?;
