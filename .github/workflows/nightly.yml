@@ -267,12 +267,9 @@ jobs:
           rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   osx-verify:
-    runs-on: ${{ matrix.macos_version }}
+    runs-on: macos-10.15
     needs:
       - build-x86_64-apple-darwin-packages
-    strategy:
-      matrix:
-        macos_version: ["macos-10.15","macos-11.0"]
     steps:
       - name: checkout
         uses: actions/checkout@v1
@@ -283,28 +280,6 @@ jobs:
           path: target/artifacts
       - run: |
           tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
-
-  windows-verify:
-    runs-on: windows-2019
-    needs:
-      - build-x86_64-pc-windows-msvc-packages
-    steps:
-      - uses: actions/checkout@v1
-      - name: "Add Vector version"
-        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-        shell: bash
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x64.msi
-          path: target/artifacts
-      - name: "Install Vector"
-        shell: cmd
-        run: |
-          msiexec /quiet /i D:\a\vector\vector\target\artifacts\vector-${{ env.VECTOR_VERSION }}-x64.msi
-      - name: "Run Vector"
-        shell: cmd
-        run: |
-          C:\Program Files\Vector\bin\vector --version
 
   release-docker:
     runs-on: ubuntu-latest
@@ -376,7 +351,6 @@ jobs:
       - deb-verify
       - rpm-verify
       - osx-verify
-      - windows-verify
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -594,7 +568,6 @@ jobs:
       - deb-verify
       - rpm-verify
       - osx-verify
-      - windows-verify
     runs-on: ubuntu-latest
     steps:
     - name: Discord notification
