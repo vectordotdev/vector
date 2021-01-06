@@ -287,6 +287,13 @@ mod tests {
             ("false * 5 ?? 5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
             ("false * 5 ?? true * 5", Ok(()), Err("remap error: value error: unable to multiply value type boolean by integer")),
             ("5 + (true * 5 ?? 0)", Ok(()), Ok(value!(5))),
+            ("fallible_func!()", Ok(()), Err("remap error: function call error: failed!")),
+            ("fallible_func()", Ok(()), Err("remap error: function call error: failed!")),
+            (
+                "map_printer!({})",
+                Err(r#"remap error: error for function "map_printer": cannot mark infallible function as "abort on error", remove the "!" signature"#),
+                Ok(().into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -298,6 +305,7 @@ mod tests {
                     Box::new(test_functions::EnumListValidator),
                     Box::new(test_functions::ArrayPrinter),
                     Box::new(test_functions::MapPrinter),
+                    Box::new(test_functions::FallibleFunc),
                 ],
                 None,
             );
@@ -506,6 +514,37 @@ mod tests {
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
                 TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct FallibleFunc;
+        impl Function for FallibleFunc {
+            fn identifier(&self) -> &'static str {
+                "fallible_func"
+            }
+
+            fn compile(&self, _: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(FallibleFuncFn))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct FallibleFuncFn;
+        impl Expression for FallibleFuncFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Err("failed!".into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef {
+                    fallible: true,
+                    ..Default::default()
+                }
             }
         }
     }

@@ -418,13 +418,28 @@ impl<'a> Parser<'a> {
         let mut inner = pair.into_inner();
 
         let ident = inner.next().ok_or(e(R::call))?.as_str().to_owned();
+        let abort_on_error = match inner.peek().map(|p| p.as_rule()) {
+            Some(R::bang) => {
+                inner.next();
+                true
+            }
+            _ => false,
+        };
+
         let arguments = inner
             .next()
             .map(|pair| self.arguments_from_pair(pair))
             .transpose()?
             .unwrap_or_default();
 
-        Function::new(ident, arguments, &self.function_definitions).map(Expr::from)
+        Function::new(
+            ident,
+            abort_on_error,
+            arguments,
+            &self.function_definitions,
+            &self.compiler_state,
+        )
+        .map(Expr::from)
     }
 
     /// Parse into a vector of argument properties.
@@ -688,10 +703,7 @@ mod tests {
             ("..", vec![" 1:2\n", "= expected path segment"], Ok(vec![])),
             (
                 ". bar",
-                vec![
-                    " 1:3\n",
-                    "= expected assignment, if-statement, query, operator, or block",
-                ],
+                vec![" 1:6\n", "= unknown parsing error"],
                 Ok(vec![]),
             ),
             (
@@ -753,8 +765,8 @@ mod tests {
             (
                 ".foo bar",
                 vec![
-                    " 1:6\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    " 1:9\n",
+                    "= unknown parsing error",
                 ],
             ),
             (
@@ -774,22 +786,22 @@ mod tests {
             (
                 ".foo = to_string",
                 vec![
-                    " 1:8\n",
-                    "= expected assignment, if-statement, query, or block",
+                    " 1:17\n",
+                    "= unknown parsing error",
                 ],
             ),
             (
                 r#"foo = "bar""#,
                 vec![
-                    " 1:1\n",
-                    "= expected assignment, if-statement, query, or block",
+                    " 1:4\n",
+                    "= unknown parsing error",
                 ],
             ),
             (
                 r#".foo.bar = "baz" and this"#,
                 vec![
-                    " 1:18\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    " 1:21\n",
+                    "= unknown parsing error",
                 ],
             ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected query"]),
@@ -842,8 +854,8 @@ mod tests {
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
                 vec![
-                    " 1:23\n",
-                    "= expected assignment, if-statement, query, or block",
+                    " 1:25\n",
+                    "= unknown parsing error",
                 ],
             ),
             (
