@@ -551,7 +551,7 @@ jobs:
 
   nightly-failure:
     name: nightly-failure
-    if: failure()
+    if: failure() && github.ref == 'refs/heads/master'
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
@@ -575,4 +575,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Nightly failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "Master nightly failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
