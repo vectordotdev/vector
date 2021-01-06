@@ -944,6 +944,9 @@ mod tests {
                     .unwrap()
                     .components;
 
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
+
                 let page_info = components.page_info;
 
                 // Check prev/next paging is accurate
@@ -978,6 +981,9 @@ mod tests {
                     .data
                     .unwrap()
                     .components;
+
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
 
                 let page_info = components.page_info;
 

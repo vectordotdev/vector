@@ -13,5 +13,6 @@ query ComponentsConnectionQuery($after: String, $before: String, $first: Int, $l
             startCursor
             endCursor
         }
+        totalCount
     }
 }
