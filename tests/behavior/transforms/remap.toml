@@ -1551,9 +1551,9 @@
     insert_at = "remap_function_to_syslog_facility"
     type = "log"
     [tests.input.log_fields]
-      a = "3"
-      b = "11"
-      c = "23"
+      a = 3
+      b = 11
+      c = 23
   [[tests.outputs]]
     extract_from = "remap_function_to_syslog_facility"
     [[tests.outputs.conditions]]
