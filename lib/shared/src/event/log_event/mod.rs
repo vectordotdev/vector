@@ -436,7 +436,7 @@ impl LogEvent {
 impl remap_lang::Object for LogEvent {
     fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
         if path.is_root() {
-            Ok(Some(Value::from(self.inner().clone()).into()))
+            Ok(Some(self.inner().clone().into()))
         } else {
             trace!(path = %path.to_string(), "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
