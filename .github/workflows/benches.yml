@@ -1,9 +1,9 @@
 name: Benchmark Suite
 
 on:
-	pull_request:
+  pull_request:
     branches:
-			-	master
+      - master
   push:
     branches:
       - master
@@ -92,7 +92,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-			- name: Upload benchmarks to criterion.dev
+      - name: Upload benchmarks to criterion.dev
         run: bash <(curl -s https://criterion.dev/bash)
 
       # note: should run last to flag regressions
