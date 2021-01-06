@@ -37,6 +37,6 @@ remap: functions: del: {
 			output: {
 				new_field: "please rename me"
 			}
-		}
+		},
 	]
 }
