@@ -38,18 +38,18 @@
 #
 # To output records like:
 # ```
-# { "throughput": "32.852 MiB/s",  "change": "none",  "throughput_change": "-1.0800%",  "name": "transforms/transforms",  "time_change": "+1.0918%",  "time": "31.932 ms", "p": "0.0"}
-# { "throughput": null,  "change": "none",  "throughput_change": null,  "name": "complex/complex",  "time_change": "+0.8758%",  "time": "1.8391 s", "p": "0,2"}
+# { "throughput": "32.852 MiB/s",  "change": "none",  "throughput_change": "-1.0800%",  "name": "transforms/transforms",  "time_change": "+1.0918%",  "time": "31.932 ms", "p": "0.00"}
+# { "throughput": null,  "change": "none",  "throughput_change": null,  "name": "complex/complex",  "time_change": "+0.8758%",  "time": "1.8391 s", "p": "0.02"}
 # ```
 ###
 
 BEGIN {
   # match time:   [1.8272 s 1.8391 s 1.8498 s]
-  measurement_regex = "\\[(.+ .+) (.+ .+) (.+ .+)\\]"
+  measurement_regex = "\\[(\\S+ \\S+) (\\S+ \\S+) (\\S+ \\S+)\\]"
   # match time change: [+0.1481% +0.8758% +1.5410%] (p = 0.01 < 0.05)
-  time_change_regex = "\\[(.+) (.+) (.+)\\] \\(p = (.+) [<>] .+\\)"
+  time_change_regex = "\\[(\\S+) (\\S+) (\\S+)\\] \\(p = (\\S+) [<>] \\S+\\)"
   # match thrpt change: [+0.1481% +0.8758% +1.5410%]
-  thrpt_change_regex = "\\[(.+) (.+) (.+)\\]"
+  thrpt_change_regex = "\\[(\\S+) (\\S+) (\\S+)\\]"
 }
 
 function finish_benchmark(benchmark, change)
