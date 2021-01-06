@@ -28,28 +28,28 @@ CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
 #
 
 start_podman () {
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} create --replace --name vector-test-integration-gcp -p 8681-8682:8681-8682
-	${CONTAINER_TOOL} run -d --${CONTAINER_ENCLOSURE}=vector-test-integration-gcp --name vector_cloud-pubsub \
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create --replace --name vector-test-integration-gcp -p 8681-8682:8681-8682
+	"${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-gcp --name vector_cloud-pubsub \
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 }
 
 start_docker () {
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} create vector-test-integration-gcp
-	${CONTAINER_TOOL} run -d --${CONTAINER_ENCLOSURE}=vector-test-integration-gcp -p 8681-8682:8681-8682 --name vector_cloud-pubsub \
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create vector-test-integration-gcp
+	"${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-gcp -p 8681-8682:8681-8682 --name vector_cloud-pubsub \
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 }
 
 stop_podman () {
-	${CONTAINER_TOOL} rm --force vector_cloud-pubsub 2>/dev/null; true
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} stop vector-test-integration-gcp 2>/dev/null; true
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm --force vector-test-integration-gcp 2>/dev/null; true
+	"${CONTAINER_TOOL}" rm --force vector_cloud-pubsub 2>/dev/null; true
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-gcp 2>/dev/null; true
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-gcp 2>/dev/null; true
 }
 
 stop_docker () {
-	${CONTAINER_TOOL} rm --force vector_cloud-pubsub 2>/dev/null; true
-  ${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-gcp 2>/dev/null; true
+	"${CONTAINER_TOOL}" rm --force vector_cloud-pubsub 2>/dev/null; true
+  "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm vector-test-integration-gcp 2>/dev/null; true
 }
 
 echo "Running $ACTION action for GCP integration tests environment"
 
-${ACTION}_${CONTAINER_TOOL}
+"${ACTION}"_"${CONTAINER_TOOL}"

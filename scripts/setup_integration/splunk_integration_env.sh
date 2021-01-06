@@ -28,28 +28,28 @@ CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
 #
 
 start_podman () {
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} create --replace --name vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
-	${CONTAINER_TOOL} run -d --${CONTAINER_ENCLOSURE}=vector-test-integration-splunk \
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create --replace --name vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
+	"${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-splunk \
      --name splunk timberio/splunk-hec-test:minus_compose
 }
 
 start_docker () {
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} create vector-test-integration-splunk
-	${CONTAINER_TOOL} run -d --${CONTAINER_ENCLOSURE}=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 \
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create vector-test-integration-splunk
+	"${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 \
    -p 8089:8089 --name splunk timberio/splunk-hec-test:minus_compose
 }
 
 stop_podman () {
-	${CONTAINER_TOOL} rm --force splunk 2>/dev/null; true
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} stop vector-test-integration-splunk 2>/dev/null; true
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm --force vector-test-integration-splunk 2>/dev/null; true
+	"${CONTAINER_TOOL}" rm --force splunk 2>/dev/null; true
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" stop vector-test-integration-splunk 2>/dev/null; true
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm --force vector-test-integration-splunk 2>/dev/null; true
 }
 
 stop_docker () {
-	${CONTAINER_TOOL} rm --force splunk 2>/dev/null; true
-	${CONTAINER_TOOL} ${CONTAINER_ENCLOSURE} rm vector-test-integration-splunk 2>/dev/null; true
+	"${CONTAINER_TOOL}" rm --force splunk 2>/dev/null; true
+	"${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" rm vector-test-integration-splunk 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Splunk integration tests environment"
 
-${ACTION}_${CONTAINER_TOOL}
+"${ACTION}"_"${CONTAINER_TOOL}"
