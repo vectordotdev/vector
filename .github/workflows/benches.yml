@@ -94,6 +94,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
       - name: Upload benchmarks to criterion.dev
         run: bash <(curl -s https://criterion.dev/bash)
+        env:
+          CRITERION_TOKEN: "${{ secrets.CRITERION_TOKEN }}"
 
       # note: should run last to flag regressions
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
