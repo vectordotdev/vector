@@ -24,6 +24,7 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
+  AWS_REGION: us-east-1
 
 jobs:
   cancel-previous:
@@ -31,19 +32,18 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
+      - uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   bench:
     name: Bench - Linux
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, benchmarks]
     # Allow benchmarks show regressions until we can refine the thresholds for
     # regression to reduce false positives.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -52,6 +52,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
         continue-on-error: true
@@ -67,14 +69,14 @@ jobs:
           test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
       - run: unzip target/criterion.zip
         continue-on-error: true
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
+        # build benchmarks on all CPUs, including isolated benchmarking CPU
+      - name: Prebuild benchmarks
+        run: taskset -c "0-$(nproc)" make bench CARGO_BENCH_FLAGS="--no-run"
+        # run benchmarks on isolated CPU and with address randomization
+        # disabled
       - name: Run benchmarks
-        run: |
-          mkdir -p target/criterion
-          make bench | tee target/criterion/out
+        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
@@ -82,6 +84,9 @@ jobs:
           path: "./target/criterion.zip"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
       # note: should run last to flag regressions
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
 

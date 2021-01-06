@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_kinesis_firehose: components._aws & {
+components: sources: aws_kinesis_firehose: {
 	_port: 443
 
 	title: "AWS Kinesis Firehose"

@@ -40,9 +40,10 @@ impl ParseUrlFn {
 
 impl Expression for ParseUrlFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = self.value.execute(state, object)?;
+        let string = value.try_bytes_utf8_lossy()?;
 
-        Url::parse(&String::from_utf8_lossy(&bytes))
+        Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())
             .map(url_to_value)
     }
