@@ -1,7 +1,6 @@
+use crate::{BoxedSubscription, QueryResult};
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
-
-use crate::{BoxedSubscription, QueryResult};
 
 /// Component links query for returning linked components for sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
