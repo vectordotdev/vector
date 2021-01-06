@@ -39,6 +39,7 @@ apt install --yes \
     gnupg-agent \
     gnuplot \
     jq \
+    libclang-dev \
     libsasl2-dev \
     libssl-dev \
     llvm \
