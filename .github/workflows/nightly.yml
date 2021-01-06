@@ -298,14 +298,11 @@ jobs:
         shell: cmd
         run: |
           msiexec /quiet /i D:\a\vector\vector\target\artifacts\vector-${{ env.VECTOR_VERSION }}-x64.msi /L*V "C:\package.log"
-      - name: "dump install log"
-        shell: cmd
+      - name: "Add Vector path"
         run: |
-          type C:\package.log
+          echo "C:\Program Files\Vector\bin" >> $GITHUB_PATH
       - name: "Run Vector"
-        shell: cmd
-        run: |
-          echo "C:\Program Files\Vector\bin" >> env:GITHUB_PATH
+         run: | 
           vector --version
 
   release-docker:
