@@ -281,6 +281,12 @@ mod tests {
                     "g": r#"{"1": Integer(1), "true": Boolean(true)}"#,
                 })),
             ),
+            ("true * 5 ?? 5 * 5", Ok(()), Ok(value!(25))),
+            ("5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? true * 5 ?? 5 * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? 5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? true * 5", Ok(()), Err("remap error: value error: unable to multiply value type boolean by integer")),
+            ("5 + (true * 5 ?? 0)", Ok(()), Ok(value!(5))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

@@ -641,7 +641,7 @@ impl<'a> Parser<'a> {
         }
 
         boolean_expr => {
-            op: [And, Or],
+            op: [ErrorOr, And, Or],
             next: equality,
         }
     }

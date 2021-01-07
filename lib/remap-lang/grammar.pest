@@ -40,7 +40,7 @@ not            = { operator_not* ~ (call | primary) }
 
 // Operators -------------------------------------------------------------------
 
-operator_boolean_expr   = { "||" | "&&" }
+operator_boolean_expr   = { "??" | "||" | "&&" }
 operator_equality       = { "!=" | "==" }
 operator_comparison     = { ">=" | ">" | "<=" | "<" }
 operator_addition       = { "-" | "+" }
