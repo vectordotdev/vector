@@ -721,11 +721,7 @@ mod tests {
                 Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
             ),
             ("..", vec![" 1:2\n", "= expected path segment"], Ok(vec![])),
-            // (
-            //     ". bar",
-            //     vec![" 1:6\n", "= unknown parsing error"],
-            //     Ok(vec![]),
-            // ),
+            (". bar", vec![" 1:3\n", "= expected operator"], Ok(vec![])),
             (
                 r#". "bar""#,
                 vec![" 1:2\n", "= expected path segment"], // TODO: improve error message
@@ -782,13 +778,13 @@ mod tests {
     #[test]
     fn check_parser_errors() {
         let cases = vec![
-            // (
-            //     ".foo bar",
-            //     vec![
-            //         " 1:9\n",
-            //         "= unknown parsing error",
-            //     ],
-            // ),
+            (
+                ".foo bar",
+                vec![
+                    " 1:6\n",
+                    "= expected operator",
+                ],
+            ),
             (
                 ".=",
                 vec![
@@ -803,13 +799,13 @@ mod tests {
                     "= expected value, variable, path, group or function call, value, variable, path, group, !",
                 ],
             ),
-            // (
-            //     r#".foo.bar = "baz" and this"#,
-            //     vec![
-            //         " 1:21\n",
-            //         "= unknown parsing error",
-            //     ],
-            // ),
+            (
+                r#".foo.bar = "baz" and this"#,
+                vec![
+                    " 1:18\n",
+                    "= expected operator",
+                ],
+            ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
@@ -839,7 +835,7 @@ mod tests {
                 ],
             ),
             ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
-            // ("only_fields(,)", vec![" 1:13\n", "= expected variable, argument, or path"]),
+            ("only_fields(,)", vec![" 1:13\n", "= expected variable, argument, or path"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
                 // doesn't actually recognize this as a string literal.
@@ -854,14 +850,14 @@ mod tests {
                 r#".foo."invalid \k escape".sequence = "foo""#,
                 vec![" 1:6\n", "= expected path segment"],
             ),
-            // (
-            //     // Regexes can't be parsed as part of a path
-            //     r#".foo = split(.foo, ./[aa]/)"#,
-            //     vec![
-            //         " 1:25\n",
-            //         "= unknown parsing error",
-            //     ],
-            // ),
+            (
+                // Regexes can't be parsed as part of a path
+                r#".foo = split(.foo, ./[aa]/)"#,
+                vec![
+                    " 1:27\n",
+                    "= expected query",
+                ],
+            ),
             (
                 // we cannot assign a regular expression to a field.
                 r#".foo = /ab/i"#,
