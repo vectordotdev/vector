@@ -3,17 +3,18 @@ package metadata
 remap: functions: del: {
 	arguments: [
 		{
-			name:        "paths"
-			description: "The paths of the fields to delete."
+			name:        "path"
+			description: "The path of the field to delete."
 			required:    true
-			multiple:    true
 			type: ["string"]
 		},
 	]
-	return: ["null"]
+	return: ["any"]
 	category: "Event"
 	description: #"""
-		Removed the fields specified by the given paths from the root `event` object. Multiple fields can be specified.
+		Removes the field specified by the given path from the event object. If the field exists,
+		the field's value is returned by the delete operation, while `null` is returned if the field
+		doesn't exist.
 		"""#
 	examples: [
 		{
@@ -21,13 +22,38 @@ remap: functions: del: {
 			input: {
 				"field1": 1
 				"field2": 2
-				"field3": 3
 			}
-			source: #"""
-				del(.field1, .field3)
-				"""#
+			source: "del(.field1)"
 			output: {
 				"field2": 2
+			}
+		},
+		{
+			title: "Delete existing only"
+			input: {
+				"user_id": 1
+			}
+			source: #"""
+				.user.id = if exists(.user_id) {
+					del(.user_id)
+				} else {
+					"unknown"
+				}
+				"""#
+			output: {
+				user: {
+					"id": 1
+				}
+			}
+		},
+		{
+			title: "Rename field"
+			input: {
+				old_field: "please rename me"
+			}
+			source: ".new_field = del(.old_field)"
+			output: {
+				new_field: "please rename me"
 			}
 		},
 	]
