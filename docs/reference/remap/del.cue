@@ -35,9 +35,9 @@ remap: functions: del: {
 			}
 			source: #"""
 				.user.id = if exists(.user_id) {
-                    del(.user_id)
+					del(.user_id)
 				} else {
-                    "unknown"
+					"unknown"
 				}
 				"""#
 			output: {
