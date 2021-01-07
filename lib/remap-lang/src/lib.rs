@@ -294,6 +294,25 @@ mod tests {
                 Err(r#"remap error: error for function "map_printer": cannot mark infallible function as "abort on error", remove the "!" signature"#),
                 Ok(().into()),
             ),
+            ("$foo, $err = fallible_func!()", Ok(()), Ok(value!("function call error: failed!"))),
+            ("$foo, $err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
+            ("$foo, $err = map_printer({})", Ok(()), Ok(value!({}))),
+            (
+                "
+                    $foo, $err = fallible_func()
+                    [$foo, $err]
+                ",
+                Ok(()),
+                Ok(value!([null, "function call error: failed!"])),
+            ),
+            (
+                "
+                    $foo, $err = map_printer({})
+                    [$foo, $err]
+                ",
+                Ok(()),
+                Ok(value!([{}, null])),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -308,6 +327,7 @@ mod tests {
                     Box::new(test_functions::FallibleFunc),
                 ],
                 None,
+                true,
             );
 
             assert_eq!(
@@ -478,8 +498,8 @@ mod tests {
                     .into())
             }
 
-            fn type_def(&self, _: &state::Compiler) -> TypeDef {
-                TypeDef::default()
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
+                self.0.type_def(state)
             }
         }
 
@@ -543,6 +563,7 @@ mod tests {
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
                 TypeDef {
                     fallible: true,
+                    kind: value::Kind::Null,
                     ..Default::default()
                 }
             }
