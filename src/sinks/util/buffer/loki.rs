@@ -47,7 +47,7 @@ impl From<&LokiEvent> for LokiEncodedEvent {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone)]
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     tenant_id: Option<String>,
 }
@@ -64,6 +64,7 @@ pub struct LokiBuffer {
 impl LokiBuffer {
     pub fn new(settings: BatchSize<Self>) -> Self {
         Self {
+            partition: None,
             num_bytes: WRAPPER_OVERHEAD,
             num_items: 0,
             streams: HashMap::default(),
