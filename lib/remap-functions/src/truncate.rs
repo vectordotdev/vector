@@ -67,8 +67,11 @@ impl TruncateFn {
 
 impl Expression for TruncateFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
-        let mut value = String::from_utf8_lossy(&bytes).into_owned();
+        let mut value = self
+            .value
+            .execute(state, object)?
+            .try_bytes_utf8_lossy()?
+            .into_owned();
 
         let limit = match self.limit.execute(state, object)? {
             Value::Float(f) => f.floor() as i64,

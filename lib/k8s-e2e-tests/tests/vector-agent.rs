@@ -1336,7 +1336,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // We want to capture the initial value for the `processed_events` metric,
     // but until the `kubernetes_logs` source loads the `Pod`s list, it's
     // internal file server discovers the log files, and some events get
-    // a chance to be processed - we don't have a reason to beleive that
+    // a chance to be processed - we don't have a reason to believe that
     // the `processed_events` is even defined.
     // We give Vector some reasonable time to perform this initial bootstrap,
     // and capture the `processed_events` value afterwards.

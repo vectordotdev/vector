@@ -436,9 +436,9 @@ fn benchmark_complex(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
-    benchmark_simple_pipes,
-    benchmark_interconnected,
-    benchmark_transforms,
-    benchmark_complex,
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.20);
+    targets = benchmark_simple_pipes, benchmark_interconnected, benchmark_transforms, benchmark_complex
 );

@@ -1,32 +1,45 @@
-query ComponentLinksQuery {
-  sources {
-    name
-    transforms {
-      name
+query ComponentLinksQuery($after: String, $before: String, $first: Int, $last: Int) {
+    sources(after: $after, before: $before, first: $first, last: $last) {
+        edges {
+            node {
+                name
+                transforms {
+                    name
+                }
+                sinks {
+                    name
+                }
+            }
+        }
     }
-    sinks {
-      name
+    transforms(after: $after, before: $before, first: $first, last: $last) {
+        edges {
+            node {
+                name
+                sources {
+                    name
+                }
+                transforms {
+                    name
+                }
+                sinks {
+                    name
+                }
+            }
+        }
     }
-  }
-  transforms {
-    name
-     sources {
-      name
+    sinks(after: $after, before: $before, first: $first, last: $last) {
+        edges {
+            node {
+                name
+                sources {
+                    name
+                }
+                transforms {
+                    name
+                }
+            }
+        }
     }
-     transforms {
-      name
-    }
-    sinks {
-      name
-    }
-  }
-  sinks {
-    name
-     sources {
-      name
-    }
-     transforms {
-      name
-    }
-  }
 }
+
