@@ -3,8 +3,10 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
-use crate::api::schema::components::state::component_by_name;
-use crate::config::Config;
+use crate::{
+    api::schema::{components::state::component_by_name, relay},
+    config::Config,
+};
 use async_graphql::{Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
@@ -27,23 +29,67 @@ pub struct ComponentsQuery;
 #[Object]
 impl ComponentsQuery {
     /// Configured components (sources/transforms/sinks)
-    async fn components(&self) -> Vec<Component> {
-        state::filter_components(|(_name, components)| Some(components.clone()))
+    async fn components(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<Component> {
+        relay::query(
+            state::get_components().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured sources
-    async fn sources(&self) -> Vec<source::Source> {
-        state::get_sources()
+    async fn sources(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<source::Source> {
+        relay::query(
+            state::get_sources().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured transforms
-    async fn transforms(&self) -> Vec<transform::Transform> {
-        state::get_transforms()
+    async fn transforms(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<transform::Transform> {
+        relay::query(
+            state::get_transforms().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured sinks
-    async fn sinks(&self) -> Vec<sink::Sink> {
-        state::get_sinks()
+    async fn sinks(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<sink::Sink> {
+        relay::query(
+            state::get_sinks().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Gets a configured component by name

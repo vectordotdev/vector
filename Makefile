@@ -14,6 +14,8 @@ endif
 
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
+# Override this with any extra flags for cargo bench
+export CARGO_BENCH_FLAGS ?= ""
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -899,23 +901,23 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-remap
 bench-remap: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-all
 bench-all: ### Run default and WASM benches
 bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
@@ -1006,6 +1008,9 @@ package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build
 
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
+
+.PHONY: package-aarch64-unknown-linux-gnu-all
+package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
 package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
