@@ -835,7 +835,7 @@ mod tests {
                 // This message isn't great, ideally I'd like "expected closing bracket"
                 vec![
                     " 1:48\n",
-                    "= expected assignment, if-statement, query, operator, path index, or block",
+                    "= expected operator or path index",
                 ],
             ),
             ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
@@ -877,7 +877,7 @@ mod tests {
                 r#"/ab/ = .foo"#,
                 vec![
                     " 1:6\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    "= expected operator",
                 ],
             ),
             (
@@ -906,6 +906,8 @@ mod tests {
                 "#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
+            ("foo bar", vec![" 1:5\n", "= expected operator"]),
+            ("[true] [false]", vec![" 1:8\n", "= expected operator"]),
         ];
 
         for (source, exp_expressions) in cases {

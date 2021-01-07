@@ -1,7 +1,7 @@
 // Root ------------------------------------------------------------------------
 
 program     = _{ SOI ~ NEWLINE* ~ expressions ~ NEWLINE* ~ EOI }
-expressions = _{ (expression ~ (EOE+ ~ expression)*)+ ~ EOE? }
+expressions = _{ expression ~ (EOE+ ~ expression)* ~ EOE? }
 expression  = _{ assignment | if_statement | boolean_expr | block }
 
 // Program Rules ---------------------------------------------------------------
