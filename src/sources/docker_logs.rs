@@ -26,6 +26,7 @@ use futures::{Stream, StreamExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     future::ready,
     path::PathBuf,
@@ -51,6 +52,12 @@ const CONTAINER: &str = "container_id";
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+}
+
+#[derive(Debug, Snafu)]
+enum Error {
+    #[snafu(display("URL has no host."))]
+    NoHost,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -1041,11 +1048,11 @@ fn default_certs() -> Option<DockerTlsConfig> {
     })
 }
 
-fn get_authority(url: &str) -> crate::Result<String> {
+fn get_authority(url: &str) -> Result<String, Error> {
     url.parse::<Uri>()
         .ok()
         .and_then(|uri| uri.authority().map(<_>::to_string))
-        .ok_or_else(|| "URL has no host.".into())
+        .ok_or_else(|| Error::NoHost)
 }
 
 fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
