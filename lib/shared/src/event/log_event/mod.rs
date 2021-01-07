@@ -446,18 +446,24 @@ impl remap_lang::Object for LogEvent {
         }
     }
 
-    fn remove(&mut self, path: &remap_lang::Path, compact: bool) -> Result<(), String> {
+    fn remove(
+        &mut self,
+        path: &remap_lang::Path,
+        compact: bool,
+    ) -> Result<Option<remap_lang::Value>, String> {
         if path.is_root() {
-            let mut value = LogEvent::default();
-            std::mem::swap(self, &mut value);
-            // TODO: Why does this not return value?
-            Ok(())
+            Ok(Some({
+                let mut value = LogEvent::default();
+                std::mem::swap(self, &mut value);
+                value
+                    .into_iter()
+                    .map(|(key, value)| (key, value.into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into()
+            }))
         } else {
-            trace!(path = %path.to_string(), "Converting to LookupBuf.");
             let lookup = LookupBuf::try_from(path).map_err(|e| format!("{}", e))?;
-            let _val = self.remove(&lookup, compact);
-            // TODO: Why does this not return?
-            Ok(())
+            Ok(self.remove(&lookup, compact).map(Into::into))
         }
     }
 

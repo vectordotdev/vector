@@ -364,7 +364,7 @@ mod remap {
 
         assert_eq!(
             Ok(
-                ["name", "namespace", "timestamp", "tags.tig", "kind", "type"]
+                ["name", "namespace", "timestamp", "tags", "tags.tig", "kind", "type"]
                     .iter()
                     .map(|path| Path::from_str(path).expect("invalid path"))
                     .collect()
@@ -416,10 +416,10 @@ mod remap {
 
             assert_eq!(Ok(current), metric.get(&path));
             assert_eq!(Ok(()), metric.insert(&path, new.clone()));
-            assert_eq!(Ok(Some(new)), metric.get(&path));
+            assert_eq!(Ok(Some(new.clone())), metric.get(&path));
 
             if delete {
-                assert_eq!(Ok(()), metric.remove(&path, true));
+                assert_eq!(Ok(Some(new)), metric.remove(&path, true));
                 assert_eq!(Ok(None), metric.get(&path));
             }
         }

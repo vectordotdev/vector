@@ -874,10 +874,11 @@ mod remap {
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
             let path = remap_lang::Path::new_unchecked(segments);
+            let removed = Object::get(&event, &path).unwrap();
 
             assert_eq!(
                 remap_lang::Object::remove(&mut event, &path, compact),
-                Ok(())
+                Ok(removed)
             );
             assert_eq!(
                 remap_lang::Object::get(&event, &remap_lang::Path::root()),
