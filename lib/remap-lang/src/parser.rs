@@ -904,6 +904,29 @@ mod tests {
             ),
             ("foo bar", vec![" 1:5\n", "= expected operator"]),
             ("[true] [false]", vec![" 1:8\n", "= expected operator"]),
+
+            // reserved keywords
+            ("if = true", vec![" 1:4\n", "= expected query"]),
+            ("else = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("for = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("while = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("loop = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("abort = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("break = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("continue = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("return = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("as = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("type = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("let = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("until = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("then = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("match = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("impl = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("in = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("self = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("this = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("use = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("std = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
         ];
 
         for (source, exp_expressions) in cases {
