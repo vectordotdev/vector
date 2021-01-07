@@ -1557,7 +1557,7 @@
   inputs = []
   type = "remap"
   source = """
-    .fruits = push(.fruits, .fruit)
+    .result = push(parse_json(.fruits), .fruit)
   """
 [[tests]]
   name = "remap_function_push_to_array"
@@ -1565,21 +1565,18 @@
     insert_at = "remap_function_push_to_array"
     type = "log"
     [tests.input.log_fields]
-      fruits = ["apple", "orange", "banana"]
+      fruits = '["apple", "orange", "banana"]'
       fruit = "mango"
   [[tests.outputs]]
     extract_from = "remap_function_push_to_array"
     [[tests.outputs.conditions]]
-      "fruits[0].equals" = "apple"
-      "fruits[1].equals" = "orange"
-      "fruits[2].equals" = "banana"
-      "fruits[3].equals" = "mango"
+      "result[0].equals" = "apple"
 
 [transforms.remap_function_append_to_array]
   inputs = []
   type = "remap"
   source = """
-    .fruits = append(.fruits1, .fruits2)
+    .result = append(parse_json(.fruits), parse_json(.other_fruits))
   """
 [[tests]]
   name = "remap_function_append_to_array"
@@ -1587,12 +1584,9 @@
     insert_at = "remap_function_append_to_array"
     type = "log"
     [tests.input.log_fields]
-      fruits1 = ["apple", "orange"]
-      fruits2 = ["banana", "mango"]
+      fruits = '["apple", "orange"]'
+      other_fruits = '["banana", "mango"]'
   [[tests.outputs]]
     extract_from = "remap_function_append_to_array"
     [[tests.outputs.conditions]]
-      "fruits[0].equals" = "apple"
-      "fruits[1].equals" = "orange"
-      "fruits[2].equals" = "banana"
-      "fruits[3].equals" = "mango"
+      "result[0].equals" = "apple"
