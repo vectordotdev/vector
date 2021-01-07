@@ -25,7 +25,7 @@ group    =  { "(" ~ expression ~ ")" }
 
 // Function Calls --------------------------------------------------------------
 
-call           = ${ ident ~ "(" ~ arguments? ~ ")"  }
+call           = ${ ident ~ bang? ~ "(" ~ arguments? ~ ")"  }
 arguments      = !{ argument ~ ("," ~ argument)* }
 argument       =  { (ident ~ "=")? ~ expression }
 
@@ -84,6 +84,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 // Other ----------------------------------------------------------------------
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+bang   =  { "!" }
 target = _{ variable | path }
 block  =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
 

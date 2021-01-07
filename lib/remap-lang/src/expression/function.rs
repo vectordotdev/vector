@@ -23,11 +23,17 @@ pub enum Error {
 
     #[error(r#"error for argument "{0}""#)]
     Argument(String, #[source] expression::argument::Error),
+
+    #[error(r#"cannot mark infallible function as "abort on error", remove the "!" signature"#)]
+    AbortInfallible,
 }
 
 #[derive(Debug, Clone)]
 pub struct Function {
     function: Box<dyn Expression>,
+
+    // If set to true, and the function fails at runtime, the program aborts.
+    abort_on_error: bool,
 
     // only used for `PartialEq` impl
     ident: &'static str,
@@ -42,8 +48,10 @@ impl PartialEq for Function {
 impl Function {
     pub fn new(
         ident: String,
+        abort_on_error: bool,
         arguments: Vec<(Option<String>, Expr)>,
         definitions: &[Box<dyn Fn>],
+        state: &state::Compiler,
     ) -> Result<Self> {
         let definition = definitions
             .iter()
@@ -116,7 +124,25 @@ impl Function {
             })?;
 
         let function = definition.compile(list)?;
-        Ok(Self { function, ident })
+
+        // Asking for an infallible function to abort on error makes no sense.
+        // We consider this an error at compile-time, because it makes the
+        // resulting program incorrectly convey this function call might fail.
+        let type_def = function.type_def(state);
+        if abort_on_error && !type_def.is_fallible() {
+            return Err(E::Function(ident.to_owned(), Error::AbortInfallible).into());
+        }
+
+        Ok(Self {
+            function,
+            abort_on_error,
+            ident,
+        })
+    }
+
+    /// If `true`, the function asks the program to abort when it raises an error.
+    pub fn abort_on_error(&self) -> bool {
+        self.abort_on_error
     }
 }
 
@@ -140,6 +166,7 @@ mod tests {
             let function = Box::new(Noop);
             Function {
                 function,
+                abort_on_error: false,
                 ident: "foo",
             }
         },

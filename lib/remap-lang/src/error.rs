@@ -83,6 +83,7 @@ impl fmt::Display for Rule {
             arguments,
             array,
             assignment,
+            bang: "",
             block,
             boolean,
             boolean_expr,
