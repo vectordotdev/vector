@@ -363,12 +363,18 @@ mod remap {
         };
 
         assert_eq!(
-            Ok(
-                ["name", "namespace", "timestamp", "tags", "tags.tig", "kind", "type"]
-                    .iter()
-                    .map(|path| Path::from_str(path).expect("invalid path"))
-                    .collect()
-            ),
+            Ok([
+                "name",
+                "namespace",
+                "timestamp",
+                "tags",
+                "tags.tig",
+                "kind",
+                "type"
+            ]
+            .iter()
+            .map(|path| Path::from_str(path).expect("invalid path"))
+            .collect()),
             metric.paths()
         );
     }

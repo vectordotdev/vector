@@ -522,14 +522,18 @@ impl remap_lang::Object for Metric {
             [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 Ok(self.timestamp.map(Into::into))
             }
-            [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => Ok(Some(self.kind.clone().into())),
+            [remap_lang::Segment::Field(kind)] if kind.as_str() == "kind" => {
+                Ok(Some(self.kind.clone().into()))
+            }
             [remap_lang::Segment::Field(tags)] if tags.as_str() == "tags" => {
                 Ok(self.tags.as_ref().map(|map| {
                     let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
                     remap_lang::Value::from_iter(iter)
                 }))
             }
-            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)] if tags.as_str() == "tags" => {
+            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)]
+                if tags.as_str() == "tags" =>
+            {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
             [remap_lang::Segment::Field(type_)] if type_.as_str() == "type" => {
@@ -583,11 +587,15 @@ impl remap_lang::Object for Metric {
             [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 Ok(self.timestamp.take().map(Into::into))
             }
-            [remap_lang::Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags.take().map(|map| {
-                let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                remap_lang::Value::from_iter(iter)
-            })),
-            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)] if tags.as_str() == "tags" => {
+            [remap_lang::Segment::Field(tags)] if tags.as_str() == "tags" => {
+                Ok(self.tags.take().map(|map| {
+                    let iter = map.into_iter().map(|(k, v)| (k, v.into()));
+                    remap_lang::Value::from_iter(iter)
+                }))
+            }
+            [remap_lang::Segment::Field(tags), remap_lang::Segment::Field(field)]
+                if tags.as_str() == "tags" =>
+            {
                 Ok(self.delete_tag(field.as_str()).map(Into::into))
             }
             _ => Err(MetricPathError::InvalidPath {
