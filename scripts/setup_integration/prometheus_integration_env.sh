@@ -44,7 +44,7 @@ CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
 
 start () {
   "${CONTAINER_TOOL}" run -d --name vector_prometheus --net=host \
-	 --volume "$(PWD)"/tests/data:/etc/vector:ro \
+	 --volume "$(pwd)"/tests/data:/etc/vector:ro \
 	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
 }
 

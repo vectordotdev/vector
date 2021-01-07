@@ -44,13 +44,13 @@ CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
 
 start_podman () {
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create --replace --name vector-test-integration-loki -p 3100:3100
-  "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-loki -v "$(PWD)"/tests/data:/etc/loki \
+  "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-loki -v "$(pwd)"/tests/data:/etc/loki \
 	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 }
 
 start_docker () {
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create vector-test-integration-loki
-  "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-loki -p 3100:3100 -v "$(PWD)"/tests/data:/etc/loki \
+  "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-loki -p 3100:3100 -v "$(pwd)"/tests/data:/etc/loki \
 	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 }
 

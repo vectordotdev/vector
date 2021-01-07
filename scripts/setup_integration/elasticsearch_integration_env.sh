@@ -53,7 +53,7 @@ start_podman () {
 	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
 	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
-	 -v "$(PWD)"/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
+	 -v "$(pwd)"/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
 }
 
 start_docker () {
@@ -67,7 +67,7 @@ start_docker () {
 	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
 	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
-	 -v "$(PWD)"/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
+	 -v "$(pwd)"/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
 }
 
 stop_podman () {

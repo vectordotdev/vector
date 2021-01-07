@@ -48,13 +48,13 @@ CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
 start_podman () {
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create --replace --name vector-test-integration-nginx -p 8010:8000
   "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-nginx --name vector_nginx \
-	-v "$(PWD)"tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+	-v "$(pwd)"tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
 start_docker () {
   "${CONTAINER_TOOL}" "${CONTAINER_ENCLOSURE}" create vector-test-integration-nginx
   "${CONTAINER_TOOL}" run -d --"${CONTAINER_ENCLOSURE}"=vector-test-integration-nginx -p 8010:8000 --name vector_nginx \
-	-v "$(PWD)"/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+	-v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
 stop_podman () {
