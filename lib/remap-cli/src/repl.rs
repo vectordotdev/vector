@@ -58,7 +58,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
-            Ok(line) if line == "help" => print_help_text(),
+            Ok(line) if line == "help" => open_docs_url(),
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
@@ -204,7 +204,7 @@ impl Validator for Repl {
     }
 }
 
-fn print_help_text() {
+fn open_docs_url() {
     if let Err(err) = webbrowser::open(DOCS_URL) {
         println!("couldn't open web browser: {}", err);
         println!("you can access the VRL docs at {}", DOCS_URL);
