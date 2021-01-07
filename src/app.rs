@@ -118,6 +118,8 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
+                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
