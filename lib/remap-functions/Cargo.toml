@@ -53,6 +53,7 @@ default = [
     "ip_subnet",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
+    "is_nullish",
     "log",
     "match",
     "md5",
@@ -114,6 +115,7 @@ ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
+is_nullish = []
 log = ["tracing"]
 match = ["regex"]
 md5 = ["md-5", "hex"]

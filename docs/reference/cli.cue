@@ -348,6 +348,50 @@ cli: {
 				}
 			}
 		}
+
+		"vrl": {
+			description: "Vector Remap Language CLI"
+
+			flags: _default_flags & {
+				"print-object": {
+					_short: "o"
+					description: """
+						Print the (modified) object, instead of the result of the final
+						expression.
+
+						The same result can be achieved by using `.` as the final expression.
+						"""
+				}
+			}
+
+			options: {
+				"input": {
+					_short: "i"
+					description: """
+						File containing the object(s) to manipulate. Leave empty to use stdin.
+						"""
+					type: "string"
+				}
+
+				"program": {
+					_short: "p"
+					description: """
+						File containing the program to execute. Can be used instead of `PROGRAM`.
+						"""
+					type: "string"
+				}
+			}
+
+			args: {
+				program: {
+					description: #"""
+						The program to execute. For example, `".foo = true"` sets the object's `foo`
+						field to `true`.
+						"""#
+					type: "string"
+				}
+			}
+		}
 	}
 
 	// Helpers

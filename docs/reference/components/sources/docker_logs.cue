@@ -101,12 +101,19 @@ components: sources: docker_logs: {
 				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
 				If absent, Vector will try to use `DOCKER_HOST` enviroment variable.
 				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
-				(`/var/run/docker.sock` on Unix flatforms, `\\\\.\\pipe\\docker_engine` on Windows).
+				(`/var/run/docker.sock` on Unix flatforms, `//./pipe/docker_engine` on Windows).
 				"""
 			required: false
 			type: string: {
 				default: null
-				examples: ["http://localhost:2375", "https://localhost:2376", "/var/run/docker.sock", "\\\\.\\pipe\\docker_engine"]
+				examples: [
+					"http://localhost:2375",
+					"https://localhost:2376",
+					"unix:///var/run/docker.sock",
+					"npipe:////./pipe/docker_engine",
+					"/var/run/docker.sock",
+					"//./pipe/docker_engine",
+				]
 			}
 		}
 		tls: {
