@@ -8,6 +8,8 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
+const DOCS_URL: &'static str = "https://vector.dev/docs/reference/remap";
+
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
 
@@ -56,7 +58,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
-            Ok(line) if line == "help" => println!("You're on your own, for now."),
+            Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
@@ -199,5 +201,12 @@ impl Validator for Repl {
 
     fn validate_while_typing(&self) -> bool {
         self.validator.validate_while_typing()
+    }
+}
+
+fn print_help_text() {
+    if let Err(err) = webbrowser::open(DOCS_URL) {
+        println!("couldn't open web browser: {}", err);
+        println!("you can access the VRL docs at {}", DOCS_URL);
     }
 }
