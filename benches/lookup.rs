@@ -55,6 +55,8 @@ fn lookup_to_string(c: &mut Criterion) {
     group_from_elem.finish();
 
     let mut group_to_string = c.benchmark_group("to_string");
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
     for (_path, fixture) in fixtures.iter() {
         group_to_string.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_to_string.bench_with_input(
@@ -91,6 +93,8 @@ fn lookup_to_string(c: &mut Criterion) {
     group_serialize.finish();
 
     let mut group_deserialize = c.benchmark_group("deserialize");
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
     for (_path, fixture) in fixtures.iter() {
         group_deserialize.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_deserialize.bench_with_input(
@@ -109,4 +113,10 @@ fn lookup_to_string(c: &mut Criterion) {
     group_deserialize.finish();
 }
 
-criterion_group!(benches, lookup_to_string);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = lookup_to_string
+);

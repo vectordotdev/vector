@@ -1,14 +1,18 @@
-query FileSourceMetricsQuery {
-    sources {
+query FileSourceMetricsQuery($after: String, $before: String, $first: Int, $last: Int) {
+    sources(after: $after, before: $before, first: $first, last: $last) {
         __typename
-        metrics {
-            __typename
-            ...on FileSourceMetrics {
-                __typename
-                files {
-                    name
-                    processedEventsTotal {
-                        processedEventsTotal
+        edges {
+            node {
+                metrics {
+                    __typename
+                    ...on FileSourceMetrics {
+                        __typename
+                        files {
+                            name
+                            processedEventsTotal {
+                                processedEventsTotal
+                            }
+                        }
                     }
                 }
             }

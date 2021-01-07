@@ -1,0 +1,18 @@
+query ComponentsConnectionQuery($after: String, $before: String, $first: Int, $last: Int) {
+    components(after: $after, before: $before, first: $first, last: $last) {
+        edges {
+            cursor
+            node {
+                __typename
+                name
+            }
+        }
+        pageInfo {
+            hasNextPage
+            hasPreviousPage
+            startCursor
+            endCursor
+        }
+        totalCount
+    }
+}
