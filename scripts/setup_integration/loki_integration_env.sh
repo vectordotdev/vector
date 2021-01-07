@@ -34,9 +34,9 @@ if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ] || [ -z "${CONTAINER_ENCLOSU
     usage
 fi
 
-ACTION="${action:-"stop"}"
-CONTAINER_TOOL="${tool:-"podman"}"
-CONTAINER_ENCLOSURE="${enclosure:-"pod"}"
+ACTION="${ACTION:-"stop"}"
+CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
+CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
 
 #
 # Functions
