@@ -10,10 +10,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use file_source::{
-    paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter,
-};
+use file_source::{paths_provider::glob::Glob, FileServer, FingerprintStrategy, Fingerprinter};
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
@@ -59,8 +56,8 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
-    pub include: Vec<PathBuf>,
-    pub exclude: Vec<PathBuf>,
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
     pub file_key: Option<String>,
     pub start_at_beginning: bool,
     pub ignore_older: Option<u64>, // secs
@@ -196,8 +193,8 @@ pub fn file_source(
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
-    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
-        .expect("invalid glob patterns");
+    let paths_provider =
+        Glob::new(&config.include, &config.exclude).expect("invalid glob patterns");
 
     let file_server = FileServer {
         paths_provider,
@@ -460,7 +457,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
 
@@ -518,7 +515,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -583,7 +580,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
@@ -649,8 +646,11 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
-            exclude: vec![dir.path().join("a.*.txt")],
+            include: vec![
+                dir.path().join("*.txt").to_str().unwrap().to_owned(),
+                dir.path().join("a.*").to_str().unwrap().to_owned(),
+            ],
+            exclude: vec![dir.path().join("a.*.txt").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
 
@@ -706,7 +706,7 @@ mod tests {
             let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
+                include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
                 ..test_default_file_config(&dir)
             };
 
@@ -739,7 +739,7 @@ mod tests {
             let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
+                include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
                 file_key: Some("source".to_string()),
                 ..test_default_file_config(&dir)
             };
@@ -773,7 +773,7 @@ mod tests {
             let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
+                include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
                 file_key: None,
                 ..test_default_file_config(&dir)
             };
@@ -812,7 +812,7 @@ mod tests {
     async fn file_start_position_server_restart() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
 
@@ -868,7 +868,7 @@ mod tests {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let config = file::FileConfig {
-                include: vec![dir.path().join("*")],
+                include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
@@ -898,7 +898,7 @@ mod tests {
     async fn file_start_position_server_restart_with_file_rotation() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
 
@@ -963,7 +963,7 @@ mod tests {
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             start_at_beginning: true,
             ignore_older: Some(5),
             ..test_default_file_config(&dir)
@@ -1039,7 +1039,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             max_line_bytes: 10,
             ..test_default_file_config(&dir)
         };
@@ -1096,7 +1096,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             message_start_indicator: Some("INFO".into()),
             multi_line_timeout: 25, // less than 50 in sleep()
             ..test_default_file_config(&dir)
@@ -1166,7 +1166,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             multiline: Some(MultilineConfig {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
@@ -1240,7 +1240,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: false,
@@ -1304,7 +1304,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: true,
@@ -1368,7 +1368,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             start_at_beginning: true,
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
@@ -1425,7 +1425,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![PathBuf::from("tests/data/gzipped.log")],
+            include: vec!["tests/data/gzipped.log".to_owned()],
             // TODO: remove this once files are fingerprinted after decompression
             //
             // Currently, this needs to be smaller than the total size of the compressed file
@@ -1477,7 +1477,7 @@ mod tests {
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             remove_after: Some(remove_after),
             glob_minimum_cooldown: 100,
             ..test_default_file_config(&dir)

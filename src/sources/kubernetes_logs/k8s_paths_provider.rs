@@ -31,8 +31,9 @@ impl K8sPathsProvider {
 
 impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
+    type Error = ();
 
-    fn paths(&self) -> Vec<PathBuf> {
+    fn paths(&self) -> Result<Self::IntoIter, Self::Error> {
         let read_ref = match self.pods_state_reader.read() {
             Some(v) => v,
             None => {
@@ -42,11 +43,11 @@ impl PathsProvider for K8sPathsProvider {
                 // is always better if possible, but it's not clear if it's
                 // a sane strategy here.
                 warn!(message = "Unable to read the state of the pods.");
-                return Vec::new();
+                return Ok(Vec::new());
             }
         };
 
-        read_ref
+        Ok(read_ref
             .into_iter()
             .flat_map(|(uid, values)| {
                 let pod = values
@@ -56,7 +57,7 @@ impl PathsProvider for K8sPathsProvider {
                 let paths_iter = list_pod_log_paths(real_glob, pod);
                 exclude_paths(paths_iter, &self.exclude_paths)
             })
-            .collect()
+            .collect())
     }
 }
 

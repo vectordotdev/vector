@@ -92,7 +92,7 @@ where
         let mut known_small_files = HashSet::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().into_iter() {
+        for path in self.paths_provider.paths().unwrap().into_iter() {
             if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                 &path,
                 &mut fingerprint_buffer,
@@ -204,7 +204,7 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+                for path in self.paths_provider.paths().unwrap().into_iter() {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,

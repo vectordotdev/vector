@@ -27,7 +27,9 @@ pub mod glob;
 pub trait PathsProvider {
     /// Provides the iterator that returns paths.
     type IntoIter: IntoIterator<Item = PathBuf>;
+    /// Provides the error that can arise during iterator construction.
+    type Error: std::fmt::Debug;
 
     /// Provides a set of paths.
-    fn paths(&self) -> Self::IntoIter;
+    fn paths(&self) -> Result<Self::IntoIter, Self::Error>;
 }

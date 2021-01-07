@@ -37,8 +37,6 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 let mut input = directory_str.to_owned();
                 input.push_str("/test.in");
 
-                let input = PathBuf::from(input);
-
                 let mut output = directory_str.to_owned();
                 output.push_str("/test.out");
 
