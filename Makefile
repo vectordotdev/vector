@@ -445,7 +445,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a stop -t ${CONTAINER_TOOL}
 	@scripts/setup_integration/setup_integration_env.sh -i prometheus -a stop -t ${CONTAINER_TOOL}
 	@scripts/setup_integration/setup_integration_env.sh -i influxdb -a start -t ${CONTAINER_TOOL}
-	@scripts/setup_integration/prometheus_integration_env.sh -a start
+	@scripts/setup_integration/prometheus_integration_env.sh -a start -t ${CONTAINER_TOOL}
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
