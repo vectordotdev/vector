@@ -312,6 +312,7 @@ pub mod test_util {
     use chrono::{offset::TimeZone, Utc};
     use std::fs::File;
     use std::io::Read;
+    use tokio::time::{delay_for, Duration};
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
@@ -366,7 +367,7 @@ pub mod test_util {
         (measurement, split[0], split[1].to_string(), split[2])
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    fn client() -> reqwest::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
             .unwrap()
@@ -374,12 +375,14 @@ pub mod test_util {
             .unwrap();
         let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        let client = reqwest::Client::builder()
+        reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
-            .unwrap();
+            .unwrap()
+    }
 
-        client
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        client()
             .get(&format!("{}/query", endpoint))
             .query(&[("q", query)])
             .send()
@@ -393,6 +396,26 @@ pub mod test_util {
             .await
             .status();
         assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        // Some times InfluxDB will return OK before it can actually
+        // accept writes to the database, leading to test failures. Test
+        // this with empty writes and loop if it reports the database
+        // does not exist yet.
+        loop {
+            match client()
+                .post(&format!("{}/write?db={}", endpoint, database))
+                .header("Content-Type", "text/plain")
+                .header("Authorization", &format!("Token {}", TOKEN))
+                .body("")
+                .send()
+                .await
+                .unwrap()
+                .status()
+            {
+                http::StatusCode::NO_CONTENT => break,
+                http::StatusCode::NOT_FOUND => delay_for(Duration::from_millis(500)).await,
+                status @ _ => panic!("Unexpected status: {}", status),
+            }
+        }
         database
     }
 
