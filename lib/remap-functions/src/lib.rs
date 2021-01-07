@@ -246,10 +246,6 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
-        #[cfg(feature = "md5")]
-        Box::new(Md5),
-        #[cfg(feature = "sha1")]
-        Box::new(Sha1),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -294,6 +290,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IsNullish),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
         #[cfg(feature = "now")]
@@ -330,6 +328,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Replace),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
         #[cfg(feature = "sha2")]
         Box::new(Sha2),
         #[cfg(feature = "sha3")]
