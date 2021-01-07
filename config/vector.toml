@@ -23,7 +23,7 @@ address = "127.0.0.1:8686"
 # Dummy Apache formatted logs
 [sources.dummy_logs]
 type = "generator"
-format = "apache_common"
+format = "syslog"
 interval = 1
 
 # Parse Apache formatted logs
@@ -31,7 +31,7 @@ interval = 1
 [transforms.parse_logs]
 type = "remap"
 source = '''
-. = parse_apache_log(.message)
+. = parse_syslog(.message)
 '''
 
 # Host-level metrics (cpu, memory, disk, etc)
