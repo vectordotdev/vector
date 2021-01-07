@@ -206,7 +206,10 @@ impl Validator for Repl {
 
 fn open_docs_url() {
     if let Err(err) = webbrowser::open(DOCS_URL) {
-        println!("couldn't open default web browser: {}\n\
-            you can access the VRL documentation at {}", err, DOCS_URL);
+        println!(
+            "couldn't open default web browser: {}\n\
+            you can access the VRL documentation at {}",
+            err, DOCS_URL
+        );
     }
 }
