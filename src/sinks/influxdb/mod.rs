@@ -413,7 +413,7 @@ pub mod test_util {
             {
                 http::StatusCode::NO_CONTENT => break,
                 http::StatusCode::NOT_FOUND => delay_for(Duration::from_millis(500)).await,
-                status @ _ => panic!("Unexpected status: {}", status),
+                status => panic!("Unexpected status: {}", status),
             }
         }
         database
