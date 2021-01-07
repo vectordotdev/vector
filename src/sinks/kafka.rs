@@ -25,7 +25,7 @@ use snafu::{ResultExt, Snafu};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -286,8 +286,8 @@ impl Sink<Event> for KafkaSink {
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
-                .map(|v| v.as_timestamp()),
-            Event::Metric(metric) => metric.timestamp.as_ref(),
+                .and_then(|v| v.clone().try_into().ok()),
+            Event::Metric(metric) => metric.timestamp,
         }
         .map(|ts| ts.timestamp_millis());
         let (key, body) = encode_event(item, &self.key_field, &self.encoding);
