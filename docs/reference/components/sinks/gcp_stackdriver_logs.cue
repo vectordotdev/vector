@@ -135,9 +135,8 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 		}
 		resource: {
-			common:      false
 			description: "Options for describing the logging resource."
-			required:    false
+			required:    true
 			warnings: []
 			type: object: {
 				examples: [
