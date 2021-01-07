@@ -392,10 +392,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("create database {}", database))
             .await
             .status();
-        assert!(
-            status == http::StatusCode::OK,
-            format!("UnexpectedStatus: {}", status)
-        );
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
         database
     }
 
@@ -403,10 +400,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("drop database {}", database))
             .await
             .status();
-        assert!(
-            status == http::StatusCode::OK,
-            format!("UnexpectedStatus: {}", status)
-        );
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
     }
 
     pub(crate) async fn onboarding_v2() {
