@@ -1,5 +1,8 @@
 use crate::{
-    api::schema::metrics::{self, MetricsFilter},
+    api::schema::{
+        metrics::{self, MetricsFilter},
+        relay,
+    },
     event::Metric,
 };
 use async_graphql::Object;
@@ -47,20 +50,19 @@ impl FileSourceMetrics {
 #[Object]
 impl FileSourceMetrics {
     /// File metrics
-    pub async fn files(&self) -> Vec<FileSourceMetricFile<'_>> {
-        self.0
-            .iter()
-            .filter_map(|m| match m.tag_value("file") {
-                Some(file) => Some((file, m)),
-                _ => None,
-            })
-            .fold(BTreeMap::new(), |mut map, (file, m)| {
-                map.entry(file).or_insert_with(Vec::new).push(m);
-                map
-            })
-            .into_iter()
-            .map(FileSourceMetricFile::from_tuple)
-            .collect()
+    pub async fn files(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<FileSourceMetricFile<'_>> {
+        relay::query(
+            get_files(self.0.iter()).into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Events processed for the current file source
@@ -72,4 +74,20 @@ impl FileSourceMetrics {
     pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
         self.0.processed_bytes_total()
     }
+}
+
+/// Returns the underlying `FileSourceMetricFile` from an iterator of `Metric`
+fn get_files<'a, T: Iterator<Item = &'a Metric>>(metrics: T) -> Vec<FileSourceMetricFile<'a>> {
+    metrics
+        .filter_map(|m| match m.tag_value("file") {
+            Some(file) => Some((file, m)),
+            _ => None,
+        })
+        .fold(BTreeMap::new(), |mut map, (file, m)| {
+            map.entry(file).or_insert_with(Vec::new).push(m);
+            map
+        })
+        .into_iter()
+        .map(FileSourceMetricFile::from_tuple)
+        .collect()
 }
