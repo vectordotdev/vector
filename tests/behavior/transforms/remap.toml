@@ -1570,7 +1570,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_push_to_array"
     [[tests.outputs.conditions]]
-      "fruits.equals" = ["apple", "orange", "banana", "mango"]
+      "fruits[0].equals" = "apple"
+      "fruits[1].equals" = "orange"
+      "fruits[2].equals" = "banana"
+      "fruits[3].equals" = "mango"
 
 [transforms.remap_function_append_to_array]
   inputs = []
@@ -1589,4 +1592,7 @@
   [[tests.outputs]]
     extract_from = "remap_function_append_to_array"
     [[tests.outputs.conditions]]
-      "fruits.equals" = ["apple", "orange", "banana", "mango"]
+      "fruits[0].equals" = "apple"
+      "fruits[1].equals" = "orange"
+      "fruits[2].equals" = "banana"
+      "fruits[3].equals" = "mango"
