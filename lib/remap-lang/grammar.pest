@@ -110,7 +110,7 @@ lookup         = ${
   // Other paths (internal to Vector) do not necessarily have this distinction, despite mapping the same way.
   | (lookup_segment ~ (LOOKUP_PERIOD ~ lookup_segment)*)
 }
-lookup_segment = ${ ((lookup_field | lookup_field_quoted | lookup_array) ~ lookup_array*) | lookup_coalesce ~ lookup_array* }
+lookup_segment = ${ (lookup_field | lookup_field_quoted | lookup_array | lookup_coalesce) ~ lookup_array* }
 lookup_coalesce = !{ "(" ~ lookup ~ ("|" ~ lookup)+ ~ ")" }
 lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"" | (LOOKUP_ESCAPE ~ ".") | (LOOKUP_ESCAPE ~ "[") | (LOOKUP_ESCAPE ~ "]"))+ }
 lookup_field_quoted = @{ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
