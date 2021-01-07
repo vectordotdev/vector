@@ -211,3 +211,9 @@ fn lookup_to_string_and_serialize() {
             _ => panic!("This test should never read Err'ing test fixtures."),
         });
 }
+
+#[test_env_log::test]
+fn test_indexed_coalesce_from_string() {
+    let parsed = LookupBuf::from_str("(a | b)[2]").unwrap();
+    assert_eq!("(a | b)[2]", parsed.to_string());
+}
