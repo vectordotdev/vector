@@ -9,20 +9,18 @@ set -o pipefail
 
 # Echo usage if something isn't right.
 usage() {
-    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|podman} ]" 1>&2; exit 1;
+    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|pdoman} ]  [-t The container enclosure to use {pod|network} ]" 1>&2; exit 1;
 }
 
-while getopts a:t: flag
+while getopts a:t:e: flag
 do
     case "${flag}" in
-        a) ACTION=${OPTARG}
-          [[ ${ACTION} == "start" || ${ACTION} == "stop" ]] && usage;;
-        t) CONTAINER_TOOL=${OPTARG}
-          [[ ${CONTAINER_TOOL} == "podman" || ${CONTAINER_TOOL} == "docker" ]] && usage;;
+        a) ACTION=${OPTARG};;
+        t) CONTAINER_TOOL=${OPTARG};;
+        e) CONTAINER_ENCLOSURE=${OPTARG};;
         :)
-          echo "ERROR: Option -$OPTARG requires an argument"
-          usage
-          ;;
+         echo "ERROR: Option -$OPTARG requires an argument"          usage
+         ;;
         *)
           echo "ERROR: Invalid option -$OPTARG"
           usage
@@ -32,12 +30,13 @@ done
 shift $((OPTIND-1))
 
 # Check required switches exist
-if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ]; then
+if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ] || [ -z "${CONTAINER_ENCLOSURE}" ]; then
     usage
 fi
 
-ACTION="${action:-"stop"}"
-CONTAINER_TOOL="${tool:-"podman"}"
+ACTION="${ACTION:-"stop"}"
+CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
+CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
 
 #
 # Functions
