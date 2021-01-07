@@ -14,11 +14,11 @@
 
 # data_dir = "/var/lib/vector"
 
-# Vector's API for introspection
-# Try it out with the `vector top` command
+# Vector's API (disabled by default)
+# Enable and try it out with the `vector top` command
 [api]
-enabled = true
-address = "127.0.0.1:8686"
+enabled = false
+# address = "127.0.0.1:8686"
 
 # Dummy Apache formatted logs
 [sources.dummy_logs]
