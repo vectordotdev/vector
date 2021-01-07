@@ -269,7 +269,7 @@ impl Object for LogEvent {
     fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
         if path.is_root() {
             return Ok(Some(
-                std::mem::replace(&mut self.fields, BTreeMap::new())
+                std::mem::take(&mut self.fields)
                     .into_iter()
                     .map(|(key, value)| (key, value.into()))
                     .collect::<BTreeMap<_, _>>()

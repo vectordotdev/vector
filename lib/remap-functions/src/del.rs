@@ -40,15 +40,15 @@ impl Expression for DelFn {
         // TODO: we're silencing the result of the `remove` call here, to make
         // this function infallible.
         //
-        // This isn't correct though, since, while deleting Vector log
-        // fields is infallible, deleting metric fields is not.
+        // This isn't correct though, since, while deleting Vector log fields is
+        // infallible, deleting metric fields is not.
         //
-        // For example, if you try to delete `.name` in a metric event, the
-        // call returns an error, since this is an infallible field.
+        // For example, if you try to delete `.name` in a metric event, the call
+        // returns an error, since this is an immutable field.
         //
-        // After some debating, we've decided to _silently ignore_ deletions
-        // of infallible fields for now, but we'll circle back to this in
-        // the near future to potentially improve this situation.
+        // After some debating, we've decided to _silently ignore_ deletions of
+        // immutable fields for now, but we'll circle back to this in the near
+        // future to potentially improve this situation.
         //
         // see tracking issue: https://github.com/timberio/vector/issues/5887
         Ok(object
