@@ -315,7 +315,7 @@ jobs:
 
   master-failure:
     name: master-failure
-    if: failure()
+    if: failure() && github.ref == 'refs/heads/master'
     needs:
       - cancel-previous
       - test-integration-aws
