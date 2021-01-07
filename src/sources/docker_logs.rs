@@ -1052,7 +1052,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
     url.parse::<Uri>()
         .ok()
         .and_then(|uri| uri.authority().map(<_>::to_string))
-        .ok_or_else(|| Error::NoHost)
+        .ok_or(Error::NoHost)
 }
 
 fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
