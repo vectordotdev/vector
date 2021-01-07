@@ -31,11 +31,7 @@ interval = 1
 [transforms.parse_logs]
 type = "remap"
 source = '''
-<<<<<<< HEAD
 . = parse_syslog(.message)
-=======
-. = parse_apache_log(.message)
->>>>>>> 917c20a56 (Use correct Remap function)
 '''
 
 # Host-level metrics (cpu, memory, disk, etc)
