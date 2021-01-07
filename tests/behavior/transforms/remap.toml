@@ -1516,3 +1516,39 @@
     "status.equals" = "304"
     "bytes.equals" = "656"
     "protocol.equals" = "https"
+
+[transforms.remap_function_is_nullish]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = is_nullish(.a)
+    .b = is_nullish(.b)
+    .c = is_nullish(.c)
+    .d = is_nullish(.d)
+    .e = is_nullish(.e)
+    .f = is_nullish(.f)
+    .g = is_nullish(.g)
+  """
+[[tests]]
+  name = "remap_function_is_nullish"
+  [tests.input]
+    insert_at = "remap_function_is_nullish"
+    type = "log"
+    [tests.input.log_fields]
+      a = ""
+      b = " "
+      c = "     "
+      d = "-"
+      e = "\n"
+      f = "\r"
+      g = "i am a teapot"
+  [[tests.outputs]]
+    extract_from = "remap_function_is_nullish"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = true
+      "d.equals" = true
+      "e.equals" = true
+      "f.equals" = true
+      "g.equals" = false
