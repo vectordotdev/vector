@@ -44,7 +44,7 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     remove_timestamp: bool,
     #[serde(default = "default_action")]
-    out_of_order: OurOfOrderAction,
+    out_of_order: OutOfOrderAction,
 
     auth: Option<Auth>,
 
@@ -59,13 +59,13 @@ pub struct LokiConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum OurOfOrderAction {
+enum OutOfOrderAction {
     Drop,
     RewriteTimestamp,
 }
 
-fn default_action() -> OurOfOrderAction {
-    OurOfOrderAction::RewriteTimestamp
+fn default_action() -> OutOfOrderAction {
+    OutOfOrderAction::RewriteTimestamp
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
