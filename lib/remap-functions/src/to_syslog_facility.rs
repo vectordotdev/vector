@@ -226,19 +226,19 @@ mod tests {
             want: Ok(value!("local7")),
         }
 
-        invalid_severity_larger_int {
+        invalid_facility_larger_int {
             args: func_args![value: value!(475)],
             want: Err("function call error: facility code 475 not valid"),
         }
 
-        invalid_severity_negative_int {
+        invalid_facility_negative_int {
             args: func_args![value: value!(-1)],
             want: Err("function call error: facility code -1 not valid"),
         }
 
-        invalid_severity_non_int {
+        invalid_facility_non_int {
             args: func_args![value: value!("nope")],
-            want: Err(r#"function call error: value error: expected "integer", got "string""#),
+            want: Err(r#"value error: expected "integer", got "string""#),
         }
     ];
 }
