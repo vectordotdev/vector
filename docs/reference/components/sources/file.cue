@@ -123,7 +123,7 @@ components: sources: file: {
 		}
 		ignore_not_found: {
 			common:      false
-			description: "Ignore missing files when fingerprinting. This can be used to reduce errors logged when reading from files that may include dangling symlinks."
+			description: "Ignore missing files when fingerprinting. This may be useful when used with source directories containing dangling symlinks."
 			required:    false
 			type: bool: default: false
 		}
