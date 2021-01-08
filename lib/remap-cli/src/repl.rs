@@ -111,7 +111,7 @@ fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &st
         Some(object) => object,
     };
 
-    let program = match Program::new(program, &remap_functions::all(), None) {
+    let program = match Program::new(program, &remap_functions::all(), None, true) {
         Ok(program) => program,
         Err(err) => return err.to_string(),
     };

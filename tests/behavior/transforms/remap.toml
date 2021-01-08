@@ -159,9 +159,7 @@
     .bar = to_int(.bar)
     .baz = to_float(.baz)
     .bev = to_bool(.bev)
-    .a = to_timestamp(.a)
-    .b = to_timestamp(.nope, 10)
-    .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
+    .a = to_string(to_timestamp(.a))
   """
 [[tests]]
   name = "remap_coercion"
@@ -182,9 +180,7 @@
       "bar.equals" = 20
       "baz.equals" = 30.3
       "bev.equals" = true
-      "a.equals" = "2020-09-14T09:53:44Z"
-      "b.equals" = "1970-01-01T00:00:10Z"
-      "c.equals" = "2020-09-14T10:51:12Z"
+      "a.equals" = "2020-09-14 09:53:44 UTC"
 
 [transforms.remap_quoted_path]
   inputs = []
@@ -211,16 +207,10 @@
   source = """
     .a = to_string(.in)
     .b = to_string(value = .in)
-    .c = to_string(.in, 20)
-    .d = to_string(.in, default = 20)
-    .e = to_string(.nope, 20)
-    .f = to_string(.nope, default = 20)
-    .g = to_string(value = .in, default = 20)
-    .h = to_string(value = .in, 20)
-    .i = to_string(default = 20, .in)
-    .j = to_string(default = 20, value = .in)
-    .k = to_string(default = 20, value = .nope)
-    .l = to_string(default = .other, value = .nope)
+    .c = to_string(.nope)
+    .d = to_string(value = .nope)
+    .e = to_string(.other)
+    .f = to_string(value = .other)
   """
 [[tests]]
   name = "remap_function_arguments"
@@ -235,16 +225,10 @@
     [[tests.outputs.conditions]]
       "a.equals" = "10"
       "b.equals" = "10"
-      "c.equals" = "10"
-      "d.equals" = "10"
-      "e.equals" = ""
-      "f.equals" = ""
-      "g.equals" = "10"
-      "h.equals" = "10"
-      "i.equals" = "10"
-      "j.equals" = "10"
-      "k.equals" = ""
-      "l.equals" = ""
+      "c.equals" = ""
+      "d.equals" = ""
+      "e.equals" = "30"
+      "f.equals" = "30"
 
 [transforms.remap_function_upcase]
   inputs = []

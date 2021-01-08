@@ -59,7 +59,12 @@ impl Remap {
             },
         };
 
-        let program = Program::new(&config.source, &remap_functions::all(), Some(accepts))?;
+        let program = Program::new(
+            &config.source,
+            &remap_functions::all(),
+            Some(accepts),
+            false,
+        )?;
 
         Ok(Remap {
             program,

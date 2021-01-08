@@ -49,14 +49,6 @@ bench_function! {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({"key": "value"})),
     }
-
-    invalid_json_with_default {
-        args: func_args![
-            value: r#"{"key": INVALID}"#,
-            default: r#"{"key": "default"}"#,
-        ],
-        want: Ok(value!({"key": "default"})),
-    }
 }
 
 fn benchmark_remap(c: &mut Criterion) {
