@@ -119,7 +119,7 @@ impl Expression for RedactFn {
         match &self.patterns {
             Some(patterns) => {
                 for p in patterns {
-                    typedef = typedef.merge(p.type_def(state).with_constraint(Kind::Regex));
+                    typedef = typedef.merge(p.type_def(state).fallible_unless(Kind::Regex));
                 }
             }
             None => (),
