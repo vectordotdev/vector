@@ -1446,7 +1446,6 @@
     "result[1].veg.equals" = "peas"
     "result[1].0.equals" = "peaches and peas"
 
-<<<<<<< HEAD
 [transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
   inputs = []
   type = "remap"
