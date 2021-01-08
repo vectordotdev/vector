@@ -131,6 +131,8 @@ impl fmt::Display for Rule {
             string,
             string_inner,
             target,
+            target_infallible,
+            target_regular,
             value,
             variable,
             WHITESPACE,
