@@ -2,7 +2,7 @@ remap: functions: to_bool: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that is to be converted to a Boolean."
+			description: "The value to convert to a Boolean."
 			required:    true
 			type: ["boolean", "integer", "float", "null", "string"]
 		},
@@ -12,13 +12,13 @@ remap: functions: to_bool: {
 	description: #"""
 		Converts the provided value to a Boolean. The conversion rules vary by type:
 
-		Type | Rule
-		:----|:----
+		Type    | Rule
+		:-------|:----
+		String  | These return `true`: `"true"`, `"t"`, `"yes"`, `"y"`. These return `false`: `"false"`, `"f"`, `"no"`, `"n"`, `"0"`.
+		Float   | `0.0` returns `false`; all other floats return `true`
+		Integer | `0` returns `false`; all other integers return `true`
+		Null    | `null` always returns `false`
 		Boolean | Returns the provided Boolean
-		String | These return `true`: `"true"`, `"t"`, `"yes"`, `"y"`. These return `false`: `"false"`, `"f"`, `"no"`, `"n"`, `"0"`
-		Float | `0.0` returns `false`, while all other values return `true`
-		Integer | `0` returns `false`, while all other values return `true`
-		Null | `null` always returns `false`
 		"""#
 	examples: [
 		{
