@@ -295,41 +295,41 @@ mod tests {
                 Ok(().into()),
             ),
             (
-                "$foo, $err = fallible_func!()",
+                "foo, err = fallible_func!()",
                 Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
-            ("$foo, $err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
+            ("foo, err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
             (
-                "$foo, $err = map_printer({})",
+                "foo, err = map_printer({})",
                 Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
             (
-                ".foo.bar, $err = map_printer({})",
+                ".foo.bar, err = map_printer({})",
                 Err(r#"remap error: assignment error: the path ".foo.bar" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
             (
                 "
-                    $foo, $err = fallible_func()
-                    [$foo, $err]
+                    foo, err = fallible_func()
+                    [foo, err]
                 ",
                 Ok(()),
                 Ok(value!([null, "function call error: failed!"])),
             ),
             (
                 "
-                    $foo, $err = fallible_func(true)
-                    [$foo, $err]
+                    foo, err = fallible_func(true)
+                    [foo, err]
                 ",
                 Ok(()),
                 Ok(value!([true, null])),
             ),
             (
                 "
-                    .foo.bar, $err = fallible_func(true)
-                    [.foo, $err]
+                    .foo.bar, err = fallible_func(true)
+                    [.foo, err]
                 ",
                 Ok(()),
                 Ok(value!([{ bar: true, qux: [1, 2, {quux: true}]}, null])),

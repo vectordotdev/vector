@@ -834,8 +834,8 @@ mod tests {
                     "= expected operator or path index",
                 ],
             ),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
-            ("only_fields(,)", vec![" 1:13\n", "= expected variable, argument, or path"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument or path"]),
+            ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
                 // doesn't actually recognize this as a string literal.
