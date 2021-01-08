@@ -21,7 +21,7 @@ ACTION=$1
 #
 
 start_podman () {
- podman pod create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000 -p 9088:80
+  podman pod create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000 -p 9088:80
   podman run -d --pod=vector-test-integration-aws --name vector_ec2_metadata \
   timberiodev/mock-ec2-metadata:latest
   podman run -d --pod=vector-test-integration-aws --name vector_localstack_aws \
@@ -49,8 +49,8 @@ start_docker () {
 
 stop_podman () {
   podman rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
- podman pod stop vector-test-integration-aws 2>/dev/null; true
- podman pod rm --force vector-test-integration-aws 2>/dev/null; true
+  podman pod stop vector-test-integration-aws 2>/dev/null; true
+  podman pod rm --force vector-test-integration-aws 2>/dev/null; true
 }
 
 stop_docker () {
