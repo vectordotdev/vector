@@ -129,6 +129,9 @@ impl<'de> Deserialize<'de> for Concurrency {
 pub trait ConcurrencyOption {
     fn parse_concurrency(&self, default: &Self) -> Option<usize>;
     fn is_none(&self) -> bool;
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
 }
 
 impl ConcurrencyOption for Option<usize> {
@@ -214,10 +217,10 @@ impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     }
 
     fn concurrency(&self) -> &T {
-        match (self.concurrency.is_none(), self.in_flight_limit.is_none()) {
-            (_, true) => &self.concurrency,
-            (true, false) => &self.in_flight_limit,
-            (false, false) => {
+        match (self.concurrency.is_some(), self.in_flight_limit.is_some()) {
+            (_, false) => &self.concurrency,
+            (false, true) => &self.in_flight_limit,
+            (true, true) => {
                 warn!("`in_flight_limit` option has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option");
                 &self.concurrency
             }
