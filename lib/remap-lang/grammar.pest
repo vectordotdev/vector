@@ -101,6 +101,13 @@ regex_char  =  { !("/" | "\\") ~ ANY | "\\" ~ ANY }
 
 kv_pair = { string ~ ":" ~ expression }
 
+// NOTE: Not all of these keywords are actually in use, but we reserve them
+// anyway to avoid introducing breaking changes if/when we add features that
+// require these keywords.
+//
+// We'll gradually remove the non-used keywords from this list as we move
+// towards the final version of the language and decide not to implement
+// certain features.
 reserved_keyword = @{
     "if"
     | "else"
