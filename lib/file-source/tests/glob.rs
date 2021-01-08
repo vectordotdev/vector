@@ -1,4 +1,5 @@
 use file_source::paths_provider::{glob::Glob, PathsProvider};
+use std::collections::HashSet;
 
 #[test]
 fn test_glob_include_plain() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,11 +10,11 @@ fn test_glob_include_plain() -> Result<(), Box<dyn std::error::Error>> {
     let paths = glob.paths()?;
 
     assert_eq!(
-        paths,
+        paths.into_iter().collect::<HashSet<_>>(),
         ["./tests/files/foo.log"]
             .iter()
             .map(std::path::PathBuf::from)
-            .collect::<Vec<_>>()
+            .collect::<HashSet<_>>()
     );
 
     Ok(())
@@ -28,11 +29,11 @@ fn test_glob_include_curly_braces() -> Result<(), Box<dyn std::error::Error>> {
     let paths = glob.paths()?;
 
     assert_eq!(
-        paths,
+        paths.into_iter().collect::<HashSet<_>>(),
         ["./tests/files/foo.log", "./tests/files/bar.log"]
             .iter()
             .map(std::path::PathBuf::from)
-            .collect::<Vec<_>>()
+            .collect::<HashSet<_>>()
     );
 
     Ok(())
@@ -47,11 +48,11 @@ fn test_glob_include_curly_braces_exclude_star() -> Result<(), Box<dyn std::erro
     let paths = glob.paths()?;
 
     assert_eq!(
-        paths,
+        paths.into_iter().collect::<HashSet<_>>(),
         ["./tests/files/bar.log"]
             .iter()
             .map(std::path::PathBuf::from)
-            .collect::<Vec<_>>()
+            .collect::<HashSet<_>>()
     );
 
     Ok(())
