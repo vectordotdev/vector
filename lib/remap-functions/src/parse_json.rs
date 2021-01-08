@@ -31,7 +31,7 @@ struct ParseJsonFn {
 impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
-        let bytes = value.unwrap_bytes();
+        let bytes = value.try_bytes()?;
         let value = serde_json::from_slice::<'_, Value>(&bytes)
             .map_err(|e| format!("unable to parse json: {}", e))?;
 

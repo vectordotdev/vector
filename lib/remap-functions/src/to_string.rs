@@ -54,8 +54,11 @@ impl Expression for ToStringFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
         self.value
             .type_def(state)
+            .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean | Kind::Timestamp | Kind::Regex | Kind::Null)
             .with_constraint(value::Kind::Bytes)
     }
 }
@@ -91,19 +94,19 @@ mod tests {
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        map_infallible {
-            expr: |_| ToStringFn { value: map!{}.boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        array_infallible {
-            expr: |_| ToStringFn { value: array![].boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
         timestamp_infallible {
             expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed() },
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToStringFn { value: map!{}.boxed() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToStringFn { value: array![].boxed() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
     ];
 

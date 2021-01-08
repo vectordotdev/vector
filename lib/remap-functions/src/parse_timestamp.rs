@@ -69,7 +69,8 @@ impl Expression for ParseTimestampFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes | Kind::Timestamp)
+            // Always fallible because the format needs to be parsed at runtime
+            .into_fallible(true)
             .with_constraint(Kind::Timestamp)
     }
 }
@@ -81,33 +82,33 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     remap::test_type_def![
-        value_string_infallible {
+        value_string_fallible {
             expr: |_| ParseTimestampFn {
                 value: lit!("<timestamp>").boxed(),
                 format: lit!("<format>").boxed(),
             },
             def: TypeDef {
-                fallible: false,
+                fallible: true,
                 kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
 
-        value_timestamp_infallible {
+        value_timestamp_fallible {
             expr: |_| ParseTimestampFn {
                 value: Literal::from(chrono::Utc::now()).boxed(),
                 format: lit!("<format>").boxed(),
             },
             def: TypeDef {
-                fallible: false,
+                fallible: true,
                 kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
 
-        value_wrong_type_fallible {
+        non_string_ot_timestamp_fallible {
             expr: |_| ParseTimestampFn {
-                value: lit!(12345).boxed(),
+                value: lit!(127).boxed(),
                 format: lit!("<format>").boxed(),
             },
             def: TypeDef {

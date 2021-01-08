@@ -12,7 +12,7 @@ impl Function for ToInt {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: crate::util::is_scalar_value,
+            accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_) | Value::Timestamp(_) | Value::Null),
             required: true,
         }]
     }
