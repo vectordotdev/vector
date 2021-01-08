@@ -219,9 +219,10 @@ mod tests {
 
     #[test]
     fn insert_single() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size);
+        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
         assert!(matches!(
             buffer.push(LokiRecord {
+                partition: PartitionKey { tenant_id: None },
                 labels: vec![("label1".into(), "value1".into())],
                 event: LokiEvent {
                     timestamp: 123456789,
@@ -241,10 +242,11 @@ mod tests {
 
     #[test]
     fn insert_multiple_streams() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size);
+        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
+                    partition: PartitionKey { tenant_id: None },
                     labels: vec![("asdf".into(), format!("value{}", n))],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
@@ -265,10 +267,11 @@ mod tests {
 
     #[test]
     fn insert_multiple_one_stream() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size);
+        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
+                    partition: PartitionKey { tenant_id: None },
                     labels: vec![("asdf".into(), "value1".into())],
                     event: LokiEvent {
                         timestamp: 123456780 + n,
