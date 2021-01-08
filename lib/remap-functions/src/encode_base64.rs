@@ -41,14 +41,20 @@ impl Expression for EncodeBase64Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_bytes()?;
 
-        let padding = match &self.padding {
-            Some(p) => Some(p.execute(state, object)?.try_boolean()?),
-            None => None,
-        };
+        let padding = self
+            .padding
+            .as_ref()
+            .map(|p| {
+                p.execute(state, object)
+                    .and_then(|v| Value::try_boolean(v).map_err(Into::into))
+            })
+            .transpose()?
+            .unwrap_or(true);
 
-        let config = match padding {
-            Some(p) if !p => base64::STANDARD_NO_PAD, // Padding enabled by default
-            _ => base64::STANDARD,
+        let config = if padding {
+            base64::STANDARD
+        } else {
+            base64::STANDARD_NO_PAD
         };
 
         Ok(base64::encode_config(value, config).into())
