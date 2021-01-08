@@ -336,6 +336,9 @@ mod tests {
             ),
             (".if.loop.bar", Ok(()), Ok(value!(null))),
             ("asyousee = true", Ok(()), Ok(value!(true))),
+            ("regex_printer(value: /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value:/foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value  :   /foo/)", Ok(()), Ok(value!("regex: foo"))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

@@ -33,7 +33,7 @@ group    =  { "(" ~ expression ~ ")" }
 
 call      = ${ ident ~ bang? ~ "(" ~ arguments? ~ ")"  }
 arguments = !{ argument ~ ("," ~ argument)* }
-argument  =  { (ident ~ "=")? ~ expression }
+argument  =  { (ident ~ ":")? ~ expression }
 
 // Operations ------------------------------------------------------------------
 
