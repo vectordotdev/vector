@@ -1,5 +1,5 @@
 use crate::Error;
-use prettytable::Table;
+use prettytable::{Table, format};
 use remap::{state, Object, Program, Runtime, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -205,19 +205,20 @@ impl Validator for Repl {
 }
 
 fn print_function_list() {
+    let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
     let all_funcs = remap_functions::all();
 
     let mut func_table = Table::new();
+    func_table.set_format(table_format);
 
     all_funcs
-        .chunks(5)
+        .chunks(4)
         .map(|funcs| {
             func_table.add_row(row![
                 funcs[0].identifier(),
                 funcs[1].identifier(),
                 funcs[2].identifier(),
                 funcs[3].identifier(),
-                funcs[4].identifier(),
             ]);
         })
         .for_each(drop);
