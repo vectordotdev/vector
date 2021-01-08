@@ -48,6 +48,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > Type `help` to learn more.
 >      `next` to load the next object, or create a new one.
 >      `prev` to load the previous object.
+>      `docs` to navigate to the VRL documentation.
 >      `exit` to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
