@@ -32,9 +32,7 @@ impl Target {
             Target::Infallible { ok, .. } => match ok.as_ref() {
                 Target::Path(_) => "infallible path",
                 Target::Variable(_) => "infallible variable",
-                Target::Infallible { .. } => {
-                    unimplemented!("nested infallible targets not supported")
-                }
+                Target::Infallible { .. } => unimplemented!("nested infallible target"),
             },
         }
     }
@@ -75,9 +73,7 @@ impl Assignment {
                         match ok.as_ref() {
                             Target::Variable(v) => v.ident().to_owned(),
                             Target::Path(v) => v.to_string(),
-                            Target::Infallible { .. } => {
-                                unimplemented!("nested infallible targets not supported")
-                            }
+                            Target::Infallible { .. } => unimplemented!("nested infallible target"),
                         },
                     ))
                     .into());
@@ -91,7 +87,7 @@ impl Assignment {
                 match ok.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, type_def),
                     Target::Path(path) => path_type_def(state, path, type_def),
-                    _ => unimplemented!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 }
 
                 // "err" target is assigned `null` or a string containing the
@@ -104,9 +100,7 @@ impl Assignment {
                 match err.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, err_type_def),
                     Target::Path(path) => path_type_def(state, path, err_type_def),
-                    Target::Infallible { .. } => {
-                        unimplemented!("nested infallible targets not supported")
-                    }
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 }
             }
         }
@@ -119,22 +113,33 @@ impl Expression for Assignment {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object);
 
+        fn var_assignment<'a>(
+            state: &mut state::Program,
+            var: &Variable,
+            value: &'a Value,
+        ) -> Result<&'a Value> {
+            state
+                .variables_mut()
+                .insert(var.ident().to_owned(), value.to_owned());
+
+            Ok(value)
+        }
+
+        fn path_assignment<'a>(
+            object: &mut dyn Object,
+            path: &Path,
+            value: &'a Value,
+        ) -> Result<&'a Value> {
+            object
+                .insert(path.as_ref(), value.to_owned())
+                .map_err(|e| E::Assignment(Error::PathInsertion(e)))?;
+
+            Ok(value)
+        }
+
         match &self.target {
-            Target::Variable(variable) => {
-                state
-                    .variables_mut()
-                    .insert(variable.ident().to_owned(), value.clone()?);
-
-                value
-            }
-            Target::Path(path) => {
-                object
-                    .insert(path.as_ref(), value.clone()?)
-                    .map_err(|e| E::Assignment(Error::PathInsertion(e)))?;
-
-                value
-            }
-
+            Target::Variable(var) => var_assignment(state, var, &value?).map(ToOwned::to_owned),
+            Target::Path(path) => path_assignment(object, path, &value?).map(ToOwned::to_owned),
             Target::Infallible { ok, err } => {
                 let (ok_value, err_value) = match value {
                     Ok(value) => (value, Value::Null),
@@ -142,33 +147,15 @@ impl Expression for Assignment {
                 };
 
                 match ok.as_ref() {
-                    Target::Variable(variable) => {
-                        state
-                            .variables_mut()
-                            .insert(variable.ident().to_owned(), ok_value.clone());
-                    }
-                    Target::Path(path) => object
-                        .insert(path.as_ref(), ok_value.clone())
-                        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
-
-                    Target::Infallible { .. } => {
-                        unimplemented!("nested infallible targets not supported")
-                    }
-                }
+                    Target::Variable(var) => var_assignment(state, var, &ok_value)?,
+                    Target::Path(path) => path_assignment(object, path, &ok_value)?,
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
+                };
 
                 match err.as_ref() {
-                    Target::Variable(variable) => {
-                        state
-                            .variables_mut()
-                            .insert(variable.ident().to_owned(), err_value.clone());
-                    }
-                    Target::Path(path) => object
-                        .insert(path.as_ref(), err_value.clone())
-                        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
-
-                    Target::Infallible { .. } => {
-                        unimplemented!("nested infallible targets not supported")
-                    }
+                    Target::Variable(var) => var_assignment(state, var, &err_value)?,
+                    Target::Path(path) => path_assignment(object, path, &err_value)?,
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 };
 
                 if err_value.is_null() {
@@ -202,9 +189,7 @@ impl Expression for Assignment {
                 let ok_type_def = match ok.as_ref() {
                     Target::Variable(var) => var_type_def(var),
                     Target::Path(path) => path_type_def(path),
-                    Target::Infallible { .. } => {
-                        unimplemented!("nested infallible targets not supported")
-                    }
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 };
 
                 // Technically the parser rejects this invariant, because an
@@ -218,9 +203,7 @@ impl Expression for Assignment {
                 let err_type_def = match err.as_ref() {
                     Target::Variable(var) => var_type_def(var),
                     Target::Path(path) => path_type_def(path),
-                    Target::Infallible { .. } => {
-                        unimplemented!("nested infallible targets not supported")
-                    }
+                    Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 };
 
                 ok_type_def.merge(err_type_def).into_fallible(false)
