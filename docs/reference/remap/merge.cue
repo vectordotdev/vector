@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: merge: {
+	fallible: true
 	arguments: [
 		{
 			name:        "to"

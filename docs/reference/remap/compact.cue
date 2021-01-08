@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: compact: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

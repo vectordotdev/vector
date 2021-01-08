@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: downcase: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: is_nullish: {
+	fallible: false
 	arguments: [
 		{
 			name:        "value"

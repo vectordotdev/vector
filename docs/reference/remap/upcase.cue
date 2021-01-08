@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: upcase: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

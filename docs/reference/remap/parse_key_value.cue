@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_key_value: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

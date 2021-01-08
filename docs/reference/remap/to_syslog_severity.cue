@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: to_syslog_severity: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

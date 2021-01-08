@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: truncate: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

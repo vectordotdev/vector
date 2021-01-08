@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: only_fields: {
+	fallible: true
 	arguments: [
 		{
 			name:        "paths"

@@ -1,4 +1,5 @@
 remap: functions: to_timestamp: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_aws_cloudwatch_log_subscription_message: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

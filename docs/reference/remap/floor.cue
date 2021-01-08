@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: floor: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

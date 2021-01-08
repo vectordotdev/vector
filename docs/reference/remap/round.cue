@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: round: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

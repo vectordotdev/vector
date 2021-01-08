@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: replace: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

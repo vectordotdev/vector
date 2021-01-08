@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_aws_vpc_flow_log: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

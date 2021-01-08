@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: strip_ansi_escape_codes: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

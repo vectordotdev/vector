@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: ip_cidr_contains: {
+	fallible: true
 	arguments: [
 		{
 			name:        "cidr"

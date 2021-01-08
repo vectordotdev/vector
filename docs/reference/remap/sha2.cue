@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: sha2: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

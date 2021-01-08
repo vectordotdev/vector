@@ -1,4 +1,5 @@
 remap: functions: parse_syslog: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

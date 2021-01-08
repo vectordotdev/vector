@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: md5: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

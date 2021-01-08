@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: encode_json: {
+	fallible: false
 	arguments: [
 		{
 			name:        "value"

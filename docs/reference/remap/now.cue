@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: now: {
+	fallible: false
 	arguments: []
 	category: "Timestamp"
 	return: ["timestamp"]

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: ip_subnet: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

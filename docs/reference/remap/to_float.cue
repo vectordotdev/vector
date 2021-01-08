@@ -1,4 +1,5 @@
 remap: functions: to_float: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

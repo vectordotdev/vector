@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: flatten: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

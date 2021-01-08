@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: ip_to_ipv6: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: starts_with: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

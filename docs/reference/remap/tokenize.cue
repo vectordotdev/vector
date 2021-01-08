@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: tokenize: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: del: {
+	fallible: false
 	arguments: [
 		{
 			name:        "path"

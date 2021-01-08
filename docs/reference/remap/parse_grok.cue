@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_grok: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: redact: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

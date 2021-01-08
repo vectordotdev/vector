@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: split: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

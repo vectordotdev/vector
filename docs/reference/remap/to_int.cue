@@ -1,4 +1,5 @@
 remap: functions: to_int: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

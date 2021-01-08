@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_duration: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

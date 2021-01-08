@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: to_string: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

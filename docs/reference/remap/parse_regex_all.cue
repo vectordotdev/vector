@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: parse_regex_all: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: slice: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

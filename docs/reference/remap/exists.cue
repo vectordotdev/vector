@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: exists: {
+	fallible: false
 	arguments: [
 		{
 			name:        "path"

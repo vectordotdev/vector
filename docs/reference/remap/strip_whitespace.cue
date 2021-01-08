@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: strip_whitespace: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

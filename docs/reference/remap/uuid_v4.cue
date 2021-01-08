@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: uuid_v4: {
+	fallible: false
 	arguments: []
 	return: ["string"]
 	category: "Random"

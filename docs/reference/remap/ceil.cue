@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: ceil: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

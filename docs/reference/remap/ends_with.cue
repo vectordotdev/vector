@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: ends_with: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

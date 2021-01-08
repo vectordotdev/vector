@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: format_timestamp: {
+	fallible: true
 	arguments: [
 		{
 			name:        "value"

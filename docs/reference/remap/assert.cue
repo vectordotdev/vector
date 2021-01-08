@@ -1,6 +1,7 @@
 package metadata
 
 remap: functions: assert: {
+	fallible: true
 	arguments: [
 		{
 			name:        "condition"
