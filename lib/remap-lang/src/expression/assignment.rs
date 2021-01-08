@@ -83,9 +83,9 @@ impl Assignment {
                     .into());
                 }
 
-                // "ok" variable takes on the type definition of the value, but
-                // is set to being infallible, as the error will be captured by
-                // the "err" variable.
+                // "ok" target takes on the type definition of the value, but is
+                // set to being infallible, as the error will be captured by the
+                // "err" target.
                 let type_def = type_def.into_fallible(false);
 
                 match ok.as_ref() {
@@ -94,7 +94,7 @@ impl Assignment {
                     _ => unimplemented!("nested infallible targets not supported"),
                 }
 
-                // "err" variable is either `null` or a string containing the
+                // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err_type_def = TypeDef {
                     kind: Kind::Bytes | Kind::Null,
