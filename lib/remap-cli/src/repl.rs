@@ -1,4 +1,5 @@
 use crate::Error;
+use prettytable::Table;
 use remap::{state, Object, Program, Runtime, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -57,6 +58,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => println!("You're on your own, for now."),
+            Ok(line) if line == "functions" => print_function_list(),
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
@@ -200,4 +202,25 @@ impl Validator for Repl {
     fn validate_while_typing(&self) -> bool {
         self.validator.validate_while_typing()
     }
+}
+
+fn print_function_list() {
+    let all_funcs = remap_functions::all();
+
+    let mut func_table = Table::new();
+
+    all_funcs
+        .chunks(5)
+        .map(|funcs| {
+            func_table.add_row(row![
+                funcs[0].identifier(),
+                funcs[1].identifier(),
+                funcs[2].identifier(),
+                funcs[3].identifier(),
+                funcs[4].identifier(),
+            ]);
+        })
+        .for_each(drop);
+
+    func_table.printstd();
 }

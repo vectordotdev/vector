@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate prettytable;
+
 pub mod cmd;
 #[cfg(feature = "repl")]
 mod repl;
