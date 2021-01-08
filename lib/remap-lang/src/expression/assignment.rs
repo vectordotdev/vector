@@ -10,6 +10,11 @@ use crate::{
 pub enum Error {
     #[error("unable to insert value in path: {0}")]
     PathInsertion(String),
+
+    #[error(
+        r#"the {0} "{1}" does not need to handle the error-case, because its result is infallible"#
+    )]
+    UneededInfallibleAssignment(&'static str, String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +24,20 @@ pub enum Target {
     Infallible { ok: Box<Target>, err: Box<Target> },
 }
 
+impl Target {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Target::Path(_) => "path",
+            Target::Variable(_) => "variable",
+            Target::Infallible { ok, .. } => match ok.as_ref() {
+                Target::Path(_) => "infallible path",
+                Target::Variable(_) => "infallible variable",
+                _ => unimplemented!(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Assignment {
     target: Target,
@@ -26,7 +45,7 @@ pub struct Assignment {
 }
 
 impl Assignment {
-    pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Self {
+    pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Result<Self> {
         let type_def = value.type_def(state);
 
         let var_type_def = |state: &mut state::Compiler, var: &Variable, type_def| {
@@ -45,6 +64,21 @@ impl Assignment {
             Target::Variable(var) => var_type_def(state, var, type_def),
             Target::Path(path) => path_type_def(state, path, type_def),
             Target::Infallible { ok, err } => {
+                // if the type definition of the rhs expression is infallible,
+                // then an infallible assignment is redundant, and we provide a
+                // compile-time error.
+                if !type_def.is_fallible() {
+                    return Err(E::from(Error::UneededInfallibleAssignment(
+                        ok.as_str(),
+                        match ok.as_ref() {
+                            Target::Variable(v) => v.ident().to_owned(),
+                            Target::Path(v) => v.to_string(),
+                            Target::Infallible { .. } => unimplemented!(),
+                        },
+                    ))
+                    .into());
+                }
+
                 // "ok" variable takes on the type definition of the value, but
                 // is set to being infallible, as the error will be captured by
                 // the "err" variable.
@@ -53,7 +87,7 @@ impl Assignment {
                 match ok.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, type_def),
                     Target::Path(path) => path_type_def(state, path, type_def),
-                    _ => unreachable!("nested infallible targets not supported"),
+                    _ => unimplemented!("nested infallible targets not supported"),
                 }
 
                 // "err" variable is either `null` or a string containing the
@@ -66,12 +100,14 @@ impl Assignment {
                 match err.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, err_type_def),
                     Target::Path(path) => path_type_def(state, path, err_type_def),
-                    _ => unreachable!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => {
+                        unimplemented!("nested infallible targets not supported")
+                    }
                 }
             }
         }
 
-        Self { target, value }
+        Ok(Self { target, value })
     }
 }
 
@@ -111,7 +147,9 @@ impl Expression for Assignment {
                         .insert(path.as_ref(), ok_value.clone())
                         .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
 
-                    _ => unreachable!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => {
+                        unimplemented!("nested infallible targets not supported")
+                    }
                 }
 
                 match err.as_ref() {
@@ -124,7 +162,9 @@ impl Expression for Assignment {
                         .insert(path.as_ref(), err_value.clone())
                         .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
 
-                    _ => unreachable!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => {
+                        unimplemented!("nested infallible targets not supported")
+                    }
                 };
 
                 if err_value.is_null() {
@@ -158,7 +198,9 @@ impl Expression for Assignment {
                 let ok_type_def = match ok.as_ref() {
                     Target::Variable(var) => var_type_def(var),
                     Target::Path(path) => path_type_def(path),
-                    _ => unreachable!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => {
+                        unimplemented!("nested infallible targets not supported")
+                    }
                 };
 
                 // Technically the parser rejects this invariant, because an
@@ -172,7 +214,9 @@ impl Expression for Assignment {
                 let err_type_def = match err.as_ref() {
                     Target::Variable(var) => var_type_def(var),
                     Target::Path(path) => path_type_def(path),
-                    _ => unreachable!("nested infallible targets not supported"),
+                    Target::Infallible { .. } => {
+                        unimplemented!("nested infallible targets not supported")
+                    }
                 };
 
                 ok_type_def.merge(err_type_def).into_fallible(false)
@@ -184,7 +228,10 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Literal, lit, test_type_def, Operator};
+    use crate::{
+        expression::{Arithmetic, Literal},
+        lit, test_type_def, Operator,
+    };
 
     test_type_def![
         variable {
@@ -192,7 +239,7 @@ mod tests {
                 let target = Target::Variable(Variable::new("foo".to_owned(), None));
                 let value = Box::new(Literal::from(true).into());
 
-                Assignment::new(target, value, state)
+                Assignment::new(target, value, state).unwrap()
             },
             def: TypeDef {
                 kind: Kind::Boolean,
@@ -205,7 +252,7 @@ mod tests {
                 let target = Target::Path(Path::from("foo"));
                 let value = Box::new(Literal::from("foo").into());
 
-                Assignment::new(target, value, state)
+                Assignment::new(target, value, state).unwrap()
             },
             def: TypeDef {
                 kind: Kind::Bytes,
@@ -213,19 +260,23 @@ mod tests {
             },
         }
 
-        infallible_ok {
+        infallible {
             expr: |state: &mut state::Compiler| {
                 let ok = Box::new(Target::Variable(Variable::new("ok".to_owned(), None)));
                 let err = Box::new(Target::Variable(Variable::new("err".to_owned(), None)));
 
                 let target = Target::Infallible { ok, err };
-                let value = Box::new(lit!(true).into());
+                let value = Box::new(Arithmetic::new(
+                    Box::new(lit!(true).into()),
+                    Box::new(lit!(3).into()),
+                    Operator::Multiply,
+                ).into());
 
-                Assignment::new(target, value, state)
+                Assignment::new(target, value, state).unwrap()
             },
             def: TypeDef {
                 fallible: false,
-                kind: Kind::Boolean,
+                kind: Kind::Bytes | Kind::Integer | Kind::Float,
                 ..Default::default()
             },
         }

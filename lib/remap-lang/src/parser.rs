@@ -237,7 +237,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Assignment::new(target, Box::new(expression), &mut self.compiler_state).into())
+        Assignment::new(target, Box::new(expression), &mut self.compiler_state).map(Into::into)
     }
 
     /// Return the target type to which a value is being assigned.
