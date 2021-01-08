@@ -64,7 +64,7 @@ path_segments    = ${
     | path_index+
 }
 path_segment     = ${ path_field | path_coalesce }
-path_field       = ${ ident | string }
+path_field       = ${ field | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }
 path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
@@ -90,6 +90,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 // Other ----------------------------------------------------------------------
 
 ident = @{ !reserved_keyword ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+field = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 bang  =  { "!" }
 block =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
 

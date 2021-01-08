@@ -334,6 +334,7 @@ mod tests {
                 Ok(()),
                 Ok(value!([{ bar: true, qux: [1, 2, {quux: true}]}, null])),
             ),
+            (".if.loop.bar", Ok(()), Ok(value!(null))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {

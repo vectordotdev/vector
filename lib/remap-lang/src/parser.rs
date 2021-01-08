@@ -571,7 +571,7 @@ impl<'a> Parser<'a> {
 
         match field.as_rule() {
             R::string => Ok(path::Field::Quoted(self.string_from_pair(field)?)),
-            R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
+            R::field => Ok(path::Field::Regular(field.as_str().to_owned())),
             _ => Err(e(R::path_field)),
         }
     }

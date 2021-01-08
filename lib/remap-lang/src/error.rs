@@ -95,6 +95,7 @@ impl fmt::Display for Rule {
             equality,
             expression,
             expressions,
+            field,
             float,
             group,
             ident: "",
