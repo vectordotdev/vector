@@ -119,7 +119,11 @@ impl Expression for RedactFn {
         match &self.patterns {
             Some(patterns) => {
                 for p in patterns {
-                    typedef = typedef.merge(p.type_def(state).fallible_unless(Kind::Regex));
+                    typedef = typedef.merge(
+                        p.type_def(state)
+                            .fallible_unless(Kind::Regex)
+                            .with_constraint(Kind::Bytes),
+                    )
                 }
             }
             None => (),
@@ -226,6 +230,7 @@ impl FromStr for Redactor {
 #[cfg(test)]
 mod test {
     use super::*;
+    use regex::Regex;
 
     test_type_def![
         string_infallible {
@@ -246,6 +251,33 @@ mod test {
                 value: lit!(27).boxed(),
                 filters: vec![Filter::Pattern],
                 patterns: None,
+                redactor: Redactor::Full,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        valid_pattern_infallible {
+            expr: |_| RedactFn {
+                value: lit!("1111222233334444").boxed(),
+                filters: vec![Filter::Pattern],
+                patterns: Some(vec![Literal::from(Regex::new("foo").unwrap()).into()]),
+                redactor: Redactor::Full,
+            },
+            def: TypeDef {
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        invalid_pattern_fallible {
+            expr: |_| RedactFn {
+                value: lit!("1111222233334444").boxed(),
+                filters: vec![Filter::Pattern],
+                patterns: Some(vec![lit!("i am a teapot").into()]),
                 redactor: Redactor::Full,
             },
             def: TypeDef {
