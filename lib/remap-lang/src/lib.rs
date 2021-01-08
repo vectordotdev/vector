@@ -339,6 +339,9 @@ mod tests {
             ("regex_printer(value: /foo/)", Ok(()), Ok(value!("regex: foo"))),
             ("regex_printer(value:/foo/)", Ok(()), Ok(value!("regex: foo"))),
             ("regex_printer(value  :   /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("two_param_func(true, true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(.foo, param2: true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(param2: .foo, param1: true)", Ok(()), Ok(value!(null))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -351,6 +354,7 @@ mod tests {
                     Box::new(test_functions::ArrayPrinter),
                     Box::new(test_functions::MapPrinter),
                     Box::new(test_functions::FallibleFunc),
+                    Box::new(test_functions::TwoParamFunc),
                 ],
                 None,
                 true,
@@ -602,6 +606,48 @@ mod tests {
                     kind: value::Kind::Boolean,
                     ..Default::default()
                 }
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct TwoParamFunc;
+        impl Function for TwoParamFunc {
+            fn identifier(&self) -> &'static str {
+                "two_param_func"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(TwoParamFuncFn(
+                    arguments.required("param1")?,
+                    arguments.required("param2")?,
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[
+                    Parameter {
+                        keyword: "param1",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                    Parameter {
+                        keyword: "param2",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                ]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct TwoParamFuncFn(Expr, Expr);
+        impl Expression for TwoParamFuncFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(().into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
             }
         }
     }
