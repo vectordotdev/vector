@@ -27,3 +27,6 @@ dashmap = "4.0.0"
 quickcheck = "0.9"
 rand = "0.7"
 tempfile = "3.1.0"
+
+[[test]]
+name = "glob"
