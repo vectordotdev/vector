@@ -1,5 +1,5 @@
 use crate::Error;
-use prettytable::{Table, format};
+use prettytable::{format, Table};
 use remap::{state, Object, Program, Runtime, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -58,7 +58,9 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => println!("You're on your own, for now."),
-            Ok(line) if line == "functions" || line == "funcs" || line == "fs" => print_function_list(),
+            Ok(line) if line == "functions" || line == "funcs" || line == "fs" => {
+                print_function_list()
+            }
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
@@ -212,13 +214,12 @@ fn print_function_list() {
     func_table.set_format(table_format);
 
     all_funcs
-        .chunks(4)
+        .chunks(3)
         .map(|funcs| {
             func_table.add_row(row![
                 funcs[0].identifier(),
                 funcs[1].identifier(),
                 funcs[2].identifier(),
-                funcs[3].identifier(),
             ]);
         })
         .for_each(drop);
