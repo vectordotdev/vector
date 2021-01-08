@@ -110,10 +110,22 @@ impl Expression for RedactFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        self.value
+        let mut typedef = self
+            .value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
-            .with_constraint(Kind::Bytes)
+            .with_constraint(Kind::Bytes);
+
+        match &self.patterns {
+            Some(patterns) => {
+                for p in patterns {
+                    typedef = typedef.merge(p.type_def(state).with_constraint(Kind::Regex));
+                }
+            }
+            None => (),
+        }
+
+        typedef
     }
 }
 
