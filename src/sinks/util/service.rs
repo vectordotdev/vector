@@ -216,12 +216,12 @@ impl<T: ConcurrencyOption> TowerRequestConfig<T> {
         }
     }
 
-    fn concurrency(&self) -> &T {
+    pub fn concurrency(&self) -> &T {
         match (self.concurrency.is_some(), self.in_flight_limit.is_some()) {
             (_, false) => &self.concurrency,
             (false, true) => &self.in_flight_limit,
             (true, true) => {
-                warn!("`in_flight_limit` option has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option");
+                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option");
                 &self.concurrency
             }
         }
@@ -463,6 +463,6 @@ mod tests {
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
+        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
     }
 }
