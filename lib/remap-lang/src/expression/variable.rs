@@ -1,16 +1,4 @@
-use crate::{
-    expression::{path, Error as ExprErr, Path},
-    state, Error as E, Expression, Object, Result, TypeDef, Value,
-};
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error(transparent)]
-    Query(#[from] path::Error),
-
-    #[error("unknown error: {0}")]
-    Unknown(String),
-}
+use crate::{expression::Path, state, value, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
@@ -40,30 +28,21 @@ impl Expression for Variable {
     fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
         let mut value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
 
-        if let Some(path) = &self.path {
-            return path.execute(state, &mut value).map_err(|err| {
-                let err = match err {
-                    E::Expression(ExprErr::Path(err)) => Error::Query(err),
-                    _ => Error::Unknown(err.to_string()),
-                };
-
-                ExprErr::Variable(self.ident.clone(), err).into()
-            });
+        match &self.path {
+            Some(path) => Ok(path.execute(state, &mut value).ok().unwrap_or(Value::Null)),
+            None => Ok(value),
         }
-
-        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         state
             .variable_type(&self.ident)
             .cloned()
-            // TODO: we can make it so this can never happen, by making it a
-            // compile-time error to reference a variable before it is assigned.
             .unwrap_or(TypeDef {
-                fallible: true,
+                kind: value::Kind::Null,
                 ..Default::default()
             })
+            .into_fallible(false) // variable queries return `null` if they fail
     }
 }
 
@@ -92,7 +71,6 @@ mod tests {
                 Variable::new("foo".to_owned(), None)
             },
             def: TypeDef {
-                fallible: true,
                 kind: Kind::Bytes,
                 ..Default::default()
             },
@@ -108,7 +86,7 @@ mod tests {
                 Variable::new("bar".to_owned(), None)
             },
             def: TypeDef {
-                fallible: true,
+                kind: Kind::Null,
                 ..Default::default()
             },
         }
@@ -116,7 +94,7 @@ mod tests {
         empty_state {
             expr: |_| Variable::new("foo".to_owned(), None),
             def: TypeDef {
-                fallible: true,
+                kind: Kind::Null,
                 ..Default::default()
             },
         }

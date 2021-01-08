@@ -285,10 +285,10 @@ mod tests {
             ("5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
             ("false * 5 ?? true * 5 ?? 5 * 5", Ok(()), Ok(value!(25))),
             ("false * 5 ?? 5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
-            ("false * 5 ?? true * 5", Ok(()), Err("remap error: value error: unable to multiply value type boolean by integer")),
+            ("false * 5 ?? true * 5", Err("remap error: parser error: the following expression must be made infallible for the program to be valid: false * 5 ?? true * 5"), Ok(().into())),
             ("5 + (true * 5 ?? 0)", Ok(()), Ok(value!(5))),
             ("fallible_func!()", Ok(()), Err("remap error: function call error: failed!")),
-            ("fallible_func()", Ok(()), Err("remap error: function call error: failed!")),
+            ("fallible_func()", Err("remap error: parser error: the following expression must be made infallible for the program to be valid: fallible_func()"), Ok(().into())),
             (
                 "map_printer!({})",
                 Err(r#"remap error: error for function "map_printer": cannot mark infallible function as "abort on error", remove the "!" signature"#),

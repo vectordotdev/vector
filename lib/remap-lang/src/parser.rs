@@ -30,6 +30,9 @@ pub enum Error {
     #[error("cannot return regex from program")]
     RegexResult,
 
+    #[error("the following expression must be made infallible for the program to be valid: {0}")]
+    FallibleRootExpression(String),
+
     #[error(r#"path in variable assignment unsupported, use "${0}" without "{1}""#)]
     VariableAssignmentPath(String, String),
 
@@ -109,7 +112,7 @@ impl<'a> Parser<'a> {
 
     pub fn program_from_str(&mut self, source: &str) -> Result<Vec<Expr>> {
         let pairs = self.pairs_from_str(R::program, source)?;
-        self.pairs_to_expressions(pairs)
+        self.root_pairs_to_expressions(pairs)
     }
 
     /// Parse a string path into a [`path::Path`] wrapper with easy access to
@@ -157,13 +160,23 @@ impl<'a> Parser<'a> {
 
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
-    fn pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
+    ///
+    /// Each root expression needs to be considered infallible, otherwise the
+    /// program won't compile.
+    fn root_pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
         let mut expressions = vec![];
 
         for pair in pairs {
             match pair.as_rule() {
                 R::assignment | R::boolean_expr | R::block | R::if_statement => {
-                    expressions.push(self.expression_from_pair(pair)?)
+                    let source = pair.as_str().to_owned();
+                    let expression = self.expression_from_pair(pair)?;
+
+                    if expression.type_def(&self.compiler_state).is_fallible() {
+                        return Err(Error::FallibleRootExpression(source).into());
+                    }
+
+                    expressions.push(expression);
                 }
                 R::EOI => (),
                 _ => return Err(e(R::expression)),

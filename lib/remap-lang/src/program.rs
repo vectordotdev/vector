@@ -177,12 +177,12 @@ mod tests {
                     },
                     allow_any: false,
                 }),
-                Err("expected to resolve to boolean value, but instead resolves to any value"),
+                Err("expected to resolve to an error, or boolean value, but instead resolves to any value"),
             ),
             // The final expression is infallible, but the first one isn't, so
             // this isn't allowed.
             (
-                ".foo\ntrue",
+                "true * 5\ntrue",
                 Some(TypeConstraint {
                     type_def: TypeDef {
                         fallible: false,
@@ -190,10 +190,10 @@ mod tests {
                     },
                     allow_any: false,
                 }),
-                Err("expected to be infallible, but is not"),
+                Err("the following expression must be made infallible for the program to be valid: true * 5"),
             ),
             (
-                ".foo",
+                "true * 5",
                 Some(TypeConstraint {
                     type_def: TypeDef {
                         fallible: false,
@@ -201,7 +201,7 @@ mod tests {
                     },
                     allow_any: false,
                 }),
-                Err("expected to resolve to any value, but instead resolves to an error, or any value"),
+                Err("the following expression must be made infallible for the program to be valid: true * 5"),
             ),
             (
                 ".foo",
@@ -213,7 +213,7 @@ mod tests {
                     },
                     allow_any: false,
                 }),
-                Err("expected to resolve to string value, but instead resolves to an error, or any value"),
+                Err("expected to resolve to string value, but instead resolves to any value"),
             ),
             (
                 "false || 2",
