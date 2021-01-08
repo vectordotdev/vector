@@ -58,7 +58,15 @@ impl Expression for ToStringFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean | Kind::Timestamp | Kind::Regex | Kind::Null)
+            .fallible_unless(
+                Kind::Bytes
+                    | Kind::Integer
+                    | Kind::Float
+                    | Kind::Boolean
+                    | Kind::Timestamp
+                    | Kind::Regex
+                    | Kind::Null,
+            )
             .with_constraint(value::Kind::Bytes)
     }
 }
