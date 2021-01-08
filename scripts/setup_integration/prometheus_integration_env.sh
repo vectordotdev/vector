@@ -7,8 +7,6 @@ set -o pipefail
 #
 #   Builds and pulls down the Vector Prometheus Integration test environment
 
-set -x
-
 if [ $# -ne 1 ]
 then
     echo "Usage: $0 {stop|start}" 1>&2; exit 1;

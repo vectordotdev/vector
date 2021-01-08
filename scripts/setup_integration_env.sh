@@ -9,35 +9,13 @@ set -o pipefail
 
 set -x
 
-# Echo usage if something isn't right.
-usage() {
-    echo "Usage: $0 [-i Name of integration suite ] [-a Action to run {stop|start} ] [-t The container tool to use]" 1>&2; exit 1;
-}
-
-while getopts i:a:t: o;
-do
-    case "${o}" in
-        i) INTEGRATION=${OPTARG};;
-        a) ACTION=${OPTARG};;
-        :)
-        echo "ERROR: Option -$OPTARG requires an argument"
-        usage
-        ;;
-        *)
-        echo "ERROR: Invalid option -$OPTARG"
-        usage
-        ;;
-    esac
-done
-shift $((OPTIND-1))
-
-# Check required switches exist
-if [ -z "${INTEGRATION}" ] || [ -z "${ACTION}" ]; then
-  usage
+if [ $# -ne 2 ]
+then
+    echo "Usage: $0 {integration_test_suite} {stop|start}" 1>&2; exit 1;
+    exit 1
 fi
-
-INTEGRATION="${INTEGRATION:-"none"}"
-ACTION="${ACTION:-"stop"}"
+INTEGRATION=$1
+ACTION=$2
 
 echo "Setting up Test Integration environment for ${INTEGRATION}..."
 
