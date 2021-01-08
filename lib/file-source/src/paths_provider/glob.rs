@@ -16,6 +16,14 @@ pub enum GlobError {
     WalkError(globwalk::WalkError),
 }
 
+impl std::fmt::Display for GlobError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:?}", self)
+    }
+}
+
+impl std::error::Error for GlobError {}
+
 /// A glob-based path provider.
 ///
 /// Provides the paths to the files on the file system that match include

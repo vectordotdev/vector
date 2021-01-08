@@ -170,7 +170,7 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        Ok(file_source(self, data_dir, shutdown, out))
+        file_source(self, data_dir, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -187,14 +187,13 @@ pub fn file_source(
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
-) -> super::Source {
+) -> crate::Result<super::Source> {
     let ignore_before = config
         .ignore_older
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
-    let paths_provider =
-        Glob::new(&config.include, &config.exclude).expect("invalid glob patterns");
+    let paths_provider = Glob::new(&config.include, &config.exclude)?;
 
     let file_server = FileServer {
         paths_provider,
@@ -228,7 +227,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
-    Box::pin(async move {
+    Ok(Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         // sizing here is just a guess
@@ -277,7 +276,7 @@ pub fn file_source(
         })
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await
-    })
+    }))
 }
 
 fn wrap_with_line_agg(
@@ -461,7 +460,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path1 = dir.path().join("file1");
@@ -518,7 +518,8 @@ mod tests {
             include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
@@ -583,7 +584,8 @@ mod tests {
             include: vec![dir.path().join("*").to_str().unwrap().to_owned()],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
@@ -654,7 +656,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path1 = dir.path().join("a.txt");
@@ -710,7 +713,8 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             let path = dir.path().join("file");
@@ -744,7 +748,8 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             let path = dir.path().join("file");
@@ -778,7 +783,8 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             let path = dir.path().join("file");
@@ -826,7 +832,8 @@ mod tests {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             sleep_500_millis().await;
@@ -847,7 +854,8 @@ mod tests {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             sleep_500_millis().await;
@@ -873,7 +881,8 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             sleep_500_millis().await;
@@ -909,7 +918,8 @@ mod tests {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             let mut file = File::create(&path).unwrap();
@@ -934,7 +944,8 @@ mod tests {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
             let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+            let source =
+                file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
             tokio::spawn(source);
 
             let mut file = File::create(&path).unwrap();
@@ -969,7 +980,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let before_path = dir.path().join("before");
@@ -1044,7 +1056,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
@@ -1102,7 +1115,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
@@ -1176,7 +1190,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
@@ -1265,7 +1280,8 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         sleep_500_millis().await;
@@ -1329,7 +1345,8 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         sleep_500_millis().await;
@@ -1381,7 +1398,8 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         sleep_500_millis().await;
@@ -1436,7 +1454,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         sleep_500_millis().await;
@@ -1483,7 +1502,8 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        let source =
+            file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx).unwrap();
         tokio::spawn(source);
 
         let path = dir.path().join("file");
