@@ -21,41 +21,41 @@ ACTION=$1
 #
 
 start_podman () {
-  "${CONTAINER_TOOL}" pod create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000 -p 9088:80
-  "${CONTAINER_TOOL}" run -d --pod=vector-test-integration-aws --name vector_ec2_metadata \
+ podman pod create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000 -p 9088:80
+  podman run -d --pod=vector-test-integration-aws --name vector_ec2_metadata \
   timberiodev/mock-ec2-metadata:latest
-  "${CONTAINER_TOOL}" run -d --pod=vector-test-integration-aws --name vector_localstack_aws \
+  podman run -d --pod=vector-test-integration-aws --name vector_localstack_aws \
   -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
   localstack/localstack-full:0.11.6
-  "${CONTAINER_TOOL}" run -d --pod=vector-test-integration-aws --name vector_mockwatchlogs \
+  podman run -d --pod=vector-test-integration-aws --name vector_mockwatchlogs \
   -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-  "${CONTAINER_TOOL}" run -d --pod=vector-test-integration-aws -v /var/run:/var/run --name vector_local_ecs \
+  podman run -d --pod=vector-test-integration-aws -v /var/run:/var/run --name vector_local_ecs \
   -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 }
 
 start_docker () {
-  "${CONTAINER_TOOL}" network create vector-test-integration-aws
-  "${CONTAINER_TOOL}" run -d --network=vector-test-integration-aws -p 8111:8111 --name vector_ec2_metadata \
+  docker network create vector-test-integration-aws
+  docker run -d --network=vector-test-integration-aws -p 8111:8111 --name vector_ec2_metadata \
   timberiodev/mock-ec2-metadata:latest
-  "${CONTAINER_TOOL}" run -d --network=vector-test-integration-aws --name vector_localstack_aws \
+  docker run -d --network=vector-test-integration-aws --name vector_localstack_aws \
   -p 4566:4566 -p 4571:4571 \
   -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
   localstack/localstack-full:0.11.6
-  "${CONTAINER_TOOL}" run -d --network=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
+  docker run -d --network=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
   -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-  "${CONTAINER_TOOL}" run -d --network=vector-test-integration-aws -v /var/run:/var/run -p 9088:80 --name vector_local_ecs \
+  docker run -d --network=vector-test-integration-aws -v /var/run:/var/run -p 9088:80 --name vector_local_ecs \
   -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 }
 
 stop_podman () {
-  "${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
-  "${CONTAINER_TOOL}" pod stop vector-test-integration-aws 2>/dev/null; true
-  "${CONTAINER_TOOL}" pod rm --force vector-test-integration-aws 2>/dev/null; true
+  podman rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
+ podman pod stop vector-test-integration-aws 2>/dev/null; true
+ podman pod rm --force vector-test-integration-aws 2>/dev/null; true
 }
 
 stop_docker () {
-  "${CONTAINER_TOOL}" rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
-  "${CONTAINER_TOOL}" network rm vector-test-integration-aws 2>/dev/null; true
+  docker rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
+  docker network rm vector-test-integration-aws 2>/dev/null; true
 }
 
 echo "Running $ACTION action for AWS integration tests environment"

@@ -19,26 +19,26 @@ ACTION=$1
 #
 
 start_podman () {
-  "${CONTAINER_TOOL}" pod create --replace --name vector-test-integration-loki -p 3100:3100
-  "${CONTAINER_TOOL}" run -d --pod=vector-test-integration-loki -v "$(pwd)"/tests/data:/etc/loki \
+ podman pod create --replace --name vector-test-integration-loki -p 3100:3100
+  podman run -d --pod=vector-test-integration-loki -v "$(pwd)"/tests/data:/etc/loki \
 	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 }
 
 start_docker () {
-   "${CONTAINER_TOOL}" network create vector-test-integration-loki
-  "${CONTAINER_TOOL}" run -d --network=vector-test-integration-loki -p 3100:3100 -v "$(pwd)"/tests/data:/etc/loki \
+   docker network create vector-test-integration-loki
+  docker run -d --network=vector-test-integration-loki -p 3100:3100 -v "$(pwd)"/tests/data:/etc/loki \
 	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 }
 
 stop_podman () {
-  "${CONTAINER_TOOL}" rm --force vector_loki 2>/dev/null; true
-  "${CONTAINER_TOOL}" pod stop vector-test-integration-loki 2>/dev/null; true
-  "${CONTAINER_TOOL}" pod rm --force vector-test-integration-loki 2>/dev/null; true
+  podman rm --force vector_loki 2>/dev/null; true
+ podman pod stop vector-test-integration-loki 2>/dev/null; true
+ podman pod rm --force vector-test-integration-loki 2>/dev/null; true
 }
 
 stop_docker () {
-  "${CONTAINER_TOOL}" rm --force vector_loki 2>/dev/null; true
-  "${CONTAINER_TOOL}" network rm vector-test-integration-loki 2>/dev/null; true
+  docker rm --force vector_loki 2>/dev/null; true
+  docker network rm vector-test-integration-loki 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Loki integration tests environment"
