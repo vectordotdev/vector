@@ -234,7 +234,11 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
           path: target/artifacts
-      - run: |
+      - name: First install of DEB package.
+        run: |
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+      - name: Second install of DEB package.
+        run: |
           dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
 
   rpm-verify:
@@ -263,7 +267,11 @@ jobs:
         with:
           name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           path: target/artifacts
-      - run: |
+      - name: First install of RPM package.
+        run: |
+          rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+      - name: Second install of RPM package.
+        run: |
           rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   osx-verify:

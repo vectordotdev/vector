@@ -10,9 +10,15 @@ rule_path         = _{ SOI ~ path ~ EOI }
 rule_ident        = _{ SOI ~ ident ~ EOI }
 rule_string_inner = _{ SOI ~ string_inner ~ EOI }
 
-// Statements ------------------------------------------------------------------
+// Assignment -------------------------------------------------------------------
 
-assignment   = { target ~ "=" ~ expression }
+assignment        =  { target ~ "=" ~ expression }
+target            = _{ target_infallible | target_regular }
+target_regular    = _{ variable | path }
+target_infallible =  { target_regular ~ "," ~ target_regular }
+
+// If Statement -----------------------------------------------------------------
+
 if_statement = { "if" ~ if_condition ~ block ~ ("else if" ~ if_condition ~ block)* ~ ("else" ~ block)? }
 if_condition = { boolean_expr | ("(" ~ expressions ~ ")") }
 
@@ -23,11 +29,11 @@ value    =  { string | float | integer | boolean | null | array | map | regex }
 variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
 group    =  { "(" ~ expression ~ ")" }
 
-// Function Calls --------------------------------------------------------------
+// Function Call ---------------------------------------------------------------
 
-call           = ${ ident ~ bang? ~ "(" ~ arguments? ~ ")"  }
-arguments      = !{ argument ~ ("," ~ argument)* }
-argument       =  { (ident ~ "=")? ~ expression }
+call      = ${ ident ~ bang? ~ "(" ~ arguments? ~ ")"  }
+arguments = !{ argument ~ ("," ~ argument)* }
+argument  =  { (ident ~ "=")? ~ expression }
 
 // Operations ------------------------------------------------------------------
 
@@ -83,10 +89,9 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 // Other ----------------------------------------------------------------------
 
-ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
-bang   =  { "!" }
-target = _{ variable | path }
-block  =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
+ident = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+bang  =  { "!" }
+block =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }
 char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }

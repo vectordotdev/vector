@@ -16,6 +16,7 @@ use std::str::FromStr;
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
+    pub allow_regex_return: bool,
     pub compiler_state: state::Compiler,
 }
 
@@ -98,9 +99,10 @@ macro_rules! operation_fns {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(function_definitions: &'a [Box<dyn Fn>]) -> Self {
+    pub fn new(function_definitions: &'a [Box<dyn Fn>], allow_regex_return: bool) -> Self {
         Self {
             function_definitions,
+            allow_regex_return,
             ..Default::default()
         }
     }
@@ -171,7 +173,10 @@ impl<'a> Parser<'a> {
         if let Some(expression) = expressions.last() {
             let type_def = expression.type_def(&self.compiler_state);
 
-            if !type_def.kind.is_all() && type_def.scalar_kind().contains_regex() {
+            if !self.allow_regex_return
+                && !type_def.kind.is_all()
+                && type_def.scalar_kind().contains_regex()
+            {
                 return Err(Error::RegexResult.into());
             }
         }
@@ -206,13 +211,13 @@ impl<'a> Parser<'a> {
         // JSON.
         if matches!(target, Target::Path(_)) {
             match &expression {
-                Expr::Literal(literal) if literal.is_regex() => {
+                Expr::Literal(literal) if !self.allow_regex_return && literal.is_regex() => {
                     return Err(Error::RegexAssignment.into())
                 }
                 Expr::Literal(literal) => {
                     if let Some(array) = literal.as_array() {
                         array.iter().try_for_each(|value| {
-                            if value.is_regex() {
+                            if !self.allow_regex_return && value.is_regex() {
                                 Err(E::from(Error::RegexAssignment))
                             } else {
                                 Ok(())
@@ -222,7 +227,7 @@ impl<'a> Parser<'a> {
                 }
                 Expr::Array(array)
                     if array.expressions().iter().any(|expr| match expr {
-                        Expr::Literal(literal) => literal.is_regex(),
+                        Expr::Literal(literal) if !self.allow_regex_return => literal.is_regex(),
                         _ => false,
                     }) =>
                 {
@@ -232,7 +237,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Assignment::new(target, Box::new(expression), &mut self.compiler_state).into())
+        Assignment::new(target, Box::new(expression), &mut self.compiler_state).map(Into::into)
     }
 
     /// Return the target type to which a value is being assigned.
@@ -253,8 +258,23 @@ impl<'a> Parser<'a> {
                 Ok(Target::Variable(variable))
             }),
             R::path => Ok(Target::Path(Path::new(self.path_from_pair(pair)?))),
+            R::target_infallible => self.target_infallible_from_pairs(pair.into_inner()),
             _ => Err(e(R::target)),
         }
+    }
+
+    fn target_infallible_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Target> {
+        let ok = pairs
+            .next()
+            .ok_or(e(R::target_infallible))
+            .and_then(|pair| Ok(Box::new(self.target_from_pair(pair)?)))?;
+
+        let err = pairs
+            .next()
+            .ok_or(e(R::target_infallible))
+            .and_then(|pair| Ok(Box::new(self.target_from_pair(pair)?)))?;
+
+        Ok(Target::Infallible { ok, err })
     }
 
     /// Parse block expressions.
@@ -722,7 +742,7 @@ mod tests {
             let compile_check: Vec<&str> = compile_check;
             i += 1;
 
-            let mut parser = Parser::new(&[]);
+            let mut parser = Parser::new(&[], true);
             let pairs = parser.program_from_str(source).map_err(RemapError::from);
 
             match pairs {
@@ -832,9 +852,9 @@ mod tests {
                     "= expected assignment, if-statement, query, operator, path index, or block",
                 ],
             ),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
             ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
             ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
@@ -905,7 +925,7 @@ mod tests {
         ];
 
         for (source, exp_expressions) in cases {
-            let mut parser = Parser::new(&[]);
+            let mut parser = Parser::new(&[], false);
             let err = parser
                 .program_from_str(source)
                 .err()

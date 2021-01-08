@@ -294,6 +294,46 @@ mod tests {
                 Err(r#"remap error: error for function "map_printer": cannot mark infallible function as "abort on error", remove the "!" signature"#),
                 Ok(().into()),
             ),
+            (
+                "$foo, $err = fallible_func!()",
+                Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            ("$foo, $err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
+            (
+                "$foo, $err = map_printer({})",
+                Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            (
+                ".foo.bar, $err = map_printer({})",
+                Err(r#"remap error: assignment error: the path ".foo.bar" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            (
+                "
+                    $foo, $err = fallible_func()
+                    [$foo, $err]
+                ",
+                Ok(()),
+                Ok(value!([null, "function call error: failed!"])),
+            ),
+            (
+                "
+                    $foo, $err = fallible_func(true)
+                    [$foo, $err]
+                ",
+                Ok(()),
+                Ok(value!([true, null])),
+            ),
+            (
+                "
+                    .foo.bar, $err = fallible_func(true)
+                    [.foo, $err]
+                ",
+                Ok(()),
+                Ok(value!([{ bar: true, qux: [1, 2, {quux: true}]}, null])),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -308,6 +348,7 @@ mod tests {
                     Box::new(test_functions::FallibleFunc),
                 ],
                 None,
+                true,
             );
 
             assert_eq!(
@@ -478,8 +519,8 @@ mod tests {
                     .into())
             }
 
-            fn type_def(&self, _: &state::Compiler) -> TypeDef {
-                TypeDef::default()
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
+                self.0.type_def(state)
             }
         }
 
@@ -524,25 +565,36 @@ mod tests {
                 "fallible_func"
             }
 
-            fn compile(&self, _: ArgumentList) -> Result<Box<dyn Expression>> {
-                Ok(Box::new(FallibleFuncFn))
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(FallibleFuncFn(
+                    arguments.optional("value").map(Expr::boxed),
+                )))
             }
 
             fn parameters(&self) -> &'static [Parameter] {
-                &[]
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: false,
+                }]
             }
         }
 
         #[derive(Debug, Clone)]
-        struct FallibleFuncFn;
+        struct FallibleFuncFn(Option<Box<dyn Expression>>);
         impl Expression for FallibleFuncFn {
             fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
-                Err("failed!".into())
+                if self.0.is_some() {
+                    Ok(true.into())
+                } else {
+                    Err("failed!".into())
+                }
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
                 TypeDef {
                     fallible: true,
+                    kind: value::Kind::Boolean,
                     ..Default::default()
                 }
             }
