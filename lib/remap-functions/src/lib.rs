@@ -36,6 +36,8 @@ mod ip_subnet;
 mod ip_to_ipv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 mod ipv6_to_ipv4;
+#[cfg(feature = "is_nullish")]
+mod is_nullish;
 #[cfg(feature = "log")]
 mod log;
 #[cfg(feature = "match")]
@@ -52,6 +54,8 @@ mod ok;
 mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_duration")]
@@ -60,6 +64,8 @@ mod parse_duration;
 mod parse_grok;
 #[cfg(feature = "parse_json")]
 mod parse_json;
+#[cfg(feature = "parse_key_value")]
+mod parse_key_value;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -159,6 +165,8 @@ pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+#[cfg(feature = "is_nullish")]
+pub use is_nullish::IsNullish;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
@@ -171,6 +179,8 @@ pub use ok::OK;
 pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_duration")]
@@ -179,6 +189,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
+#[cfg(feature = "parse_key_value")]
+pub use parse_key_value::ParseKeyValue;
 #[cfg(feature = "parse_regex")]
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
@@ -238,10 +250,6 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
-        #[cfg(feature = "md5")]
-        Box::new(Md5),
-        #[cfg(feature = "sha1")]
-        Box::new(Sha1),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -282,8 +290,12 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_nullish")]
+        Box::new(IsNullish),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
         #[cfg(feature = "now")]
@@ -294,6 +306,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
+        #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
+        Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]
@@ -302,6 +316,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
+        #[cfg(feature = "parse_key_value")]
+        Box::new(ParseKeyValue),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -316,6 +332,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Replace),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
         #[cfg(feature = "sha2")]
         Box::new(Sha2),
         #[cfg(feature = "sha3")]

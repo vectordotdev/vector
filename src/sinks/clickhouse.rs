@@ -335,8 +335,10 @@ mod integration_tests {
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
-        let mut encoding = EncodingConfigWithDefault::default();
-        encoding.timestamp_format = Some(TimestampFormat::Unix);
+        let encoding = EncodingConfigWithDefault {
+            timestamp_format: Some(TimestampFormat::Unix),
+            ..Default::default()
+        };
 
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),

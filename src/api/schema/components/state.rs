@@ -22,6 +22,11 @@ pub fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T
         .collect()
 }
 
+/// Returns all components
+pub fn get_components() -> Vec<Component> {
+    filter_components(|(_name, components)| Some(components.clone()))
+}
+
 /// Filters components, and returns a clone of sources
 pub fn get_sources() -> Vec<source::Source> {
     filter_components(|(_, components)| match components {

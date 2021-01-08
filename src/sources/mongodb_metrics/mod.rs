@@ -57,20 +57,18 @@ macro_rules! gauge {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("invalid endpoint: {:?}", source))]
+    #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: MongoError },
-    #[snafu(display("invalid client options: {:?}", source))]
+    #[snafu(display("invalid client options: {}", source))]
     InvalidClientOptions { source: MongoError },
-    #[snafu(display("failed to execute `isMaster` command: {:?}", source))]
+    #[snafu(display("failed to execute `isMaster` command: {}", source))]
     CommandIsMasterMongoError { source: MongoError },
-    #[snafu(display("failed to parse `isMaster` response: {:?}", source))]
+    #[snafu(display("failed to parse `isMaster` response: {}", source))]
     CommandIsMasterParseError { source: bson::de::Error },
-    #[snafu(display("failed to execute `buildInfo` command: {:?}", source))]
+    #[snafu(display("failed to execute `buildInfo` command: {}", source))]
     CommandBuildInfoMongoError { source: MongoError },
-    #[snafu(display("failed to parse `buildInfo` response: {:?}", source))]
+    #[snafu(display("failed to parse `buildInfo` response: {}", source))]
     CommandBuildInfoParseError { source: bson::de::Error },
-    #[snafu(display("only `Mongod` supported right now, current: `{:?}`", node_type))]
-    UnsupportedNodeType { node_type: NodeType },
 }
 
 #[derive(Debug)]

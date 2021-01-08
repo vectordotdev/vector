@@ -266,14 +266,16 @@ impl Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
         if path.is_root() {
-            for key in self.keys().collect::<Vec<_>>() {
-                self.remove_prune(key, compact);
-            }
-
-            return Ok(());
-        };
+            return Ok(Some(
+                std::mem::take(&mut self.fields)
+                    .into_iter()
+                    .map(|(key, value)| (key, value.into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into(),
+            ));
+        }
 
         // loop until we find a path that exists.
         for key in path.to_alternative_strings() {
@@ -281,11 +283,10 @@ impl Object for LogEvent {
                 continue;
             }
 
-            self.remove_prune(&key, compact);
-            break;
+            return Ok(self.remove_prune(&key, compact).map(Into::into));
         }
 
-        Ok(())
+        Ok(None)
     }
 
     fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
@@ -658,8 +659,9 @@ mod test {
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
             let path = Path::new_unchecked(segments);
+            let removed = Object::get(&event, &path).unwrap();
 
-            assert_eq!(Object::remove(&mut event, &path, compact), Ok(()));
+            assert_eq!(Object::remove(&mut event, &path, compact), Ok(removed));
             assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
         }
     }

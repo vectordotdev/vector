@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.5.0
+      - uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -315,7 +315,7 @@ jobs:
 
   master-failure:
     name: master-failure
-    if: failure()
+    if: failure() && github.ref == 'refs/heads/master'
     needs:
       - cancel-previous
       - test-integration-aws
