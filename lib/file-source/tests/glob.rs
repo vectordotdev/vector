@@ -56,3 +56,14 @@ fn test_glob_include_curly_braces_exclude_star() -> Result<(), Box<dyn std::erro
 
     Ok(())
 }
+
+#[test]
+fn test_glob_include_invalid() -> Result<(), Box<dyn std::error::Error>> {
+    let include_patterns = ["{{}".to_owned()];
+    let exclude_patterns = [];
+    let glob = Glob::new(&include_patterns, &exclude_patterns);
+
+    assert!(glob.is_err());
+
+    Ok(())
+}
