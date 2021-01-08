@@ -7,36 +7,13 @@ set -o pipefail
 #
 #   Builds and pulls down the Vector NATS Integration test environment
 
-# Echo usage if something isn't right.
-usage() {
-    echo "Usage: $0 [-a Action to run {stop|start} ] [-t The container tool to use {docker|podman} ] [-e The container enclosure to use {pod|network} ]" 1>&2; exit 1;
-}
-
-while getopts a:t:e: flag
-do
-    case "${flag}" in
-        a) ACTION=${OPTARG};;
-        t) CONTAINER_TOOL=${OPTARG};;
-        e) CONTAINER_ENCLOSURE=${OPTARG};;
-        :)
-         echo "ERROR: Option -$OPTARG requires an argument"          usage
-         ;;
-        *)
-          echo "ERROR: Invalid option -$OPTARG"
-          usage
-          ;;
-    esac
-done
-shift $((OPTIND-1))
-
-# Check required switches exist
-if [ -z "${ACTION}" ] || [ -z "${CONTAINER_TOOL}" ] || [ -z "${CONTAINER_ENCLOSURE}" ]; then
-    usage
+if [ $# -ne 2 ]
+then
+    echo "Usage: $0 {stop|start} {docker|podman}" 1>&2; exit 1;
+    exit 1
 fi
-
-ACTION="${ACTION:-"stop"}"
-CONTAINER_TOOL="${CONTAINER_TOOL:-"podman"}"
-CONTAINER_ENCLOSURE="${CONTAINER_ENCLOSURE:-"pod"}"
+ACTION=$1
+CONTAINER_TOOL=$2
 
 #
 # Functions
