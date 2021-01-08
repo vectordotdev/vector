@@ -594,7 +594,7 @@ mod tests {
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
                 TypeDef {
                     fallible: true,
-                    kind: value::Kind::Null,
+                    kind: value::Kind::Boolean,
                     ..Default::default()
                 }
             }
