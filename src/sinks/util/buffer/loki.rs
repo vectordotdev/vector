@@ -8,8 +8,10 @@ use super::{
     err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchSettings,
     BatchSize, PushResult,
 };
+use dashmap::DashMap;
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 const WRAPPER_OVERHEAD: usize = r#"{"streams":[]}"#.len();
 const STREAM_OVERHEAD: usize = r#"{"stream":{},"values":[]}"#.len();
@@ -25,6 +27,7 @@ pub struct LokiEvent {
 
 #[derive(Clone, Debug)]
 pub struct LokiRecord {
+    pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
 }
@@ -49,26 +52,36 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
-    tenant_id: Option<String>,
+    pub tenant_id: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct GlobalTimestamps {
+    map: Arc<DashMap<PartitionKey, HashMap<Labels, i64>>>,
 }
 
 #[derive(Debug)]
 pub struct LokiBuffer {
-    partition: Option<PartitionKey>,
     num_bytes: usize,
     num_items: usize,
     streams: HashMap<Labels, Vec<LokiEncodedEvent>>,
     settings: BatchSize<Self>,
+
+    partition: Option<PartitionKey>,
+    latest_timestamps: Option<HashMap<Labels, i64>>,
+    global_timestamps: GlobalTimestamps,
 }
 
 impl LokiBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub fn new(settings: BatchSize<Self>, global_timestamps: GlobalTimestamps) -> Self {
         Self {
-            partition: None,
             num_bytes: WRAPPER_OVERHEAD,
             num_items: 0,
-            streams: HashMap::default(),
+            streams: HashMap::new(),
             settings,
+            partition: None,
+            latest_timestamps: None,
+            global_timestamps,
         }
     }
 }
@@ -137,7 +150,7 @@ impl Batch for LokiBuffer {
     }
 
     fn fresh(&self) -> Self {
-        Self::new(self.settings)
+        Self::new(self.settings, self.global_timestamps.clone())
     }
 
     fn finish(self) -> Self::Output {

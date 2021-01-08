@@ -17,7 +17,7 @@ use crate::{
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
-        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
+        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
@@ -121,7 +121,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = PartitionHttpSink::new(
             sink,
-            PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
+            PartitionBuffer::new(LokiBuffer::new(batch_settings.size, Default::default())),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -141,11 +141,6 @@ impl SinkConfig for LokiConfig {
     fn sink_type(&self) -> &'static str {
         "loki"
     }
-}
-
-#[derive(Hash, Eq, PartialEq, Clone)]
-pub struct PartitionKey {
-    tenant_id: Option<String>,
 }
 
 struct LokiSink {
@@ -241,7 +236,14 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(PartitionInnerBuffer::new(LokiRecord { labels, event }, key))
+        Some(PartitionInnerBuffer::new(
+            LokiRecord {
+                labels,
+                event,
+                partition: key.clone(),
+            },
+            key,
+        ))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
