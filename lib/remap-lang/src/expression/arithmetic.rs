@@ -18,6 +18,13 @@ impl Expression for Arithmetic {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Operator::*;
 
+        if matches!(self.op, ErrorOr) {
+            return self
+                .lhs
+                .execute(state, object)
+                .or_else(|_| self.rhs.execute(state, object));
+        }
+
         let lhs = self.lhs.execute(state, object)?;
         let rhs = self.rhs.execute(state, object)?;
 
@@ -36,6 +43,7 @@ impl Expression for Arithmetic {
             GreaterOrEqual => lhs.try_ge(rhs),
             Less => lhs.try_lt(rhs),
             LessOrEqual => lhs.try_le(rhs),
+            ErrorOr => unreachable!(),
         }
         .map_err(Into::into)
     }
@@ -52,6 +60,9 @@ impl Expression for Arithmetic {
             Or if lhs_def.kind.is_null() => rhs_def,
             Or if !lhs_def.kind.is_boolean() => lhs_def,
             Or => type_def,
+            ErrorOr if !lhs_def.is_fallible() => lhs_def,
+            ErrorOr if !rhs_def.is_fallible() => rhs_def,
+            ErrorOr => type_def,
             And if lhs_def.kind.is_null() => lhs_def.with_constraint(Kind::Boolean),
             And => type_def
                 .fallible_unless(Kind::Null | Kind::Boolean)
@@ -78,7 +89,7 @@ mod tests {
     use super::*;
     use crate::{
         expression::{Literal, Noop},
-        test_type_def,
+        lit, test_type_def,
         value::Kind,
     };
 
@@ -269,6 +280,83 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Boolean,
+                ..Default::default()
+            },
+        }
+
+        error_or_lhs_infallible {
+            expr: |_| Arithmetic::new(
+                Box::new(Expr::from(lit!("foo"))),
+                Box::new(Arithmetic::new(
+                    Box::new(Expr::from(lit!("foo"))),
+                    Box::new(Expr::from(lit!(1))),
+                    Operator::Divide,
+                ).into()),
+                Operator::ErrorOr,
+            ),
+            def: TypeDef {
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        error_or_rhs_infallible {
+            expr: |_| Arithmetic::new(
+                Box::new(Arithmetic::new(
+                    Box::new(Expr::from(lit!("foo"))),
+                    Box::new(Expr::from(lit!(1))),
+                    Operator::Divide,
+                ).into()),
+                Box::new(Expr::from(lit!(true))),
+                Operator::ErrorOr,
+            ),
+            def: TypeDef {
+                kind: Kind::Boolean,
+                ..Default::default()
+            },
+        }
+
+        error_or_fallible {
+            expr: |_| Arithmetic::new(
+                Box::new(Arithmetic::new(
+                    Box::new(Expr::from(lit!("foo"))),
+                    Box::new(Expr::from(lit!(1))),
+                    Operator::Divide,
+                ).into()),
+                Box::new(Arithmetic::new(
+                    Box::new(Expr::from(lit!(true))),
+                    Box::new(Expr::from(lit!(1))),
+                    Operator::Divide,
+                ).into()),
+                Operator::ErrorOr,
+            ),
+            def: TypeDef {
+                kind: Kind::Integer | Kind::Float,
+                fallible: true,
+                ..Default::default()
+            },
+        }
+
+        error_or_nested_infallible {
+            expr: |_| Arithmetic::new(
+                Box::new(Arithmetic::new(
+                    Box::new(Expr::from(lit!("foo"))),
+                    Box::new(Expr::from(lit!(1))),
+                    Operator::Divide,
+                ).into()),
+                Box::new(Arithmetic::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(Expr::from(lit!(true))),
+                        Box::new(Expr::from(lit!(1))),
+                        Operator::Divide,
+                    ).into()),
+                    Box::new(Expr::from(lit!("foo"))),
+                    Operator::ErrorOr,
+                ).into()),
+                Operator::ErrorOr,
+            ),
+            def: TypeDef {
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }
