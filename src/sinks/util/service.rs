@@ -185,8 +185,6 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
 
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
-        // let concurrency
-
         TowerRequestSettings {
             concurrency: self
                 .concurrency()
