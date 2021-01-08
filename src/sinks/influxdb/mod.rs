@@ -312,7 +312,6 @@ pub mod test_util {
     use chrono::{offset::TimeZone, Utc};
     use std::fs::File;
     use std::io::Read;
-    use tokio::time::{delay_for, Duration};
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
@@ -400,22 +399,26 @@ pub mod test_util {
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
         // does not exist yet.
-        loop {
-            match client()
-                .post(&format!("{}/write?db={}", endpoint, database))
-                .header("Content-Type", "text/plain")
-                .header("Authorization", &format!("Token {}", TOKEN))
-                .body("")
-                .send()
-                .await
-                .unwrap()
-                .status()
-            {
-                http::StatusCode::NO_CONTENT => break,
-                http::StatusCode::NOT_FOUND => delay_for(Duration::from_millis(500)).await,
-                status => panic!("Unexpected status: {}", status),
+        crate::test_util::wait_for(|| {
+            let write_url = format!("{}/write?db={}", endpoint, &database);
+            async move {
+                match client()
+                    .post(&write_url)
+                    .header("Content-Type", "text/plain")
+                    .header("Authorization", &format!("Token {}", TOKEN))
+                    .body("")
+                    .send()
+                    .await
+                    .unwrap()
+                    .status()
+                {
+                    http::StatusCode::NO_CONTENT => true,
+                    http::StatusCode::NOT_FOUND => false,
+                    status => panic!("Unexpected status: {}", status),
+                }
             }
-        }
+        })
+        .await;
         database
     }
 
