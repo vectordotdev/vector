@@ -7,13 +7,14 @@ set -o pipefail
 #
 #   Builds and pulls down the Vector Prometheus Integration test environment
 
-if [ $# -ne 2 ]
+set -x
+
+if [ $# -ne 1 ]
 then
-    echo "Usage: $0 {stop|start} {docker|podman}" 1>&2; exit 1;
+    echo "Usage: $0 {stop|start}" 1>&2; exit 1;
     exit 1
 fi
 ACTION=$1
-CONTAINER_TOOL=$2
 
 #
 # Functions
