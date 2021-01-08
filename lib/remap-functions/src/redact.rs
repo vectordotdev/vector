@@ -108,9 +108,12 @@ impl Expression for RedactFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
         self.value
             .type_def(state)
-            .with_constraint(value::Kind::Bytes)
+            .fallible_unless(Kind::Bytes)
+            .with_constraint(Kind::Bytes)
     }
 }
 
