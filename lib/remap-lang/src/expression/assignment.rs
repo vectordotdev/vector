@@ -32,7 +32,9 @@ impl Target {
             Target::Infallible { ok, .. } => match ok.as_ref() {
                 Target::Path(_) => "infallible path",
                 Target::Variable(_) => "infallible variable",
-                _ => unimplemented!(),
+                Target::Infallible { .. } => {
+                    unimplemented!("nested infallible targets not supported")
+                }
             },
         }
     }
@@ -73,7 +75,9 @@ impl Assignment {
                         match ok.as_ref() {
                             Target::Variable(v) => v.ident().to_owned(),
                             Target::Path(v) => v.to_string(),
-                            Target::Infallible { .. } => unimplemented!(),
+                            Target::Infallible { .. } => {
+                                unimplemented!("nested infallible targets not supported")
+                            }
                         },
                     ))
                     .into());
