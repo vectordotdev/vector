@@ -264,7 +264,7 @@ mod test {
             expr: |_| RedactFn {
                 value: lit!("1111222233334444").boxed(),
                 filters: vec![Filter::Pattern],
-                patterns: Some(vec![Literal::from(Regex::new("foo").unwrap()).into()]),
+                patterns: Some(vec![Literal::from(Regex::new(r"/[0-9]{16}/").unwrap()).into()]),
                 redactor: Redactor::Full,
             },
             def: TypeDef {
