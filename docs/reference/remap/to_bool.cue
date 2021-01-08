@@ -25,9 +25,9 @@ remap: functions: to_bool: {
 		{
 			title: "Success"
 			input: {
-				string: "yes"
-				float: 0.0
-				"null": null
+				string:  "yes"
+				float:   0.0
+				"null":  null
 				integer: 1
 				boolean: false
 			}
