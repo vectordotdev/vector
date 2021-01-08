@@ -210,3 +210,37 @@ impl FromStr for Redactor {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    test_type_def![
+        string_infallible {
+            expr: |_| RedactFn {
+                value: lit!("foo").boxed(),
+                filters: vec![Filter::Pattern],
+                patterns: None,
+                redactor: Redactor::Full,
+            },
+            def: TypeDef {
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        non_string_fallible {
+            expr: |_| RedactFn {
+                value: lit!(27).boxed(),
+                filters: vec![Filter::Pattern],
+                patterns: None,
+                redactor: Redactor::Full,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+    ];
+}
