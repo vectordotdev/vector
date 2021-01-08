@@ -8,7 +8,7 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
-const DOCS_URL: &'static str = "https://vector.dev/docs/reference/remap";
+const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
