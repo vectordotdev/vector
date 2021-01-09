@@ -43,7 +43,7 @@ pub struct LokiConfig {
     remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     remove_timestamp: bool,
-    #[serde(default = "default_action")]
+    #[serde(default)]
     out_of_order: OutOfOrderAction,
 
     auth: Option<Auth>,
@@ -59,13 +59,15 @@ pub struct LokiConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum OutOfOrderAction {
+pub enum OutOfOrderAction {
     Drop,
     RewriteTimestamp,
 }
 
-fn default_action() -> OutOfOrderAction {
-    OutOfOrderAction::RewriteTimestamp
+impl Default for OutOfOrderAction {
+    fn default() -> OutOfOrderAction {
+        OutOfOrderAction::RewriteTimestamp
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -121,7 +123,11 @@ impl SinkConfig for LokiConfig {
 
         let sink = PartitionHttpSink::new(
             sink,
-            PartitionBuffer::new(LokiBuffer::new(batch_settings.size, Default::default())),
+            PartitionBuffer::new(LokiBuffer::new(
+                batch_settings.size,
+                Default::default(),
+                config.out_of_order.clone(),
+            )),
             request_settings,
             batch_settings.timeout,
             client.clone(),

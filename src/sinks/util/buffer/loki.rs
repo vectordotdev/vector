@@ -8,6 +8,7 @@ use super::{
     err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchSettings,
     BatchSize, PushResult,
 };
+use crate::sinks::loki::OutOfOrderAction;
 use dashmap::DashMap;
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
@@ -70,10 +71,15 @@ pub struct LokiBuffer {
     partition: Option<PartitionKey>,
     latest_timestamps: Option<HashMap<Labels, i64>>,
     global_timestamps: GlobalTimestamps,
+    out_of_order: OutOfOrderAction,
 }
 
 impl LokiBuffer {
-    pub fn new(settings: BatchSize<Self>, global_timestamps: GlobalTimestamps) -> Self {
+    pub fn new(
+        settings: BatchSize<Self>,
+        global_timestamps: GlobalTimestamps,
+        out_of_order: OutOfOrderAction,
+    ) -> Self {
         Self {
             num_bytes: WRAPPER_OVERHEAD,
             num_items: 0,
@@ -82,6 +88,7 @@ impl LokiBuffer {
             partition: None,
             latest_timestamps: None,
             global_timestamps,
+            out_of_order,
         }
     }
 }
@@ -150,7 +157,7 @@ impl Batch for LokiBuffer {
     }
 
     fn fresh(&self) -> Self {
-        Self::new(self.settings, self.global_timestamps.clone())
+        Self::new(self.settings, self.global_timestamps.clone(), self.out_of_order.clone())
     }
 
     fn finish(self) -> Self::Output {
@@ -219,7 +226,11 @@ mod tests {
 
     #[test]
     fn insert_single() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
+        let mut buffer = LokiBuffer::new(
+            BatchSettings::default().size,
+            Default::default(),
+            Default::default(),
+        );
         assert!(matches!(
             buffer.push(LokiRecord {
                 partition: PartitionKey { tenant_id: None },
@@ -242,7 +253,11 @@ mod tests {
 
     #[test]
     fn insert_multiple_streams() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
+        let mut buffer = LokiBuffer::new(
+            BatchSettings::default().size,
+            Default::default(),
+            Default::default(),
+        );
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
@@ -267,7 +282,11 @@ mod tests {
 
     #[test]
     fn insert_multiple_one_stream() {
-        let mut buffer = LokiBuffer::new(BatchSettings::default().size, Default::default());
+        let mut buffer = LokiBuffer::new(
+            BatchSettings::default().size,
+            Default::default(),
+            Default::default(),
+        );
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
