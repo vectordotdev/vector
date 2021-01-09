@@ -1571,6 +1571,9 @@
     extract_from = "remap_function_push_to_array"
     [[tests.outputs.conditions]]
       "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
 
 [transforms.remap_function_append_to_array]
   inputs = []
@@ -1590,3 +1593,6 @@
     extract_from = "remap_function_append_to_array"
     [[tests.outputs.conditions]]
       "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
