@@ -40,7 +40,7 @@ mod tests {
         #[rustfmt::skip]
         let cases = vec![
             (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
-            (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            (r#"foo = null || "bar""#, Ok(()), Ok("bar".into())),
             (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
@@ -56,11 +56,11 @@ mod tests {
             //     r#".a.b.(c | d) == .e."f.g"[2].(h | i)"#,
             //     Ok(Value::Boolean(false)),
             // ),
-            ("$bar = true\n.foo = $bar", Ok(()), Ok(Value::Boolean(true))),
+            ("bar = true\n.foo = bar", Ok(()), Ok(Value::Boolean(true))),
             (
                 r#"{
-                    $foo = "foo"
-                    .foo = $foo + "bar"
+                    foo = "foo"
+                    .foo = foo + "bar"
                     .foo
                 }"#,
                 Ok(()),
@@ -105,13 +105,13 @@ mod tests {
                 Ok(()), Ok(4.into()),
             ),
             (
-                r#"if ($foo = true; $foo) { $foo } else { false }"#,
+                r#"if (foo = true; foo) { foo } else { false }"#,
                 Ok(()), Ok(true.into())
             ),
             (
-                r#"if ($foo = "sproink"
-                       $foo == "sproink") {
-                      $foo
+                r#"if (foo = "sproink"
+                       foo == "sproink") {
+                      foo
                    } else {
                      false
                    }"#,
@@ -168,18 +168,18 @@ mod tests {
             (
                 r#"
                     .foo.bar = "baz"
-                    $foo = .foo
+                    foo = .foo
                     .foo.bar
                 "#,
                 Ok(()),
                 Ok("baz".into()),
             ),
-            ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
-            ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
-            ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
+            ("foo = .foo\nfoo.bar", Ok(()), Ok("baz".into())),
+            ("foo = .foo.qux\nfoo[1]", Ok(()), Ok(2.into())),
+            ("foo = .foo.qux\nfoo[2].quux", Ok(()), Ok(true.into())),
             (
-                "$foo[0] = true",
-                Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
+                "foo[0] = true",
+                Err(r#"remap error: parser error: path in variable assignment unsupported, use "foo" without ".[0]""#),
                 Ok(().into()),
             ),
             (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(value!(["foo", "bar", "baz"]))),
@@ -247,7 +247,7 @@ mod tests {
                 Ok("bar".into()),
             ),
             (
-                r#"$foo = 1;$nork = $foo + 3;$nork"#,
+                r#"foo = 1;nork = foo + 3;nork"#,
                 Ok(()),
                 Ok(4.into()),
             ),
@@ -258,8 +258,8 @@ mod tests {
                 r#"
                     .result = {
                         .foo = true
-                        $bar = 5
-                        { "foo": .foo, "bar": $bar, "baz": "qux" }
+                        bar = 5
+                        { "foo": .foo, "bar": bar, "baz": "qux" }
                     }
 
                     { "result": .result }
@@ -295,45 +295,53 @@ mod tests {
                 Ok(().into()),
             ),
             (
-                "$foo, $err = fallible_func!()",
+                "foo, err = fallible_func!()",
                 Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
-            ("$foo, $err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
+            ("foo, err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
             (
-                "$foo, $err = map_printer({})",
+                "foo, err = map_printer({})",
                 Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
             (
-                ".foo.bar, $err = map_printer({})",
+                ".foo.bar, err = map_printer({})",
                 Err(r#"remap error: assignment error: the path ".foo.bar" does not need to handle the error-case, because its result is infallible"#),
                 Ok(().into()),
             ),
             (
                 "
-                    $foo, $err = fallible_func()
-                    [$foo, $err]
+                    foo, err = fallible_func()
+                    [foo, err]
                 ",
                 Ok(()),
                 Ok(value!([null, "function call error: failed!"])),
             ),
             (
                 "
-                    $foo, $err = fallible_func(true)
-                    [$foo, $err]
+                    foo, err = fallible_func(true)
+                    [foo, err]
                 ",
                 Ok(()),
                 Ok(value!([true, null])),
             ),
             (
                 "
-                    .foo.bar, $err = fallible_func(true)
-                    [.foo, $err]
+                    .foo.bar, err = fallible_func(true)
+                    [.foo, err]
                 ",
                 Ok(()),
                 Ok(value!([{ bar: true, qux: [1, 2, {quux: true}]}, null])),
             ),
+            (".if.loop.bar", Ok(()), Ok(value!(null))),
+            ("asyousee = true", Ok(()), Ok(value!(true))),
+            ("regex_printer(value: /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value:/foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value  :   /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("two_param_func(true, true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(.foo, param2: true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(param2: .foo, param1: true)", Ok(()), Ok(value!(null))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -346,6 +354,7 @@ mod tests {
                     Box::new(test_functions::ArrayPrinter),
                     Box::new(test_functions::MapPrinter),
                     Box::new(test_functions::FallibleFunc),
+                    Box::new(test_functions::TwoParamFunc),
                 ],
                 None,
                 true,
@@ -597,6 +606,48 @@ mod tests {
                     kind: value::Kind::Boolean,
                     ..Default::default()
                 }
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct TwoParamFunc;
+        impl Function for TwoParamFunc {
+            fn identifier(&self) -> &'static str {
+                "two_param_func"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(TwoParamFuncFn(
+                    arguments.required("param1")?,
+                    arguments.required("param2")?,
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[
+                    Parameter {
+                        keyword: "param1",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                    Parameter {
+                        keyword: "param2",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                ]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct TwoParamFuncFn(Expr, Expr);
+        impl Expression for TwoParamFuncFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(().into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
             }
         }
     }
