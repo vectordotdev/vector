@@ -269,10 +269,10 @@ jobs:
           path: target/artifacts
       - name: First install of RPM package.
         run: |
-          rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
       - name: Second install of RPM package.
         run: |
-          rpm -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
 
   osx-verify:
     runs-on: macos-10.15
