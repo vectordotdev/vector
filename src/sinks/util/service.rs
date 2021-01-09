@@ -219,7 +219,7 @@ impl<T: ConcurrencyOption> TowerRequestConfig<T> {
             (_, false) => &self.concurrency,
             (false, true) => &self.in_flight_limit,
             (true, true) => {
-                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option");
+                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option.");
                 &self.concurrency
             }
         }
