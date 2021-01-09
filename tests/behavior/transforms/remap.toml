@@ -1242,8 +1242,8 @@
   inputs = []
   type = "remap"
   source = """
-    .pass = ok(.a: .a * 3)
-    .fail = ok(.b: true * false)
+    .pass = ok(.a = .a * 3)
+    .fail = ok(.b = true * false)
   """
 [[tests]]
   name = "remap_function_ok"
