@@ -30,7 +30,7 @@ pub enum Error {
     #[error("cannot return regex from program")]
     RegexResult,
 
-    #[error(r#"path in variable assignment unsupported, use "${0}" without "{1}""#)]
+    #[error(r#"path in variable assignment unsupported, use "{0}" without "{1}""#)]
     VariableAssignmentPath(String, String),
 
     #[error("regex error")]
@@ -571,7 +571,7 @@ impl<'a> Parser<'a> {
 
         match field.as_rule() {
             R::string => Ok(path::Field::Quoted(self.string_from_pair(field)?)),
-            R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
+            R::field => Ok(path::Field::Regular(field.as_str().to_owned())),
             _ => Err(e(R::path_field)),
         }
     }
@@ -721,11 +721,7 @@ mod tests {
                 Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
             ),
             ("..", vec![" 1:2\n", "= expected path segment"], Ok(vec![])),
-            (
-                ". bar",
-                vec![" 1:6\n", "= unknown parsing error"],
-                Ok(vec![]),
-            ),
+            (". bar", vec![" 1:3\n", "= expected operator"], Ok(vec![])),
             (
                 r#". "bar""#,
                 vec![" 1:2\n", "= expected path segment"], // TODO: improve error message
@@ -785,8 +781,8 @@ mod tests {
             (
                 ".foo bar",
                 vec![
-                    " 1:9\n",
-                    "= unknown parsing error",
+                    " 1:6\n",
+                    "= expected operator",
                 ],
             ),
             (
@@ -804,24 +800,10 @@ mod tests {
                 ],
             ),
             (
-                ".foo = to_string",
-                vec![
-                    " 1:17\n",
-                    "= unknown parsing error",
-                ],
-            ),
-            (
-                r#"foo = "bar""#,
-                vec![
-                    " 1:4\n",
-                    "= unknown parsing error",
-                ],
-            ),
-            (
                 r#".foo.bar = "baz" and this"#,
                 vec![
-                    " 1:21\n",
-                    "= unknown parsing error",
+                    " 1:18\n",
+                    "= expected operator",
                 ],
             ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected query"]),
@@ -849,12 +831,10 @@ mod tests {
                 // This message isn't great, ideally I'd like "expected closing bracket"
                 vec![
                     " 1:48\n",
-                    "= expected assignment, if-statement, query, operator, path index, or block",
+                    "= expected operator or path index",
                 ],
             ),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
-            ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected variable, argument, or path"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument or path"]),
             ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
@@ -874,8 +854,8 @@ mod tests {
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
                 vec![
-                    " 1:25\n",
-                    "= unknown parsing error",
+                    " 1:27\n",
+                    "= expected query",
                 ],
             ),
             (
@@ -893,7 +873,7 @@ mod tests {
                 r#"/ab/ = .foo"#,
                 vec![
                     " 1:6\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    "= expected operator",
                 ],
             ),
             (
@@ -901,7 +881,7 @@ mod tests {
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
-                r#"$foo = /ab/"#,
+                r#"foo = /ab/"#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
@@ -910,18 +890,42 @@ mod tests {
             ),
             (
                 r#"
-                    $foo = /ab/
-                    [$foo]
+                    foo = /ab/
+                    [foo]
                 "#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
                 r#"
-                    $foo = [/ab/]
-                    $foo
+                    foo = [/ab/]
+                    foo
                 "#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
+            ("foo bar", vec![" 1:5\n", "= expected operator"]),
+            ("[true] [false]", vec![" 1:8\n", "= expected operator"]),
+
+            // reserved keywords
+            ("if = true", vec![" 1:4\n", "= expected query"]),
+            ("else = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("for = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("while = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("loop = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("abort = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("break = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("continue = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("return = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("as = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("type = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("let = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("until = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("then = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("impl = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("in = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("self = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("this = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("use = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("std = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
         ];
 
         for (source, exp_expressions) in cases {

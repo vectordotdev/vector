@@ -197,7 +197,7 @@ fn benchmark_remap(c: &mut Criterion) {
             Remap::new(RemapConfig {
                 source: r#".number = to_int(.number)
                 .bool = to_bool(.bool)
-                .timestamp = parse_timestamp(.timestamp, format = "%d/%m/%Y:%H:%M:%S %z")
+                .timestamp = parse_timestamp(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
                 "#
                 .to_owned(),
                 drop_on_err: true,
