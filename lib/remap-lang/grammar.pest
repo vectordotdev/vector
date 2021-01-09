@@ -124,7 +124,6 @@ reserved_keyword = @{
     | "let"
     | "until"
     | "then"
-    | "match"
     | "impl"
     | "in"
     | "self"

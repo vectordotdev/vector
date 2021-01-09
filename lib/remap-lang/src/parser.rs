@@ -920,7 +920,6 @@ mod tests {
             ("let = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
             ("until = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
             ("then = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
-            ("match = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
             ("impl = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
             ("in = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
             ("self = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
