@@ -2,7 +2,7 @@ use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    fs::{self, File},
+    fs::{self, metadata, File},
     io::{self, Read, Seek, SeekFrom, Write},
     path::PathBuf,
 };
@@ -99,7 +99,14 @@ impl Fingerprinter {
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
-        self.get_fingerprint_of_file(path, buffer)
+        metadata(path)
+            .and_then(|metadata| {
+                if metadata.is_dir() {
+                    Ok(None)
+                } else {
+                    self.get_fingerprint_of_file(path, buffer).map(Some)
+                }
+            })
             .map_err(|error| match error.kind() {
                 io::ErrorKind::UnexpectedEof => {
                     if !known_small_files.contains(path) {
@@ -117,6 +124,7 @@ impl Fingerprinter {
                 }
             })
             .ok()
+            .flatten()
     }
 
     pub fn get_bytes_checksum(
