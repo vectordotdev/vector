@@ -36,7 +36,7 @@ stop_podman () {
 
 stop_docker () {
 	docker rm --force vector_humio 2>/dev/null; true
-  "${CONTAINER_TOOL}" rm --force vector_humio 2>/dev/null; true
+  docker rm --force vector_humio 2>/dev/null; true
 	docker network rm vector-test-integration-humio 2>/dev/null; true
 }
 

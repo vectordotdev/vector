@@ -24,8 +24,8 @@ start_podman () {
 	podman pod create --replace --name vector-test-integration-mongodb_metrics -p 27017:27017 -p 27018:27018 -p 27019:27019
 	podman run -d --pod=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
 	sleep 1
-  "${CONTAINER_TOOL}" exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
-  "${CONTAINER_TOOL}" exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+  podman exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+  podman exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
 	podman run -d --pod=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics2 mongo:4.2.10 mongod
 }
 
@@ -33,8 +33,8 @@ start_docker () {
 	docker network create vector-test-integration-mongodb_metrics
 	docker run -d --network=vector-test-integration-mongodb_metrics -p 27018:27018 -p 27019:27019 --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
 	sleep 1
-  "${CONTAINER_TOOL}" exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
-  "${CONTAINER_TOOL}" exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+  docker exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+  docker exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
 	docker run -d --network=vector-test-integration-mongodb_metrics -p 27017:27017 --name vector_mongodb_metrics2 mongo:4.2.10 mongod
 }
 
