@@ -24,11 +24,6 @@ remap: {
 			VRL is built specifically for processing data within Vector.
 			"""
 
-		errors: [Name=string]: {
-			description: string
-			name:        Name
-		}
-
 		functions: [Name=string]: {
 			#Argument: {
 				name:        string
@@ -42,9 +37,13 @@ remap: {
 			#RemapExample: {
 				title: string
 				configuration?: [string]: string
-				input:  #Fields
-				source: string
-				output: #Fields
+				input:   #Fields
+				source:  string
+				raises?: string
+
+				if raises == _|_ {
+					output: #Fields
+				}
 			}
 
 			arguments: [...#Argument] // Allow for empty list
