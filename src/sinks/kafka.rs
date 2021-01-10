@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    kafka::{KafkaAuthConfig, KafkaCompression},
+    kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -80,7 +80,7 @@ pub enum Encoding {
 }
 
 pub struct KafkaSink {
-    producer: Arc<FutureProducer>,
+    producer: Arc<FutureProducer<KafkaStatisticsContext>>,
     topic: Template,
     key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
@@ -233,7 +233,9 @@ impl KafkaSinkConfig {
 impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
-        let producer = producer_config.create().context(KafkaCreateFailed)?;
+        let producer = producer_config
+            .create_with_context(KafkaStatisticsContext)
+            .context(KafkaCreateFailed)?;
         Ok(KafkaSink {
             producer: Arc::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
