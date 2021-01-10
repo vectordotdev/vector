@@ -710,7 +710,7 @@ impl EventStreamBuilder {
     }
 
     fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
-        // This can legaly fail when shuting down, and any other
+        // This can legaly fail when shutting down, and any other
         // reason should have been logged in the main future.
         let _ = self.main_send.send(result);
     }
