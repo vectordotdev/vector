@@ -575,6 +575,7 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
+            statistics: None,
             librdkafka_options: HashMap::new(),
         };
 
@@ -629,6 +630,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             batch,
+            statistics: None,
             librdkafka_options,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
@@ -780,6 +782,7 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
+            statistics: None,
             librdkafka_options: HashMap::new(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
