@@ -158,7 +158,7 @@ async fn fork() {
     assert_eq!(input_lines, output_lines2);
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 async fn merge_and_fork() {
     trace_init();
 
