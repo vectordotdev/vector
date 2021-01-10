@@ -7,27 +7,22 @@ remap: {
 
 	{
 		description: """
-			The Vector Remap Language (VRL) is a lean, single-purpose data transformation language
-			that enables you to easily map and reshape observability event data (logs and metrics)
-			without sacrificing performance or safety. VRL occupies a cozy middle ground between
-			stitching together fundamental [transforms](\(urls.vector_transforms)) and using a
-			full-blown runtime like [Lua](\(urls.lua)). Guiding principles behind VRL include:
+			**Vector Remap Language** (VRL) is a lean, single-purpose language for transforming observability data
+			(logs and metrics) in Vector. It features a simple [syntax](#syntax) and a rich set of built-in
+			[functions](#functions) tailored specifically to observability use cases. VRL is built on the following
+			two principles:
 
-			1. **Performance** - Beyond extremely fast execution, VRL is designed to prevent Vector
-			   operators from writing slow scripts.
-			2. **Safety** - VRL is Rust native and performs compile-time checks at boot time to
-			   ensure safety. In addition, VRL's simplicity and lack of complex \"footguns\" are
-			   ideal for collaboration.
-			3. **Self-documenting** - A VRL script's intentions are clear even at first glance because the
-			   language is designed to have a very gentle learning curve.
+			1. **Performance** - Built with Rust, VRL allows anyone to transform observability data with the speed and
+			   efficiency of Rust. Because VRL tightly integrates with Vector, it pays no performance penalty while
+			   events pass through the language, making it up 10x faster than alternatives. In addition, thoughtful
+			   ergonomics prevent users from writing slow scripts, avoiding the need to optimize VRL scripts, delivering
+			   on real-world production performance.
+			2. **Safety** - Explicit design decisions make VRL safe. Compile-time type and error safety ensure VRL
+			   scripts work expected, and thoughtful limitations prevent common footguns found in alternatives. Finally,
+			   memory safety ensures VRL is secure in even the most sensitive environments.
 
-			VRL is built specifically for processing data within Vector.
+			Checkout the [announcement blog post](...) for more details.
 			"""
-
-		errors: [Name=string]: {
-			description: string
-			name:        Name
-		}
 
 		functions: [Name=string]: {
 			#Argument: {

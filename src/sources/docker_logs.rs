@@ -610,10 +610,8 @@ impl EventStreamBuilder {
                     container_id: id.as_str()
                 }),
             }
-            // In case of any error we have to notify the main thread that it should try again. This is %error because the API doesn't support Display.
-            if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", %error);
-            }
+
+            this.finish(Err(id));
         });
 
         ContainerState::new_running()
@@ -627,7 +625,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -707,10 +705,14 @@ impl EventStreamBuilder {
             Ok(()) => Ok(info),
             Err(crate::pipeline::ClosedError) => Err(info.id),
         };
-        // This is %error because the API doesn't support Display.
-        if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", %error);
-        }
+
+        self.finish(result);
+    }
+
+    fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
+        // This can legaly fail when shutting down, and any other
+        // reason should have been logged in the main future.
+        let _ = self.main_send.send(result);
     }
 }
 
