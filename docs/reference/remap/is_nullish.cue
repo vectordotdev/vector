@@ -28,19 +28,19 @@ remap: functions: is_nullish: {
 			title: "Empty string is nullish"
 			input: log: string: ""
 			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish:     true}
+			output: input & {log: is_nullish: true}
 		},
 		{
 			title: "Dash is nullish"
 			input: log: string: "-"
 			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish:     true}
+			output: input & {log: is_nullish: true}
 		},
 		{
 			title: "Whitespace is nullish"
 			input: log: string: "\n   \n"
 			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish:     true}
+			output: input & {log: is_nullish: true}
 		},
 	]
 }

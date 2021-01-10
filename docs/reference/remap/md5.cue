@@ -22,6 +22,6 @@ remap: functions: md5: {
 				.hash = md5(.text)
 				"""#
 			output: input & {log: hash: "acbd18db4cc2f85cedef654fccc4a4d8"}
-		}
+		},
 	]
 }

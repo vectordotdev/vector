@@ -24,7 +24,7 @@ remap: functions: ip_to_ipv6: {
 			source: #"""
 				.v6 = ip_to_ipv6(.v4)
 				"""#
-			output: input & {log: v6:      "::ffff:192.168.10.32"}
+			output: input & {log: v6: "::ffff:192.168.10.32"}
 		},
 	]
 }
