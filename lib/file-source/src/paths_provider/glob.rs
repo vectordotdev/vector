@@ -69,6 +69,7 @@ impl Glob {
 
         let include_patterns = include_patterns.to_owned();
 
+        // Validate exclude patterns.
         let exclude_patterns = exclude_patterns
             .iter()
             .map(|exclude_pattern| -> Result<_, _> {
@@ -97,6 +98,7 @@ impl PathsProvider for Glob {
     fn paths(&self) -> Result<Self::IntoIter, Self::Error> {
         let mut paths = Vec::new();
 
+        // Iterate over all include patterns, turn them into globs and walk them on the file system.
         for include_pattern in &self.include_patterns {
             let glob = glob(include_pattern).map_err(|error| GlobError::InvalidIncludePattern {
                 glob: include_pattern.to_owned(),
@@ -116,6 +118,7 @@ impl PathsProvider for Glob {
                         .map_or(false, |path| exclude_pattern.matches(path))
                 });
 
+                // Exclude all paths that match the list of our exclude patterns.
                 if is_excluded {
                     continue;
                 }
