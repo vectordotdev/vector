@@ -4,8 +4,10 @@ components: transforms: remap: {
 	title: "Remap"
 
 	description: """
-		Transforms events using the [Vector Remap Language](\(urls.vector_remap_language_reference)) (VRL),
-		a fast, safe, self-documenting data mapping language.
+		Transforms events using the [Vector Remap Language](\(urls.vrl_reference)) (VRL), a lean, single-purpose
+		language for transforming observability data (logs and metrics) in Vector.
+
+		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
 		"""
 
 	classes: {
@@ -18,7 +20,7 @@ components: transforms: remap: {
 		program: {
 			runtime: {
 				name:    "Vector Remap Language (VRL)"
-				url:     urls.vrl
+				url:     urls.vrl_reference
 				version: null
 			}
 		}
@@ -42,10 +44,9 @@ components: transforms: remap: {
 	configuration: {
 		source: {
 			description: """
-				The [Vector Remap Language](\(urls.vector_remap_language_reference)) (VRL)
-				expression to execute for each event. Please refer to the
-				[Vector Remap Language reference](\(urls.vector_remap_language_reference))
-				for a list of operations and functions.
+				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) expression to execute for each event. Please
+				refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of operations and
+				functions.
 				"""
 			required:    true
 			type: string: {
