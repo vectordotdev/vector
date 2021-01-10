@@ -60,7 +60,8 @@ components: sinks: kafka: {
 				examples: ["user_id"]
 			}
 		}
-		librdkafka_options: components._kafka.configuration.librdkafka_options
+		statistics_interval_ms: components._kafka.configuration.statistics_interval_ms
+		librdkafka_options:     components._kafka.configuration.librdkafka_options
 		message_timeout_ms: {
 			common:      false
 			description: "Local message timeout."
