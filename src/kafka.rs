@@ -95,17 +95,6 @@ fn pathbuf_to_string(path: &PathBuf) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaStatisticsConfig {
-    interval_ms: u64,
-}
-
-impl KafkaStatisticsConfig {
-    pub(crate) fn apply(&self, client: &mut ClientConfig) {
-        client.set("statistics.interval.ms", &self.interval_ms.to_string());
-    }
-}
-
 pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {

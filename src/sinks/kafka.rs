@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsConfig},
+    kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -59,7 +59,7 @@ pub struct KafkaSinkConfig {
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     message_timeout_ms: u64,
-    statistics: Option<KafkaStatisticsConfig>,
+    statistics_interval_ms: Option<u64>,
     #[serde(default)]
     librdkafka_options: HashMap<String, String>,
 }
@@ -151,8 +151,11 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
-        if let Some(statistics) = &self.statistics {
-            statistics.apply(&mut client_config);
+        if let Some(statistics_interval_ms) = &self.statistics_interval_ms {
+            client_config.set(
+                "statistics.interval.ms",
+                &statistics_interval_ms.to_string(),
+            );
         }
 
         // All batch options are producer only.
@@ -575,7 +578,7 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            statistics: None,
+            statistics_interval_ms: None,
             librdkafka_options: HashMap::new(),
         };
 
@@ -630,7 +633,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             batch,
-            statistics: None,
+            statistics_interval_ms: None,
             librdkafka_options,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
@@ -782,7 +785,7 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            statistics: None,
+            statistics_interval_ms: None,
             librdkafka_options: HashMap::new(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));

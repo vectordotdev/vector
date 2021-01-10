@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
-    kafka::{KafkaAuthConfig, KafkaStatisticsConfig, KafkaStatisticsContext},
+    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -49,7 +49,7 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
-    statistics: Option<KafkaStatisticsConfig>,
+    statistics_interval_ms: Option<u64>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -232,8 +232,11 @@ fn create_consumer(
 
     config.auth.apply(&mut client_config)?;
 
-    if let Some(statistics) = &config.statistics {
-        statistics.apply(&mut client_config);
+    if let Some(statistics_interval_ms) = &config.statistics_interval_ms {
+        client_config.set(
+            "statistics.interval.ms",
+            &statistics_interval_ms.to_string(),
+        );
     }
 
     if let Some(librdkafka_options) = &config.librdkafka_options {
