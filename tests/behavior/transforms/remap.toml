@@ -1536,3 +1536,27 @@
       "e.equals" = true
       "f.equals" = true
       "g.equals" = false
+
+[transforms.remap_function_to_syslog_facility]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = to_syslog_facility(.a)
+    .b = to_syslog_facility(.b)
+    .c = to_syslog_facility(.c)
+  """
+[[tests]]
+  name = "remap_function_to_syslog_facility"
+  [tests.input]
+    insert_at = "remap_function_to_syslog_facility"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 11
+      c = 23
+  [[tests.outputs]]
+    extract_from = "remap_function_to_syslog_facility"
+    [[tests.outputs.conditions]]
+      "a.equals" = "daemon"
+      "b.equals" = "ftp"
+      "c.equals" = "local7"
