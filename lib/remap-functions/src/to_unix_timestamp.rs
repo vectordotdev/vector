@@ -121,9 +121,9 @@ impl Expression for ToUnixTimestampFn {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::map;
     use chrono::TimeZone;
-    use super::*;
     use value::Kind;
 
     test_type_def![
@@ -157,17 +157,26 @@ mod test {
             (
                 map![],
                 Ok(1609459200.into()),
-                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Seconds)
+                ToUnixTimestampFn::new(
+                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
+                    Unit::Seconds,
+                ),
             ),
             (
                 map![],
                 Ok(1609459200000i64.into()),
-                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Milliseconds)
+                ToUnixTimestampFn::new(
+                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
+                    Unit::Milliseconds,
+                ),
             ),
             (
                 map![],
                 Ok(1609459200000000000i64.into()),
-                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Nanoseconds)
+                ToUnixTimestampFn::new(
+                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
+                    Unit::Nanoseconds,
+                ),
             ),
         ];
 
