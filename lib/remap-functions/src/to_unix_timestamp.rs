@@ -91,6 +91,13 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
+impl ToUnixTimestampFn {
+    #[cfg(test)]
+    fn new(value: Box<dyn Expression>, unit: Unit) -> Self {
+        Self { value, unit }
+    }
+}
+
 impl Expression for ToUnixTimestampFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let ts = self.value.execute(state, object)?.try_timestamp()?;
@@ -114,6 +121,8 @@ impl Expression for ToUnixTimestampFn {
 
 #[cfg(test)]
 mod test {
+    use crate::map;
+    use chrono::TimeZone;
     use super::*;
     use value::Kind;
 
@@ -131,7 +140,7 @@ mod test {
 
         string_fallible {
             expr: |_| ToUnixTimestampFn {
-                value: Literal::from("late December back in '63").boxed(),
+                value: lit!("late December back in '63").boxed(),
                 unit: Unit::Seconds,
             },
             def: TypeDef {
@@ -141,4 +150,36 @@ mod test {
             },
         }
     ];
+
+    #[test]
+    fn to_unix_timestamp() {
+        let cases = vec![
+            (
+                map![],
+                Ok(1609459200.into()),
+                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Seconds)
+            ),
+            (
+                map![],
+                Ok(1609459200000i64.into()),
+                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Milliseconds)
+            ),
+            (
+                map![],
+                Ok(1609459200000000000i64.into()),
+                ToUnixTimestampFn::new(Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(), Unit::Nanoseconds)
+            ),
+        ];
+
+        let mut state = state::Program::default();
+
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
+        }
+    }
 }
