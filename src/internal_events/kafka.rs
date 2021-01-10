@@ -60,17 +60,17 @@ impl InternalEvent for KafkaKeyExtractionFailed<'_> {
 }
 
 #[derive(Debug)]
-pub struct KafkaStatistics<'a> {
+pub struct KafkaStatisticsReceived<'a> {
     statistics: &'a Statistics,
 }
 
-impl<'a> KafkaStatistics<'a> {
+impl<'a> KafkaStatisticsReceived<'a> {
     pub(crate) fn new(statistics: &'a Statistics) -> Self {
         Self { statistics }
     }
 }
 
-impl InternalEvent for KafkaStatistics<'_> {
+impl InternalEvent for KafkaStatisticsReceived<'_> {
     fn emit_metrics(&self) {
         // gauge!("name", self.statistics.name);
         // gauge!("client_id", self.statistics.client_id);
