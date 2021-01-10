@@ -113,17 +113,16 @@ impl PathsProvider for Glob {
                     })?
                     .into_path();
 
-                let is_excluded = self.exclude_patterns.iter().any(|exclude_pattern| {
-                    path.to_str()
-                        .map_or(false, |path| exclude_pattern.matches(path))
+                let is_excluded = path.to_str().map_or(false, |path| {
+                    self.exclude_patterns
+                        .iter()
+                        .any(|exclude_pattern| exclude_pattern.matches(path))
                 });
 
-                // Exclude all paths that match the list of our exclude patterns.
-                if is_excluded {
-                    continue;
+                // Only include paths that does not match the list of our exclude patterns.
+                if !is_excluded {
+                    paths.push(path);
                 }
-
-                paths.push(path);
             }
         }
 
