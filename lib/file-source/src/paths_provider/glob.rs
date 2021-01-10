@@ -5,24 +5,34 @@ use glob::Pattern;
 use globwalk::glob;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, snafu::Snafu)]
 /// An error that arised either during parsing or execution of this glob.
 pub enum GlobError {
     /// Include glob pattern could not be parsed.
-    InvalidIncludePattern(globwalk::GlobError),
+    #[snafu(display("Include glob pattern {} could not be parsed: {}", glob, error))]
+    InvalidIncludePattern {
+        /// The glob string that produced the error.
+        glob: String,
+        /// The underlying error.
+        error: globwalk::GlobError,
+    },
     /// Exclude glob pattern could not be parsed.
-    InvalidExcludePattern(glob::PatternError),
+    #[snafu(display("Exclude glob pattern {} could not be parsed: {}", glob, error))]
+    InvalidExcludePattern {
+        /// The glob string that produced the error.
+        glob: String,
+        /// The underlying error.
+        error: glob::PatternError,
+    },
     /// Failed while iterating on the glob.
-    WalkError(globwalk::WalkError),
+    #[snafu(display("Failed while iterating on the glob {}: {}", glob, error))]
+    WalkError {
+        /// The glob string that produced the error.
+        glob: String,
+        /// The underlying error.
+        error: globwalk::WalkError,
+    },
 }
-
-impl std::fmt::Display for GlobError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "{:?}", self)
-    }
-}
-
-impl std::error::Error for GlobError {}
 
 /// A glob-based path provider.
 ///
@@ -46,18 +56,32 @@ impl Glob {
         // `std::clone::Clone` trait.
         include_patterns
             .iter()
-            .map(glob)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(GlobError::InvalidIncludePattern)?;
+            .map(|include_pattern| -> Result<_, _> {
+                let glob =
+                    glob(include_pattern).map_err(|error| GlobError::InvalidIncludePattern {
+                        glob: include_pattern.to_owned(),
+                        error,
+                    })?;
+
+                Ok(glob)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let include_patterns = include_patterns.to_owned();
 
         let exclude_patterns = exclude_patterns
             .iter()
-            .map(AsRef::as_ref)
-            .map(Pattern::new)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(GlobError::InvalidExcludePattern)?;
+            .map(|exclude_pattern| -> Result<_, _> {
+                let pattern = Pattern::new(exclude_pattern).map_err(|error| {
+                    GlobError::InvalidExcludePattern {
+                        glob: exclude_pattern.to_owned(),
+                        error,
+                    }
+                })?;
+
+                Ok(pattern)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             include_patterns,
@@ -74,10 +98,19 @@ impl PathsProvider for Glob {
         let mut paths = Vec::new();
 
         for include_pattern in &self.include_patterns {
-            let glob = glob(include_pattern).map_err(GlobError::InvalidIncludePattern)?;
+            let glob = glob(include_pattern).map_err(|error| GlobError::InvalidIncludePattern {
+                glob: include_pattern.to_owned(),
+                error,
+            })?;
 
             for dir_entry in glob {
-                let path = dir_entry.map_err(GlobError::WalkError)?.into_path();
+                let path = dir_entry
+                    .map_err(|error| GlobError::WalkError {
+                        glob: include_pattern.to_owned(),
+                        error,
+                    })?
+                    .into_path();
+
                 let is_excluded = self.exclude_patterns.iter().any(|exclude_pattern| {
                     path.to_str()
                         .map_or(false, |path| exclude_pattern.matches(path))
