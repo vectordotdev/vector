@@ -19,9 +19,9 @@ ACTION=$1
 #
 
 start_podman () {
- podman pod create --replace --name vector-test-integration-kafka -p 2181:2181 -p 9091-9093:9091-9093
-  podman run -d --pod=vector-test-integration-kafka --name vector_zookeeper wurstmeister/zookeeper
-  podman run -d --pod=vector-test-integration-kafka -e KAFKA_BROKER_ID=1 \
+	podman pod create --replace --name vector-test-integration-kafka -p 2181:2181 -p 9091-9093:9091-9093
+	podman run -d --pod=vector-test-integration-kafka --name vector_zookeeper wurstmeister/zookeeper
+	podman run -d --pod=vector-test-integration-kafka -e KAFKA_BROKER_ID=1 \
 	 -e KAFKA_ZOOKEEPER_CONNECT=vector_zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
 	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
 	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
@@ -34,9 +34,9 @@ start_podman () {
 }
 
 start_docker () {
-   docker network create vector-test-integration-kafka
-  docker run -d --network=vector-test-integration-kafka -p 2181:2181 --name vector_zookeeper wurstmeister/zookeeper
-  docker run -d --network=vector-test-integration-kafka -p 9091-9093:9091-9093 -e KAFKA_BROKER_ID=1 \
+	docker network create vector-test-integration-kafka
+	docker run -d --network=vector-test-integration-kafka -p 2181:2181 --name vector_zookeeper wurstmeister/zookeeper
+	docker run -d --network=vector-test-integration-kafka -p 9091-9093:9091-9093 -e KAFKA_BROKER_ID=1 \
 	 -e KAFKA_ZOOKEEPER_CONNECT=vector_zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
 	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
 	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
@@ -49,14 +49,14 @@ start_docker () {
 }
 
 stop_podman () {
-  podman rm --force vector_kafka vector_zookeeper 2>/dev/null; true
- podman pod stop vector-test-integration-kafka 2>/dev/null; true
- podman pod rm --force vector-test-integration-kafka 2>/dev/null; true
+	podman rm --force vector_kafka vector_zookeeper 2>/dev/null; true
+	podman pod stop vector-test-integration-kafka 2>/dev/null; true
+	podman pod rm --force vector-test-integration-kafka 2>/dev/null; true
 }
 
 stop_docker () {
-  docker rm --force vector_kafka vector_zookeeper 2>/dev/null; true
-  docker network rm vector-test-integration-kafka 2>/dev/null; true
+	docker rm --force vector_kafka vector_zookeeper 2>/dev/null; true
+	docker network rm vector-test-integration-kafka 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Kafka integration tests environment"
