@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use indexmap::map::IndexMap;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {
@@ -192,23 +192,22 @@ pub(super) trait MetricCollector {
 }
 
 pub(super) struct StringCollector {
-    result: String,
-    processed: HashSet<String>,
+    // BTreeMap ensures we get sorted output, which whilst not required is preferable
+    processed: BTreeMap<String, String>,
 }
 
 impl MetricCollector for StringCollector {
     type Output = String;
 
     fn new() -> Self {
-        let result = String::new();
-        let processed = HashSet::new();
-        Self { result, processed }
+        let processed = BTreeMap::new();
+        Self { processed }
     }
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        if !self.processed.contains(name) {
-            self.encode_header(name, fullname, value);
-            self.processed.insert(name.into());
+        if !self.processed.contains_key(fullname) {
+            let header = Self::encode_header(name, fullname, value);
+            self.processed.insert(fullname.into(), header);
         }
     }
 
@@ -221,29 +220,34 @@ impl MetricCollector for StringCollector {
         tags: &Option<BTreeMap<String, String>>,
         extra: Option<(&str, String)>,
     ) {
-        self.result.push_str(name);
-        self.result.push_str(suffix);
-        self.encode_tags(tags, extra);
+        let result = self
+            .processed
+            .get_mut(name)
+            .expect("metric metadata not encoded");
+
+        result.push_str(name);
+        result.push_str(suffix);
+        Self::encode_tags(result, tags, extra);
         let _ = match timestamp_millis {
-            None => writeln!(&mut self.result, " {}", value),
-            Some(timestamp) => writeln!(&mut self.result, " {} {}", value, timestamp),
+            None => writeln!(result, " {}", value),
+            Some(timestamp) => writeln!(result, " {} {}", value, timestamp),
         };
     }
 
     fn finish(self) -> String {
-        self.result
+        self.processed.into_iter().map(|(_, value)| value).collect()
     }
 }
 
 impl StringCollector {
     fn encode_tags(
-        &mut self,
+        result: &mut String,
         tags: &Option<BTreeMap<String, String>>,
         extra: Option<(&str, String)>,
     ) {
         match (tags, extra) {
             (None, None) => Ok(()),
-            (None, Some(tag)) => write!(&mut self.result, "{{{}=\"{}\"}}", tag.0, tag.1),
+            (None, Some(tag)) => write!(result, "{{{}=\"{}\"}}", tag.0, tag.1),
             (Some(tags), ref tag) => {
                 let mut parts = tags
                     .iter()
@@ -255,16 +259,18 @@ impl StringCollector {
                 }
 
                 parts.sort();
-                write!(&mut self.result, "{{{}}}", parts.join(","))
+                write!(result, "{{{}}}", parts.join(","))
             }
         }
         .ok();
     }
 
-    pub(super) fn encode_header(&mut self, name: &str, fullname: &str, value: &MetricValue) {
+    fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
         let r#type = value.prometheus_metric_type().as_str();
-        writeln!(&mut self.result, "# HELP {} {}", fullname, name).ok();
-        writeln!(&mut self.result, "# TYPE {} {}", fullname, r#type).ok();
+        format!(
+            "# HELP {} {}\n# TYPE {} {}\n",
+            fullname, name, fullname, r#type
+        )
     }
 }
 
