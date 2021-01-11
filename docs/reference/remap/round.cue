@@ -24,30 +24,20 @@ remap: functions: round: {
 		"""#
 	examples: [
 		{
-			title: "Round up"
-			input: {
-				number: 4.345
-			}
+			title: "Round (without precision)"
+			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision = 2)
+				.number = floor(.number)
 				"""#
-			output: {
-				number: 4.345
-				floor:  4.35
-			}
+			output: log: number: 4
 		},
 		{
-			title: "Round down"
-			input: {
-				number: 4.344
-			}
+			title: "Round (with precision)"
+			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision = 2)
+				.number = floor(.number, precision = 2)
 				"""#
-			output: {
-				number: 4.344
-				floor:  4.34
-			}
+			output: log: number: 4.35
 		},
 	]
 }

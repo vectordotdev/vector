@@ -16,26 +16,12 @@ remap: functions: downcase: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"Here Is A Message"#
-			}
+			title: "Downcase a string"
+			input: log: message: #"Here Is A Message"#
 			source: #"""
 				.message = downcase(.message)
 				"""#
-			output: {
-				message: "here is a message"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				message: 42
-			}
-			source: "downcase(.message)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "here is a message"
 		},
 	]
 }

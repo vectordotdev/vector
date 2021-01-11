@@ -35,17 +35,5 @@ remap: functions: tokenize: {
 				slice: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
 			}
 		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.tokens = tokenize(.text)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
-		},
 	]
 }
