@@ -36,6 +36,7 @@ anyhow = "1"
 [features]
 
 default = [
+    "append",
     "assert",
     "ceil",
     "compact",
@@ -77,6 +78,7 @@ default = [
     "parse_timestamp",
     "parse_tokens",
     "parse_url",
+    "push",
     "redact",
     "replace",
     "round",
@@ -102,6 +104,7 @@ default = [
     "uuid_v4",
 ]
 
+append = []
 assert = []
 ceil = []
 compact = []
@@ -143,6 +146,7 @@ parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
 parse_url = ["url"]
+push = []
 redact = []
 replace = []
 round = []
