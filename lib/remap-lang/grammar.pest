@@ -134,6 +134,8 @@ reserved_keyword = @{
     | boolean
 }
 
+COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
+
 WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }
 
 // end of expression
