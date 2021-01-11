@@ -1582,3 +1582,47 @@
       "secs.equals" = 1600077224
       "millis.equals" = 1600077224000
       "nanos.equals" = 1600077224000000000
+
+[transforms.remap_function_push_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .result = push(parse_json(.fruits), .fruit)
+  """
+[[tests]]
+  name = "remap_function_push_to_array"
+  [tests.input]
+    insert_at = "remap_function_push_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits = '["apple", "orange", "banana"]'
+      fruit = "mango"
+  [[tests.outputs]]
+    extract_from = "remap_function_push_to_array"
+    [[tests.outputs.conditions]]
+      "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
+
+[transforms.remap_function_append_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .result = append(parse_json(.fruits), parse_json(.other_fruits))
+  """
+[[tests]]
+  name = "remap_function_append_to_array"
+  [tests.input]
+    insert_at = "remap_function_append_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits = '["apple", "orange"]'
+      other_fruits = '["banana", "mango"]'
+  [[tests.outputs]]
+    extract_from = "remap_function_append_to_array"
+    [[tests.outputs.conditions]]
+      "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
