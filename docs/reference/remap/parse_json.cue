@@ -21,13 +21,11 @@ remap: functions: parse_json: {
 	examples: [
 		{
 			title: "Parse JSON (success)"
-			input: log: "message": #"{"key": "val"}"#
+			input: log: message: #"{"key": "val"}"#
 			source: #"""
 				. = parse_json(del(.message))
 				"""#
-			output: log: {
-				"message": "action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";"
-			}
+			output: log: key: "val"
 		},
 	]
 }
