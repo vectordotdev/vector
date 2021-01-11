@@ -43,11 +43,10 @@ components: transforms: wasm: {
 		warnings: []
 		notices: [
 			"""
-			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
-			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
-			is designed for safe, performant, and easy data mapping. It is intended to cover the
-			vast majority of data mapping use cases leaving WASM for very advanced and edge-case
-			situations.
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this tranform. The
+			[Vector Remap Language](\(urls.vrl_reference)) is designed for safe, performant, and easy data mapping. It
+			is intended to cover the vast majority of data mapping use cases leaving WASM for very advanced and
+			edge-case situations.
 			""",
 		]
 	}
