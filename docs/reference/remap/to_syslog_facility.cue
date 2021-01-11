@@ -26,15 +26,5 @@ remap: functions: to_syslog_facility: {
 				log_facility: "auth"
 			}
 		},
-		{
-			title: "Error"
-			input: {
-				syslog_facility: "1337"
-			}
-			source: ".log_facility = to_syslog_facility(.syslog_facility)"
-			output: {
-				error: remap.errors.ParseError
-			}
-		},
 	]
 }
