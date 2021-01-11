@@ -707,6 +707,10 @@ remap: {
 					"*": "Multiply by"
 					"%": "Modulo"
 				}
+				"Error handling and assignment": {
+					"??=": "[Conditional assignment](#conditional-assignment)"
+					"??":  "[Error coalescence](#error-coalescence)"
+				}
 			}
 		}
 	}
