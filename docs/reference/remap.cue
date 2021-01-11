@@ -76,26 +76,29 @@ remap: {
 			description: """
 				A list of values. Items in a VRL array can be of any type, including other arrays
 				and `null` (which is a value in VRL). You can access values insude arrays via
-				index (beginning with 0). For the array `primary = ["magenta", "yellow", "cyan"]`,
-				for example, `primary[0]` yields `"magenta"`.
+				index (beginning with 0). For the array `primary = [\"magenta\", \"yellow\",
+				\"cyan\"]`, for example, `primary[0]` yields `\"magenta\"`.
 
 				You can also assign values to arrays by index:
 
 				```js
-				stooges = ["Larry", "Moe"]
-				stooges[2] = "Curly"
+				stooges = [\"Larry\", \"Moe\"]
+				stooges[2] = \"Curly\"
 				```
 
 				You can even assign values to arbitrary indices in arrays; indices that need to be
 				created are back-filled as `null`. For example, if the `hobbies` field doesn't
-				exist, the expression `.hobbies[2] = "Pogs"` sets the `hobbies` field to
-				`[null, null, "Pogs"]`.
+				exist, the expression `.hobbies[2] = \"Pogs\"` sets the `hobbies` field to the array
+				`[null, null, \"Pogs\"]`.
 
-				Because all expressions in VRL return a value, you can put expressions in arrays:
+				And because all expressions in VRL are technically values, if you put expressions
+				in arrays, the expressions are evaluated.
 
+				```js
+				.strange = [false || \"booper\", 1 + 1, 1 == 2]
 				```
-				.strange = [(false || "booper"), "foo", $bar, .baz]
-				```
+
+				In this case, `.strange` would evalue to `[\"booper\", 2, false]`.
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -103,6 +106,7 @@ remap: {
 				#"["error", "warn", "emerg"]"#,
 				"[[1, 2, 3], [4, 5, 6]]",
 				#"[true, 10, {"foo": "bar"}, [10], 47.5]"#,
+				#"[1 + 1, 2 == 5, "hello" + " " + "world"]"#,
 			]
 		}
 		"boolean": {
@@ -127,17 +131,29 @@ remap: {
 		"map": {
 			description: """
 				A key-value map in which keys are strings and values can be of any VRL type,
-				including other maps. And as with arrays, you can use expressions to provide the
-				value for a key:
+				including other maps.
 
+				As with arrays, you can use expressions to provide the value for a key:
+
+				```js
+				.user = { \"username\": exists(.username) || \"none\" }
 				```
-				.user = { "username": exists(.username) || "none" }
+
+				Nested maps are supported:
+
+				```js
+				.user = {
+					\"username\": \"thrillho\",
+					\"metadata\": {
+						\"level\": \"warrior\"
+					}
+				}
 				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
 				#"{"code": 200, "error_type": "insufficient_resources"}"#,
-				"""
+				#"""
 					{
 					  "user": {
 					    "id": "tonydanza1337",
@@ -145,7 +161,7 @@ remap: {
 						"boss": true
 					  }
 					}
-					""",
+					"""#,
 			]
 		}
 		"integer": {
@@ -161,22 +177,22 @@ remap: {
 			description: """
 				No value. In VRL, you can assign `null` to fields and variables:
 
-				```
+				```js
 				.hostname = null
-				$code = null
+				code = null
 				```
 
-				`null` is also the return value of expressions that don't return any other value.
-				The [`del`](#del) function for removing fields, for example, always returns `null`.
+				`null` is the return value of expressions that don't return any other value, such
+				as any invocation of the [`assert`](#assert) function.
 
-				`null` is also convertable to other types using `to_*` functions like `to_string`:
+				`null` is convertable to other types using `to_*` functions like `to_string`:
 
-				Type | Conversion
+				Function | Output
 				:----|:----------
-				string | `""`
-				integer | `0`
-				Boolean | `false`
-				float | `0`
+				`to_string` | `""`
+				`to_int` | `0`
+				`to_bool` | `false`
+				`to_float` | `0`
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -189,8 +205,8 @@ remap: {
 				use [Rust regex syntax](\(urls.rust_regex_syntax)). Here's an example usage of a
 				regular expression:
 
-				```
-				match("happy", /(happy|sad)/)
+				```js
+				text_matches = match("happy", /(happy|sad)/)
 				```
 
 				### Flags
@@ -215,14 +231,14 @@ remap: {
 
 				* You can't assign a regex to an object path. Thus, `.pattern = /foo|bar/i` is not
 					allowed.
-				* Expressions can't return regexes. Thus, you can't, for example, dynamically create
-					regexes.
+				* Expressions can't return regexes. Thus you can't, for example, dynamically create
+					regular expressions.
 				"""
 			use: ["parameter"]
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
 				#"""
-					$has_foo_or_bar = match("does contain foo", /(foo|bar)/)
+					has_foo_or_bar = match("does contain foo", /(foo|bar)/)
 					"""#,
 			]
 		}
@@ -232,23 +248,23 @@ remap: {
 
 				* VRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
 					sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
-				* Strings can be escaped using a backslash (`/`), as in `\"The song is called
+				* Strings can be escaped using a forward slash (`\`), as in `\"The song is called
 					\"My name is Jonas\"\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
 
 				You can concatenate strings using plus (`+`). Here's an example:
 
-				```
-				$name = \"Vector Vic\"
-				.message = $name + \" is a pretty great mascot\" + \" (though we're a bit biased)\"
+				```js
+				name = \"Vector Vic\"
+				.message = name + \" is a pretty great mascot\" + \" (though we're a bit biased)\"
 				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
 				"\"I am a teapot\"",
 				#"""
-					"I am split
+					"I am split \
 					across multiple lines"
 					"""#,
 				#"This is not escaped, \"but this is\""#,
