@@ -3,34 +3,35 @@
 use super::PathsProvider;
 use glob::Pattern;
 use globwalk::glob;
+use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, Snafu)]
 /// An error that arised either during parsing or execution of this glob.
 pub enum GlobError {
     /// Include glob pattern could not be parsed.
-    #[snafu(display("Include glob pattern {} could not be parsed: {}", glob, error))]
+    #[snafu(display("Include glob pattern {} could not be parsed", glob))]
     InvalidIncludePattern {
         /// The glob string that produced the error.
         glob: String,
         /// The underlying error.
-        error: globwalk::GlobError,
+        source: globwalk::GlobError,
     },
     /// Exclude glob pattern could not be parsed.
-    #[snafu(display("Exclude glob pattern {} could not be parsed: {}", glob, error))]
+    #[snafu(display("Exclude glob pattern {} could not be parsed", glob))]
     InvalidExcludePattern {
         /// The glob string that produced the error.
         glob: String,
         /// The underlying error.
-        error: glob::PatternError,
+        source: glob::PatternError,
     },
     /// Failed while iterating on the glob.
-    #[snafu(display("Failed while iterating on the glob {}: {}", glob, error))]
+    #[snafu(display("Failed while iterating on the glob {}", glob))]
     WalkError {
         /// The glob string that produced the error.
         glob: String,
         /// The underlying error.
-        error: globwalk::WalkError,
+        source: globwalk::WalkError,
     },
 }
 
@@ -57,11 +58,9 @@ impl Glob {
         include_patterns
             .iter()
             .map(|include_pattern| -> Result<_, _> {
-                let glob =
-                    glob(include_pattern).map_err(|error| GlobError::InvalidIncludePattern {
-                        glob: include_pattern.to_owned(),
-                        error,
-                    })?;
+                let glob = glob(include_pattern).with_context(|| InvalidIncludePattern {
+                    glob: include_pattern.to_owned(),
+                })?;
 
                 Ok(glob)
             })
@@ -73,12 +72,10 @@ impl Glob {
         let exclude_patterns = exclude_patterns
             .iter()
             .map(|exclude_pattern| -> Result<_, _> {
-                let pattern = Pattern::new(exclude_pattern).map_err(|error| {
-                    GlobError::InvalidExcludePattern {
+                let pattern =
+                    Pattern::new(exclude_pattern).with_context(|| InvalidExcludePattern {
                         glob: exclude_pattern.to_owned(),
-                        error,
-                    }
-                })?;
+                    })?;
 
                 Ok(pattern)
             })
@@ -100,16 +97,14 @@ impl PathsProvider for Glob {
 
         // Iterate over all include patterns, turn them into globs and walk them on the file system.
         for include_pattern in &self.include_patterns {
-            let glob = glob(include_pattern).map_err(|error| GlobError::InvalidIncludePattern {
+            let glob = glob(include_pattern).with_context(|| InvalidIncludePattern {
                 glob: include_pattern.to_owned(),
-                error,
             })?;
 
             for dir_entry in glob {
                 let path = dir_entry
-                    .map_err(|error| GlobError::WalkError {
+                    .with_context(|| WalkError {
                         glob: include_pattern.to_owned(),
-                        error,
                     })?
                     .into_path();
 
