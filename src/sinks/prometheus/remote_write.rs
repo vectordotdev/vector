@@ -103,13 +103,12 @@ impl SinkConfig for RemoteWriteConfig {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {
                         template
                             .render_string(&event)
-                            .or_else(|fields| {
+                            .map_err(|fields| {
                                 error!(
-                                    message = "Tenant template contains missing fields",
+                                    message = "Tenant template contains missing fields.",
                                     ?fields,
                                     rate_limit_secs = 30,
-                                );
-                                Err(())
+                                )
                             })
                             .ok()
                     });
@@ -334,7 +333,7 @@ mod tests {
         .await
     }
 
-    fn create_event(name: String, value: f64) -> Event {
+    pub(super) fn create_event(name: String, value: f64) -> Event {
         Event::Metric(Metric {
             name,
             namespace: None,
@@ -359,7 +358,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::{Metric, MetricKind, MetricValue},
+        event::metric::MetricValue,
         sinks::influxdb::test_util::{cleanup_v1, onboarding_v1, query_v1},
         tls::TlsOptions,
         Event,
