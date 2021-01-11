@@ -8,13 +8,12 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use pad::PadStr;
 use std::io::stdout;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
+    text::{Span, Spans},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
@@ -120,19 +119,8 @@ impl<'a> Widgets<'a> {
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
-        // Column calculations. Factor 8 chars for 6x columns + padding
-        let padding = 8;
-
-        let width = f.size().width;
-        let width_10: usize = ((width / (100 / 10)) - padding).into();
-        let width_20: usize = ((width / (100 / 20)) - padding).into();
-
         // Header columns
-        let events = "Events".pad_to_width_with_alignment(width_20, pad::Alignment::Right);
-        let bytes = "Bytes".pad_to_width_with_alignment(width_20, pad::Alignment::Right);
-        let errors = "Errors".pad_to_width_with_alignment(width_10, pad::Alignment::Right);
-
-        let header = ["Name", "Kind", "Type", &events, &bytes, &errors]
+        let header = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"]
             .iter()
             .map(|s| Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD)))
             .collect::<Vec<_>>();
@@ -142,7 +130,7 @@ impl<'a> Widgets<'a> {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
             let formatted_metrics = [
-                (match r.processed_events_total {
+                match r.processed_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -153,8 +141,7 @@ impl<'a> Widgets<'a> {
                         },
                         r.processed_events_throughput_sec.human_format()
                     ),
-                })
-                .pad_to_width_with_alignment(width_20, pad::Alignment::Right),
+                },
                 match r.processed_bytes_total {
                     0 => "N/A".to_string(),
                     v => format!(
