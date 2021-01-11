@@ -354,7 +354,10 @@ where
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
-            Ok(hyper::Response::from_parts(parts, body.to_bytes()))
+            Ok(hyper::Response::from_parts(
+                parts,
+                body.copy_to_bytes(body.remaining()),
+            ))
         })
     }
 }

@@ -585,7 +585,5 @@ tower-layer = "0.3"
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 # Not maintained, our branch update `sync` and `quote` crates: https://github.com/fitzgen/derive_is_enum_variant/pull/3
 derive_is_enum_variant = { version = "0.1.1", git = "https://github.com/timberio/derive_is_enum_variant", rev = "e4550f8ca1366823b8366f0126a7d00ee8ffb080" }
-# TODO: update to the next 0.13.x (after 0.13.9, if any) or 0.14 (or higher)
-hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "a00cc20afc597cb55cbc62c70b0b25b46c82a0a6" }
 # Not maintained, our branch update `rand` crate: https://github.com/Dentosal/portpicker-rs/pull/3
 portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }
