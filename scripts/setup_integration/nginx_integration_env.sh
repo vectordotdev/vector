@@ -19,25 +19,25 @@ ACTION=$1
 #
 
 start_podman () {
-	podman pod create --replace --name vector-test-integration-nginx -p 8010:8000
-	podman run -d --pod=vector-test-integration-nginx --name vector_nginx \
+  podman pod create --replace --name vector-test-integration-nginx -p 8010:8000
+  podman run -d --pod=vector-test-integration-nginx --name vector_nginx \
 	-v "$(pwd)"tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
 start_docker () {
-	docker network create vector-test-integration-nginx
-	docker run -d --network=vector-test-integration-nginx -p 8010:8000 --name vector_nginx \
+  docker network create vector-test-integration-nginx
+  docker run -d --network=vector-test-integration-nginx -p 8010:8000 --name vector_nginx \
 	-v "$(pwd)"/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
 }
 
 stop_podman () {
-	podman pod stop vector-test-integration-nginx 2>/dev/null; true
-	podman pod rm --force vector-test-integration-nginx 2>/dev/null; true
+  podman pod stop vector-test-integration-nginx 2>/dev/null; true
+  podman pod rm --force vector-test-integration-nginx 2>/dev/null; true
 }
 
 stop_docker () {
-	docker rm --force vector_nats 2>/dev/null; true
-	docker network rm vector-test-integration-nginx 2>/dev/null; true
+  docker rm --force vector_nats 2>/dev/null; true
+  docker network rm vector-test-integration-nginx 2>/dev/null; true
 }
 
 echo "Running $ACTION action for Nginx integration tests environment"
