@@ -21,14 +21,6 @@ pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub fn init(color: bool, json: bool, levels: &str) {
-    let (sender, _) = broadcast::channel(99);
-    // Ignore errors when setting, since tests can initialize this
-    // multiple times.
-    let _ = SENDER.set(sender);
-    // However, we need to grab a handle on the actual channel that was
-    // previously set up.
-    let sender = SENDER.get().unwrap().clone();
-
     let dispatch = if json {
         let formatter = FmtSubscriber::builder()
             .with_env_filter(levels)
@@ -38,7 +30,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .with(Limit::default())
             .with(MetricsLayer::new());
 
-        Dispatch::new(BroadcastSubscriber { sender, formatter })
+        Dispatch::new(BroadcastSubscriber { formatter })
     } else {
         let formatter = FmtSubscriber::builder()
             .with_ansi(color)
@@ -46,7 +38,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .finish()
             .with(Limit::default())
             .with(MetricsLayer::new());
-        Dispatch::new(BroadcastSubscriber { sender, formatter })
+        Dispatch::new(BroadcastSubscriber { formatter })
     };
 
     let _ = LogTracer::init();
@@ -57,12 +49,11 @@ pub fn current_span() -> Span {
     Span::current()
 }
 
-pub fn subscribe() -> Option<Receiver<Event>> {
-    SENDER.get().map(|sender| sender.subscribe())
+pub fn subscribe() -> Receiver<Event> {
+    SENDER.get_or_init(|| broadcast::channel(99).0).subscribe()
 }
 
 struct BroadcastSubscriber<F> {
-    sender: Sender<Event>,
     formatter: F,
 }
 
@@ -89,8 +80,8 @@ impl<F: Subscriber + 'static> Subscriber for BroadcastSubscriber<F> {
 
     #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
-        if self.sender.receiver_count() > 0 {
-            let _ = self.sender.send(event.into()); // Ignore errors
+        if let Some(sender) = SENDER.get() {
+            let _ = sender.send(event.into()); // Ignore errors
         }
         self.formatter.event(event)
     }
