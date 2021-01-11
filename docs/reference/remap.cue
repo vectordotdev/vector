@@ -55,15 +55,6 @@ remap: {
 		}
 	}
 
-	errors: {
-		ArgumentError: {
-			description: "Raised when the provided input is not a supported type for that function."
-		}
-		ParseError: {
-			description: "Raised when the provided input cannot be parsed."
-		}
-	}
-
 	// VRL type system
 	types: [TypeName=string]: {
 		#Use: "parameter" | "return"
