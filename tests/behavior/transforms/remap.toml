@@ -580,23 +580,23 @@
       "c.equals" = "ar"
       "d.equals" = "ooba"
 
-[transforms.remap_function_tokenize]
+[transforms.remap_function_parse_tokens]
   inputs = []
   type = "remap"
   source = """
-    .a = tokenize(.a)
-    .b = tokenize(.b)
+    .a = parse_tokens(.a)
+    .b = parse_tokens(.b)
   """
 [[tests]]
-  name = "remap_function_tokenize"
+  name = "remap_function_parse_tokens"
   [tests.input]
-    insert_at = "remap_function_tokenize"
+    insert_at = "remap_function_parse_tokens"
     type = "log"
     [tests.input.log_fields]
       a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
       b = "bar"
   [[tests.outputs]]
-    extract_from = "remap_function_tokenize"
+    extract_from = "remap_function_parse_tokens"
     [[tests.outputs.conditions]]
       "a.length_eq" = 7
       "a[0].equals" = "217.250.207.207"
