@@ -61,6 +61,19 @@ pub struct GlobalTimestamps {
     map: Arc<DashMap<PartitionKey, HashMap<Labels, i64>>>,
 }
 
+impl GlobalTimestamps {
+    pub fn take(&self, partition: &PartitionKey) -> HashMap<Labels, i64> {
+        self.map
+            .remove(partition)
+            .map(|(_k, v)| v)
+            .unwrap_or_default()
+    }
+
+    pub fn insert(&self, partition: PartitionKey, map: HashMap<Labels, i64>) {
+        self.map.insert(partition, map);
+    }
+}
+
 #[derive(Debug)]
 pub struct LokiBuffer {
     num_bytes: usize,
@@ -126,6 +139,29 @@ impl Batch for LokiBuffer {
             // We must sort the stream labels here to ensure they hash to
             // the same stream if the label set matches.
             item.labels.sort();
+
+            let partition = &item.partition;
+            if self.latest_timestamps.is_none() {
+                self.partition = Some(item.partition.clone());
+                self.latest_timestamps = Some(self.global_timestamps.take(&partition));
+            }
+            let latest_timestamp = self
+                .latest_timestamps
+                .as_ref()
+                .unwrap()
+                .get(&item.labels)
+                .cloned()
+                .unwrap_or(item.event.timestamp);
+            if item.event.timestamp < latest_timestamp {
+                match self.out_of_order {
+                    OutOfOrderAction::Drop => return PushResult::Ok(false),
+                    OutOfOrderAction::RewriteTimestamp => {
+                        item.event.timestamp =
+                            i64::max(latest_timestamp, chrono::Utc::now().timestamp_nanos());
+                    }
+                }
+            }
+
             let new_bytes = match self.streams.get_mut(&item.labels) {
                 // Label exists, and we checked the size, just add it
                 Some(stream) => {
@@ -157,16 +193,26 @@ impl Batch for LokiBuffer {
     }
 
     fn fresh(&self) -> Self {
-        Self::new(self.settings, self.global_timestamps.clone(), self.out_of_order.clone())
+        Self::new(
+            self.settings,
+            self.global_timestamps.clone(),
+            self.out_of_order.clone(),
+        )
     }
 
     fn finish(self) -> Self::Output {
+        let mut latest_timestamps = self.latest_timestamps.expect("Batch is empty");
         let streams_json = self
             .streams
             .into_iter()
             .map(|(labels, mut events)| {
                 // Sort events by timestamp
                 events.sort_by_key(|e| e.timestamp);
+
+                latest_timestamps.insert(
+                    labels.clone(),
+                    events.last().expect("Batch is empty").timestamp,
+                );
 
                 let labels = labels.into_iter().collect::<HashMap<_, _>>();
                 let events = events.into_iter().map(|e| e.encoded).collect::<Vec<_>>();
@@ -177,6 +223,8 @@ impl Batch for LokiBuffer {
                 )
             })
             .collect::<Vec<_>>();
+        self.global_timestamps
+            .insert(self.partition.expect("Bacth is empty"), latest_timestamps);
 
         // This is just to guarantee stable key ordering for tests
         #[cfg(test)]
