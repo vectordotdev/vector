@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: tokenize: {
+remap: functions: parse_tokens: {
 	arguments: [
 		{
 			name:        "value"
@@ -41,7 +41,7 @@ remap: functions: tokenize: {
 				text: 42
 			}
 			source: #"""
-				.tokens = tokenize(.text)
+				.tokens = parse_tokens(.text)
 				"""#
 			output: {
 				error: remap.errors.ArgumentError
