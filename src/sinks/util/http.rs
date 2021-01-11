@@ -426,7 +426,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::next_addr;
+    use crate::{sinks::util::service::Concurrency, test_util::next_addr};
     use futures::{compat::Future01CompatExt, future::ready};
     use futures01::Stream;
     use hyper::{
@@ -503,5 +503,12 @@ mod test {
 
         let (body, _rest) = rx.into_future().compat().await.unwrap();
         assert_eq!(body.unwrap(), "hello");
+    }
+
+    #[test]
+    fn alias_in_flight_limit_works() {
+        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
+            .expect("Fixed concurrency failed for in_flight_limit param");
+        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

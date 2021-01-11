@@ -1,5 +1,5 @@
 use crate::Error;
-use prettytable::{format, Table};
+use prettytable::{format, Cell, Row, Table};
 use remap::{state, Object, Program, Runtime, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -8,6 +8,14 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
+
+const HELP_TEXT: &str = r#"
+VRL REPL commands:
+  next      Load the next object or create a new one
+  functions Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
+  prev      Load the previous object
+  exit      Terminate the program
+"#;
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
@@ -45,7 +53,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > Type `help` to learn more.
->      `next` to load the next object, or create a new one.
+       `functions` to see a list of currently available VRL functions.
+>      `next` to either load the next object or create a new one.
 >      `prev` to load the previous object.
 >      `exit` to terminate the program.
 >
@@ -57,10 +66,10 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
-            Ok(line) if line == "help" => println!("You're on your own, for now."),
+            Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "functions" || line == "funcs" || line == "fs" => {
                 print_function_list()
-            }
+            },
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
@@ -115,7 +124,7 @@ fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &st
         Some(object) => object,
     };
 
-    let program = match Program::new(program, &remap_functions::all(), None) {
+    let program = match Program::new(program, &remap_functions::all(), None, true) {
         Ok(program) => program,
         Err(err) => return err.to_string(),
     };
@@ -210,19 +219,28 @@ fn print_function_list() {
     let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
     let all_funcs = remap_functions::all();
 
+    let num_columns = 3;
+
     let mut func_table = Table::new();
     func_table.set_format(table_format);
-
     all_funcs
-        .chunks(3)
+        .chunks(num_columns)
         .map(|funcs| {
-            func_table.add_row(row![
-                funcs[0].identifier(),
-                funcs[1].identifier(),
-                funcs[2].identifier(),
-            ]);
+            let mut ids: Vec<Cell> = Vec::new();
+
+            for n in 0..num_columns {
+                if let Some(v) = funcs.get(n) {
+                    ids.push(Cell::new(v.identifier()));
+                }
+            }
+
+            func_table.add_row(Row::new(ids));
         })
         .for_each(drop);
 
     func_table.printstd();
+}
+
+fn print_help_text() {
+    println!("{}", HELP_TEXT);
 }

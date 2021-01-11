@@ -39,6 +39,10 @@ use tokio::{
 };
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
+const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
+const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
+const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
+
 pub mod stats;
 
 #[macro_export]
@@ -300,11 +304,14 @@ where
     Fut: Future<Output = bool> + Send + 'static,
 {
     let started = Instant::now();
+    let mut delay = WAIT_FOR_MIN_MILLIS;
     while !f().await {
-        delay_for(Duration::from_millis(5)).await;
+        delay_for(Duration::from_millis(delay)).await;
         if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
+        // quadratic backoff up to a maximum delay
+        delay = (delay * 2).min(WAIT_FOR_MAX_MILLIS);
     }
 }
 
@@ -314,7 +321,7 @@ where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
 {
-    wait_for_duration(f, Duration::from_secs(5)).await
+    wait_for_duration(f, Duration::from_secs(WAIT_FOR_SECS)).await
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable

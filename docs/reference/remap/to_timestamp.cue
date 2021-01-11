@@ -40,15 +40,5 @@ remap: functions: to_timestamp: {
 				date: "1970-01-01T00:00:10Z"
 			}
 		},
-		{
-			title: "Error"
-			input: {
-				date: "Not a date"
-			}
-			source: ".date = to_timestamp(.date)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
-		},
 	]
 }

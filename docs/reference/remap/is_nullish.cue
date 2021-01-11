@@ -25,15 +25,22 @@ remap: functions: is_nullish: {
 		"""#
 	examples: [
 		{
-			title: "Empty string"
-			input: {
-				string_field: ""
-			}
-			source: ".is_empty = is_nullish(.string_field)"
-			output: {
-				string_field: ""
-				is_empty:     true
-			}
+			title: "Empty string is nullish"
+			input: log: string: ""
+			source: ".is_nullish = is_nullish(.string)"
+			output: input & {log: is_nullish: true}
+		},
+		{
+			title: "Dash is nullish"
+			input: log: string: "-"
+			source: ".is_nullish = is_nullish(.string)"
+			output: input & {log: is_nullish: true}
+		},
+		{
+			title: "Whitespace is nullish"
+			input: log: string: "\n   \n"
+			source: ".is_nullish = is_nullish(.string)"
+			output: input & {log: is_nullish: true}
 		},
 	]
 }

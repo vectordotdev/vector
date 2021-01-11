@@ -55,38 +55,25 @@ remap: functions: compact: {
 		"""#
 	examples: [
 		{
-			title: "Array"
-			input: {
-				array: ["foo", "bar", "", null, [], "buzz"]
-			}
+			title: "Compact an array"
+			input: log: array: ["foo", "bar", "", null, [], "buzz"]
 			source: #"""
-				.compacted = compact(.array, string = true, array = true, null = true)
+				.log = compact(.array, string = true, array = true, null = true)
 				"""#
-			output: {
-				array: ["foo", "bar", "", null, [], "buzz"]
-				compacted: ["foo", "bar", "buzz"]
-			}
+			output: log: array: ["foo", "bar", "buzz"]
 		},
 		{
-			title: "Map"
-			input: {
-				map: {field1: 1
-						field2: ""
-					field3: []
-					field4: null
-				}
+			title: "Compact a map"
+			input: map: {
+				field1: 1
+				field2: ""
+				field3: []
+				field4: null
 			}
 			source: #"""
-				.compacted = compact(.map, string = true, array = true, null = true)
+				.map = compact(.map, string = true, array = true, null = true)
 				"""#
-			output: {
-				map: {field1: 1
-						field2: ""
-					field3: []
-					field4: null
-				}
-				compacted: {field1: 1}
-			}
+			output: map: field1: 1
 		},
 	]
 }

@@ -18,17 +18,17 @@ remap: functions: only_fields: {
 	examples: [
 		{
 			title: "Success"
-			input: {
-				"field1": 1
-				"field2": 2
-				"field3": 3
+			input: log: {
+				field1: 1
+				field2: 2
+				field3: 3
 			}
 			source: #"""
 				only_fields(.field1, .field3)
 				"""#
-			output: {
-				"field1": 1
-				"field3": 3
+			output: log: {
+				field1: 1
+				field3: 3
 			}
 		},
 	]

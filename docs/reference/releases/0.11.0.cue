@@ -42,7 +42,7 @@ releases: "0.11.0": {
 				`add_fields` and a full blown runtime like `lua`.
 
 				If interested, you can beta test via the [`remap` transform](\(urls.vector_remap_transform))
-				and use the [Vector Remap Language reference](\(urls.vector_remap_language_reference))
+				and use the [Vector Remap Language reference](\(urls.vrl_reference))
 				to write scripts.
 				"""
 		},

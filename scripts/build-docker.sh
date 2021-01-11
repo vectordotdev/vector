@@ -14,7 +14,7 @@ CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
-PUSH="${PUSH:-}"
+PUSH="${PUSH:-"true"}"
 REPO="${REPO:-"timberio/vector"}"
 
 #
@@ -29,18 +29,24 @@ build() {
   local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
 
   if [ -n "$PLATFORM" ]; then
+    ARGS=()
+    if [[ "$PUSH" == "true" ]]; then
+      ARGS+=(--push)
+    fi
+
     docker buildx build \
       --platform="$PLATFORM" \
       --tag "$TAG" \
       target/artifacts \
-      -f "$DOCKERFILE" --push
+      -f "$DOCKERFILE" \
+      "${ARGS[@]}"
   else
     docker build \
       --tag "$TAG" \
       target/artifacts \
       -f "$DOCKERFILE"
 
-      if [ -n "$PUSH" ]; then
+      if [[ "$PUSH" == "true" ]]; then
         docker push "$TAG"
       fi
   fi

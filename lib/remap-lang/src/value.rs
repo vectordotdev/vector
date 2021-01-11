@@ -275,6 +275,12 @@ impl From<String> for Value {
     }
 }
 
+impl From<crate::Error> for Value {
+    fn from(v: crate::Error) -> Self {
+        Value::Bytes(v.to_string().into())
+    }
+}
+
 impl From<bool> for Value {
     fn from(v: bool) -> Self {
         Value::Boolean(v)

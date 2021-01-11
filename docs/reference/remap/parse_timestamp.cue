@@ -33,31 +33,20 @@ remap: functions: parse_timestamp: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				"timestamp_bad":  "I am not a timestamp"
-				"timestamp_good": "10-Oct-2020 16:00"
-			}
+			title: "Parse a timestamp (success)"
+			input: log: timestamp: "10-Oct-2020 16:00"
 			source: #"""
-				.timestamp = parse_timestamp(.timestamp_bad, format="%v %R", default=.timestamp_good)
+				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
 				"""#
-			output: {
-				"timestamp":      "10-Oct-2020 16:00:00"
-				"timestamp_bad":  "I am not a timestamp"
-				"timestamp_good": "10-Oct-2020 16:00"
-			}
+			output: log: timestamp: "2020-10-10T16:00:00Z"
 		},
 		{
-			title: "Error"
-			input: {
-				"timestamp_bad": "I am not a timestamp"
-			}
+			title: "Parse a timestamp (error)"
+			input: log: timestamp_bad: "I am not a timestamp"
 			source: #"""
-				.timestamp = parse_timestamp(.timestamp_bad, format="%v %R")
+				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
 				"""#
-			output: {
-				error: remap.errors.ParseError
-			}
+			raise: "Failed to parse"
 		},
 	]
 }
