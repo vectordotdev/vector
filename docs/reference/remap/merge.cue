@@ -32,76 +32,68 @@ remap: functions: merge: {
 		"""#
 	examples: [
 		{
-			title: "Shallow"
-			input: {
-				map1: {"parent1": {"child1": 1
-								"child2": 2
+			title: "Shallow object merge"
+			input: log: {
+				map1: {
+					parent1: {
+						child1: 1
+						child2: 2
+					}
+					parent2: child3: 3
 				}
-					"parent2": {"child3": 3}
-				}
-				map2: {"parent1": {"child2": 4
-								"child5": 5
-				}
+				map2: parent1: {
+					child2: 4
+					child5: 5
 				}
 			}
 			source: #"""
 				merge(.map1, .map2, deep = false)
 				"""#
-			output: {
-				map1: {"parent1": {"child2": 4
-								"child5": 5
+			output: log: {
+				map1: {
+					parent1: {
+						child2: 4
+						child5: 5
+					}
+					parent2: child3: 3
 				}
-					"parent2": {"child3": 3}
-				}
-				map2: {"parent1": {"child2": 4
-								"child5": 5
-				}
+				map2: parent1: {
+					child2: 4
+					child5: 5
 				}
 			}
 		},
 		{
 			title: "Deep"
-			input: {
-				map1: {"parent1": {"child1": 1
-								"child2": 2
+			input: log: {
+				map1: {
+					parent1: {
+						child1: 1
+						child2: 2
+					}
+					parent2: child3: 3
 				}
-					"parent2": {"child3": 3}
-				}
-				map2: {"parent1": {"child2": 4
-								"child5": 5
-				}
-				}
-			}
-			source: #"""
-				merge(.map1, .map2, deep = true)
-				"""#
-			output: {
-				map1: {"parent1": {"child1": 1
-								"child2": 4
-								"child5": 5
-				}
-					"parent2": {"child3": 3}
-				}
-				map2: {"parent1": {"child2": 4
-								"child5": 5
-				}
-				}
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				map1: "just a string"
-				map2: {"parent1": {"child2": 4
-								"child5": 5
-				}
+				map2: parent1: {
+					child2: 4
+					child5: 5
 				}
 			}
 			source: #"""
 				merge(.map1, .map2, deep = true)
 				"""#
-			output: {
-				error: remap.errors.ArgumentError
+			output: log: {
+				map1: {
+					parent1: {
+						child1: 1
+						child2: 4
+						child5: 5
+					}
+					parent2: child3: 3
+				}
+				map2: parent1: {
+					child2: 4
+					child5: 5
+				}
 			}
 		},
 	]

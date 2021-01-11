@@ -24,21 +24,21 @@ remap: functions: parse_regex_all: {
 		"""
 	examples: [
 		{
-			title: "Successful match"
-			input: {
-				message: "first group and second group."
-			}
-			source: ".result = parse_regex_all(.message, /(?P<number>.*?) group/)"
-			output: {
-				result: [ {number: "first"
-							"0": "first group"
-							"1": "first"
+			title: "Parse via Regex (all matches)"
+			input: log: message: "first group and second group."
+			source: ". = parse_regex_all(del(.message), /(?P<number>.*?) group/)"
+			output: log: [
+				{
+					number: "first"
+					"0":    "first group"
+					"1":    "first"
 				},
-					{number: "second"
-							"0": "second group"
-							"1": "second"
-					}]
-			}
+				{
+					number: "second"
+					"0":    "second group"
+					"1":    "second"
+				},
+			]
 		},
 	]
 }

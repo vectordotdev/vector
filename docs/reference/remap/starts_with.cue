@@ -30,27 +30,20 @@ remap: functions: starts_with: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"The Needle In The Haystack"#
-			}
+			title: "String starts with (case sensitive)"
+			input: log: message: #"The Needle In The Haystack"#
+			source: #"""
+				.starts = starts_with(.message, \"The Needle\")
+				"""#
+			output: input & {log: starts: true}
+		},
+		{
+			title: "String starts with (case insensitive)"
+			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
 				.starts = starts_with(.message, \"the needle\", case_sensitive = false)
 				"""#
-			output: {
-				message: #"The Needle In The Haystack"#
-				starts:  true
-			}
-		},
-		{
-			title: "Invalid \"substring\" argument type"
-			input: {
-				message: "A string with 42"
-			}
-			source: ".starts = starts_with(.message, 42)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: input & {log: starts: true}
 		},
 	]
 }

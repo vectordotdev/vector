@@ -14,24 +14,10 @@ remap: functions: to_float: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				float: "3.14"
-			}
+			title: "Convert string to float"
+			input: log: float: "3.14"
 			source: ".float = to_float(.float)"
-			output: {
-				float: 3.14
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				integer: "hi"
-			}
-			source: ".float = to_float(.float)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: float: 3.14
 		},
 	]
 }

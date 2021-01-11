@@ -37,9 +37,13 @@ remap: {
 			#RemapExample: {
 				title: string
 				configuration?: [string]: string
-				input:  #Fields
-				source: string
-				output: #Fields
+				input:   #Fields
+				source:  string
+				raises?: string
+
+				if raises == _|_ {
+					output: #Fields
+				}
 			}
 
 			arguments: [...#Argument] // Allow for empty list
@@ -48,15 +52,6 @@ remap: {
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
-		}
-	}
-
-	errors: {
-		ArgumentError: {
-			description: "Raised when the provided input is not a supported type for that function."
-		}
-		ParseError: {
-			description: "Raised when the provided input cannot be parsed."
 		}
 	}
 

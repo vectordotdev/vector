@@ -20,14 +20,10 @@ remap: functions: to_syslog_severity: {
 
 	examples: [
 		{
-			title: "Success"
-			input: {
-				string: "alert"
-			}
-			source: ".severity = to_syslog_severity(.log_level)"
-			output: {
-				integer: 1
-			}
+			title: "Concert Syslog level to serverity"
+			input: log: level: "alert"
+			source: ".severity = to_syslog_severity(.level)"
+			output: input & {log: severity: 1}
 		},
 	]
 }
