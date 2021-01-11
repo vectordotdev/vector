@@ -27,11 +27,5 @@ remap: functions: parse_json: {
 				"""#
 			output: log: key: "val"
 		},
-		{
-			title: "Parse JSON (success)"
-			input: log: message: "{\"malformed\":"
-			source: ". = parse_json(del(.message))"
-			raise:  "Failed to parse"
-		},
 	]
 }
