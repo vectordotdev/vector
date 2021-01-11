@@ -289,8 +289,8 @@ components: transforms: remap: {
 		{
 			title: "Parsing Syslog severity and level"
 			configuration: source: """
-				.level = to_syslog_level(.level)
-				.severity = to_syslog_severity(.severity)
+				.level = parse_syslog_level(.level)
+				.severity = parse_syslog_severity(.severity)
 				"""
 			input: log: {
 				level:    1

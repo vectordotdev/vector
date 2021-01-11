@@ -5,7 +5,7 @@ pub struct ParseSyslogSeverity;
 
 impl Function for ParseSyslogSeverity {
     fn identifier(&self) -> &'static str {
-        "to_syslog_severity"
+        "parse_syslog_severity"
     }
 
     fn parameters(&self) -> &'static [Parameter] {

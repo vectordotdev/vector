@@ -5,7 +5,7 @@ pub struct ParseSyslogFacility;
 
 impl Function for ParseSyslogFacility {
     fn identifier(&self) -> &'static str {
-        "to_syslog_facility"
+        "parse_syslog_facility"
     }
 
     fn parameters(&self) -> &'static [Parameter] {

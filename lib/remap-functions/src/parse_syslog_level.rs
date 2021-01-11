@@ -1,11 +1,11 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ToSyslogLevel;
+pub struct ParseSyslogLevel;
 
 impl Function for ParseSyslogLevel {
     fn identifier(&self) -> &'static str {
-        "to_syslog_level"
+        "parse_syslog_level"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
