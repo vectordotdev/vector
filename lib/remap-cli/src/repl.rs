@@ -11,10 +11,10 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  next      Load the next object or create a new one
-  functions Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
-  prev      Load the previous object
-  exit      Terminate the program
+  next       Load the next object or create a new one
+  functions  Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
+  prev       Load the previous object
+  exit       Terminate the program
 "#;
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
@@ -25,7 +25,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     rl.set_helper(Some(Repl::new()));
 
     println!(
-        "
+        r#"
 > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
 > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
 > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
@@ -52,15 +52,16 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >
 > To run the CLI in regular mode, add a program to your command.
 >
-> Type `help` to learn more.
-       `functions` to see a list of currently available VRL functions.
->      `next` to either load the next object or create a new one.
->      `prev` to load the previous object.
->      `exit` to terminate the program.
+> VRL REPL commands:
+>   next       Load the next object or create a new one
+>   functions  Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
+>   prev       Load the previous object
+>   exit       Terminate the program
 >
 > Any other value is resolved to a TRL expression.
 >
-> Try it out now by typing `.` and hitting [enter] to see the result.\n"
+> Try it out now by typing `.` and hitting [enter] to see the result.
+"#
     );
 
     loop {
