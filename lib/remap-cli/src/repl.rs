@@ -68,7 +68,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => print_help_text(),
-            Ok(line) if line == "help functions" || line == "help funcs" || line == "help fs" => {
+            Ok(line) if line == "help function" || line == "help func" || line == "help f" => {
                 print_function_list()
             }
             Ok(line) if line == "exit" => break,
