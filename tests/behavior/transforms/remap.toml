@@ -1626,3 +1626,37 @@
       "result[1].equals" = "orange"
       "result[2].equals" = "banana"
       "result[3].equals" = "mango"
+
+[transforms.remap_function_encode_base64]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = encode_base64(.message)
+  '''
+[[tests]]
+  name = "remap_function_encode_base64"
+  [tests.input]
+    insert_at = "remap_function_encode_base64"
+    type = "raw"
+    value = "Bron-Y-Aur Stomp"
+  [[tests.outputs]]
+    extract_from = "remap_function_encode_base64"
+    [[tests.outputs.conditions]]
+    "result.equals" = "QnJvbi1ZLUF1ciBTdG9tcA=="
+
+[transforms.remap_function_decode_base64]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = decode_base64(.message)
+  '''
+[[tests]]
+  name = "remap_function_decode_base64"
+  [tests.input]
+    insert_at = "remap_function_decode_base64"
+    type = "raw"
+    value = "QnJvbi1ZLUF1ciBTdG9tcA=="
+  [[tests.outputs]]
+    extract_from = "remap_function_decode_base64"
+    [[tests.outputs.conditions]]
+    "result.equals" = "Bron-Y-Aur Stomp"

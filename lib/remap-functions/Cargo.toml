@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 remap = { package = "remap-lang", path = "../remap-lang" }
 
+base64 = { version = "0.13.0", optional = true }
 bytes = { version = "0.5.6", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
@@ -40,8 +41,10 @@ default = [
     "ceil",
     "compact",
     "contains",
+    "decode_base64",
     "del",
     "downcase",
+    "encode_base64",
     "encode_json",
     "ends_with",
     "exists",
@@ -106,8 +109,10 @@ assert = []
 ceil = []
 compact = []
 contains = []
+decode_base64 = ["base64"]
 del = []
 downcase = []
+encode_base64 = ["base64"]
 encode_json = ["serde_json"]
 ends_with = []
 exists = []

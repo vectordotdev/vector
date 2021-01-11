@@ -10,10 +10,14 @@ mod ceil;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base64")]
+mod decode_base64;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base64")]
+mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "ends_with")]
@@ -145,10 +149,14 @@ pub use ceil::Ceil;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base64")]
+pub use decode_base64::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base64")]
+pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
@@ -272,10 +280,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base64")]
+        Box::new(DecodeBase64),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base64")]
+        Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "ends_with")]

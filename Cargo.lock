@@ -5183,6 +5183,7 @@ name = "remap-functions"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.13.0",
  "bytes 0.5.6",
  "chrono",
  "cidr-utils",
