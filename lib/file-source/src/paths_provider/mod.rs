@@ -28,7 +28,7 @@ pub trait PathsProvider {
     /// Provides the iterator that returns paths.
     type IntoIter: IntoIterator<Item = PathBuf>;
     /// Provides the error that can arise during iterator construction.
-    type Error: std::fmt::Debug;
+    type Error: std::error::Error;
 
     /// Provides a set of paths.
     fn paths(&self) -> Result<Self::IntoIter, Self::Error>;

@@ -12,6 +12,7 @@ use futures::{
     stream, Future, Sink, SinkExt,
 };
 use indexmap::IndexMap;
+use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
@@ -22,6 +23,19 @@ use std::{
 use tokio::time::delay_for;
 
 use crate::paths_provider::PathsProvider;
+
+#[derive(Debug, Snafu)]
+pub enum FileServerError<
+    PathsSource: std::error::Error + 'static,
+    ChannelClosedSource: std::error::Error + 'static,
+> {
+    #[snafu(display("File paths could not be retrieved."))]
+    PathsError { source: PathsSource },
+    #[snafu(display("Output channel closed."))]
+    ChannelClosedError { source: ChannelClosedSource },
+    #[snafu(display("Overflow ocurred when calculating timer."))]
+    TimeOverflowError,
+}
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -72,7 +86,7 @@ where
         self,
         mut chans: C,
         shutdown: S,
-    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
+    ) -> Result<Shutdown, FileServerError<PP::Error, <C as Sink<Vec<(Bytes, String)>>>::Error>>
     where
         C: Sink<Vec<(Bytes, String)>> + Unpin,
         <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
@@ -92,7 +106,7 @@ where
         let mut known_small_files = HashSet::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().unwrap().into_iter() {
+        for path in self.paths_provider.paths().context(PathsError)? {
             if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                 &path,
                 &mut fingerprint_buffer,
@@ -189,7 +203,9 @@ where
             let now_time = time::Instant::now();
             if next_glob_time <= now_time {
                 // Schedule the next glob time.
-                next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
+                next_glob_time = now_time
+                    .checked_add(self.glob_minimum_cooldown)
+                    .ok_or(FileServerError::TimeOverflowError)?;
 
                 if stats.started_at.elapsed() > Duration::from_secs(1) {
                     stats.report();
@@ -204,7 +220,7 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().unwrap().into_iter() {
+                for path in self.paths_provider.paths().context(PathsError)? {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,
@@ -342,14 +358,7 @@ where
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             let mut stream = stream::once(futures::future::ok(to_send));
-            let result = block_on(chans.send_all(&mut stream));
-            match result {
-                Ok(()) => {}
-                Err(error) => {
-                    error!(message = "Output channel closed.", error = ?error);
-                    return Err(error);
-                }
-            }
+            block_on(chans.send_all(&mut stream)).context(ChannelClosedError)?;
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();

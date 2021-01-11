@@ -7,6 +7,7 @@ use crate::kubernetes as k8s;
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::Pod;
+use snafu::Snafu;
 use std::path::PathBuf;
 
 /// A paths provider implementation that uses the state obtained from the
@@ -29,9 +30,12 @@ impl K8sPathsProvider {
     }
 }
 
+#[derive(Debug, Snafu)]
+pub enum K8sPathsProviderError {}
+
 impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
-    type Error = ();
+    type Error = K8sPathsProviderError;
 
     fn paths(&self) -> Result<Self::IntoIter, Self::Error> {
         let read_ref = match self.pods_state_reader.read() {
