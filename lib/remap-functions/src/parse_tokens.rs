@@ -97,7 +97,7 @@ mod tests {
                             "11881".into(),
 
                     ].into()),
-                    TokenizeFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
+                    ParseTokensFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
                 )];
 
         let mut state = state::Program::default();
