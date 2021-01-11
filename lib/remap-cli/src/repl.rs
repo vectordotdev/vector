@@ -11,10 +11,10 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  next       Load the next object or create a new one
-  functions  Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
-  prev       Load the previous object
-  exit       Terminate the program
+  help functions  Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+  next            Load the next object or create a new one
+  prev            Load the previous object
+  exit            Terminate the program
 "#;
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
@@ -53,8 +53,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > VRL REPL commands:
+>   help       Learn more about VRL
 >   next       Load the next object or create a new one
->   functions  Display a list of currently available VRL functions (aliases: ["funcs", "fs"])
 >   prev       Load the previous object
 >   exit       Terminate the program
 >
@@ -68,7 +68,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => print_help_text(),
-            Ok(line) if line == "functions" || line == "funcs" || line == "fs" => {
+            Ok(line) if line == "help functions" || line == "help funcs" || line == "help fs" => {
                 print_function_list()
             }
             Ok(line) if line == "exit" => break,
