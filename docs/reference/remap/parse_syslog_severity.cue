@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: to_syslog_severity: {
+remap: functions: parse_syslog_severity: {
 	arguments: [
 		{
 			name:        "value"
@@ -24,7 +24,7 @@ remap: functions: to_syslog_severity: {
 			input: {
 				string: "alert"
 			}
-			source: ".severity = to_syslog_severity(.log_level)"
+			source: ".severity = parse_syslog_severity(.log_level)"
 			output: {
 				integer: 1
 			}

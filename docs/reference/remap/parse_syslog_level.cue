@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: to_syslog_level: {
+remap: functions: parse_syslog_level: {
 	arguments: [
 		{
 			name:        "value"
@@ -21,7 +21,7 @@ remap: functions: to_syslog_level: {
 			input: {
 				severity: "5"
 			}
-			source: ".log_level = to_syslog_level(.severity)"
+			source: ".log_level = parse_syslog_level(.severity)"
 			output: {
 				level: "notice"
 			}
@@ -31,7 +31,7 @@ remap: functions: to_syslog_level: {
 			input: {
 				severity: "1337"
 			}
-			source: ".log_level = to_syslog_level(.severity)"
+			source: ".log_level = parse_syslog_level(.severity)"
 			output: {
 				error: remap.errors.ParseError
 			}

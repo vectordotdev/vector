@@ -71,6 +71,9 @@ default = [
     "parse_syslog",
     "parse_regex",
     "parse_regex_all",
+    "parse_syslog_facility",
+    "parse_syslog_level",
+    "parse_syslog_severity",
     "parse_timestamp",
     "parse_url",
     "redact",
@@ -87,10 +90,7 @@ default = [
     "to_bool",
     "to_float",
     "to_int",
-    "to_syslog_facility",
-    "to_syslog_level",
     "to_string",
-    "to_syslog_severity",
     "to_timestamp",
     "tokenize",
     "truncate",
@@ -134,6 +134,9 @@ parse_regex = ["regex"]
 parse_regex_all = ["regex"]
 parse_key_value = ["nom"]
 parse_syslog = ["syslog_loose"]
+parse_syslog_facility = []
+parse_syslog_level = []
+parse_syslog_severity = []
 parse_timestamp = ["shared/conversion"]
 parse_url = ["url"]
 redact = []
@@ -151,9 +154,6 @@ to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
 to_string = []
-to_syslog_facility = []
-to_syslog_level = []
-to_syslog_severity = []
 to_timestamp = ["chrono"]
 tokenize = ["shared/tokenize"]
 truncate = []

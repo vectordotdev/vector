@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: to_syslog_facility: {
+remap: functions: parse_syslog_facility: {
 	arguments: [
 		{
 			name:        "value"
@@ -21,7 +21,7 @@ remap: functions: to_syslog_facility: {
 			input: {
 				syslog_facility: "4"
 			}
-			source: ".log_facility = to_syslog_facility(.syslog_facility)"
+			source: ".log_facility = parse_syslog_facility(.syslog_facility)"
 			output: {
 				log_facility: "auth"
 			}
@@ -31,7 +31,7 @@ remap: functions: to_syslog_facility: {
 			input: {
 				syslog_facility: "1337"
 			}
-			source: ".log_facility = to_syslog_facility(.syslog_facility)"
+			source: ".log_facility = parse_syslog_facility(.syslog_facility)"
 			output: {
 				error: remap.errors.ParseError
 			}

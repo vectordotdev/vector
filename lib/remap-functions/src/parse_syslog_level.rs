@@ -3,7 +3,7 @@ use remap::prelude::*;
 #[derive(Clone, Copy, Debug)]
 pub struct ToSyslogLevel;
 
-impl Function for ToSyslogLevel {
+impl Function for ParseSyslogLevel {
     fn identifier(&self) -> &'static str {
         "to_syslog_level"
     }
@@ -19,16 +19,16 @@ impl Function for ToSyslogLevel {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToSyslogLevelFn { value }))
+        Ok(Box::new(ParseSyslogLevelFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ToSyslogLevelFn {
+struct ParseSyslogLevelFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogLevelFn {
+impl Expression for ParseSyslogLevelFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_integer()?;
 
@@ -68,7 +68,7 @@ mod tests {
 
     test_type_def![
         value_integer_non_fallible {
-            expr: |_| ToSyslogLevelFn {
+            expr: |_| ParseSyslogLevelFn {
                 value: Literal::from(3).boxed(),
             },
             def: TypeDef {
@@ -79,7 +79,7 @@ mod tests {
         }
 
         value_non_integer_fallible {
-            expr: |_| ToSyslogLevelFn {
+            expr: |_| ParseSyslogLevelFn {
                 value: Literal::from("foo").boxed(),
             },
             def: TypeDef {
@@ -91,7 +91,7 @@ mod tests {
     ];
 
     test_function![
-        to_syslog_level => ToSyslogLevel;
+        parse_syslog_level => ParseSyslogLevel;
 
         emergency {
             args: func_args![value: value!(0)],

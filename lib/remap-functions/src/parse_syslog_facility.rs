@@ -1,9 +1,9 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ToSyslogFacility;
+pub struct ParseSyslogFacility;
 
-impl Function for ToSyslogFacility {
+impl Function for ParseSyslogFacility {
     fn identifier(&self) -> &'static str {
         "to_syslog_facility"
     }
@@ -19,16 +19,16 @@ impl Function for ToSyslogFacility {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToSyslogFacilityFn { value }))
+        Ok(Box::new(ParseSyslogFacilityFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ToSyslogFacilityFn {
+struct ParseSyslogFacilityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogFacilityFn {
+impl Expression for ParseSyslogFacilityFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_integer()?;
 
@@ -81,7 +81,7 @@ mod tests {
 
     test_type_def![
         value_integer_non_fallible {
-            expr: |_| ToSyslogFacilityFn {
+            expr: |_| ParseSyslogFacilityFn {
                 value: Literal::from(3).boxed(),
             },
             def: TypeDef {
@@ -92,7 +92,7 @@ mod tests {
         }
 
         value_non_integer_fallible {
-            expr: |_| ToSyslogFacilityFn {
+            expr: |_| ParseSyslogFacilityFn {
                 value: Literal::from("foo").boxed(),
             },
             def: TypeDef {
@@ -104,7 +104,7 @@ mod tests {
     ];
 
     test_function![
-        to_syslog_facility => ToSyslogFacility;
+        parse_syslog_facility => ParseSyslogFacility;
 
         kern {
             args: func_args![value: value!(0)],

@@ -1,9 +1,9 @@
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct ToSyslogSeverity;
+pub struct ParseSyslogSeverity;
 
-impl Function for ToSyslogSeverity {
+impl Function for ParseSyslogSeverity {
     fn identifier(&self) -> &'static str {
         "to_syslog_severity"
     }
@@ -19,16 +19,16 @@ impl Function for ToSyslogSeverity {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(ToSyslogSeverityFn { value }))
+        Ok(Box::new(ParseSyslogSeverityFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ToSyslogSeverityFn {
+struct ParseSyslogSeverityFn {
     value: Box<dyn Expression>,
 }
 
-impl Expression for ToSyslogSeverityFn {
+impl Expression for ParseSyslogSeverityFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let level_bytes = self.value.execute(state, object)?.try_bytes()?;
 
@@ -70,14 +70,14 @@ mod tests {
 
     test_type_def![
         value_string_infallible {
-            expr: |_| ToSyslogSeverityFn {
+            expr: |_| ParseSyslogSeverityFn {
                 value: Literal::from("warning").boxed(),
             },
             def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
         }
 
         value_not_string_fallible {
-            expr: |_| ToSyslogSeverityFn {
+            expr: |_| ParseSyslogSeverityFn {
                 value: Literal::from(27).boxed(),
             },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
@@ -85,7 +85,7 @@ mod tests {
     ];
 
     test_function![
-        to_level => ToSyslogSeverity;
+        parse_syslog_severity => ParseSyslogSeverity;
 
         emergency {
             args: func_args![value: value!("emerg")],
