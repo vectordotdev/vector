@@ -1,3 +1,4 @@
+use crate::util;
 use remap::prelude::*;
 use std::collections::BTreeMap;
 
@@ -41,6 +42,11 @@ impl Function for Compact {
                 accepts: |v| matches!(v, Value::Boolean(_)),
                 required: false,
             },
+            Parameter {
+                keyword: "nullish",
+                accepts: |v| matches!(v, Value::Boolean(_)),
+                required: false,
+            },
         ]
     }
 
@@ -51,6 +57,7 @@ impl Function for Compact {
         let string = arguments.optional("string").map(Expr::boxed);
         let map = arguments.optional("map").map(Expr::boxed);
         let array = arguments.optional("array").map(Expr::boxed);
+        let nullish = arguments.optional("nullish").map(Expr::boxed);
 
         Ok(Box::new(CompactFn {
             value,
@@ -59,6 +66,7 @@ impl Function for Compact {
             string,
             map,
             array,
+            nullish,
         }))
     }
 }
@@ -71,27 +79,7 @@ struct CompactFn {
     string: Option<Box<dyn Expression>>,
     map: Option<Box<dyn Expression>>,
     array: Option<Box<dyn Expression>>,
-}
-
-impl CompactFn {
-    #[cfg(test)]
-    fn new(
-        value: Box<dyn Expression>,
-        recursive: Option<Box<dyn Expression>>,
-        null: Option<Box<dyn Expression>>,
-        string: Option<Box<dyn Expression>>,
-        map: Option<Box<dyn Expression>>,
-        array: Option<Box<dyn Expression>>,
-    ) -> Self {
-        Self {
-            value,
-            recursive,
-            null,
-            string,
-            map,
-            array,
-        }
-    }
+    nullish: Option<Box<dyn Expression>>,
 }
 
 #[derive(Debug)]
@@ -101,6 +89,7 @@ struct CompactOptions {
     string: bool,
     map: bool,
     array: bool,
+    nullish: bool,
 }
 
 impl Default for CompactOptions {
@@ -111,6 +100,7 @@ impl Default for CompactOptions {
             string: true,
             map: true,
             array: true,
+            nullish: false,
         }
     }
 }
@@ -118,6 +108,10 @@ impl Default for CompactOptions {
 impl CompactOptions {
     /// Check if the value is empty according to the given options
     fn is_empty(&self, value: &Value) -> bool {
+        if self.nullish && util::is_nullish(&value) {
+            return true;
+        }
+
         match value {
             Value::Bytes(bytes) => self.string && bytes.len() == 0,
             Value::Null => self.null,
@@ -154,6 +148,11 @@ impl Expression for CompactFn {
             array: match &self.array {
                 Some(expr) => expr.execute(state, object)?.try_boolean()?,
                 None => true,
+            },
+
+            nullish: match &self.nullish {
+                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                None => false,
             },
         };
 
@@ -344,50 +343,29 @@ mod test {
         }
     }
 
-    #[test]
-    fn compact() {
-        let cases = vec![
-            (
-                map![
-                    "foo":
-                        map!["key1": Value::Null,
-                             "key2": 1,
-                             "key3": "",
-                        ]
-                ],
-                Ok(Value::Map(map!["key2": 1])),
-                CompactFn::new(
-                    Box::new(Path::from("foo")),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                ),
-            ),
-            (
-                map!["foo": vec![Value::Null, Value::from(1), Value::from(""),]],
-                Ok(Value::Array(vec![Value::from(1)])),
-                CompactFn::new(
-                    Box::new(Path::from("foo")),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                    Some(Literal::from(true).boxed()),
-                ),
-            ),
-        ];
+    test_function![
+        compact => Compact;
 
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object = Value::Map(object);
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
+        with_map {
+            args: func_args![value: map!["key1": Value::Null,
+                                         "key2": 1,
+                                         "key3": "",
+            ]],
+            want: Ok(Value::Map(map!["key2": 1])),
         }
-    }
+
+        with_array {
+            args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
+            want: Ok(Value::Array(vec![Value::from(1)])),
+        }
+
+        nullish {
+            args: func_args![value: map!["key1": "-",
+                                         "key2": 1,
+                                         "key3": " "],
+                             nullish: true
+            ],
+            want: Ok(Value::Map(map!["key2": 1])),
+        }
+    ];
 }

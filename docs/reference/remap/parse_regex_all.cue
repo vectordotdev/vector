@@ -26,8 +26,8 @@ remap: functions: parse_regex_all: {
 		{
 			title: "Parse via Regex (all matches)"
 			input: log: message: "first group and second group."
-			source: ". = parse_regex_all(del(.message), /(?P<number>.*?) group/)"
-			output: log: [
+			source: ".matches = parse_regex_all(del(.message), /(?P<number>.*?) group/)"
+			output: input & {log: matches: [
 				{
 					number: "first"
 					"0":    "first group"
@@ -38,7 +38,7 @@ remap: functions: parse_regex_all: {
 					"0":    "second group"
 					"1":    "second"
 				},
-			]
+			]}
 		},
 	]
 }

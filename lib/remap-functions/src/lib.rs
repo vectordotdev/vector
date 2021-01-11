@@ -1,5 +1,7 @@
 mod util;
 
+#[cfg(feature = "append")]
+mod append;
 #[cfg(feature = "assert")]
 mod assert;
 #[cfg(feature = "ceil")]
@@ -84,6 +86,8 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "push")]
+mod push;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "replace")]
@@ -131,6 +135,8 @@ mod uuid_v4;
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
+#[cfg(feature = "append")]
+pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "ceil")]
@@ -211,6 +217,8 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "push")]
+pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
 #[cfg(feature = "redact")]
@@ -254,6 +262,8 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
+        #[cfg(feature = "append")]
+        Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -336,6 +346,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "push")]
+        Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "redact")]
