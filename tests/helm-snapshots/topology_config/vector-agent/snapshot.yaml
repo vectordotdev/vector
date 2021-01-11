@@ -66,7 +66,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-    [sources.source1]
       option = "value"
       arbitrary text
     
@@ -86,7 +85,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-    [transforms.transform1]
       option = "value"
       arbitrary text
     
@@ -108,7 +106,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-    [sinks.sink1]
       option = "value"
       arbitrary text
     

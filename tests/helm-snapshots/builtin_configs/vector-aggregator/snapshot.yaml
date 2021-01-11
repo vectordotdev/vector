@@ -48,7 +48,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "vector"
-    [sources.vector]
       arbitrary text 1
     
     
@@ -57,7 +56,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "internal_metrics"
-    [sources.internal_metrics]
       arbitrary text 1
     
     # Expose metrics for scraping in the Prometheus format.
@@ -67,7 +65,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "prometheus"
-    [sinks.prometheus_sink]
       arbitrary text 1
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
