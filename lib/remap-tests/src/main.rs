@@ -23,7 +23,7 @@ fn main() {
 
         match program {
             Ok(program) => {
-                let result = runtime.execute(&mut test.object, &program);
+                let result = runtime.run(&mut test.object, &program);
 
                 match result {
                     Ok(value) => {
@@ -35,7 +35,7 @@ fn main() {
                             println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
 
                             let diff =
-                                prettydiff::diff_chars(&got, &want).set_highlight_whitespace(true);
+                                prettydiff::diff_chars(&want, &got).set_highlight_whitespace(true);
                             println!("  {}", diff);
 
                             failed_count += 1;
@@ -60,7 +60,7 @@ fn main() {
                 } else {
                     println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
 
-                    let diff = prettydiff::diff_chars(&got, &want).set_highlight_whitespace(true);
+                    let diff = prettydiff::diff_lines(&want, &got);
                     println!("{}", diff);
                 }
             }

@@ -944,6 +944,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codespan-reporting"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6ce42b8998a383572e0a802d859b1f00c79b7b7474e62fff88ee5c2845d9c13"
+dependencies = [
+ "termcolor",
+ "unicode-width",
+]
+
+[[package]]
 name = "colored"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5353,6 +5363,7 @@ dependencies = [
  "bitflags",
  "bytes 0.5.6",
  "chrono",
+ "codespan-reporting",
  "criterion",
  "dyn-clone",
  "paste",
@@ -5360,6 +5371,7 @@ dependencies = [
  "pest_derive",
  "regex",
  "serde",
+ "termcolor",
  "thiserror",
 ]
 

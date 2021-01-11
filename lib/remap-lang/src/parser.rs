@@ -40,10 +40,9 @@ pub enum Error {
     Pest(pest::error::Error<R>),
 }
 
-impl From<pest::error::Error<R>> for Error {
-    fn from(mut error: pest::error::Error<R>) -> Self {
+impl From<(&str, pest::error::Error<R>)> for Error {
+    fn from((_source, mut error): (&str, pest::error::Error<R>)) -> Self {
         use pest::error::ErrorVariant;
-
         if let ErrorVariant::ParsingError {
             ref mut positives,
             negatives: _,
@@ -186,7 +185,7 @@ impl<'a> Parser<'a> {
 
     fn pairs_from_str<'b>(&mut self, rule: R, s: &'b str) -> Result<Pairs<'b, R>> {
         use pest::Parser;
-        Self::parse(rule, s).map_err(|err| E::from(Error::from(err)))
+        Self::parse(rule, s).map_err(|err| E::from(Error::from((s, err))))
     }
 
     /// Given a `Pair`, build a boxed [`Expression`] trait object from it.
@@ -690,7 +689,6 @@ fn e(rule: R) -> E {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::RemapError;
 
     #[test]
     fn rule_root_path() {
@@ -739,7 +737,7 @@ mod tests {
             i += 1;
 
             let mut parser = Parser::new(&[], true);
-            let pairs = parser.program_from_str(source).map_err(RemapError::from);
+            let pairs = parser.program_from_str(source);
 
             match pairs {
                 Ok(got) => {
@@ -930,12 +928,7 @@ mod tests {
 
         for (source, exp_expressions) in cases {
             let mut parser = Parser::new(&[], false);
-            let err = parser
-                .program_from_str(source)
-                .err()
-                .map(RemapError::from)
-                .unwrap()
-                .to_string();
+            let err = parser.program_from_str(source).err().unwrap().to_string();
 
             for exp in exp_expressions {
                 assert!(

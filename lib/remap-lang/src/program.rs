@@ -1,56 +1,16 @@
-use crate::{parser::Parser, value, Error as E, Expr, Expression, Function, RemapError, TypeDef};
-use std::fmt;
+use crate::error::ProgramError;
+use crate::{parser::Parser, value, Expr, Expression, Function, TypeDef};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error(transparent)]
-    ResolvesTo(#[from] ResolvesToError),
+    #[error("unable to parse program")]
+    Parse,
+
+    #[error("unexpected return value")]
+    ReturnValue { want: value::Kind, got: value::Kind },
 
     #[error("expected to be infallible, but is not")]
     Fallible,
-}
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub struct ResolvesToError(TypeDef, TypeDef);
-
-impl fmt::Display for ResolvesToError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let want = &self.0;
-        let got = &self.1;
-
-        let mut want_str = "".to_owned();
-        let mut got_str = "".to_owned();
-
-        if want.is_fallible() != got.is_fallible() {
-            if want.is_fallible() {
-                want_str.push_str("an error, or ");
-            }
-
-            if got.is_fallible() {
-                got_str.push_str("an error, or ");
-            }
-        }
-
-        want_str.push_str(&format!("{} value", want.kind));
-        got_str.push_str(&format!("{} value", got.kind));
-
-        let want_kinds: Vec<_> = want.kind.into_iter().collect();
-        let got_kinds: Vec<_> = got.kind.into_iter().collect();
-
-        if !want.kind.is_all() && want_kinds.len() > 1 {
-            want_str.push('s');
-        }
-
-        if !got.kind.is_all() && got_kinds.len() > 1 {
-            got_str.push('s');
-        }
-
-        write!(
-            f,
-            "expected to resolve to {}, but instead resolves to {}",
-            want_str, got_str
-        )
-    }
 }
 
 /// The constraint applied to the result of a program.
@@ -80,19 +40,23 @@ pub struct TypeConstraint {
 /// You can create a program using [`Program::from_str`]. The provided string
 /// will be parsed. If parsing fails, an [`Error`] is returned.
 #[derive(Debug, Clone)]
-pub struct Program {
+pub struct Program<'a> {
+    pub(crate) source: &'a str,
     pub(crate) expressions: Vec<Expr>,
 }
 
-impl Program {
+impl<'a> Program<'a> {
     pub fn new(
-        source: &str,
+        source: &'a str,
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
         allow_regex_return: bool, // TODO: move this into a builder pattern
-    ) -> Result<Self, RemapError> {
+    ) -> Result<Self, ProgramError<'a>> {
         let mut parser = Parser::new(function_definitions, allow_regex_return);
-        let expressions = parser.program_from_str(source)?;
+
+        let expressions = parser
+            .program_from_str(source)
+            .map_err(|_ /* TODO */| (source, Error::Parse))?;
 
         // optional type constraint checking
         if let Some(constraint) = constraint {
@@ -110,17 +74,21 @@ impl Program {
             if !constraint.type_def.contains(&program_def)
                 && (!program_def.kind.is_all() || !constraint.allow_any)
             {
-                return Err(RemapError::from(E::from(Error::ResolvesTo(
-                    ResolvesToError(constraint.type_def, program_def),
-                ))));
+                let want = constraint.type_def.kind;
+                let got = program_def.kind;
+
+                return Err((source, Error::ReturnValue { want, got }).into());
             }
 
             if !constraint.type_def.is_fallible() && type_defs.iter().any(TypeDef::is_fallible) {
-                return Err(RemapError::from(E::from(Error::Fallible)));
+                return Err((source, Error::Fallible).into());
             }
         }
 
-        Ok(Self { expressions })
+        Ok(Self {
+            source,
+            expressions,
+        })
     }
 }
 

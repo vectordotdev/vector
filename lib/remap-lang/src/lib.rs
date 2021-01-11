@@ -7,6 +7,7 @@ mod runtime;
 mod test_util;
 mod type_def;
 
+pub mod diagnostic;
 pub mod expression;
 pub mod function;
 pub mod object;
@@ -14,7 +15,8 @@ pub mod prelude;
 pub mod state;
 pub mod value;
 
-pub use error::{Error, RemapError};
+pub use diagnostic::Diagnostic;
+pub use error::Error;
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
 pub use object::Object;
