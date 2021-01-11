@@ -32,7 +32,11 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{io::AsyncRead, net::TcpStream, time::sleep};
+use tokio::{
+    io::{AsyncRead, ReadBuf},
+    net::TcpStream,
+    time::sleep,
+};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -204,9 +208,9 @@ impl TcpSink {
         // If this returns `Poll::Pending` we know the connection is still
         // valid and the write will most likely succeed.
         let mut cx = Context::from_waker(noop_waker_ref());
-        match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
+        match Pin::new(stream).poll_read(&mut cx, &mut ReadBuf::new(&mut [0u8; 1])) {
             Poll::Ready(Err(error)) => ShutdownCheck::Error(error),
-            Poll::Ready(Ok(0)) => {
+            Poll::Ready(Ok(())) => {
                 // Maybe this is only a sign to close the channel,
                 // in which case we should try to flush our buffers
                 // before disconnecting.
