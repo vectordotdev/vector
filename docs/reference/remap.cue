@@ -608,6 +608,17 @@ remap: {
 				is_success = .status_code == 200
 				has_buzzword = contains(.message, "serverless")
 				```
+
+				### Reserved terms
+
+				The following terms are reserved in VRL and thus can't be used as variable names:
+				`if`, `else`, `for`, `while`, `loop`, `abort`, `break`, `continue`, `return`, `as`,
+				`type`, `let`, `until`, `then`, `impl`, `in`, `self`, `this`, `use`, `std`, `null`,
+				`boolean`.
+
+				Note that of these terms are not currently used in the language, but may be in the
+				future. The goal of pre-reserving these terms is to provide as much backward
+				compatibility as possible as VRL changes over time.
 				"""
 
 			examples: [
