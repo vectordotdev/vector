@@ -27,6 +27,6 @@ remap: functions: parse_syslog_facility: {
 			input: log: facility: 27
 			source: ".level = parse_syslog_facility(.facility)"
 			raise:  "Failed to parse"
-		}
+		},
 	]
 }
