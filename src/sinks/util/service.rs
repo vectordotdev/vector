@@ -129,6 +129,9 @@ impl<'de> Deserialize<'de> for Concurrency {
 pub trait ConcurrencyOption {
     fn parse_concurrency(&self, default: &Self) -> Option<usize>;
     fn is_none(&self) -> bool;
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
 }
 
 impl ConcurrencyOption for Option<usize> {
@@ -163,11 +166,13 @@ impl ConcurrencyOption for Concurrency {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(default)]
-    #[serde(
-        alias = "in_flight_limit",
-        skip_serializing_if = "ConcurrencyOption::is_none"
-    )]
+    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
     pub concurrency: T, // 5
+    /// The same as concurrency but with old deprecated name.
+    /// Alias couldn't be used because of https://github.com/serde-rs/serde/issues/1504
+    #[serde(default)]
+    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -181,7 +186,9 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            concurrency: self.concurrency.parse_concurrency(&defaults.concurrency),
+            concurrency: self
+                .concurrency()
+                .parse_concurrency(&defaults.concurrency()),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -204,6 +211,17 @@ impl<T: ConcurrencyOption> TowerRequestConfig<T> {
                     .unwrap_or(1),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
+        }
+    }
+
+    pub fn concurrency(&self) -> &T {
+        match (self.concurrency.is_some(), self.in_flight_limit.is_some()) {
+            (_, false) => &self.concurrency,
+            (false, true) => &self.in_flight_limit,
+            (true, true) => {
+                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option.");
+                &self.concurrency
+            }
         }
     }
 }
@@ -443,6 +461,6 @@ mod tests {
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
+        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
     }
 }

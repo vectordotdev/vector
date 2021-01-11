@@ -56,12 +56,12 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
         .iter()
         .map(|(name, config)| (name, config.resources(name)));
 
-    let conflicting_componenets = Resource::conflicts(source_resources.chain(sink_resources));
+    let conflicting_components = Resource::conflicts(source_resources.chain(sink_resources));
 
-    if conflicting_componenets.is_empty() {
+    if conflicting_components.is_empty() {
         Ok(())
     } else {
-        Err(conflicting_componenets
+        Err(conflicting_components
             .into_iter()
             .map(|(resource, components)| {
                 format!(

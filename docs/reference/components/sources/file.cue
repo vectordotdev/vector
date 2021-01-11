@@ -121,6 +121,12 @@ components: sources: file: {
 			required:    false
 			type: string: default: "host"
 		}
+		ignore_not_found: {
+			common:      false
+			description: "Ignore missing files when fingerprinting. This may be useful when used with source directories containing dangling symlinks."
+			required:    false
+			type: bool: default: false
+		}
 		ignore_older: {
 			common:      true
 			description: "Ignore files with a data modification date that does not exceed this age."
