@@ -74,6 +74,8 @@ mod parse_regex_all;
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
 mod parse_timestamp;
+#[cfg(feature = "parse_tokens")]
+mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
 #[cfg(feature = "redact")]
@@ -116,8 +118,6 @@ mod to_syslog_severity;
 mod to_timestamp;
 #[cfg(feature = "to_unix_timestamp")]
 mod to_unix_timestamp;
-#[cfg(feature = "tokenize")]
-mod tokenize;
 #[cfg(feature = "truncate")]
 mod truncate;
 #[cfg(feature = "upcase")]
@@ -201,6 +201,8 @@ pub use parse_regex_all::ParseRegexAll;
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
 pub use parse_timestamp::ParseTimestamp;
+#[cfg(feature = "parse_tokens")]
+pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
 #[cfg(feature = "match")]
@@ -243,8 +245,6 @@ pub use to_syslog_severity::ToSyslogSeverity;
 pub use to_timestamp::ToTimestamp;
 #[cfg(feature = "to_unix_timestamp")]
 pub use to_unix_timestamp::ToUnixTimestamp;
-#[cfg(feature = "tokenize")]
-pub use tokenize::Tokenize;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
 #[cfg(feature = "upcase")]
@@ -326,6 +326,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
         Box::new(ParseTimestamp),
+        #[cfg(feature = "parse_tokens")]
+        Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
         #[cfg(feature = "match")]
@@ -370,8 +372,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToTimestamp),
         #[cfg(feature = "to_unix_timestamp")]
         Box::new(ToUnixTimestamp),
-        #[cfg(feature = "tokenize")]
-        Box::new(Tokenize),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
         #[cfg(feature = "upcase")]
