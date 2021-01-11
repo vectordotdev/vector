@@ -248,7 +248,7 @@ remap: {
 
 				* VRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
 					sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
-				* Strings can be escaped using a forward slash (`\`), as in `\"The song is called
+				* Strings can be escaped using a forward slash (`\\`), as in `\"The song is called
 					\"My name is Jonas\"\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
@@ -582,7 +582,7 @@ remap: {
 			examples: [
 				". ??= parse_json(.message)",
 				".timestamp ??= to_unix_timestamp(.timestamp)",
-				""
+				"",
 			]
 		}
 
@@ -625,11 +625,11 @@ remap: {
 				"status_code = .code",
 				#"is_critical = .log_level == "critical""#,
 				#"creepy_greeting = "Hello, Clarice""#,
-				"""
+				#"""
 					is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
 					.has_proper_format = is_url
 					del(.url)
-					""",
+					"""#,
 			]
 		}
 
