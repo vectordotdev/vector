@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
-    TransformDescription,
+    component::ExampleError, default_data_dir, GlobalOptions, SinkDescription,
+    SinkHealthcheckOptions, SourceDescription, TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -58,10 +58,10 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
+    pub healthcheck: SinkHealthcheckOptions,
     pub buffer: crate::buffers::BufferConfig,
 }
 
@@ -94,10 +94,9 @@ fn generate_example(
         })
         .collect();
 
-    let globals = {
-        let mut globals = GlobalOptions::default();
-        globals.data_dir = crate::config::default_data_dir();
-        globals
+    let globals = GlobalOptions {
+        data_dir: default_data_dir(),
+        ..Default::default()
     };
     let mut config = Config::default();
 
@@ -264,7 +263,7 @@ fn generate_example(
                         })
                         .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
-                    healthcheck: true,
+                    healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
             );
@@ -292,9 +291,10 @@ fn generate_example(
     };
     if let Some(sources) = config.sources {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sources = Some(sources);
-            sub
+            Config {
+                sources: Some(sources),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sources: {}", e)),
@@ -302,9 +302,10 @@ fn generate_example(
     }
     if let Some(transforms) = config.transforms {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.transforms = Some(transforms);
-            sub
+            Config {
+                transforms: Some(transforms),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal transforms: {}", e)),
@@ -312,9 +313,10 @@ fn generate_example(
     }
     if let Some(sinks) = config.sinks {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sinks = Some(sinks);
-            sub
+            Config {
+                sinks: Some(sinks),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sinks: {}", e)),
@@ -442,13 +444,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -473,13 +477,15 @@ drop_invalid = false
 type = "json_parser"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["transform0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -498,13 +504,15 @@ max_length = 102400
 type = "stdin"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["source0"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -519,13 +527,15 @@ when_full = "block"
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sinks.sink0]
-healthcheck = true
 inputs = ["component-name"]
 target = "stdout"
 type = "console"
 
 [sinks.sink0.encoding]
 codec = "json"
+
+[sinks.sink0.healthcheck]
+enabled = true
 
 [sinks.sink0.buffer]
 type = "memory"

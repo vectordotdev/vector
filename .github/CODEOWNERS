@@ -75,6 +75,9 @@
 /docs/reference/remap/log.cue @FungusHumungus
 /docs/reference/remap/merge.cue @FungusHumungus
 /docs/reference/remap/parse_grok.cue @FungusHumungus
+/docs/reference/remap/parse_aws_alb_log.cue @fanatid
+/docs/reference/remap/parse_aws_cloudwatch_log_subscription_message.cue @fanatid
+/docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
 
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @vector-kubernetes
@@ -87,6 +90,25 @@
 /lib/k8s-e2e-tests/ @vector-kubernetes
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
+
+/lib/remap-cli/ @JeanMertz
+
+/lib/remap-lang/ @JeanMertz @FungusHumungus
+/lib/remap-functions/ @JeanMertz
+/lib/remap-functions/src/assert.rs @FungusHumungus
+/lib/remap-functions/src/compact.rs @FungusHumungus
+/lib/remap-functions/src/exists.rs @FungusHumungus
+/lib/remap-functions/src/flatten.rs @FungusHumungus
+/lib/remap-functions/src/ip_cidr_contains.rs @FungusHumungus
+/lib/remap-functions/src/ip_subnet.rs @FungusHumungus
+/lib/remap-functions/src/ip_to_ipv6.rs @FungusHumungus
+/lib/remap-functions/src/ipv6_to_ipv4.rs @FungusHumungus
+/lib/remap-functions/src/log.rs @FungusHumungus
+/lib/remap-functions/src/merge.rs @FungusHumungus
+/lib/remap/functions/src/parse_aws_alb_log.rs @fanatid
+/lib/remap/functions/src/parse_aws_cloudwatch_log_subscription_message.rs @fanatid
+/lib/remap/functions/src/parse_aws_vpc_flow_log.rs @fanatid
+/lib/remap-functions/src/parse_grok.rs @FungusHumungus
 
 /proto/ @lukesteensen
 
@@ -189,19 +211,6 @@
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
-
-/src/remap/ @JeanMertz
-/src/remap/function/assert.rs @FungusHumungus
-/src/remap/function/compact.rs @FungusHumungus
-/src/remap/function/exists.rs @FungusHumungus
-/src/remap/function/flatten.rs @FungusHumungus
-/src/remap/function/ip_cidr_contains.rs @FungusHumungus
-/src/remap/function/ip_subnet.rs @FungusHumungus
-/src/remap/function/ip_to_ipv6.rs @FungusHumungus
-/src/remap/function/ipv6_to_ipv4.rs @FungusHumungus
-/src/remap/function/log.rs @FungusHumungus
-/src/remap/function/merge.rs @FungusHumungus
-/src/remap/function/parse_grok.rs @FungusHumungus
 
 /src/wasm/ @hoverbear @JeanMertz
 

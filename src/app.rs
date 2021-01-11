@@ -8,12 +8,11 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    StreamExt,
-};
-use futures01::sync::mpsc;
+use futures::{compat::Future01CompatExt, StreamExt};
+use tokio::sync::mpsc;
 
+#[cfg(feature = "sources-host_metrics")]
+use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
 #[cfg(feature = "api")]
@@ -119,12 +118,17 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
+                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
                 };
 
                 info!(message = "Log level is enabled.", level = ?level);
+
+                #[cfg(feature = "sources-host_metrics")]
+                host_metrics::init_roots();
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
@@ -142,12 +146,17 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let config =
+                let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
+
+                if !config.healthchecks.enabled {
+                    info!("Health checks are disabled.");
+                }
+                config.healthchecks.set_require_healthy(require_healthy);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -157,7 +166,7 @@ impl Application {
                 #[cfg(feature = "api")]
                 let api = config.api;
 
-                let result = topology::start_validated(config, diff, pieces, require_healthy).await;
+                let result = topology::start_validated(config, diff, pieces).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
@@ -180,7 +189,7 @@ impl Application {
     pub fn run(self) {
         let mut rt = self.runtime;
 
-        let graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -211,7 +220,6 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
-            let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
                 tokio::select! {
@@ -222,9 +230,10 @@ impl Application {
                         // Reload config
                         let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
-                        if let Some(new_config) = new_config {
+                        if let Some(mut new_config) = new_config {
+                            new_config.healthchecks.set_require_healthy(opts.require_healthy);
                             match topology
-                                .reload_config_and_respawn(new_config, opts.require_healthy)
+                                .reload_config_and_respawn(new_config)
                                 .await
                             {
                                 Ok(true) => {

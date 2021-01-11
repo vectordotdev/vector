@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct SplitEventProcessed;
-
-impl InternalEvent for SplitEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
     pub field: &'a str,
 }
@@ -20,7 +11,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
         warn!(
             message = "Field does not exist.",
             field = %self.field,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -41,7 +32,7 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
             message = "Could not convert types.",
             field = %self.field,
             error = ?self.error,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 

@@ -1,10 +1,11 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
+    internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -105,7 +106,7 @@ impl FunctionTransform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(Value::from(value.to_owned())) {
+                match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }
@@ -120,8 +121,6 @@ impl FunctionTransform for Split {
         } else {
             emit!(SplitFieldMissing { field: &self.field });
         };
-
-        emit!(SplitEventProcessed);
 
         output.push(event);
     }

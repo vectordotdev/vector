@@ -9,6 +9,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
+#![deny(clippy::trivially_copy_pass_by_ref)]
 
 #[macro_use]
 extern crate tracing;
@@ -16,6 +17,8 @@ extern crate tracing;
 extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
+#[cfg(feature = "vrl-cli")]
+extern crate remap_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
@@ -51,7 +54,6 @@ pub mod metrics;
 pub(crate) mod pipeline;
 #[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
 pub(crate) mod prometheus;
-pub mod remap;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;

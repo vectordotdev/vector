@@ -7,13 +7,13 @@ use crate::{
     buffers,
     config::{DataType, SinkContext},
     event::Event,
+    internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
 };
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
-    future, FutureExt, StreamExt, TryFutureExt,
+    compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{Future as Future01, Stream as Stream01};
 use std::{
@@ -78,10 +78,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
-            .map(Ok)
-            .forward(output.sink_compat())
-            .map_ok(|_| TaskOutput::Source);
+        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -121,14 +118,18 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = futures01::sync::mpsc::channel(100);
+        let (input_tx, input_rx) = mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
 
+        let filtered = input_rx
+            .map(Ok)
+            .compat()
+            .filter(move |event| filter_event_type(event, input_type))
+            .inspect(|_| emit!(EventProcessed));
         let transform = match transform {
             Transform::Function(mut t) => {
-                let filtered = filter_event_type(input_rx, input_type);
                 #[allow(deprecated)]
                 // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
                 let transformed = filtered
@@ -139,13 +140,12 @@ pub async fn build_pieces(
                     })
                     .flatten()
                     .boxed();
-                transformed.forward(output)
+                transformed.forward(output.compat())
             }
             Transform::Task(t) => {
-                let filtered = filter_event_type(input_rx, input_type);
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
-                    t.transform(filtered);
-                transformed.forward(output)
+                    t.transform(Box::new(filtered));
+                transformed.forward(output.compat())
             }
         }
         .map(|_| {
@@ -167,7 +167,8 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sinks.contains_new(&name))
     {
         let sink_inputs = &sink.inputs;
-        let enable_healthcheck = sink.healthcheck;
+        let healthcheck = sink.healthcheck();
+        let enable_healthcheck = healthcheck.enabled && config.healthchecks.enabled;
 
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
@@ -181,12 +182,13 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", name, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
             }
         };
 
         let cx = SinkContext {
             acker: acker.clone(),
+            healthcheck,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
@@ -213,16 +215,9 @@ pub async fn build_pieces(
                 .expect("Task started but input has been taken.");
 
             sink.run(
-                (&mut rx)
-                    .filter(|event| match input_type {
-                        DataType::Any => true,
-                        DataType::Log => matches!(event, Event::Log(_)),
-                        DataType::Metric => matches!(event, Event::Metric(_)),
-                    })
-                    .compat()
-                    .take_while(|e| ready(e.is_ok()))
-                    .take_until_if(tripwire)
-                    .map(|x| x.unwrap()),
+                rx.by_ref()
+                    .filter(|event| ready(filter_event_type(event, input_type)))
+                    .take_until_if(tripwire),
             )
             .await
             .map(|_| {
@@ -281,16 +276,10 @@ pub async fn build_pieces(
     }
 }
 
-fn filter_event_type<S>(
-    stream: S,
-    data_type: DataType,
-) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
-where
-    S: Stream01<Item = Event, Error = ()> + Send + 'static,
-{
+fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     match data_type {
-        DataType::Any => Box::new(stream), // it's possible to not call any comparing function if any type is supported
-        DataType::Log => Box::new(stream.filter(|event| matches!(event, Event::Log(_)))),
-        DataType::Metric => Box::new(stream.filter(|event| matches!(event, Event::Metric(_)))),
+        DataType::Any => true,
+        DataType::Log => matches!(event, Event::Log(_)),
+        DataType::Metric => matches!(event, Event::Metric(_)),
     }
 }

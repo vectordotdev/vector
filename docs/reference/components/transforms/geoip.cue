@@ -3,6 +3,11 @@ package metadata
 components: transforms: geoip: {
 	title: "GeoIP"
 
+	description: """
+		Enrich events with geolocation data from the MaxMind GeoIP2-City,
+		GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -43,7 +48,7 @@ components: transforms: geoip: {
 				"""
 			required:    true
 			type: string: {
-				examples: ["/path/to/GeoLite2-City.mmdb"]
+				examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
 			}
 		}
 		source: {
@@ -230,7 +235,9 @@ components: transforms: geoip: {
 							groups: ["ISP"]
 						}
 						postal_code: {
-							description: "The postal code associated with the IP address. \(_city_db_blurb)."
+							description: """
+								The postal code associated with the IP address. \(_city_db_blurb).
+								"""
 							required:    true
 							type: string: {
 								examples: ["07094", "10010", "OX1"]

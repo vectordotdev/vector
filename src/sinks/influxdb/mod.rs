@@ -176,12 +176,12 @@ pub(in crate::sinks) fn influx_line_protocol(
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut String,
-) {
+) -> Result<(), &'static str> {
     // Fields
     let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
-        return;
+        return Err("fields must not be empty");
     }
 
     encode_string(measurement, line_protocol);
@@ -200,6 +200,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     // Timestamp
     line_protocol.push_str(&timestamp.to_string());
     line_protocol.push('\n');
+    Ok(())
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
@@ -308,19 +309,16 @@ pub(in crate::sinks) fn encode_uri(
 #[allow(dead_code)]
 pub mod test_util {
     use super::*;
-    use chrono::offset::TimeZone;
+    use chrono::{offset::TimeZone, Utc};
     use std::fs::File;
     use std::io::Read;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
 
-    static DATABASE_NUM: AtomicUsize = AtomicUsize::new(0);
-
     pub(crate) fn next_database() -> String {
-        format!("testdb{}", DATABASE_NUM.fetch_add(1, Ordering::Relaxed))
+        format!("testdb{}", Utc::now().timestamp_nanos())
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
@@ -368,7 +366,7 @@ pub mod test_util {
         (measurement, split[0], split[1].to_string(), split[2])
     }
 
-    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+    fn client() -> reqwest::Client {
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
             .unwrap()
@@ -376,12 +374,14 @@ pub mod test_util {
             .unwrap();
         let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-        let client = reqwest::Client::builder()
+        reqwest::Client::builder()
             .add_root_certificate(test_ca)
             .build()
-            .unwrap();
+            .unwrap()
+    }
 
-        client
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        client()
             .get(&format!("{}/query", endpoint))
             .query(&[("q", query)])
             .send()
@@ -391,14 +391,34 @@ pub mod test_util {
 
     pub(crate) async fn onboarding_v1(endpoint: &str) -> String {
         let database = next_database();
-        query_v1(endpoint, &format!("drop database {}", database)).await;
         let status = query_v1(endpoint, &format!("create database {}", database))
             .await
             .status();
-        assert!(
-            status == http::StatusCode::OK,
-            format!("UnexpectedStatus: {}", status)
-        );
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        // Some times InfluxDB will return OK before it can actually
+        // accept writes to the database, leading to test failures. Test
+        // this with empty writes and loop if it reports the database
+        // does not exist yet.
+        crate::test_util::wait_for(|| {
+            let write_url = format!("{}/write?db={}", endpoint, &database);
+            async move {
+                match client()
+                    .post(&write_url)
+                    .header("Content-Type", "text/plain")
+                    .header("Authorization", &format!("Token {}", TOKEN))
+                    .body("")
+                    .send()
+                    .await
+                    .unwrap()
+                    .status()
+                {
+                    http::StatusCode::NO_CONTENT => true,
+                    http::StatusCode::NOT_FOUND => false,
+                    status => panic!("Unexpected status: {}", status),
+                }
+            }
+        })
+        .await;
         database
     }
 
@@ -406,10 +426,7 @@ pub mod test_util {
         let status = query_v1(endpoint, &format!("drop database {}", database))
             .await
             .status();
-        assert!(
-            status == http::StatusCode::OK,
-            format!("UnexpectedStatus: {}", status)
-        );
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
     }
 
     pub(crate) async fn onboarding_v2() {

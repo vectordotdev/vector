@@ -89,8 +89,9 @@ impl Program {
         source: &str,
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
+        allow_regex_return: bool, // TODO: move this into a builder pattern
     ) -> Result<Self, RemapError> {
-        let mut parser = Parser::new(function_definitions);
+        let mut parser = Parser::new(function_definitions, allow_regex_return);
         let expressions = parser.program_from_str(source)?;
 
         // optional type constraint checking
@@ -103,6 +104,7 @@ impl Program {
             let program_def = type_defs.pop().unwrap_or(TypeDef {
                 fallible: true,
                 kind: value::Kind::Null,
+                ..Default::default()
             });
 
             if !constraint.type_def.contains(&program_def)
@@ -145,6 +147,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: true,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: true,
                 }),
@@ -157,6 +160,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: true,
                 }),
@@ -169,6 +173,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: true,
                         kind: Kind::Boolean,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),
@@ -204,6 +209,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Bytes,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),
@@ -215,6 +221,7 @@ mod tests {
                     type_def: TypeDef {
                         fallible: false,
                         kind: Kind::Bytes | Kind::Float,
+                        ..Default::default()
                     },
                     allow_any: false,
                 }),
@@ -223,7 +230,7 @@ mod tests {
         ];
 
         for (source, constraint, expect) in cases {
-            let program = Program::new(source, &[], constraint)
+            let program = Program::new(source, &[], constraint, false)
                 .map(|_| ())
                 .map_err(|e| {
                     e.source()

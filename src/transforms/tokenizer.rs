@@ -1,12 +1,13 @@
-use super::util::tokenize::parse;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use shared::tokenize::parse;
 use std::collections::HashMap;
 use std::str;
 
@@ -99,7 +100,7 @@ impl FunctionTransform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(Value::from(value.to_owned())) {
+                match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
@@ -114,8 +115,6 @@ impl FunctionTransform for Tokenizer {
         } else {
             emit!(TokenizerFieldMissing { field: &self.field });
         };
-
-        emit!(TokenizerEventProcessed);
 
         output.push(event)
     }

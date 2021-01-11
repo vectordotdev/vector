@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers,
-    config::{Config, ConfigDiff, Resource},
+    config::{Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{
@@ -21,15 +21,19 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
-use futures01::{sync::mpsc, Future, Stream as Stream01};
+use futures::{compat::Future01CompatExt, future, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures01::Future;
 use std::{
     collections::{HashMap, HashSet},
     future::ready,
     panic::AssertUnwindSafe,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
-use tokio::time::{delay_until, interval, Duration, Instant};
+use tokio::{
+    sync::mpsc,
+    time::{delay_until, interval, Duration, Instant},
+};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
@@ -37,7 +41,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
     buffers::BufferInputCloner,
-    Arc<Mutex<Option<Box<dyn Stream01<Item = Event, Error = ()> + Send>>>>,
+    Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
     buffers::Acker,
 );
 
@@ -57,9 +61,8 @@ pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
-    require_healthy: bool,
 ) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    let (abort_tx, abort_rx) = mpsc::unbounded();
+    let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
@@ -73,7 +76,7 @@ pub async fn start_validated(
     };
 
     if !running_topology
-        .run_healthchecks(&diff, &mut pieces, require_healthy)
+        .run_healthchecks(&diff, &mut pieces, running_topology.config.healthchecks)
         .await
     {
         return None;
@@ -221,11 +224,7 @@ impl RunningTopology {
 
     /// On Error, topology is in invalid state.
     /// May change componenets even if reload fails.
-    pub async fn reload_config_and_respawn(
-        &mut self,
-        new_config: Config,
-        require_healthy: bool,
-    ) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
             return Ok(false);
@@ -248,7 +247,7 @@ impl RunningTopology {
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
         {
             if self
-                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
@@ -264,7 +263,7 @@ impl RunningTopology {
         let diff = diff.flip();
         if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
             if self
-                .run_healthchecks(&diff, &mut new_pieces, require_healthy)
+                .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
@@ -284,26 +283,30 @@ impl RunningTopology {
         &mut self,
         diff: &ConfigDiff,
         pieces: &mut Pieces,
-        require_healthy: bool,
+        options: HealthcheckOptions,
     ) -> bool {
-        let healthchecks = take_healthchecks(diff, pieces)
-            .into_iter()
-            .map(|(_, task)| task);
-        let healthchecks = future::try_join_all(healthchecks);
+        if options.enabled {
+            let healthchecks = take_healthchecks(diff, pieces)
+                .into_iter()
+                .map(|(_, task)| task);
+            let healthchecks = future::try_join_all(healthchecks);
 
-        info!("Running healthchecks.");
-        if require_healthy {
-            let success = healthchecks.await;
+            info!("Running healthchecks.");
+            if options.require_healthy {
+                let success = healthchecks.await;
 
-            if success.is_ok() {
-                info!("All healthchecks passed.");
-                true
+                if success.is_ok() {
+                    info!("All healthchecks passed.");
+                    true
+                } else {
+                    error!("Sinks unhealthy.");
+                    false
+                }
             } else {
-                error!("Sinks unhealthy.");
-                false
+                tokio::spawn(healthchecks);
+                true
             }
         } else {
-            tokio::spawn(healthchecks);
             true
         }
     }
@@ -624,7 +627,7 @@ impl RunningTopology {
             for input in inputs {
                 if let Some(output) = self.outputs.get(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                    let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
                 }
             }
         }
@@ -638,7 +641,7 @@ impl RunningTopology {
                 // Sink may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(sink_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
+                        .send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
                         .expect("Components shouldn't be spawned before connecting them together.");
                 }
             }
@@ -648,7 +651,7 @@ impl RunningTopology {
                 // Transform may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(transform_name) {
                     output
-                        .unbounded_send(fanout::ControlMessage::Add(
+                        .send(fanout::ControlMessage::Add(
                             transform_name.clone(),
                             input.get(),
                         ))
@@ -665,8 +668,8 @@ impl RunningTopology {
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[&input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[&input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -696,19 +699,19 @@ impl RunningTopology {
         for input in inputs_to_remove {
             if let Some(output) = self.outputs.get(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.unbounded_send(fanout::ControlMessage::Remove(name.to_string()));
+                let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
             }
         }
 
         for input in inputs_to_add {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
         }
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+            let _ = self.outputs[input].send(fanout::ControlMessage::Replace(
                 name.to_string(),
                 Some(tx.get()),
             ));
@@ -731,8 +734,8 @@ impl RunningTopology {
 
         for input in old_inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+            let _ =
+                self.outputs[input].send(fanout::ControlMessage::Replace(name.to_string(), None));
         }
     }
 
@@ -752,7 +755,7 @@ fn handle_errors<T>(
         .flatten()
         .or_else(move |()| {
             error!("An error occurred that vector couldn't handle.");
-            let _ = abort_tx.unbounded_send(());
+            let _ = abort_tx.send(());
             Err(())
         })
 }
@@ -799,7 +802,7 @@ mod tests {
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap();
 
@@ -829,7 +832,7 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology, temp_dir, wait_for_tcp};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::StreamExt;
     use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
     use tokio::time::delay_for;
@@ -862,7 +865,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -899,7 +902,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -922,7 +925,7 @@ mod reload_tests {
         let (mut topology, _crash) =
             start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(old_config.build().unwrap(), false)
+            .reload_config_and_respawn(old_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -931,8 +934,7 @@ mod reload_tests {
     async fn topology_reuse_old_port_sink() {
         let address = next_addr();
 
-        let source =
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001));
+        let source = GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
         let transform = LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
                 field: "message".to_string(),
@@ -995,7 +997,7 @@ mod reload_tests {
         let mut old_config = Config::builder();
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform("trans", &[&"in"], transform.clone());
         old_config.add_sink(
@@ -1041,7 +1043,7 @@ mod reload_tests {
         old_config.global.data_dir = Some(data_dir);
         old_config.add_source(
             "in",
-            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
         );
         old_config.add_transform(
             "trans",
@@ -1094,8 +1096,7 @@ mod reload_tests {
         old_address: SocketAddr,
         new_address: SocketAddr,
     ) {
-        let (mut topology, crash) = start_topology(old_config, false).await;
-        let mut crash = crash.compat();
+        let (mut topology, mut crash) = start_topology(old_config, false).await;
 
         // Wait for sink to come online
         wait_for_tcp(old_address).await;
@@ -1104,7 +1105,7 @@ mod reload_tests {
         delay_for(Duration::from_secs(1)).await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config)
             .await
             .unwrap());
 
@@ -1258,7 +1259,7 @@ mod transient_state_tests {
         topology.sources_finished().await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1294,7 +1295,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }
@@ -1338,7 +1339,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config.build().unwrap())
             .await
             .unwrap());
     }

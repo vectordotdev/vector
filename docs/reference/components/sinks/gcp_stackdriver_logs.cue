@@ -35,6 +35,7 @@ components: sinks: gcp_stackdriver_logs: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -134,9 +135,8 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 		}
 		resource: {
-			common:      false
 			description: "Options for describing the logging resource."
-			required:    false
+			required:    true
 			warnings: []
 			type: object: {
 				examples: [
@@ -214,4 +214,18 @@ components: sinks: gcp_stackdriver_logs: {
 				"""#
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "logging"
+
+			policies: [
+				{
+					_action: "logEntries.create"
+					required_for: ["healthcheck", "write"]
+				},
+			]
+		},
+	]
 }

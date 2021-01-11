@@ -2,8 +2,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
-        RegexParserMissingField, RegexParserTargetExists,
+        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
+        RegexParserTargetExists,
     },
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
@@ -115,8 +115,7 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value =
-                                    Value::from(Bytes::from(value[start..end].to_owned()));
+                                let capture = Bytes::from(value[start..end].to_owned());
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
@@ -240,7 +239,6 @@ impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(&value).into_iter().next();

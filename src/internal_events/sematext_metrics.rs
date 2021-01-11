@@ -14,7 +14,7 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
             message = "Invalid metric received; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 
@@ -23,5 +23,24 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
             "processing_errors_total", 1,
             "error_type" => "invalid_metric",
         );
+    }
+}
+
+#[derive(Debug)]
+pub struct SematextMetricsEncodeEventFailed {
+    pub error: &'static str,
+}
+
+impl InternalEvent for SematextMetricsEncodeEventFailed {
+    fn emit_logs(&self) {
+        warn!(
+             message = "Failed to encode event; dropping event.",
+             error = %self.error,
+             internal_log_rate_secs = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("encode_errors_total", 1);
     }
 }

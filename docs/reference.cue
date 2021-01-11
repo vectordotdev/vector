@@ -441,7 +441,9 @@ _values: {
 	//      }
 	enum?: #Enum
 
-	if enum == _|_ {
+	examples?: [...string]
+
+	if Args.required {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[

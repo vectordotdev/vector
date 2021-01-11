@@ -10,7 +10,7 @@ remap: functions: downcase: {
 		},
 	]
 	return: ["string"]
-	category: "text"
+	category: "String"
 	description: #"""
 		Returns a copy of `string` that has been converted into lowercase.
 		"""#

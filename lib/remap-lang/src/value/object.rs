@@ -14,16 +14,18 @@ impl Object for Value {
         self.paths().map_err(|err| err.to_string())
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+        let value = self.get(path)?;
         self.remove_by_path(path, compact);
-        Ok(())
+
+        Ok(value)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{map, value, Field::*, Segment::*};
+    use crate::{value, Field::*, Segment::*};
     use std::str::FromStr;
 
     #[test]
@@ -83,21 +85,49 @@ mod tests {
     fn object_insert() {
         let cases = vec![
             (
-                map!["foo": "bar"],
+                value!({foo: "bar"}),
                 vec![],
-                map!["baz": "qux"].into(),
-                map!["baz": "qux"],
+                value!({baz: "qux"}),
+                value!({baz: "qux"}),
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                value!({foo: "bar"}),
+                vec![Field(Regular("baz".to_owned()))],
+                true.into(),
+                value!({foo: "bar", baz: true}),
+                Ok(()),
+            ),
+            (
+                value!({foo: [{bar: "baz"}]}),
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Index(0),
+                    Field(Regular("baz".to_owned())),
+                ],
+                true.into(),
+                value!({foo: [{bar: "baz", baz: true}]}),
+                Ok(()),
+            ),
+            (
+                value!({foo: {bar: "baz"}}),
+                vec![
+                    Field(Regular("bar".to_owned())),
+                    Field(Regular("baz".to_owned())),
+                ],
+                true.into(),
+                value!({foo: {bar: "baz"}, bar: {baz: true}}),
+                Ok(()),
+            ),
+            (
+                value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
-                map!["foo": "baz"],
+                value!({foo: "baz"}),
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                value!({foo: "bar"}),
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(2),
@@ -106,74 +136,54 @@ mod tests {
                     Field(Regular("b".to_owned())),
                 ],
                 true.into(),
-                map![
-                    "foo":
-                        vec![
-                            Value::Null,
-                            Value::Null,
-                            map!["bar baz": map!["a": map!["b": true]],].into()
-                        ]
-                ],
+                value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
             ),
             (
-                map!["foo": vec![0, 1, 2]],
+                value!({foo: [0, 1, 2]}),
                 vec![Field(Regular("foo".to_owned())), Index(5)],
                 "baz".into(),
-                map![
-                    "foo":
-                        vec![
-                            0.into(),
-                            1.into(),
-                            2.into(),
-                            Value::Null,
-                            Value::Null,
-                            Value::from("baz"),
-                        ]
-                ],
+                value!({foo: [0, 1, 2, null, null, "baz"]}),
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![])],
+                value!({foo: []}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into()])],
+                value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                value!({foo: [0, 1]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
+                value!({foo: ["baz", 1]}),
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                value!({foo: [0, 1]}),
                 vec![Field(Regular("foo".to_owned())), Index(1)],
                 "baz".into(),
-                map!["foo": Value::Array(vec![0.into(), "baz".into()])],
+                value!({foo: [0, "baz"]}),
                 Ok(()),
             ),
         ];
 
-        for (object, segments, value, expect, result) in cases {
-            let mut object: Value = object.into();
-            let expect: Value = expect.into();
-            let value: Value = value;
+        for (mut object, segments, value, expect, result) in cases {
             let path = Path::new_unchecked(segments);
 
             assert_eq!(Object::insert(&mut object, &path, value.clone()), result);
@@ -186,112 +196,115 @@ mod tests {
     fn object_remove() {
         let cases = vec![
             (
-                map!["foo": "bar"].into(),
-                vec![Field(Regular("foo".to_owned()))],
+                value!({foo: "bar"}),
+                vec![Field(Regular("baz".to_owned()))],
                 false,
-                Some(map![].into()),
+                None,
+                Some(value!({foo: "bar"})),
             ),
             (
-                map!["foo": "bar"].into(),
+                value!({foo: "bar"}),
+                vec![Field(Regular("foo".to_owned()))],
+                false,
+                Some(value!("bar")),
+                Some(value!({})),
+            ),
+            (
+                value!({foo: "bar"}),
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
                 ])],
                 false,
-                Some(map![].into()),
+                Some(value!("bar")),
+                Some(value!({})),
             ),
             (
-                map!["foo": "bar", "baz": "qux"].into(),
+                value!({foo: "bar", baz: "qux"}),
                 vec![],
                 false,
-                Some(map![].into()),
+                Some(value!({foo: "bar", baz: "qux"})),
+                Some(value!({})),
             ),
             (
-                map!["foo": "bar", "baz": "qux"].into(),
+                value!({foo: "bar", baz: "qux"}),
                 vec![],
                 true,
-                Some(map![].into()),
+                Some(value!({foo: "bar", baz: "qux"})),
+                Some(value!({})),
             ),
             (
-                map!["foo": vec![0]].into(),
+                value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
-                Some(map!["foo": Value::Array(vec![])].into()),
+                Some(value!(0)),
+                Some(value!({foo: []})),
             ),
             (
-                map!["foo": vec![0]].into(),
+                value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
-                Some(map![].into()),
+                Some(value!(0)),
+                Some(value!({})),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"].into(),
+                value!({foo: {"bar baz": [0]}, bar: "baz"}),
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 false,
-                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+                Some(value!(0)),
+                Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"].into(),
+                value!({foo: {"bar baz": [0]}, bar: "baz"}),
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 true,
-                Some(map!["bar": "baz"].into()),
+                Some(value!(0)),
+                Some(value!({bar: "baz"})),
             ),
         ];
 
-        for (object, segments, compact, expect) in cases {
-            let mut object: Value = object;
+        for (mut object, segments, compact, value, expect) in cases {
             let path = Path::new_unchecked(segments);
 
-            assert_eq!(Object::remove(&mut object, &path, compact), Ok(()));
-            assert_eq!(Object::get(&object, &Path::root()), Ok(expect))
+            assert_eq!(Object::remove(&mut object, &path, compact), Ok(value));
+            assert_eq!(Object::get(&object, &Path::root()), Ok(expect));
         }
     }
 
     #[test]
     fn object_paths() {
         let cases = vec![
-            (map![], Ok(vec![". "])),
+            (value!({}), Ok(vec![". "])),
             (
-                map!["foo bar baz": "bar"],
+                value!({"foo bar baz": "bar"}),
                 Ok(vec![". ", r#"."foo bar baz""#]),
             ),
             (
-                map!["foo": "bar", "baz": "qux"],
+                value!({foo: "bar", baz: "qux"}),
                 Ok(vec![". ", ".baz", ".foo"]),
             ),
             (
-                map!["foo": map!["bar": "baz"]],
+                value!({foo: {bar: "baz"}}),
                 Ok(vec![". ", ".foo", ".foo.bar"]),
             ),
+            (value!({a: [0, 1]}), Ok(vec![". ", ".a", ".a[0]", ".a[1]"])),
             (
-                map!["a": vec![0, 1]],
-                Ok(vec![". ", ".a", ".a[0]", ".a[1]"]),
-            ),
-            (
-                map!["a": map!["b": "c"], "d": 12, "e": vec![
-                    map!["f": 1],
-                    map!["g": 2],
-                    map!["h": 3],
-                ]],
+                value!({a: {b: "c"}, d: 12, e: [{f: 1}, {g: 2}, {h: 3}]}),
                 Ok(vec![
                     ". ", ".a", ".a.b", ".d", ".e", ".e[0]", ".e[0].f", ".e[1]", ".e[1].g",
                     ".e[2]", ".e[2].h",
                 ]),
             ),
             (
-                map![
-                    "a": vec![map![
-                        "b": vec![map!["c": map!["d": map!["e": vec![vec![0, 1]]]]]]
-                    ]]
-                ],
+                value!({a: [{b: [{c: {d: {e: [[0, 1]]}}}]}]}),
                 Ok(vec![
                     ". ",
                     ".a",
@@ -309,8 +322,6 @@ mod tests {
         ];
 
         for (object, expect) in cases {
-            let object: Value = object.into();
-
             assert_eq!(
                 Object::paths(&object),
                 expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())

@@ -3,6 +3,10 @@ package metadata
 components: transforms: log_to_metric: {
 	title: "Log to Metric"
 
+	description: """
+		Derives one or more metric events from a log event.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
@@ -46,9 +50,9 @@ components: transforms: log_to_metric: {
 					}
 					increment_by_value: {
 						description: """
-	                If `true` the metric will be incremented by the `field` value.
-	                If `false` the metric will be incremented by 1 regardless of the `field` value.
-	                """
+							If `true` the metric will be incremented by the `field` value.
+							If `false` the metric will be incremented by 1 regardless of the `field` value.
+							"""
 						required: false
 						common:   false
 						warnings: []

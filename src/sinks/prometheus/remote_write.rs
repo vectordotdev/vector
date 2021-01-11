@@ -218,6 +218,8 @@ mod integration_tests {
     }
 
     async fn insert_metrics(url: &str) {
+        crate::test_util::trace_init();
+
         let database = onboarding_v1(url).await;
 
         let cx = SinkContext::new_test();

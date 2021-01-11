@@ -2,7 +2,7 @@ use crate::{
     conditions::{CheckFieldsConfig, Condition, ConditionConfig},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
+    internal_events::SamplerEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -78,8 +78,6 @@ impl Sampler {
 
 impl FunctionTransform for Sampler {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(SamplerEventProcessed);
-
         if let Some(condition) = self.exclude.as_ref() {
             if condition.check(&event) {
                 output.push(event);
@@ -155,7 +153,7 @@ mod tests {
             .into_iter()
             .filter_map(|event| sampler.transform_one(event))
             .count();
-        let ideal = 1.0 as f64 / 2.0 as f64;
+        let ideal = 1.0f64 / 2.0f64;
         let actual = total_passed as f64 / num_events as f64;
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
@@ -169,7 +167,7 @@ mod tests {
             .into_iter()
             .filter_map(|event| sampler.transform_one(event))
             .count();
-        let ideal = 1.0 as f64 / 25.0 as f64;
+        let ideal = 1.0f64 / 25.0f64;
         let actual = total_passed as f64 / num_events as f64;
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
     }

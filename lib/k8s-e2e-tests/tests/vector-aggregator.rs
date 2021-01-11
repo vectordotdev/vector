@@ -8,8 +8,9 @@ sources:
   dummy:
     type: "generator"
     rawConfig: |
+      format = "shuffle"
       lines = ["Hello world"]
-      batch_interval = 60 # once a minute
+      interval = 60 # once a minute
 
 sinks:
   stdout:

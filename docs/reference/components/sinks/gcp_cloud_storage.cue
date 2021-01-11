@@ -44,6 +44,7 @@ components: sinks: gcp_cloud_storage: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -278,4 +279,22 @@ components: sinks: gcp_cloud_storage: {
 					"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "storage"
+
+			policies: [
+				{
+					_action: "objects.create"
+					required_for: ["write"]
+				},
+				{
+					_action: "objects.get"
+					required_for: ["healthcheck"]
+				},
+			]
+		},
+	]
 }

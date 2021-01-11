@@ -1,5 +1,4 @@
 mod error;
-mod object;
 mod operator;
 mod parser;
 mod path;
@@ -10,6 +9,7 @@ mod type_def;
 
 pub mod expression;
 pub mod function;
+pub mod object;
 pub mod prelude;
 pub mod state;
 pub mod value;
@@ -33,19 +33,19 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod tests {
     use super::*;
     use crate::function::ArgumentList;
-    use crate::map;
+    use crate::value;
 
     #[test]
     fn it_works() {
         #[rustfmt::skip]
         let cases = vec![
             (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
-            (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            (r#"foo = null || "bar""#, Ok(()), Ok("bar".into())),
             (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
-                Ok(()),
-                Err(r#"remap error: value error: expected "boolean", got "string""#),
+                Err(r#"remap error: if-statement error: conditional error: expected "boolean", got "string""#),
+                Ok(().into()),
             ),
             (r#".foo = (null || "bar")"#, Ok(()), Ok("bar".into())),
             (r#"!false"#, Ok(()), Ok(true.into())),
@@ -56,11 +56,11 @@ mod tests {
             //     r#".a.b.(c | d) == .e."f.g"[2].(h | i)"#,
             //     Ok(Value::Boolean(false)),
             // ),
-            ("$bar = true\n.foo = $bar", Ok(()), Ok(Value::Boolean(true))),
+            ("bar = true\n.foo = bar", Ok(()), Ok(Value::Boolean(true))),
             (
                 r#"{
-                    $foo = "foo"
-                    .foo = $foo + "bar"
+                    foo = "foo"
+                    .foo = foo + "bar"
                     .foo
                 }"#,
                 Ok(()),
@@ -105,13 +105,13 @@ mod tests {
                 Ok(()), Ok(4.into()),
             ),
             (
-                r#"if ($foo = true; $foo) { $foo } else { false }"#,
+                r#"if (foo = true; foo) { foo } else { false }"#,
                 Ok(()), Ok(true.into())
             ),
             (
-                r#"if ($foo = "sproink"
-                       $foo == "sproink") {
-                      $foo
+                r#"if (foo = "sproink"
+                       foo == "sproink") {
+                      foo
                    } else {
                      false
                    }"#,
@@ -145,14 +145,14 @@ mod tests {
             (r#"null || false"#, Ok(()), Ok(false.into())),
             (r#"false || null"#, Ok(()), Ok(().into())),
             (r#"null || "foo""#, Ok(()), Ok("foo".into())),
-            (r#". = .foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
-            (r#"."#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
-            (r#" . "#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
-            (r#".foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#". = .foo"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
+            (r#"."#, Ok(()), Ok(value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}}))),
+            (r#" . "#, Ok(()), Ok(value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}}))),
+            (r#".foo"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
             (r#".foo.qux[0]"#, Ok(()), Ok(1.into())),
             (r#".foo.bar"#, Ok(()), Ok("baz".into())),
-            (r#".(nope | foo)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
-            (r#".(foo | nope)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(nope | foo)"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
+            (r#".(foo | nope)"#, Ok(()), Ok(value!({"bar": "baz", "qux": [1, 2, {"quux": true}]}))),
             (r#".(nope | foo).bar"#, Ok(()), Ok("baz".into())),
             (r#".foo.(nope | bar)"#, Ok(()), Ok("baz".into())),
             (r#".foo.(nope | no)"#, Ok(()), Ok(().into())),
@@ -163,37 +163,26 @@ mod tests {
                     .foo
                 "#,
                 Ok(()),
-                Ok(map![
-                    "bar": map![
-                        "bar2": map![
-                            "baz": vec![
-                                Value::Null,
-                                Value::Null,
-                                "qux".into(),
-                            ],
-                        ],
-                    ],
-                    "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()]),
-                ].into()),
+                Ok(value!({"bar": {"bar2": {"baz": [null, null, "qux"]}}, "qux": [1, 2, {"quux": true}]})),
             ),
             (
                 r#"
                     .foo.bar = "baz"
-                    $foo = .foo
+                    foo = .foo
                     .foo.bar
                 "#,
                 Ok(()),
                 Ok("baz".into()),
             ),
-            ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
-            ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
-            ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
+            ("foo = .foo\nfoo.bar", Ok(()), Ok("baz".into())),
+            ("foo = .foo.qux\nfoo[1]", Ok(()), Ok(2.into())),
+            ("foo = .foo.qux\nfoo[2].quux", Ok(()), Ok(true.into())),
             (
-                "$foo[0] = true",
-                Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
+                "foo[0] = true",
+                Err(r#"remap error: parser error: path in variable assignment unsupported, use "foo" without ".[0]""#),
                 Ok(().into()),
             ),
-            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),
+            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(value!(["foo", "bar", "baz"]))),
             (
                 r#"
                     .foo = [
@@ -204,19 +193,20 @@ mod tests {
                     .foo
                 "#,
                 Ok(()),
-                Ok(vec!["foo".into(), 5.into(), Value::Array(vec!["bar".into()])].into()),
+                Ok(value!(["foo", 5, ["bar"]])),
             ),
             (
-                r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/])"#,
+                r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/, {"1": 1, "true": true}])"#,
                 Ok(()),
-                Ok(vec![
+                Ok(value!([
                     r#"Bytes(b"foo")"#,
                     r#"Regex(bar)"#,
                     r#"Integer(5)"#,
                     r#"[Bytes(b"baz"), Float(4.2)]"#,
                     r#"Boolean(true)"#,
                     r#"Regex(qu+x)"#,
-                ].into()),
+                    r#"{"1": Integer(1), "true": Boolean(true)}"#,
+                ])),
             ),
             (
                 r#"
@@ -257,10 +247,101 @@ mod tests {
                 Ok("bar".into()),
             ),
             (
-                r#"$foo = 1;$nork = $foo + 3;$nork"#,
+                r#"foo = 1;nork = foo + 3;nork"#,
                 Ok(()),
-                Ok(4.into())
-            )
+                Ok(4.into()),
+            ),
+            (r#"{ "foo" }"#, Ok(()), Ok("foo".into())),
+            (r#"{ "foo": "bar" }"#, Ok(()), Ok(value!({"foo": "bar"}))),
+            (r#"{ "foo": true, "bar": true, "baz": false }"#, Ok(()), Ok(value!({"foo": true, "bar": true, "baz": false}))),
+            (
+                r#"
+                    .result = {
+                        .foo = true
+                        bar = 5
+                        { "foo": .foo, "bar": bar, "baz": "qux" }
+                    }
+
+                    { "result": .result }
+                "#,
+                Ok(()),
+                Ok(value!({"result": {"foo": true, "bar": 5, "baz": "qux"}})),
+            ),
+            ("{}", Ok(()), Ok(value!({}))),
+            (
+                r#"map_printer({"a": "foo", "b": /bar/, "c": 5, "d": ["baz", 4.2], "e": true, "f": /qu+x/, "g": {"1": 1, "true": true}})"#,
+                Ok(()),
+                Ok(value!({
+                    "a": r#"Bytes(b"foo")"#,
+                    "b": r#"Regex(bar)"#,
+                    "c": r#"Integer(5)"#,
+                    "d": r#"[Bytes(b"baz"), Float(4.2)]"#,
+                    "e": r#"Boolean(true)"#,
+                    "f": r#"Regex(qu+x)"#,
+                    "g": r#"{"1": Integer(1), "true": Boolean(true)}"#,
+                })),
+            ),
+            ("true * 5 ?? 5 * 5", Ok(()), Ok(value!(25))),
+            ("5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? true * 5 ?? 5 * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? 5 * 5 ?? true * 5", Ok(()), Ok(value!(25))),
+            ("false * 5 ?? true * 5", Ok(()), Err("remap error: value error: unable to multiply value type boolean by integer")),
+            ("5 + (true * 5 ?? 0)", Ok(()), Ok(value!(5))),
+            ("fallible_func!()", Ok(()), Err("remap error: function call error: failed!")),
+            ("fallible_func()", Ok(()), Err("remap error: function call error: failed!")),
+            (
+                "map_printer!({})",
+                Err(r#"remap error: error for function "map_printer": cannot mark infallible function as "abort on error", remove the "!" signature"#),
+                Ok(().into()),
+            ),
+            (
+                "foo, err = fallible_func!()",
+                Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            ("foo, err = fallible_func()", Ok(()), Ok(value!("function call error: failed!"))),
+            (
+                "foo, err = map_printer({})",
+                Err(r#"remap error: assignment error: the variable "foo" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            (
+                ".foo.bar, err = map_printer({})",
+                Err(r#"remap error: assignment error: the path ".foo.bar" does not need to handle the error-case, because its result is infallible"#),
+                Ok(().into()),
+            ),
+            (
+                "
+                    foo, err = fallible_func()
+                    [foo, err]
+                ",
+                Ok(()),
+                Ok(value!([null, "function call error: failed!"])),
+            ),
+            (
+                "
+                    foo, err = fallible_func(true)
+                    [foo, err]
+                ",
+                Ok(()),
+                Ok(value!([true, null])),
+            ),
+            (
+                "
+                    .foo.bar, err = fallible_func(true)
+                    [.foo, err]
+                ",
+                Ok(()),
+                Ok(value!([{ bar: true, qux: [1, 2, {quux: true}]}, null])),
+            ),
+            (".if.loop.bar", Ok(()), Ok(value!(null))),
+            ("asyousee = true", Ok(()), Ok(value!(true))),
+            ("regex_printer(value: /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value:/foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("regex_printer(value  :   /foo/)", Ok(()), Ok(value!("regex: foo"))),
+            ("two_param_func(true, true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(.foo, param2: true)", Ok(()), Ok(value!(null))),
+            ("two_param_func(param2: .foo, param1: true)", Ok(()), Ok(value!(null))),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -271,8 +352,12 @@ mod tests {
                     Box::new(test_functions::EnumValidator),
                     Box::new(test_functions::EnumListValidator),
                     Box::new(test_functions::ArrayPrinter),
+                    Box::new(test_functions::MapPrinter),
+                    Box::new(test_functions::FallibleFunc),
+                    Box::new(test_functions::TwoParamFunc),
                 ],
                 None,
+                true,
             );
 
             assert_eq!(
@@ -286,20 +371,7 @@ mod tests {
 
             let program = program.unwrap();
             let mut runtime = Runtime::new(state::Program::default());
-            let mut event: Value = map![
-                "foo":
-                    map![
-                        "bar": "baz",
-                        "qux": Value::Array(vec![
-                            1.into(),
-                            2.into(),
-                            map![
-                                "quux": true,
-                            ].into(),
-                        ]),
-                    ],
-            ]
-            .into();
+            let mut event = value!({"foo": {"bar": "baz", "qux": [1, 2, {"quux": true}]}});
 
             let result = runtime
                 .execute(&mut event, &program)
@@ -311,7 +383,9 @@ mod tests {
 
     mod test_functions {
         use super::*;
-        use crate::expression::Array;
+        use crate::expression::{Array, Map};
+        use std::collections::BTreeMap;
+        use std::convert::TryFrom;
 
         #[derive(Debug, Clone)]
         pub(super) struct EnumValidator;
@@ -423,6 +497,43 @@ mod tests {
         }
 
         #[derive(Debug, Clone)]
+        pub(super) struct MapPrinter;
+        impl Function for MapPrinter {
+            fn identifier(&self) -> &'static str {
+                "map_printer"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(MapPrinterFn(arguments.required("value")?)))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct MapPrinterFn(Expr);
+        impl Expression for MapPrinterFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(Map::try_from(self.0.clone())
+                    .unwrap()
+                    .into_iter()
+                    .map(|(k, v)| (k, format!("{:?}", v).into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into())
+            }
+
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
+                self.0.type_def(state)
+            }
+        }
+
+        #[derive(Debug, Clone)]
         pub(super) struct EnumListValidator;
         impl Function for EnumListValidator {
             fn identifier(&self) -> &'static str {
@@ -449,6 +560,90 @@ mod tests {
         impl Expression for EnumListValidatorFn {
             fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
                 Ok(format!("valid: {:?}", self.0).into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct FallibleFunc;
+        impl Function for FallibleFunc {
+            fn identifier(&self) -> &'static str {
+                "fallible_func"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(FallibleFuncFn(
+                    arguments.optional("value").map(Expr::boxed),
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: false,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct FallibleFuncFn(Option<Box<dyn Expression>>);
+        impl Expression for FallibleFuncFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                if self.0.is_some() {
+                    Ok(true.into())
+                } else {
+                    Err("failed!".into())
+                }
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef {
+                    fallible: true,
+                    kind: value::Kind::Boolean,
+                    ..Default::default()
+                }
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct TwoParamFunc;
+        impl Function for TwoParamFunc {
+            fn identifier(&self) -> &'static str {
+                "two_param_func"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(TwoParamFuncFn(
+                    arguments.required("param1")?,
+                    arguments.required("param2")?,
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[
+                    Parameter {
+                        keyword: "param1",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                    Parameter {
+                        keyword: "param2",
+                        accepts: |_| true,
+                        required: true,
+                    },
+                ]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct TwoParamFuncFn(Expr, Expr);
+        impl Expression for TwoParamFuncFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(().into())
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {

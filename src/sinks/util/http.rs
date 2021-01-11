@@ -1,13 +1,16 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestSettings,
+    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    TowerRequestSettings,
 };
 use crate::{buffers::Acker, http::HttpClient, Event};
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
 use http::StatusCode;
 use hyper::{body, Body};
+use indexmap::IndexMap;
 use pin_project::pin_project;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     future::Future,
@@ -401,10 +404,29 @@ impl RetryLogic for HttpRetryLogic {
     }
 }
 
+/// A helper config struct
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct RequestConfig {
+    #[serde(flatten)]
+    pub tower: TowerRequestConfig,
+    #[serde(default)]
+    pub headers: IndexMap<String, String>,
+}
+
+impl RequestConfig {
+    pub fn add_old_option(&mut self, headers: Option<IndexMap<String, String>>) {
+        if let Some(headers) = headers {
+            warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
+            self.headers.extend(headers);
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::next_addr;
+    use crate::{sinks::util::service::Concurrency, test_util::next_addr};
     use futures::{compat::Future01CompatExt, future::ready};
     use futures01::Stream;
     use hyper::{
@@ -481,5 +503,12 @@ mod test {
 
         let (body, _rest) = rx.into_future().compat().await.unwrap();
         assert_eq!(body.unwrap(), "hello");
+    }
+
+    #[test]
+    fn alias_in_flight_limit_works() {
+        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
+            .expect("Fixed concurrency failed for in_flight_limit param");
+        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

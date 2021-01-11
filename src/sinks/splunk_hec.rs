@@ -2,10 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{
-        SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
-        SplunkSourceTypeMissingKeys,
-    },
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkMissingKeys},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
@@ -147,7 +144,8 @@ impl HttpSink for HecSinkConfig {
             sourcetype
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceTypeMissingKeys {
+                    emit!(SplunkMissingKeys {
+                        field: "sourcetype",
                         keys: &missing_keys
                     });
                 })
@@ -158,7 +156,8 @@ impl HttpSink for HecSinkConfig {
             source
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceMissingKeys {
+                    emit!(SplunkMissingKeys {
+                        field: "source",
                         keys: &missing_keys
                     });
                 })
@@ -169,7 +168,8 @@ impl HttpSink for HecSinkConfig {
             index
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceMissingKeys {
+                    emit!(SplunkMissingKeys {
+                        field: "index",
                         keys: &missing_keys
                     });
                 })
@@ -234,8 +234,8 @@ impl HttpSink for HecSinkConfig {
                 });
                 Some(value)
             }
-            Err(e) => {
-                emit!(SplunkEventEncodeError { error: e });
+            Err(error) => {
+                emit!(SplunkEventEncodeError { error });
                 None
             }
         }

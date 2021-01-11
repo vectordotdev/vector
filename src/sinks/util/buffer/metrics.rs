@@ -5,8 +5,10 @@ use crate::{
 };
 use std::{
     cmp::Ordering,
-    collections::{hash_map::DefaultHasher, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
+    mem::discriminant,
+    ops::Deref,
 };
 
 #[derive(Clone, Debug)]
@@ -17,8 +19,9 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(&metric.value).hash(state);
+        discriminant(&metric.value).hash(state);
         metric.name.hash(state);
+        metric.namespace.hash(state);
         metric.kind.hash(state);
 
         if let Some(tags) = &metric.tags {
@@ -47,15 +50,42 @@ impl Hash for MetricEntry {
 
 impl PartialEq for MetricEntry {
     fn eq(&self, other: &Self) -> bool {
-        let mut state = DefaultHasher::new();
-        self.hash(&mut state);
-        let hash1 = state.finish();
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.name == other.name
+            && self.namespace == other.namespace
+            && self.kind == other.kind
+            && self.tags == other.tags
+            && discriminant(&self.value) == discriminant(&other.value)
+            && match (&self.value, &other.value) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => buckets1 == buckets2,
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => quantiles1 == quantiles2,
+                _ => true,
+            }
+    }
+}
 
-        let mut state = DefaultHasher::new();
-        other.hash(&mut state);
-        let hash2 = state.finish();
-
-        hash1 == hash2
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
     }
 }
 
@@ -134,18 +164,19 @@ impl Batch for MetricBuffer {
         } else {
             let item = item.into_metric();
 
-            match &item.value {
-                MetricValue::Counter { value } if item.kind.is_absolute() => {
-                    let new = MetricEntry(item.clone());
+            match (item.kind, &item.value) {
+                (MetricKind::Absolute, MetricValue::Counter { value }) => {
+                    let value = *value;
+                    let item = MetricEntry(item);
                     if let Some(MetricEntry(Metric {
                         value: MetricValue::Counter { value: value0, .. },
                         ..
-                    })) = self.state.get(&new)
+                    })) = self.state.get(&item)
                     {
                         // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
-                            name: item.name.to_string(),
+                            name: item.name.clone(),
                             namespace: item.namespace.clone(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
@@ -162,12 +193,12 @@ impl Batch for MetricBuffer {
                         } else {
                             self.metrics.insert(delta);
                         }
-                        self.state.replace(new);
+                        self.state.replace(item);
                     } else {
-                        self.state.insert(new);
+                        self.state.insert(item);
                     }
                 }
-                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
                     let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
@@ -193,14 +224,13 @@ impl Batch for MetricBuffer {
                         self.metrics.insert(MetricEntry(initial));
                     }
                 }
-                _metric if item.kind.is_absolute() => {
-                    let new = MetricEntry(item);
-                    self.metrics.replace(new);
+                (MetricKind::Absolute, _) => {
+                    self.metrics.replace(MetricEntry(item));
                 }
                 _ => {
-                    let new = MetricEntry(item.clone());
+                    let new = MetricEntry(item);
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
+                        existing.add(&new);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         self.metrics.insert(new);
@@ -288,18 +318,9 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        buffers::Acker,
-        event::metric::{MetricValue, StatisticKind},
-        sinks::util::BatchSink,
-    };
-    use futures::{future, stream, Sink, SinkExt, StreamExt};
+    use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
-    use std::{
-        collections::BTreeMap,
-        sync::{Arc, Mutex},
-    };
-    use tokio::time::Duration;
+    use std::collections::BTreeMap;
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -307,589 +328,200 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
-        let mut buffer = buffer.to_owned();
-        buffer.sort_by_key(|k| format!("{:?}", k));
-        buffer
-    }
-
-    fn sink() -> (
-        impl Sink<Event, Error = crate::Error>,
-        Arc<Mutex<Vec<Vec<Metric>>>>,
-    ) {
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-        let sent_requests1 = Arc::clone(&sent_requests);
-
-        let svc = tower::service_fn(move |req| {
-            let sent_requests = Arc::clone(&sent_requests1);
-            sent_requests.lock().unwrap().push(req);
-            future::ok::<_, std::io::Error>(())
-        });
+    fn rebuffer(events: Vec<Metric>) -> Vec<Vec<Metric>> {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
-        let buffered = BatchSink::new(
-            svc,
-            MetricBuffer::new(batch_size),
-            Duration::from_secs(0),
-            acker,
-        );
+        let mut buffer = MetricBuffer::new(batch_size);
+        let mut result = vec![];
 
-        (buffered, sent_requests)
+        for event in events {
+            match buffer.push(Event::Metric(event)) {
+                PushResult::Overflow(_) => panic!("overflowed too early"),
+                PushResult::Ok(true) => {
+                    result.push(buffer.fresh_replace().finish());
+                }
+                PushResult::Ok(false) => (),
+            }
+        }
+
+        if !buffer.is_empty() {
+            result.push(buffer.finish())
+        }
+
+        // Sort each batch to provide a predictable result ordering
+        result
+            .into_iter()
+            .map(|mut batch| {
+                batch.sort_by_key(|k| format!("{:?}", k));
+                batch
+            })
+            .collect()
     }
 
-    #[tokio::test]
-    async fn metric_buffer_counters() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_counters() {
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "counter-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_counter(0, "production", Incremental, i as f64));
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_counter(i, "staging", Incremental, i as f64));
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_counter(i, "production", Incremental, i as f64));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
+        let buffer = rebuffer(events);
 
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(0, "production", Incremental, 6.0),
+                sample_counter(0, "staging", Incremental, 0.0),
+                sample_counter(1, "production", Incremental, 1.0),
+                sample_counter(1, "staging", Incremental, 1.0),
+                sample_counter(2, "staging", Incremental, 2.0),
+                sample_counter(3, "staging", Incremental, 3.0),
+            ]
+        );
+
+        assert_eq!(
+            buffer[1],
+            [
+                sample_counter(2, "production", Incremental, 2.0),
+                sample_counter(3, "production", Incremental, 3.0),
+            ]
+        );
 
         assert_eq!(buffer.len(), 2);
-        assert_eq!(buffer[0].len(), 6);
-        assert_eq!(buffer[1].len(), 2);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 6.0 }
-                },
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 0.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                },
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 3.0 },
-                },
-            ]
-        );
-
-        assert_eq!(
-            sorted(&buffer[1].clone()),
-            [
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 3.0 },
-                },
-            ]
-        );
     }
 
-    #[tokio::test]
-    async fn metric_buffer_aggregated_counters() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_aggregated_counters() {
         let mut events = Vec::new();
         for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_counter(i, "production", Absolute, i as f64));
         }
 
         for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
-                    value: i as f64 * 3.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_counter(i, "production", Absolute, i as f64 * 3.0));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 0.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 4.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 6.0 },
-                },
+                sample_counter(0, "production", Incremental, 0.0),
+                sample_counter(1, "production", Incremental, 2.0),
+                sample_counter(2, "production", Incremental, 4.0),
+                sample_counter(3, "production", Incremental, 6.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
-    #[tokio::test]
-    async fn metric_buffer_gauges() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_gauges() {
         let mut events = Vec::new();
         for i in 1..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_gauge(i, Incremental, i as f64));
         }
 
         for i in 1..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_gauge(i, Incremental, i as f64));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "gauge-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "gauge-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 4.0 },
-                },
-                Metric {
-                    name: "gauge-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 6.0 },
-                },
-                Metric {
-                    name: "gauge-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 8.0 },
-                },
+                sample_gauge(1, Absolute, 2.0),
+                sample_gauge(2, Absolute, 4.0),
+                sample_gauge(3, Absolute, 6.0),
+                sample_gauge(4, Absolute, 8.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
-    #[tokio::test]
-    async fn metric_buffer_aggregated_gauges() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_aggregated_gauges() {
         let mut events = Vec::new();
         for i in 3..6 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
-                    value: i as f64 * 10.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_gauge(i, Absolute, i as f64 * 10.0));
         }
 
         for i in 1..4 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
+            events.push(sample_gauge(i, Incremental, i as f64));
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
-                    value: i as f64 * 2.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_gauge(i, Absolute, i as f64 * 2.0));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 5);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "gauge-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "gauge-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 4.0 },
-                },
-                Metric {
-                    name: "gauge-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 6.0 },
-                },
-                Metric {
-                    name: "gauge-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 8.0 },
-                },
-                Metric {
-                    name: "gauge-5".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 50.0 },
-                },
+                sample_gauge(1, Absolute, 1.0),
+                sample_gauge(2, Absolute, 4.0),
+                sample_gauge(3, Absolute, 6.0),
+                sample_gauge(4, Absolute, 8.0),
+                sample_gauge(5, Absolute, 50.0),
             ]
         );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_sets() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec![format!("{}", i)].into_iter().collect(),
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec![format!("{}", i)].into_iter().collect(),
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
-                        .into_iter()
-                        .collect(),
-                },
-            },]
-        );
     }
 
-    #[tokio::test]
-    async fn metric_buffer_distributions() {
-        let (sink, sent_batches) = sink();
+    #[test]
+    fn metric_buffer_sets() {
+        let mut events = Vec::new();
+        for i in 0..4 {
+            events.push(sample_set(0, &[i]));
+        }
 
+        for i in 0..4 {
+            events.push(sample_set(0, &[i]));
+        }
+
+        let buffer = rebuffer(events);
+
+        assert_eq!(buffer[0], [sample_set(0, &[0, 1, 2, 3])]);
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn metric_buffer_distributions() {
         let mut events = Vec::new();
         for _ in 2..6 {
-            let event = Event::Metric(Metric {
-                name: "dist-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![2.0],
-                    sample_rates: vec![10],
-                    statistic: StatisticKind::Histogram,
-                },
-            });
-            events.push(event);
+            events.push(sample_distribution_histogram(2, 10));
         }
 
         for i in 2..6 {
-            let event = Event::Metric(Metric {
-                name: format!("dist-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![i as f64],
-                    sample_rates: vec![10],
-                    statistic: StatisticKind::Histogram,
-                },
-            });
-            events.push(event);
+            events.push(sample_distribution_histogram(i, 10));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "dist-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![2.0],
-                        sample_rates: vec![50],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![3.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![4.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-5".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![5.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
-                    }
-                },
+                sample_distribution_histogram(2, 50),
+                sample_distribution_histogram(3, 10),
+                sample_distribution_histogram(4, 10),
+                sample_distribution_histogram(5, 10),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]
@@ -903,260 +535,165 @@ mod test {
         );
     }
 
-    #[tokio::test]
-    async fn metric_buffer_aggregated_histograms_absolute() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_aggregated_histograms_absolute() {
         let mut events = Vec::new();
         for _ in 2..5 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1, 2, 4],
-                    count: 6,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_aggregated_histogram(2, Absolute, 1.0, 1, 10.0));
         }
 
         for i in 2..5 {
-            let event = Event::Metric(Metric {
-                name: format!("buckets-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![i, 2 * i, 4 * i],
-                    count: 6 * i,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_aggregated_histogram(
+                i, Absolute, 1.0, i as u32, 10.0,
+            ));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![2, 4, 8],
-                        count: 12,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![3, 6, 12],
-                        count: 6 * 3,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![4, 8, 16],
-                        count: 6 * 4,
-                        sum: 10.0,
-                    },
-                }
+                sample_aggregated_histogram(2, Absolute, 1.0, 2, 10.0),
+                sample_aggregated_histogram(3, Absolute, 1.0, 3, 10.0),
+                sample_aggregated_histogram(4, Absolute, 1.0, 4, 10.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
-    #[tokio::test]
-    async fn metric_buffer_aggregated_histograms_incremental() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_aggregated_histograms_incremental() {
         let mut events = Vec::new();
         for _ in 0..3 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1, 2, 4],
-                    count: 6,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0));
         }
 
         for i in 1..4 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 4.0, 16.0],
-                    counts: vec![i, 2 * i, 4 * i],
-                    count: 6 * i,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
+            events.push(sample_aggregated_histogram(2, Incremental, 2.0, i, 10.0));
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![3, 6, 12],
-                        count: 18,
-                        sum: 30.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 4.0, 16.0],
-                        counts: vec![6, 12, 24],
-                        count: 36,
-                        sum: 30.0,
-                    },
-                },
+                sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
+                sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
     }
 
-    #[tokio::test]
-    async fn metric_buffer_aggregated_summaries() {
-        let (sink, sent_batches) = sink();
-
+    #[test]
+    fn metric_buffer_aggregated_summaries() {
         let mut events = Vec::new();
         for _ in 0..10 {
             for i in 2..5 {
-                let event = Event::Metric(Metric {
-                    name: format!("quantiles-{}", i),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![i as f64, (2 * i) as f64, (4 * i) as f64],
-                        count: 6 * i,
-                        sum: 10.0,
-                    },
-                });
-                events.push(event);
+                events.push(sample_aggregated_summary(i));
             }
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
+        let buffer = rebuffer(events);
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "quantiles-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![2.0, 4.0, 8.0],
-                        count: 6 * 2,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "quantiles-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![3.0, 6.0, 12.0],
-                        count: 6 * 3,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "quantiles-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![4.0, 8.0, 16.0],
-                        count: 6 * 4,
-                        sum: 10.0,
-                    },
-                }
+                sample_aggregated_summary(2),
+                sample_aggregated_summary(3),
+                sample_aggregated_summary(4),
             ]
         );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
+        Metric {
+            name: format!("counter-{}", num),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag(tagstr)),
+            kind,
+            value: MetricValue::Counter { value },
+        }
+    }
+
+    fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
+        Metric {
+            name: format!("gauge-{}", num),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag("staging")),
+            kind,
+            value: MetricValue::Gauge { value },
+        }
+    }
+
+    fn sample_set<T: ToString>(num: usize, values: &[T]) -> Metric {
+        Metric {
+            name: format!("set-{}", num),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag("production")),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: values.iter().map(|s| s.to_string()).collect(),
+            },
+        }
+    }
+
+    fn sample_distribution_histogram(num: u32, rate: u32) -> Metric {
+        Metric {
+            name: format!("dist-{}", num),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag("production")),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![num as f64],
+                sample_rates: vec![rate],
+                statistic: StatisticKind::Histogram,
+            },
+        }
+    }
+
+    fn sample_aggregated_histogram(
+        num: usize,
+        kind: MetricKind,
+        bpower: f64,
+        cfactor: u32,
+        sum: f64,
+    ) -> Metric {
+        Metric {
+            name: format!("buckets-{}", num),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag("production")),
+            kind,
+            value: MetricValue::AggregatedHistogram {
+                buckets: vec![1.0, 2.0f64.powf(bpower), 4.0f64.powf(bpower)],
+                counts: vec![cfactor, 2 * cfactor, 4 * cfactor],
+                count: 6 * cfactor,
+                sum,
+            },
+        }
+    }
+
+    fn sample_aggregated_summary(factor: u32) -> Metric {
+        Metric {
+            name: format!("quantiles-{}", factor),
+            namespace: None,
+            timestamp: None,
+            tags: Some(tag("production")),
+            kind: MetricKind::Absolute,
+            value: MetricValue::AggregatedSummary {
+                quantiles: vec![0.0, 0.5, 1.0],
+                values: vec![factor as f64, (2 * factor) as f64, (4 * factor) as f64],
+                count: 6 * factor,
+                sum: 10.0,
+            },
+        }
     }
 }

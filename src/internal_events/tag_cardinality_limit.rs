@@ -1,18 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 
-pub(crate) struct TagCardinalityLimitEventProcessed;
-
-impl InternalEvent for TagCardinalityLimitEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
 pub(crate) struct TagCardinalityLimitRejectingEvent<'a> {
     pub tag_key: &'a str,
     pub tag_value: &'a str,
@@ -24,7 +12,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
             message = "Event containing tag with new value after hitting configured 'value_limit'; discarding event.",
             tag_key = self.tag_key,
             tag_value = self.tag_value,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
     }
 
@@ -44,7 +32,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
             message = "Rejecting tag after hitting configured 'value_limit'.",
             tag_key = self.tag_key,
             tag_value = self.tag_value,
-            rate_limit_secs = 10,
+            internal_log_rate_secs = 10,
         );
     }
 

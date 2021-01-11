@@ -15,11 +15,17 @@ use vector::{
     test_util::runtime,
 };
 
-criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.02);
+    targets = benchmark_remap, upcase, downcase, parse_json
+);
 criterion_main!(benches);
 
 bench_function! {
-    upcase => vector::remap::Upcase;
+    upcase => remap_functions::Upcase;
 
     literal_value {
         args: func_args![value: "foo"],
@@ -28,7 +34,7 @@ bench_function! {
 }
 
 bench_function! {
-    downcase => vector::remap::Downcase;
+    downcase => remap_functions::Downcase;
 
     literal_value {
         args: func_args![value: "FOO"],
@@ -37,19 +43,11 @@ bench_function! {
 }
 
 bench_function! {
-    parse_json => vector::remap::ParseJson;
+    parse_json => remap_functions::ParseJson;
 
     literal_value {
         args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(map!["key": "value"]),
-    }
-
-    invalid_json_with_default {
-        args: func_args![
-            value: r#"{"key": INVALID}"#,
-            default: r#"{"key": "default"}"#,
-        ],
-        want: Ok(map!["key": "default"]),
+        want: Ok(value!({"key": "value"})),
     }
 }
 
@@ -199,7 +197,7 @@ fn benchmark_remap(c: &mut Criterion) {
             Remap::new(RemapConfig {
                 source: r#".number = to_int(.number)
                 .bool = to_bool(.bool)
-                .timestamp = parse_timestamp(.timestamp, format = "%d/%m/%Y:%H:%M:%S %z")
+                .timestamp = parse_timestamp(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
                 "#
                 .to_owned(),
                 drop_on_err: true,

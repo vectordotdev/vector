@@ -59,7 +59,7 @@ impl InternalEvent for EventProcessingProgress {
                 role = self.role.as_const_str(),
                 error = ?self.error.as_ref().unwrap_or(&String::from("")),
                 elapsed_micros = self.elapsed.as_micros() as u64,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
                 "Event processing error.",
             ),
         }
@@ -71,7 +71,7 @@ impl InternalEvent for EventProcessingProgress {
             "state" => self.state.as_const_str(),
         );
         match self.state {
-            State::Completed => counter!("processed_events_total", 1,
+            State::Completed => counter!("wasm_processed_events_total", 1,
                 "component_role" => self.role.as_const_str(),
             ),
             State::Errored => counter!("processing_errors_total", 1,

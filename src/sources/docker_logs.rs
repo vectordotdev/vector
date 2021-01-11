@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, LogSchema, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -26,6 +26,7 @@ use futures::{Stream, StreamExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     future::ready,
     path::PathBuf,
@@ -53,9 +54,17 @@ lazy_static! {
     static ref STDOUT: Bytes = "stdout".into();
 }
 
+#[derive(Debug, Snafu)]
+enum Error {
+    #[snafu(display("URL has no host."))]
+    NoHost,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    #[serde(default = "LogSchema::default_host_key")]
+    host_key: String,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
@@ -79,6 +88,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            host_key: LogSchema::default_host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -343,6 +353,9 @@ impl DockerLogsSource {
 
         let backoff_secs = config.retry_backoff_secs;
 
+        let host_key = config.host_key.clone();
+        let hostname = crate::get_hostname().ok();
+
         // Only logs created at, or after this moment are logged.
         let core = DockerLogsSourceCore::new(config)?;
 
@@ -363,6 +376,8 @@ impl DockerLogsSource {
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
+            host_key,
+            hostname,
             core: Arc::new(core),
             out,
             main_send,
@@ -554,6 +569,8 @@ impl DockerLogsSource {
 /// Used to construct and start event stream futures
 #[derive(Clone)]
 struct EventStreamBuilder {
+    host_key: String,
+    hostname: Option<String>,
     core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
     out: Pipeline,
@@ -593,10 +610,8 @@ impl EventStreamBuilder {
                     container_id: id.as_str()
                 }),
             }
-            // In case of any error we have to notify the main thread that it should try again. This is %error because the API doesn't support Display.
-            if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", %error);
-            }
+
+            this.finish(Err(id));
         });
 
         ContainerState::new_running()
@@ -610,7 +625,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -673,7 +688,13 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        let result = events_stream.map(Ok).forward(self.out.clone()).await;
+        let host_key = self.host_key.clone();
+        let hostname = self.hostname.clone();
+        let result = events_stream
+            .map(move |event| add_hostname(event, &host_key, &hostname))
+            .map(Ok)
+            .forward(self.out.clone())
+            .await;
 
         // End of stream
         emit!(DockerLogsContainerUnwatch {
@@ -684,11 +705,23 @@ impl EventStreamBuilder {
             Ok(()) => Ok(info),
             Err(crate::pipeline::ClosedError) => Err(info.id),
         };
-        // This is %error because the API doesn't support Display.
-        if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", %error);
-        }
+
+        self.finish(result);
     }
+
+    fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
+        // This can legaly fail when shutting down, and any other
+        // reason should have been logged in the main future.
+        let _ = self.main_send.send(result);
+    }
+}
+
+fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> Event {
+    if let Some(hostname) = hostname {
+        event.as_mut_log().insert(host_key, hostname.clone());
+    }
+
+    event
 }
 
 /// Container ID as assigned by Docker.
@@ -1017,11 +1050,18 @@ fn default_certs() -> Option<DockerTlsConfig> {
     })
 }
 
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, DockerError> {
+fn get_authority(url: &str) -> Result<String, Error> {
+    url.parse::<Uri>()
+        .ok()
+        .and_then(|uri| uri.authority().map(<_>::to_string))
+        .ok_or(Error::NoHost)
+}
+
+fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
-        None => Docker::connect_with_local_defaults(),
+        None => Docker::connect_with_local_defaults().map_err(Into::into),
 
         Some(host) => {
             let scheme = host
@@ -1031,9 +1071,12 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
                 Some("http") => {
+                    let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
                 }
                 Some("https") => {
+                    let host = get_authority(&host)?;
                     let tls = tls
                         .or_else(default_certs)
                         .ok_or(DockerError::NoCertPathError)?;
@@ -1045,9 +1088,13 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
                         DEFAULT_TIMEOUT,
                         API_DEFAULT_VERSION,
                     )
+                    .map_err(Into::into)
                 }
-                // unix socket on unix, named pipe on windows
-                _ => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION),
+                Some("unix") | Some("npipe") | None => {
+                    Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
+                }
+                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
             }
         }
     }

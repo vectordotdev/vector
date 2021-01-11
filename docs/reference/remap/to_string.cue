@@ -15,9 +15,8 @@ remap: functions: to_string: {
 			type: ["any"]
 		},
 	]
-	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
-	category: "coerce"
-
+	return: ["string"]
+	category: "Coerce"
 	description: #"""
 		Returns the string representation of the first parameter. If this parameter is an error, then
 		the second parameter is returned.

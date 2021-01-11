@@ -35,6 +35,7 @@ components: sinks: gcp_pubsub: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -129,4 +130,22 @@ components: sinks: gcp_pubsub: {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "pubsub"
+
+			policies: [
+				{
+					_action: "topics.get"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "topics.publish"
+					required_for: ["write"]
+				},
+			]
+		},
+	]
 }

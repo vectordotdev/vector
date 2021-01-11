@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.5.0
+      - uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -82,7 +82,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -187,7 +187,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: [self-hosted, windows, x64]
+    runs-on: [self-hosted, windows, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -253,17 +253,22 @@ jobs:
       - name: Check helm lint
         if: needs.changes.outputs.helm == 'true'
         run: make check-helm-lint
-      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
+      - name: Check that generated Kubernetes YAMLs don't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
       - name: Check events
         if: needs.changes.outputs.source == 'true'
         run: make check-events
-      - name: Check cargo deny
+      - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
+      - name: Check cargo deny licenses
+        if: needs.changes.outputs.dependencies == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check licenses
 
   master-failure:
     name: master-failure

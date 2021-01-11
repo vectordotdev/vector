@@ -2,14 +2,13 @@ use super::Transform;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{
-        AwsCloudwatchLogsSubscriptionParserEventProcessed,
-        AwsCloudwatchLogsSubscriptionParserFailedParse,
-    },
+    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
     transforms::FunctionTransform,
 };
-use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use shared::aws_cloudwatch_logs_subscription::{
+    AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
+};
 use std::iter;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -72,8 +71,6 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_log();
 
-        emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
-
         let message = log
             .get(&self.field)
             .map(|s| s.as_bytes())
@@ -123,32 +120,6 @@ fn subscription_event_to_events<'a>(
             })) as Box<dyn Iterator<Item = Event> + 'a>
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum AwsCloudWatchLogsSubscriptionMessageType {
-    ControlMessage,
-    DataMessage,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AwsCloudWatchLogsSubscriptionMessage {
-    owner: String,
-    message_type: AwsCloudWatchLogsSubscriptionMessageType,
-    log_group: String,
-    log_stream: String,
-    subscription_filters: Vec<String>,
-    log_events: Vec<AwsCloudWatchLogEvent>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AwsCloudWatchLogEvent {
-    id: String,
-    #[serde(with = "ts_milliseconds")]
-    timestamp: DateTime<Utc>,
-    message: String,
 }
 
 #[cfg(test)]
