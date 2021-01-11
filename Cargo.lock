@@ -7024,9 +7024,9 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d4e6c82bb967df89f20b875fa8835fab5d5622c6a5efa574a1f0b6d0aa6e8f6"
+checksum = "9ced152a8e9295a5b168adc254074525c17ac4a83c90b2716274cc38118bddc9"
 dependencies = [
  "bitflags",
  "cassowary",
