@@ -25,8 +25,14 @@ Serialize the passed Vector component configuration bits as TOML.
 {{- $toml -}}
 
 {{- with $rawConfig -}}
-{{- /* Ensure raw config section is put under the component-level section. */ -}}
+{{- /* Here is a poor attempt to ensure raw config section is put under the */ -}}
+{{- /* component-level section. What we're trying to do here is prohibited */ -}}
+{{- /* in the TOML spec, but it may work in the simple case - and this is */ -}}
+{{- /* what we have to support for the backward compatibility. */ -}}
+{{- if contains (printf "[%s.%s." $componentGroup $componentId) $toml -}}
 {{- $header| nindent 0 -}}
+{{- end -}}
+{{- /* Print the raw config. */ -}}
   {{- $rawConfig | nindent 2 -}}
 {{- end }}
 
