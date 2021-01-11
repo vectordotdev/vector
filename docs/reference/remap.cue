@@ -549,26 +549,12 @@ remap: {
 				If you assign a value to an object field that doesn't already exist, the field is
 				created; if the field does exist, the value is re-assigned.
 
-				VRL also supports [conditional assignment](#conditional-assignment) based on the
-				return value of functions.
-				"""
+				### Conditional assignment
 
-			examples: [
-				".request_id = uuid_v4()",
-				"average = to_float(.total / .number)",
-				".partition_id = .status_code",
-				".is_server_error = .status_code == 500",
-			]
-		}
-
-		"Conditional assignment": {
-			href: "conditional-assignment"
-
-			description: """
-				In VRL, conditional assignment is [assignment](#assignment) to a field or variable
-				only if the right-hand-side expression succeeds. It uses the `??=` operator (a
-				combination of `=` for assignemtn and `??` for [coalescence](#coalescence)). Here's
-				an example of conditional assignment:
+				In VRL, *conditional* assignment is assignment to a field or variable only if the
+				right-hand-side expression succeeds. This form of assignment uses the `??=`
+				operator (a combination of `=` for assignment and `??` for
+				[coalescence](#coalescence)). Here's an example:
 
 				```js
 				. ??= parse_json(.message)
@@ -580,9 +566,12 @@ remap: {
 				"""
 
 			examples: [
+				".request_id = uuid_v4()",
+				"average = to_float(.total / .number)",
+				".partition_id = .status_code",
+				".is_server_error = .status_code == 500",
 				". ??= parse_json(.message)",
 				".timestamp ??= to_unix_timestamp(.timestamp)",
-				"",
 			]
 		}
 
