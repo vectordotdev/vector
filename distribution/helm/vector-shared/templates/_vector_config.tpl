@@ -15,7 +15,7 @@ Serialize the passed Vector component configuration bits as TOML.
 
 {{- /* Build the right hierarchy and evaluate the TOML. */ -}}
 {{- $toml := toToml (dict $componentGroup (dict $componentId $value)) -}}
-{{- /* Cut the root-level key containing the component kind name (i.e. `[sink]`). */ -}}
+{{- /* Cut the root-level key containing the component kind name (i.e. `[sinks]`). */ -}}
 {{- $toml = $toml | trimPrefix (printf "[%s]\n" $componentGroup) -}}
 {{- /* Remove one level of indentation. */ -}}
 {{- $toml = regexReplaceAllLiteral "(?m)^  " $toml "" -}}
