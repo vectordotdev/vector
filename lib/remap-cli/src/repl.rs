@@ -70,7 +70,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "functions" || line == "funcs" || line == "fs" => {
                 print_function_list()
-            },
+            }
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
             Ok(line) => {
