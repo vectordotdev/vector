@@ -17,7 +17,7 @@ _values: {
 }
 
 // `#Any` allows for any value.
-#Any: _ | {[_=string]: #Any}
+#Any: _ | {[_=string]: #Any} | [...#Any]
 
 #Arch: "ARM64" | "ARMv7" | "x86_64"
 
@@ -83,8 +83,8 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	{log: #LogEvent} |
-	{metric: #MetricEvent}
+	log?:    #LogEvent
+	metric?: #MetricEvent
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -494,10 +494,10 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
-components:    _ | *{}
-configuration: _ | *{}
-data_model:    _ | *{}
-installation:  _ | *{}
-process:       _ | *{}
-releases:      _ | *{}
-remap:         _ | *{}
+components:    _
+configuration: _
+data_model:    _
+installation:  _
+process:       _
+releases:      _
+remap:         _
