@@ -22,8 +22,8 @@ remap: functions: to_bool: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
+			title: "Cast a value to a boolean"
+			input: log: {
 				string:  "yes"
 				float:   0.0
 				"null":  null
@@ -31,28 +31,18 @@ remap: functions: to_bool: {
 				boolean: false
 			}
 			source: """
-				.b1 = to_bool(.string)
-				.b2 = to_bool(.float)
-				.b3 = to_bool(.null)
-				.b4 = to_bool(.integer)
-				.b5 = to_bool(.boolean)
+				.string = to_bool(.string)
+				.float = to_bool(.float)
+				.null = to_bool(.null)
+				.integer = to_bool(.integer)
+				.boolean = to_bool(.boolean)
 				"""
-			output: {
-				b1: true
-				b2: false
-				b3: false
-				b4: true
-				b5: false
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				string: "definitely will not work"
-			}
-			source: ".bool = to_bool(.string)"
-			output: {
-				error: remap.errors.ArgumentError
+			output: log: {
+				string:  true
+				float:   false
+				null:    false
+				integer: true
+				boolean: false
 			}
 		},
 	]

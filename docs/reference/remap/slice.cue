@@ -33,42 +33,20 @@ remap: functions: slice: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"Supercalifragilisticexpialidocious"#
-			}
+			title: "Slice a string (positve index)"
+			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.slice = slice(.text, start=5, end=13)
+				.text = slice(.text, start=5, end=13)
 				"""#
-			output: {
-				text:  #"Supercalifragilisticexpialidocious"#
-				slice: "califrag"
-			}
+			output: log: text: "califrag"
 		},
 		{
-			title: "From End"
-			input: {
-				text: #"Supercalifragilisticexpialidocious"#
-			}
+			title: "Slice a string (negative index)"
+			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.slice = slice(.text, start=5, end=-14)
+				.text = slice(.text, start=5, end=-14)
 				"""#
-			output: {
-				text:  #"Supercalifragilisticexpialidocious"#
-				slice: "califragilistic"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: #"Super"#
-			}
-			source: #"""
-				.slice = slice(.text, start=10)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: text: "califragilistic"
 		},
 	]
 }
