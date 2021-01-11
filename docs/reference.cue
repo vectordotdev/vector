@@ -83,8 +83,8 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	close({log: #LogEvent}) |
-	close({metric: #MetricEvent})
+	{log: #LogEvent} |
+	{metric: #MetricEvent}
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -151,7 +151,7 @@ _values: {
 	message?:   string | null
 	timestamp?: string | null
 	#Any
-}
+} | {}
 
 #Map: [string]: string
 
@@ -494,10 +494,10 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
-components:    _
-configuration: _
-data_model:    _
-installation:  _
-process:       _
-releases:      _
-remap:         _
+components:    _ | *{}
+configuration: _ | *{}
+data_model:    _ | *{}
+installation:  _ | *{}
+process:       _ | *{}
+releases:      _ | *{}
+remap:         _ | *{}

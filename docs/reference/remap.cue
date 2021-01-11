@@ -37,12 +37,12 @@ remap: {
 			#RemapExample: {
 				title: string
 				configuration?: [string]: string
-				input:   #Fields
+				input:   #Event
 				source:  string
 				raises?: string
 
 				if raises == _|_ {
-					output: #Fields
+					output: #Event
 				}
 			}
 
