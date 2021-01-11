@@ -11,10 +11,10 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  help functions  Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  next            Load the next object or create a new one
-  prev            Load the previous object
-  exit            Terminate the program
+  help function  Display a list of currently available VRL functions (aliases: ["help func", "help f"])
+  next           Load the next object or create a new one
+  prev           Load the previous object
+  exit           Terminate the program
 "#;
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
