@@ -8,16 +8,15 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
-<<<<<<< HEAD
 const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
-=======
+
 const HELP_TEXT: &str = "
 VRL REPL commands:
+  docs      Navigate to the VRL docs on the Vector website
   next      Load the next object or create a new one
   prev      Load the previous object
   exit      Terminate the program
 ";
->>>>>>> master
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
