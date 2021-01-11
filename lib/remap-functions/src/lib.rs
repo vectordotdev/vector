@@ -36,6 +36,8 @@ mod ip_subnet;
 mod ip_to_ipv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 mod ipv6_to_ipv4;
+#[cfg(feature = "is_nullish")]
+mod is_nullish;
 #[cfg(feature = "log")]
 mod log;
 #[cfg(feature = "match")]
@@ -104,6 +106,8 @@ mod to_float;
 mod to_int;
 #[cfg(feature = "to_string")]
 mod to_string;
+#[cfg(feature = "to_syslog_facility")]
+mod to_syslog_facility;
 #[cfg(feature = "to_syslog_level")]
 mod to_syslog_level;
 #[cfg(feature = "to_syslog_severity")]
@@ -161,6 +165,8 @@ pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+#[cfg(feature = "is_nullish")]
+pub use is_nullish::IsNullish;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
@@ -225,6 +231,8 @@ pub use to_float::ToFloat;
 pub use to_int::ToInt;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
+#[cfg(feature = "to_syslog_facility")]
+pub use to_syslog_facility::ToSyslogFacility;
 #[cfg(feature = "to_syslog_level")]
 pub use to_syslog_level::ToSyslogLevel;
 #[cfg(feature = "to_syslog_severity")]
@@ -242,10 +250,6 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
-        #[cfg(feature = "md5")]
-        Box::new(Md5),
-        #[cfg(feature = "sha1")]
-        Box::new(Sha1),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -286,8 +290,12 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_nullish")]
+        Box::new(IsNullish),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
         #[cfg(feature = "now")]
@@ -324,6 +332,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Replace),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
         #[cfg(feature = "sha2")]
         Box::new(Sha2),
         #[cfg(feature = "sha3")]
@@ -344,6 +354,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_syslog_facility")]
+        Box::new(ToSyslogFacility),
         #[cfg(feature = "to_syslog_level")]
         Box::new(ToSyslogLevel),
         #[cfg(feature = "to_syslog_severity")]

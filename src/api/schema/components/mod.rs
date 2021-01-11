@@ -37,7 +37,7 @@ impl ComponentsQuery {
         last: Option<i32>,
     ) -> relay::ConnectionResult<Component> {
         relay::query(
-            state::filter_components(|(_name, components)| Some(components.clone())).into_iter(),
+            state::get_components().into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -45,18 +45,51 @@ impl ComponentsQuery {
     }
 
     /// Configured sources
-    async fn sources(&self) -> Vec<source::Source> {
-        state::get_sources()
+    async fn sources(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<source::Source> {
+        relay::query(
+            state::get_sources().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured transforms
-    async fn transforms(&self) -> Vec<transform::Transform> {
-        state::get_transforms()
+    async fn transforms(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<transform::Transform> {
+        relay::query(
+            state::get_transforms().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Configured sinks
-    async fn sinks(&self) -> Vec<sink::Sink> {
-        state::get_sinks()
+    async fn sinks(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> relay::ConnectionResult<sink::Sink> {
+        relay::query(
+            state::get_sinks().into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
     }
 
     /// Gets a configured component by name

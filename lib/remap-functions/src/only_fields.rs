@@ -46,7 +46,7 @@ impl Expression for OnlyFieldsFn {
             .iter()
             .map(|path| (path, path.to_string()))
             .filter(|(_, key)| paths.iter().find(|p| key.starts_with(p.as_str())).is_none())
-            .try_for_each(|(path, _)| object.remove(&path, true))?;
+            .try_for_each(|(path, _)| object.remove(&path, true).map(|_| ()))?;
 
         Ok(Value::Null)
     }

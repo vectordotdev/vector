@@ -42,7 +42,9 @@ members = [
   "lib/k8s-test-framework",
   "lib/portpicker",
   "lib/prometheus-parser",
+  "lib/vector-api-client",
   "lib/remap-cli",
+  "lib/remap-lang",
   "lib/remap-functions",
   "lib/remap-lang",
   "lib/shared",
@@ -61,6 +63,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+remap-cli = { path = "lib/remap-cli", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -288,6 +291,9 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
+
+# VRL
+vrl-cli = ["remap-cli"]
 
 # API
 api = [

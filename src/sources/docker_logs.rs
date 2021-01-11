@@ -26,6 +26,7 @@ use futures::{Stream, StreamExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     future::ready,
     path::PathBuf,
@@ -51,6 +52,12 @@ const CONTAINER: &str = "container_id";
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+}
+
+#[derive(Debug, Snafu)]
+enum Error {
+    #[snafu(display("URL has no host."))]
+    NoHost,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -603,10 +610,8 @@ impl EventStreamBuilder {
                     container_id: id.as_str()
                 }),
             }
-            // In case of any error we have to notify the main thread that it should try again. This is %error because the API doesn't support Display.
-            if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", %error);
-            }
+
+            this.finish(Err(id));
         });
 
         ContainerState::new_running()
@@ -620,7 +625,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -700,10 +705,14 @@ impl EventStreamBuilder {
             Ok(()) => Ok(info),
             Err(crate::pipeline::ClosedError) => Err(info.id),
         };
-        // This is %error because the API doesn't support Display.
-        if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", %error);
-        }
+
+        self.finish(result);
+    }
+
+    fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
+        // This can legaly fail when shutting down, and any other
+        // reason should have been logged in the main future.
+        let _ = self.main_send.send(result);
     }
 }
 
@@ -1041,11 +1050,18 @@ fn default_certs() -> Option<DockerTlsConfig> {
     })
 }
 
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, DockerError> {
+fn get_authority(url: &str) -> Result<String, Error> {
+    url.parse::<Uri>()
+        .ok()
+        .and_then(|uri| uri.authority().map(<_>::to_string))
+        .ok_or(Error::NoHost)
+}
+
+fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
-        None => Docker::connect_with_local_defaults(),
+        None => Docker::connect_with_local_defaults().map_err(Into::into),
 
         Some(host) => {
             let scheme = host
@@ -1055,9 +1071,12 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
 
             match scheme.as_ref().map(|scheme| scheme.as_str()) {
                 Some("http") => {
+                    let host = get_authority(&host)?;
                     Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
                 }
                 Some("https") => {
+                    let host = get_authority(&host)?;
                     let tls = tls
                         .or_else(default_certs)
                         .ok_or(DockerError::NoCertPathError)?;
@@ -1069,9 +1088,13 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> Result<Docker, 
                         DEFAULT_TIMEOUT,
                         API_DEFAULT_VERSION,
                     )
+                    .map_err(Into::into)
                 }
-                // unix socket on unix, named pipe on windows
-                _ => Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION),
+                Some("unix") | Some("npipe") | None => {
+                    Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
+                }
+                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
             }
         }
     }

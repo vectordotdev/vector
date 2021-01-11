@@ -92,4 +92,10 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmark_files_without_partitions);
+criterion_group!(
+    name = benches;
+    // encapsulates inherent CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_files_without_partitions
+);

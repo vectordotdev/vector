@@ -14,9 +14,11 @@ impl Object for Value {
         self.paths().map_err(|err| err.to_string())
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+        let value = self.get(path)?;
         self.remove_by_path(path, compact);
-        Ok(())
+
+        Ok(value)
     }
 }
 
@@ -195,8 +197,16 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
+                vec![Field(Regular("baz".to_owned()))],
+                false,
+                None,
+                Some(value!({foo: "bar"})),
+            ),
+            (
+                value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned()))],
                 false,
+                Some(value!("bar")),
                 Some(value!({})),
             ),
             (
@@ -206,30 +216,35 @@ mod tests {
                     Regular("foo".to_owned()),
                 ])],
                 false,
+                Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
                 vec![],
                 false,
+                Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
                 vec![],
                 true,
+                Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
+                Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
+                Some(value!(0)),
                 Some(value!({})),
             ),
             (
@@ -240,6 +255,7 @@ mod tests {
                     Index(0),
                 ],
                 false,
+                Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
@@ -250,15 +266,16 @@ mod tests {
                     Index(0),
                 ],
                 true,
+                Some(value!(0)),
                 Some(value!({bar: "baz"})),
             ),
         ];
 
-        for (mut object, segments, compact, expect) in cases {
+        for (mut object, segments, compact, value, expect) in cases {
             let path = Path::new_unchecked(segments);
 
-            assert_eq!(Object::remove(&mut object, &path, compact), Ok(()));
-            assert_eq!(Object::get(&object, &Path::root()), Ok(expect))
+            assert_eq!(Object::remove(&mut object, &path, compact), Ok(value));
+            assert_eq!(Object::get(&object, &Path::root()), Ok(expect));
         }
     }
 

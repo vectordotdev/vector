@@ -9,47 +9,58 @@ impl Function for Del {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        generate_param_list! {
-            accepts = |_| true,
-            required = false,
-            keywords = [
-                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
-            ],
-        }
+        &[Parameter {
+            keyword: "path",
+            accepts: |_| true,
+            required: true,
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let mut paths = vec![];
-        paths.push(arguments.required_path("1")?);
+        let path = arguments.required_path("path")?;
 
-        for i in 2..=16 {
-            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
-                paths.push(path)
-            }
-        }
-
-        Ok(Box::new(DelFn { paths }))
+        Ok(Box::new(DelFn { path }))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DelFn {
-    paths: Vec<Path>,
+    path: Path,
+}
+
+impl DelFn {
+    #[cfg(test)]
+    fn new(path: Path) -> Self {
+        Self { path }
+    }
 }
 
 impl Expression for DelFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        self.paths
-            .iter()
-            .try_for_each(|path| object.remove(path.as_ref(), false))?;
-
-        Ok(Value::Null)
+        // TODO: we're silencing the result of the `remove` call here, to make
+        // this function infallible.
+        //
+        // This isn't correct though, since, while deleting Vector log fields is
+        // infallible, deleting metric fields is not.
+        //
+        // For example, if you try to delete `.name` in a metric event, the call
+        // returns an error, since this is an immutable field.
+        //
+        // After some debating, we've decided to _silently ignore_ deletions of
+        // immutable fields for now, but we'll circle back to this in the near
+        // future to potentially improve this situation.
+        //
+        // see tracking issue: https://github.com/timberio/vector/issues/5887
+        Ok(object
+            .remove(self.path.as_ref(), false)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            fallible: true,
-            kind: value::Kind::Null,
+            kind: value::Kind::all(),
             ..Default::default()
         }
     }
@@ -58,15 +69,65 @@ impl Expression for DelFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map;
+    use std::str::FromStr;
 
-    test_type_def![static_type_def {
-        expr: |_| DelFn {
-            paths: vec![Path::from("foo")]
-        },
-        def: TypeDef {
-            fallible: true,
-            kind: value::Kind::Null,
-            ..Default::default()
-        },
-    }];
+    #[test]
+    fn del() {
+        let cases = vec![
+            (
+                // String field exists
+                map!["exists": "value"],
+                Ok(value!("value")),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // String field doesn't exist
+                map!["exists": "value"],
+                Ok(value!(null)),
+                DelFn::new(Path::from("does_not_exist")),
+            ),
+            (
+                // Array field exists
+                map!["exists": value!([1, 2, 3])],
+                Ok(value!([1, 2, 3])),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Null field exists
+                map!["exists": value!(null)],
+                Ok(value!(null)),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Map field exists
+                map!["exists": map!["foo": "bar"]],
+                Ok(value!(map!["foo": "bar"])),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Integer field exists
+                map!["exists": 127],
+                Ok(value!(127)),
+                DelFn::new(Path::from("exists")),
+            ),
+            (
+                // Array field exists
+                map!["exists": value!([1, 2, 3])],
+                Ok(value!(2)),
+                DelFn::new(remap::Path::from_str(".exists[1]").unwrap().into()),
+            ),
+        ];
+
+        let mut state = state::Program::default();
+
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
+        }
+    }
 }
