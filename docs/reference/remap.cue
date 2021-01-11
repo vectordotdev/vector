@@ -343,7 +343,7 @@ remap: {
 				`.status_code`, `.username`, and `.message`. You can assign new values to the
 				existing fields (`.message = "something different"`), add new fields (`.new_field =
 				"new value"`), delete fields (`del(.username)`), store those values in variables
-				(`$code = .status_code`), and more.
+				(`code = .status_code`), and more.
 
 				### Nested values
 
@@ -373,7 +373,7 @@ remap: {
 				In the examples above, all paths have used literals à la `.foo.bar`. But path
 				segments can also be quoted, as in this example:
 
-				```
+				```js
 				user.preferences."favorite color" = "chartreuse"
 				```
 
@@ -382,13 +382,13 @@ remap: {
 				### Indexing
 
 				Values inside VRL arrays can be accessed via index (beginning with 0). For the array
-				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
+				`primary = ["magenta", "yellow", "cyan"]`, `primary[0]` would yield `"magenta"`.
 
 				You can also assign values to arrays by index:
 
-				```
-				$stooges = ["Larry", "Moe"]
-				$stooges[2] = "Curly"
+				```js
+				stooges = ["Larry", "Moe"]
+				stooges[2] = "Curly"
 				```
 
 				You can even assign values to arbitrary indices in arrays; any indices that need to
@@ -401,7 +401,7 @@ remap: {
 				All of the path methods above can be combined in any way. Here's an example of a
 				complex path:
 
-				```
+				```js
 				.transaction.(metadata | info).orders[0] = "a1b2c3d4e5f6"
 				```
 
@@ -441,7 +441,7 @@ remap: {
 				{in: #"contains("emergency", "this is an emergency")"#, out:     "boolean"},
 				{
 					in: """
-						$is_success = { $code = .status_code; del(.status_code); $code == 200 }
+						is_success = { code = .status_code; del(.status_code); code == 200 }
 						"""
 					out: "boolean"
 				},
@@ -454,7 +454,7 @@ remap: {
 			description: #"""
 				VRL expressions can be split across multiple lines using a backslash (`\`):
 
-				```
+				```js
 				del(.one, .two, .three, .four \
 					.five, .six)
 				```
@@ -465,8 +465,8 @@ remap: {
 				Conversely, multiple expressions can be collapsed into a single line using a
 				semicolon (`;`) as the separator:
 
-				```
-				$success_code = 200; .success = .success_code == $success_code; del(.success_code)
+				```js
+				success_code = 200; .success = .success_code == success_code; del(.success_code)
 				```
 
 				You can also use line collapsing via semicolon in [control flow
@@ -498,7 +498,7 @@ remap: {
 				be called on any expression that returns a Boolean. Here's a generic example of the
 				syntax:
 
-				```
+				```js
 				if (condition) {
 					...
 				} else if (other_condition) {
@@ -511,9 +511,12 @@ remap: {
 				Any number of expressions can be combined inside of a block if they're separated by
 				a semicolon (`;`), provided that the last expression resolves to a Boolean:
 
-				```
-				if ($keyword = "sesame"; .password == $keyword) {
+				```js
+				.password = "sesame"
+
+				if (keyword = "sesame"; .password == keyword) {
 					.entry = true
+					del(.password)
 				}
 				```
 				"""
@@ -537,12 +540,11 @@ remap: {
 				equals sign (`=`). Some examples:
 
 				* `.is_success = .code > 200 && .code <= 299`
-				* `$pattern = /foo|bar/i`
-				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
+				* `is_severe = to_syslog_level(.severity) == \"severity\"
 
-				In VRL, `=` represents assignment, while `==` is a [comparison
-				operator](#operators), as in many programming languages.
+				In VRL, `=` represents assignment while `==` is a [comparison operator](#operators),
+				as in many programming languages.
 
 				If you assign a value to an object field that doesn't already exist, the field is
 				created; if the field does exist, the value is re-assigned.
@@ -553,7 +555,7 @@ remap: {
 
 			examples: [
 				".request_id = uuid_v4()",
-				"$average = .total / .number",
+				"average = to_float(.total / .number)",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
 			]
@@ -588,35 +590,35 @@ remap: {
 			href: "variables"
 
 			description: """
-				You can assign values to variables in VRL. Variables in VRL are prefixed with a `$`
-				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
-				`$my_var`, `$this_is_my_variable123`, etc. Here's an example usage of a variable:
+				You can assign values to variables in VRL. You can use any bare word for a variable
+				in VRL, with the exception of VLR's [reserved terms](#reserved-terms). Here's an
+				example usage of a variable:
 
-				```
-				$log_level = "critical"
-				.log_level = $log_level
+				```js
+				log_level = "critical"
+				.log_level = log_level
 				```
 
 				### Assignment using expressions
 
-				Because all VRL expressions return a value (by definition), you can assign using
-				expressions as well:
+				Because all VRL expressions return a value (by definition), you can assign the
+				result of expressions to variables as well:
 
-				```
-				$is_success = .status_code == 200
-				$has_buzzword = contains(.message, "serverless")
+				```js
+				is_success = .status_code == 200
+				has_buzzword = contains(.message, "serverless")
 				```
 				"""
 
 			examples: [
-				"$status_code = .code",
-				#"$is_critical = .log_level == "critical""#,
-				#"$creepy_greeting = "Hello, Clarice""#,
-				#"""
-					$is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
-					.has_proper_format = $is_url
+				"status_code = .code",
+				#"is_critical = .log_level == "critical""#,
+				#"creepy_greeting = "Hello, Clarice""#,
+				"""
+					is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
+					.has_proper_format = is_url
 					del(.url)
-					"""#,
+					""",
 			]
 		}
 
@@ -626,42 +628,38 @@ remap: {
 			description: """
 				VRL supports organizing expressions into blocks using curly braces. Everything
 				inside of a block is evaluated as a single expression. In this example, the value
-				assigned to the variable `$success` is `true` if the value of the `status_code`
+				assigned to the variable `success` is `true` if the value of the `status_code`
 				field is `201`:
 
-				```
-				$very_important = {
-					$fail_code = .status_code >= 500
-					$paying_customer = .user.plan == "enterprise"
+				```js
+				.very_important_event = {
+					fail_code = .status_code >= 500
+					paying_customer = .user.plan == "enterprise"
 
-					$fail_code && $paying_custmer
+					fail_code && paying_customer
 				}
 				```
-
-				Blocks are particularly useful in conjunction with variables, as in the example
-				above.
 
 				You can also collapse blocks into a single line by separating the expressions with a
 				semicolon (`;`), as in this block:
 
-				```
-				$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }
+				```js
+				not_important = { success_code = .status_code == 200; debug_msg = .level == "debug"; success_code && debug_msg }
 				```
 				"""
 
 			examples: [
-				#"$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }"#,
 				"""
-					$very_important = {
-						$fail_code = .status_code >= 500
+					very_important = {
+						fail_code = .status_code >= 500
 						del(.status_code)
-						$paying_customer = .user.plan == "enterprise"
+						paying_customer = .user.plan == "enterprise"
 						del(.user)
 
-						$fail_code && $paying_custmer
+						fail_code && paying_customer
 					}
 
-					.if ($very_important) {
+					if very_important {
 						.important = true
 					}
 					""",
