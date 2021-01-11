@@ -100,9 +100,19 @@ impl SinkConfig for RemoteWriteConfig {
             let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
-                    let tenant_id = tenant_id
-                        .as_ref()
-                        .map(|template| template.render_string(&event).expect("FIXME"));
+                    let tenant_id = tenant_id.as_ref().and_then(|template| {
+                        template
+                            .render_string(&event)
+                            .or_else(|fields| {
+                                error!(
+                                    message = "Tenant template contains missing fields",
+                                    ?fields,
+                                    rate_limit_secs = 30,
+                                );
+                                Err(())
+                            })
+                            .ok()
+                    });
                     let key = PartitionKey { tenant_id };
                     let inner = PartitionInnerBuffer::new(event, key);
                     stream::iter(Some(Ok(inner)))
