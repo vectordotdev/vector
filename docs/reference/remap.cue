@@ -546,6 +546,9 @@ remap: {
 
 				If you assign a value to an object field that doesn't already exist, the field is
 				created; if the field does exist, the value is re-assigned.
+
+				VRL also supports [conditional assignment](#conditional-assignment) based on the
+				return value of functions.
 				"""
 
 			examples: [
@@ -553,6 +556,31 @@ remap: {
 				"$average = .total / .number",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
+			]
+		}
+
+		"Conditional assignment": {
+			href: "conditional-assignment"
+
+			description: """
+				In VRL, conditional assignment is [assignment](#assignment) to a field or variable
+				only if the right-hand-side expression succeeds. It uses the `??=` operator (a
+				combination of `=` for assignemtn and `??` for [coalescence](#coalescence)). Here's
+				an example of conditional assignment:
+
+				```js
+				. ??= parse_json(.message)
+				```
+
+				In this case, the root event field is assigned the parsed JSON value of the
+				`message` *only if JSON parsing succeeds*; if it fails, the assignment doesn't
+				occur.
+				"""
+
+			examples: [
+				". ??= parse_json(.message)",
+				".timestamp ??= to_unix_timestamp(.timestamp)",
+				""
 			]
 		}
 
