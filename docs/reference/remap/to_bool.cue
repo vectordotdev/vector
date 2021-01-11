@@ -22,8 +22,8 @@ remap: functions: to_bool: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
+			title: "Cast a value to a boolean"
+			input: log: {
 				string:  "yes"
 				float:   0.0
 				"null":  null
@@ -37,7 +37,7 @@ remap: functions: to_bool: {
 				.b4 = to_bool(.integer)
 				.b5 = to_bool(.boolean)
 				"""
-			output: {
+			output: log: {
 				b1: true
 				b2: false
 				b3: false
