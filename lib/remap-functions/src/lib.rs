@@ -114,6 +114,8 @@ mod to_syslog_level;
 mod to_syslog_severity;
 #[cfg(feature = "to_timestamp")]
 mod to_timestamp;
+#[cfg(feature = "to_unix_timestamp")]
+mod to_unix_timestamp;
 #[cfg(feature = "tokenize")]
 mod tokenize;
 #[cfg(feature = "truncate")]
@@ -239,6 +241,8 @@ pub use to_syslog_level::ToSyslogLevel;
 pub use to_syslog_severity::ToSyslogSeverity;
 #[cfg(feature = "to_timestamp")]
 pub use to_timestamp::ToTimestamp;
+#[cfg(feature = "to_unix_timestamp")]
+pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "tokenize")]
 pub use tokenize::Tokenize;
 #[cfg(feature = "truncate")]
@@ -364,6 +368,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToString),
         #[cfg(feature = "to_timestamp")]
         Box::new(ToTimestamp),
+        #[cfg(feature = "to_unix_timestamp")]
+        Box::new(ToUnixTimestamp),
         #[cfg(feature = "tokenize")]
         Box::new(Tokenize),
         #[cfg(feature = "truncate")]
