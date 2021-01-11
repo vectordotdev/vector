@@ -41,7 +41,7 @@ pub struct FixedRetryPolicy<L> {
 }
 
 pub struct RetryPolicyFuture<L: RetryLogic> {
-    delay: Sleep,
+    delay: Pin<Box<Sleep>>,
     policy: FixedRetryPolicy<L>,
 }
 
@@ -79,7 +79,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
 
     fn build_retry(&self) -> RetryPolicyFuture<L> {
         let policy = self.advance();
-        let delay = sleep(self.backoff());
+        let delay = Box::pin(sleep(self.backoff()));
 
         debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
         RetryPolicyFuture { delay, policy }

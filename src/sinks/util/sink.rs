@@ -180,7 +180,7 @@ where
     batch: StatefulBatch<B>,
     partitions: HashMap<K, StatefulBatch<B>>,
     timeout: Duration,
-    lingers: HashMap<K, Sleep>,
+    lingers: HashMap<K, Pin<Box<Sleep>>>,
     closing: bool,
 }
 
@@ -249,7 +249,7 @@ where
             self.partitions.insert(partition.clone(), batch);
 
             let delay = sleep(self.timeout);
-            self.lingers.insert(partition.clone(), delay);
+            self.lingers.insert(partition.clone(), Box::pin(delay));
         };
 
         if let PushResult::Overflow(item) = batch.push(item) {
