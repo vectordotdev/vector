@@ -634,7 +634,7 @@ remap: {
 				```js
 				.very_important_event = {
 					fail_code = .status_code >= 500
-					paying_customer = .user.plan == "enterprise"
+					paying_customer = .user.plan == \"enterprise\"
 
 					fail_code && paying_customer
 				}
@@ -644,12 +644,12 @@ remap: {
 				semicolon (`;`), as in this block:
 
 				```js
-				not_important = { success_code = .status_code == 200; debug_msg = .level == "debug"; success_code && debug_msg }
+				not_important = { success_code = .status_code == 200; debug_msg = .level == \"debug\"; success_code && debug_msg }
 				```
 				"""
 
 			examples: [
-				"""
+				#"""
 					very_important = {
 						fail_code = .status_code >= 500
 						del(.status_code)
@@ -662,7 +662,7 @@ remap: {
 					if very_important {
 						.important = true
 					}
-					""",
+					"""#,
 			]
 		}
 
