@@ -43,6 +43,13 @@ remap: functions: compact: {
 			default:     true
 			type: ["boolean"]
 		},
+		{
+			name:        "nullish"
+			description: "Tests if the value is nullish."
+			required:    false
+			default:     false
+			type: ["boolean"]
+		},
 	]
 	return: ["array", "map"]
 	category: "Enumerate"
@@ -52,6 +59,13 @@ remap: functions: compact: {
 		`array`.
 		Specify recursive, if recursive structures should also be compacted, the routine
 		will recurse along and `Array`s or `Map`s and compact those structures.
+		The following are considered nullish in VRL:
+
+		* `null`
+		* A single dash (`"-"`)
+		* Any string that contains only whitespace characters as defined by the the [Unicode
+		  definition of the `White_Space` property](\(urls.unicode_whitespace)). That includes
+		  empty strings (`""`), common characters like `"\n"`, "\r", and others.
 		"""#
 	examples: [
 		{
