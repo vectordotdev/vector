@@ -18,21 +18,25 @@ remap: functions: assert: {
 	return: ["null"]
 	category: "Test"
 	description: #"""
-			Checks a given condition. If that condition evaluates to false the event is aborted with
-			an error message provided.
+		Checks a given condition. If that condition evaluates to false the event is aborted with
+		an error message provided.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				foo: #"bar"#
-			}
+			title: "True assertion"
+			input: log: foo: "foo"
 			source: #"""
-				assert(.foo == "buzz", message = "Foo must be buzz!")
+				assert(.foo == "foo", message = "Foo must be foo!")
 				"""#
-			output: {
-				error: "Foo must be buzz!"
-			}
+			output: input
+		},
+		{
+			title: "False assertion"
+			input: log: foo: "bar"
+			source: #"""
+				assert(.foo == "foo", message = "Foo must be foo!")
+				"""#
+			raises: "Foo must be foo!"
 		},
 	]
 }

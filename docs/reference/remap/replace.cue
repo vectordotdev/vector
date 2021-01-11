@@ -42,55 +42,28 @@ remap: functions: replace: {
 		"""#
 	examples: [
 		{
-			title: "Text match"
-			input: {
-				text: #"Apples and Bananas"#
-			}
+			title: "Replace literal text"
+			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.replaced = replace(.text, "and", "not")
+				.message = replace(.message, "and", "not")
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "Apples not Bananas"
-			}
+			output: log: message: "Apples not Bananas"
 		},
 		{
-			title: "Regular expression match"
-			input: {
-				text: #"Apples and Bananas"#
-			}
+			title: "Replace via regular expression"
+			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.replaced = replace(.text, /bananas/i, "Pineapples")
+				.message = replace(.message, /bananas/i, "Pineapples")
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "apples and Pineapples"
-			}
+			output: log: message: "apples and Pineapples"
 		},
 		{
 			title: "Replace first instance"
-			input: {
-				text: #"Bananas and Bananas"#
-			}
+			input: log: message: #"Bananas and Bananas"#
 			source: #"""
-				.replaced = replace(.text, "Bananas", "Pineapples", count = 1)
+				.message = replace(.message, "Bananas", "Pineapples", count = 1)
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "Pineapples and Bananas"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.replaced = replace(.text, "42", "43")
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "Pineapples and Bananas"
 		},
 	]
 }

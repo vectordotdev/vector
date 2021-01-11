@@ -23,26 +23,12 @@ remap: functions: to_string: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: 52
-			}
+			title: "Convert number to string"
+			input: log: number: 52
 			source: #"""
-				.message = to_string(.message)
+				.number = to_string(.number)
 				"""#
-			output: {
-				message: "52"
-			}
-		},
-		{
-			title: "Default"
-			input: {
-				message: "Some invalid JSON"
-			}
-			source: "to_string(parse_json(.message), 42)"
-			output: {
-				message: 42
-			}
+			output: log: number: "52"
 		},
 	]
 }

@@ -30,26 +30,13 @@ remap: functions: ends_with: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"The Needle In The Haystack"#
-			}
+			title: "String ends with"
+			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
 				.contains = ends_with(.message, "the haystack", case_sensitive = false)
 				"""#
-			output: {
-				message:  #"The Needle In The Haystack"#
-				contains: true
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				message: "A string with 42"
-			}
-			source: ".contains = ends_with(.message, 42)"
-			output: {
-				error: remap.errors.ArgumentError
+			output: input & {
+				log: contains: true
 			}
 		},
 	]

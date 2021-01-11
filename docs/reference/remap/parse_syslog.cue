@@ -17,41 +17,30 @@ remap: functions: parse_syslog: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: """
-					<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
-					"""
-			}
-			source: ".parsed = parse_syslog(.message)"
-			output: {
-				message: """
-					<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
-					"""
-				parsed: {severity: "notice"
-							facility:    "user"
-							timestamp:   "2020-03-13T20:45:38.119Z"
-							hostname:    "dynamicwireless.name"
-							appname:     "non"
-							procid:      "2426"
-							msgid:       "ID931"
-							iut:         "3"
-							eventSource: "Application"
-							eventID:     "1011"
-							message:     "Try to override the THX port, maybe it will reboot the neural interface!"
-				}
+			title: "Parse Syslog meessage (success)"
+			input: log: message: """
+				<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
+				"""
+			source: ". = parse_syslog(del(.message))"
+			output: log: {
+				severity:    "notice"
+				facility:    "user"
+				timestamp:   "2020-03-13T20:45:38.119Z"
+				hostname:    "dynamicwireless.name"
+				appname:     "non"
+				procid:      "2426"
+				msgid:       "ID931"
+				iut:         "3"
+				eventSource: "Application"
+				eventID:     "1011"
+				message:     "Try to override the THX port, maybe it will reboot the neural interface!"
 			}
 		},
 		{
-			title: "Invalid Message"
-			input: {
-				message: "A simple message"
-			}
-			source: ".parsed = parse_syslog(.message)"
-			output: {
-				message: "A simple message"
-				parsed: {message: "A simple message"}
-			}
+			title: "Parse Syslog meessage (error)"
+			input: log: message: "I am not a Syslog message"
+			source: ". = parse_syslog(del(.message))"
+			raise:  "Failed to parse"
 		},
 	]
 }

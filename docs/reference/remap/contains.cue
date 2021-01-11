@@ -30,25 +30,23 @@ remap: functions: contains: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"The Needle In The Haystack"#
-			}
+			title: "String contains (case sensitive)"
+			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = contains(.message, "needle", case_sensitive = false)
+				.contains = contains(.message, "Needle")
 				"""#
-			output: {
-				contains: true
+			output: input & {
+				log: contains: true
 			}
 		},
 		{
-			title: "Error"
-			input: {
-				message: "A string with 42"
-			}
-			source: ".contains = contains(.message, 42)"
-			output: {
-				error: remap.errors.ArgumentError
+			title: "String contains (case insensitive)"
+			input: log: message: #"The Needle In The Haystack"#
+			source: #"""
+				.contains = contains(.message, "needle", case_sensitive = false)
+				"""#
+			output: input & {
+				log: contains: true
 			}
 		},
 	]
