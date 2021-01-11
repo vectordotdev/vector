@@ -132,7 +132,7 @@ impl Encoder {
         }
     }
 
-    fn encode_from_utf8_to_utf16(&mut self, input: &str, variant: &UTF16Encoding) -> Bytes {
+    fn encode_from_utf8_to_utf16(&mut self, input: &str, variant: UTF16Encoding) -> Bytes {
         let to_bytes_func = match variant {
             UTF16Encoding::LE => u16::to_le_bytes,
             UTF16Encoding::BE => u16::to_be_bytes,
@@ -148,7 +148,7 @@ impl Encoder {
     pub fn encode_from_utf8(&mut self, input: &str) -> Bytes {
         // alternate logic if the encoder is for a utf-16 encoding variant
         if let Some(variant) = self.utf16_encoding {
-            return self.encode_from_utf8_to_utf16(input, &variant);
+            return self.encode_from_utf8_to_utf16(input, variant);
         }
 
         let mut total_read_from_input = 0;
