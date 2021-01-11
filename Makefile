@@ -498,14 +498,13 @@ endif
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
 
-.PHONY: build-wasm-tests
+.PHONY: test-wasm-build-modules
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
 
 $(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
 $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
 	${MAYBE_ENVIRONMENT_EXEC} cargo build \
-		--target-dir target/ \
 		--manifest-path tests/data/wasm/${MODULE}/Cargo.toml \
 		--target wasm32-wasi \
 		--release \
