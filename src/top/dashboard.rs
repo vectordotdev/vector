@@ -73,6 +73,8 @@ impl HumanFormatter for i64 {
     }
 }
 
+static HEADER: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
+
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
@@ -120,7 +122,7 @@ impl<'a> Widgets<'a> {
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
         // Header columns
-        let header = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"]
+        let header = HEADER
             .iter()
             .map(|s| Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD)))
             .collect::<Vec<_>>();
