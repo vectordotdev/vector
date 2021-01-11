@@ -30,14 +30,14 @@ remap: functions: parse_regex_all: {
 			output: log: [
 				{
 					number: "first"
-					"0": "first group"
-					"1": "first"
+					"0":    "first group"
+					"1":    "first"
 				},
 				{
 					number: "second"
-					"0": "second group"
-					"1": "second"
-				}
+					"0":    "second group"
+					"1":    "second"
+				},
 			]
 		},
 	]

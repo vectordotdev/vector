@@ -35,7 +35,7 @@ remap: functions: starts_with: {
 			source: #"""
 				.starts = starts_with(.message, \"The Needle\")
 				"""#
-			output: input & {log: starts:  true}
+			output: input & {log: starts: true}
 		},
 		{
 			title: "String starts with (case insensitive)"
@@ -43,7 +43,7 @@ remap: functions: starts_with: {
 			source: #"""
 				.starts = starts_with(.message, \"the needle\", case_sensitive = false)
 				"""#
-			output: input & {log: starts:  true}
+			output: input & {log: starts: true}
 		},
 	]
 }

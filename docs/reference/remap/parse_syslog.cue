@@ -23,7 +23,7 @@ remap: functions: parse_syslog: {
 				"""
 			source: ". = parse_syslog(del(.message))"
 			output: log: {
-				severity: "notice"
+				severity:    "notice"
 				facility:    "user"
 				timestamp:   "2020-03-13T20:45:38.119Z"
 				hostname:    "dynamicwireless.name"
@@ -40,7 +40,7 @@ remap: functions: parse_syslog: {
 			title: "Parse Syslog meessage (error)"
 			input: log: message: "I am not a Syslog message"
 			source: ". = parse_syslog(del(.message))"
-			raise: "Failed to parse"
+			raise:  "Failed to parse"
 		},
 	]
 }
