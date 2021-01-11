@@ -24,47 +24,51 @@ impl DistributionStatistic {
             return None;
         }
 
-        let mut samples = Vec::new();
-        for (v, c) in values.iter().zip(counts.iter()) {
-            for _ in 0..*c {
-                samples.push(*v);
-            }
-        }
+        let mut bins = values
+            .iter()
+            .zip(counts.iter())
+            .filter(|(_, &c)| c > 0)
+            .map(|(v, c)| (*v, *c))
+            .collect::<Vec<_>>();
 
-        if samples.is_empty() {
+        if bins.is_empty() {
             return None;
         }
 
-        if samples.len() == 1 {
-            let val = samples[0];
+        if bins.len() == 1 {
+            let val = bins[0].0;
+            let count = bins[0].1;
             return Some(Self {
                 min: val,
                 max: val,
                 median: val,
                 avg: val,
-                sum: val,
-                count: 1,
+                sum: val * count as f64,
+                count: count as u64,
                 quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
             });
         }
 
-        samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        bins.sort_unstable_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(Ordering::Equal));
 
-        let length = samples.len() as f64;
-        let min = *samples.first().unwrap();
-        let max = *samples.last().unwrap();
+        let min = bins.first().unwrap().0;
+        let max = bins.last().unwrap().0;
+        let sum = bins.iter().map(|(v, c)| v * *c as f64).sum::<f64>();
+        let count = bins.iter().map(|(_, c)| *c).sum::<u32>();
+        let avg = sum / count as f64;
 
-        let median = samples[(0.50 * length - 1.0).round() as usize];
+        for i in 1..bins.len() {
+            bins[i].1 += bins[i - 1].1;
+        }
+
+        let median = find_sample(&bins, (0.50 * count as f64 - 1.0).round() as u32);
         let quantiles = quantiles
             .iter()
             .map(|&p| {
-                let sample = samples[(p * length - 1.0).round() as usize];
-                (p, sample)
+                let idx = (p * count as f64 - 1.0).round() as u32;
+                (p, find_sample(&bins, idx))
             })
             .collect();
-
-        let sum = samples.iter().sum();
-        let avg = sum / length;
 
         Some(Self {
             min,
@@ -72,10 +76,19 @@ impl DistributionStatistic {
             median,
             avg,
             sum,
-            count: samples.len() as u64,
+            count: count as u64,
             quantiles,
         })
     }
+}
+
+/// `bins` is a cumulative histogram
+fn find_sample(bins: &[(f64, u32)], index: u32) -> f64 {
+    let i = match bins.binary_search_by_key(&index, |(_, c)| *c) {
+        Ok(i) => i,
+        Err(i) => i,
+    };
+    bins[i].0
 }
 
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
