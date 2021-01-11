@@ -370,7 +370,7 @@ urls: {
 	toml_array:                                               "https://github.com/toml-lang/toml#array"
 	toml_table:                                               "https://github.com/toml-lang/toml#table"
 	toml_types:                                               "https://github.com/toml-lang/toml#table-of-contents"
-	vrl_reference:                                                      "https://vector.dev/docs/reference/remap/"
+	vrl_reference:                                            "https://vector.dev/docs/reference/remap/"
 	twelve_factor_app:                                        "https://12factor.net/"
 	ubuntu:                                                   "https://ubuntu.com/"
 	udp:                                                      "https://en.wikipedia.org/wiki/User_Datagram_Protocol"
