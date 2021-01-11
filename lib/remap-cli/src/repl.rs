@@ -8,7 +8,16 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
+<<<<<<< HEAD
 const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
+=======
+const HELP_TEXT: &str = "
+VRL REPL commands:
+  next      Load the next object or create a new one
+  prev      Load the previous object
+  exit      Terminate the program
+";
+>>>>>>> master
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
@@ -46,7 +55,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > Type `help` to learn more.
->      `next` to load the next object, or create a new one.
+>      `next` to either load the next object or create a new one.
 >      `prev` to load the previous object.
 >      `docs` to navigate to the VRL documentation.
 >      `exit` to terminate the program.
@@ -59,7 +68,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
-            Ok(line) if line == "help" => println!("You're on your own, for now"),
+            Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "docs" => open_docs_url(),
             Ok(line) if line == "exit" => break,
             Ok(line) if line == "quit" => break,
@@ -204,6 +213,10 @@ impl Validator for Repl {
     fn validate_while_typing(&self) -> bool {
         self.validator.validate_while_typing()
     }
+}
+
+fn print_help_text() {
+    println!("{}", HELP_TEXT);
 }
 
 fn open_docs_url() {

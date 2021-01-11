@@ -24,12 +24,10 @@ remap: functions: parse_regex: {
 		"""
 	examples: [
 		{
-			title: "Successful match"
-			input: {
-				message: "first group and second group."
-			}
-			source: ". = parse_regex(.message, /(?P<number>.*?) group/)"
-			output: {
+			title: "Parse via Regex"
+			input: log: message: "first group and second group."
+			source: ". = parse_regex(del(.message), /(?P<number>.*?) group/)"
+			output: log: {
 				number: "first"
 				"0":    "first group"
 				"1":    "first"

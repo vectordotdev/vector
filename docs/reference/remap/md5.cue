@@ -16,28 +16,12 @@ remap: functions: md5: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"foo"#
-			}
+			title: "Create md5 hash"
+			input: log: text: #"foo"#
 			source: #"""
 				.hash = md5(.text)
 				"""#
-			output: {
-				hash: "acbd18db4cc2f85cedef654fccc4a4d8"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.hash = sha1(.text)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: input & {log: hash: "acbd18db4cc2f85cedef654fccc4a4d8"}
 		},
 	]
 }
