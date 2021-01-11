@@ -6,23 +6,25 @@ remap: {
 	#RemapReturnTypes: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "string" | "timestamp"
 
 	{
-		description: """
+		description: #"""
 			**Vector Remap Language** (VRL) is a lean, single-purpose language for transforming observability data
 			(logs and metrics) in Vector. It features a simple [syntax](#syntax) and a rich set of built-in
 			[functions](#functions) tailored specifically to observability use cases. VRL is built on the following
 			two principles:
 
-			1. **Performance** - Built with Rust, VRL allows anyone to transform observability data with the speed and
-			   efficiency of Rust. Because VRL tightly integrates with Vector, it pays no performance penalty while
-			   events pass through the language, making it up 10x faster than alternatives. In addition, thoughtful
-			   ergonomics prevent users from writing slow scripts, avoiding the need to optimize VRL scripts, delivering
-			   on real-world production performance.
-			2. **Safety** - Explicit design decisions make VRL safe. Compile-time type and error safety ensure VRL
-			   scripts work expected, and thoughtful limitations prevent common footguns found in alternatives. Finally,
-			   memory safety ensures VRL is secure in even the most sensitive environments.
+			1. **Performance** — VRL is implemented in the very fast and efficient [Rust](\(urls.rust)) language and
+			   VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to
+			   transform observability with a minimal per-event performance penalty vis-à-vis pure Rust. In addition,
+			   ergonomic features such as compile-time correctness checks and the lack of language constructs like
+			   loops make it difficult to write scripts that are slow or buggy or require optimization.
+			2. **Safety** - VRL is a safe language in several senses: VRL scripts have access only to the event data
+			   that they handle and not, for example, to the Internet or the host; VRL provides the same strong memory
+			   safety guarantees as Rust; and, as mentioned above, compile-time correctness checks prevent VRL
+			   scripts from behaving in unexpected or sub-optimal ways. These factors distinguish VRL from other
+			   available event data transformation languages and runtimes.
 
-			Checkout the [announcement blog post](...) for more details.
-			"""
+			For a more in-depth picture, see the [announcement blog post](\(urls.vrl_announcement)) for more details.
+			"""#
 
 		functions: [Name=string]: {
 			#Argument: {
@@ -72,16 +74,16 @@ remap: {
 	types: {
 		"array": {
 			description: """
-				A list of values. Items in an array can be of any VRL type, including other arrays
-				and `null` (which is a value in VRL). Values inside VRL arrays can be accessed via
-				index (beginning with 0). For the array `$primary = ["magenta", "yellow", "cyan"]`,
-				for example, `$primary[0` yields `"magenta"`.
+				A list of values. Items in a VRL array can be of any type, including other arrays
+				and `null` (which is a value in VRL). You can access values insude arrays via
+				index (beginning with 0). For the array `primary = ["magenta", "yellow", "cyan"]`,
+				for example, `primary[0]` yields `"magenta"`.
 
 				You can also assign values to arrays by index:
 
-				```
-				$stooges = ["Larry", "Moe"]
-				$stooges[2] = "Curly"
+				```js
+				stooges = ["Larry", "Moe"]
+				stooges[2] = "Curly"
 				```
 
 				You can even assign values to arbitrary indices in arrays; indices that need to be
@@ -387,9 +389,9 @@ remap: {
 				.transaction.(metadata | info).orders[0] = "a1b2c3d4e5f6"
 				```
 
-				This sets the first element of `.transaction.metadata.orders` to `"a1b2c3d4e5f6"`
-				*if* `.transaction.metadata` exist; if not, it sets `.transaction.info.orders` to
-				that value.
+				This sets the first element of `.transaction.metadata.orders[0]` to `"a1b2c3d4e5f6"`
+				*if* `.transaction.metadata` exists; if not, it sets `.transaction.info.orders[0]`
+				to `"a1b2c3d4e5f6"` instead. If neither exists,
 				"""
 			examples: [
 				".",
