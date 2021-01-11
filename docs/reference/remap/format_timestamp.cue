@@ -23,30 +23,20 @@ remap: functions: format_timestamp: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				date: "2020-10-21T16:00:00Z"
-			}
+			title: "Format a timestamp (ISO8601/RFC 3339)"
+			input: log: {}
 			source: #"""
-				.timestamp = to_timestamp(.date)
-				.formatted = format_timestamp(.timestamp, format = "%v %R")
+				.timestamp = format_timestamp(now(), format = "%+")
 				"""#
-			output: {
-				formatted: "10-Oct-2020 16:00"
-			}
+			output: log: timestamp: "2020-10-21T16:00:00Z"
 		},
 		{
-			title: "Error"
-			input: {
-				date: "2020-10-21T16:00:00Z"
-			}
+			title: "Format a timestamp (custom)"
+			input: log: {}
 			source: #"""
-				.timestamp = to_timestamp(.date)
-				.formatted = format_timestamp(.timestamp, format = "NOTAFORMAT")
+				.timestamp = format_timestamp(now(), format = "%v %R")
 				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: timestamp: "10-Oct-2020 16:00"
 		},
 	]
 }

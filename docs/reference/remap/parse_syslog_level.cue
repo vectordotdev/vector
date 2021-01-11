@@ -17,24 +17,16 @@ remap: functions: parse_syslog_level: {
 		"""
 	examples: [
 		{
-			title: "Success"
-			input: {
-				severity: "5"
-			}
-			source: ".log_level = parse_syslog_level(.severity)"
-			output: {
-				level: "notice"
-			}
+			title: "Convert Syslog severity to level"
+			input: log: severity: 5
+			source: ".level = to_syslog_level(.severity)"
+			output: input & {log: level: "notice"}
 		},
 		{
 			title: "Error"
-			input: {
-				severity: "1337"
-			}
-			source: ".log_level = parse_syslog_level(.severity)"
-			output: {
-				error: remap.errors.ParseError
-			}
+			input: log: severity: 1337
+			source: ".level = to_syslog_level(.severity)"
+			raise:  "Failed to parse"
 		},
 	]
 }

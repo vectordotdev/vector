@@ -20,26 +20,18 @@ remap: functions: parse_json: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"{"key": "val"}"#
-			}
+			title: "Parse JSON (success)"
+			input: log: message: #"{"key": "val"}"#
 			source: #"""
-				. = parse_json(.message)
+				. = parse_json(del(.message))
 				"""#
-			output: {
-				key: "val"
-			}
+			output: log: key: "val"
 		},
 		{
-			title: "Error"
-			input: {
-				message: "{\"malformed\":"
-			}
-			source: "parse_json(.message)"
-			output: {
-				error: remap.errors.ParseError
-			}
+			title: "Parse JSON (success)"
+			input: log: message: "{\"malformed\":"
+			source: ". = parse_json(del(.message))"
+			raise:  "Failed to parse"
 		},
 	]
 }

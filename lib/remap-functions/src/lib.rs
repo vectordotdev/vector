@@ -80,6 +80,8 @@ mod parse_syslog_level;
 mod parse_syslog_severity;
 #[cfg(feature = "parse_timestamp")]
 mod parse_timestamp;
+#[cfg(feature = "parse_tokens")]
+mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
 #[cfg(feature = "redact")]
@@ -114,8 +116,8 @@ mod to_int;
 mod to_string;
 #[cfg(feature = "to_timestamp")]
 mod to_timestamp;
-#[cfg(feature = "tokenize")]
-mod tokenize;
+#[cfg(feature = "to_unix_timestamp")]
+mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
 #[cfg(feature = "upcase")]
@@ -205,6 +207,8 @@ pub use parse_syslog_level::ParseSyslogLevel;
 pub use parse_syslog_severity::ParseSyslogSeverity;
 #[cfg(feature = "parse_timestamp")]
 pub use parse_timestamp::ParseTimestamp;
+#[cfg(feature = "parse_tokens")]
+pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
 #[cfg(feature = "match")]
@@ -239,8 +243,8 @@ pub use to_int::ToInt;
 pub use to_string::ToString;
 #[cfg(feature = "to_timestamp")]
 pub use to_timestamp::ToTimestamp;
-#[cfg(feature = "tokenize")]
-pub use tokenize::Tokenize;
+#[cfg(feature = "to_unix_timestamp")]
+pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
 #[cfg(feature = "upcase")]
@@ -328,6 +332,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseSyslogSeverity),
         #[cfg(feature = "parse_timestamp")]
         Box::new(ParseTimestamp),
+        #[cfg(feature = "parse_tokens")]
+        Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
         #[cfg(feature = "match")]
@@ -364,8 +370,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToString),
         #[cfg(feature = "to_timestamp")]
         Box::new(ToTimestamp),
-        #[cfg(feature = "tokenize")]
-        Box::new(Tokenize),
+        #[cfg(feature = "to_unix_timestamp")]
+        Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
         #[cfg(feature = "upcase")]

@@ -580,23 +580,23 @@
       "c.equals" = "ar"
       "d.equals" = "ooba"
 
-[transforms.remap_function_tokenize]
+[transforms.remap_function_parse_tokens]
   inputs = []
   type = "remap"
   source = """
-    .a = tokenize(.a)
-    .b = tokenize(.b)
+    .a = parse_tokens(.a)
+    .b = parse_tokens(.b)
   """
 [[tests]]
-  name = "remap_function_tokenize"
+  name = "remap_function_parse_tokens"
   [tests.input]
-    insert_at = "remap_function_tokenize"
+    insert_at = "remap_function_parse_tokens"
     type = "log"
     [tests.input.log_fields]
       a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
       b = "bar"
   [[tests.outputs]]
-    extract_from = "remap_function_tokenize"
+    extract_from = "remap_function_parse_tokens"
     [[tests.outputs.conditions]]
       "a.length_eq" = 7
       "a[0].equals" = "217.250.207.207"
@@ -1560,6 +1560,29 @@
       "a.equals" = "daemon"
       "b.equals" = "ftp"
       "c.equals" = "local7"
+
+[transforms.remap_function_to_unix_timestamp]
+  inputs = []
+  type = "remap"
+  source = """
+    .secs = to_unix_timestamp(to_timestamp(.time))
+    .millis = to_unix_timestamp(to_timestamp(.time), unit: "milliseconds")
+    .nanos = to_unix_timestamp(to_timestamp(.time), unit: "nanoseconds")
+  """
+[[tests]]
+  name = "remap_function_to_unix_timestamp"
+  [tests.input]
+    insert_at = "remap_function_to_unix_timestamp"
+    type = "log"
+    [tests.input.log_fields]
+      time = "2020-09-14T12:53:44+03:00"
+  [[tests.outputs]]
+    extract_from = "remap_function_to_unix_timestamp"
+    [[tests.outputs.conditions]]
+      "secs.equals" = 1600077224
+      "millis.equals" = 1600077224000
+      "nanos.equals" = 1600077224000000000
+
 
 [transforms.remap_function_parse_syslog_level]
   inputs = []

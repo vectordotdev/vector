@@ -34,28 +34,20 @@ remap: functions: parse_duration: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				duration: "1005ms"
-			}
+			title: "Parse duration (milliseconds)"
+			input: log: duration: "1005ms"
 			source: #"""
 				.seconds = parse_duration(.duration, "s")
 				"""#
-			output: {
-				seconds: 1.005
-			}
+			output: input & {log: seconds: 1.005}
 		},
 		{
-			title: "Error"
-			input: {
-				duration: "1005years"
-			}
+			title: "Parse duration (error)"
+			input: log: duration: "1005years"
 			source: #"""
 				.seconds = parse_duration(.duration, "s")
 				"""#
-			output: {
-				error: remap.errors.ParseError
-			}
+			raise: "Failed to parse"
 		},
 	]
 }

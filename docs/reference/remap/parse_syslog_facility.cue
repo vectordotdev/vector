@@ -13,28 +13,20 @@ remap: functions: parse_syslog_facility: {
 	category:    "Coerce"
 	description: """
 		Converts a Syslog [facility code](\(urls.syslog_facility)) into its corresponding keyword,
-		i.e. 0 into `"kern"`, 1 into `"user", etc.
+		i.e. 0 into `\"kern\"`, 1 into `\"user\", etc.
 		"""
 	examples: [
 		{
-			title: "Success"
-			input: {
-				syslog_facility: "4"
-			}
-			source: ".log_facility = parse_syslog_facility(.syslog_facility)"
-			output: {
-				log_facility: "auth"
-			}
+			title: "Convert Syslog facility to level"
+			input: log: facility: "4"
+			source: ".level = parse_syslog_facility(.facility)"
+			output: input & {log: level: "auth"}
 		},
 		{
 			title: "Error"
-			input: {
-				syslog_facility: "1337"
-			}
-			source: ".log_facility = parse_syslog_facility(.syslog_facility)"
-			output: {
-				error: remap.errors.ParseError
-			}
-		},
+			input: log: facility: 27
+			source: ".level = parse_syslog_facility(.facility)"
+			raise:  "Failed to parse"
+		}
 	]
 }
