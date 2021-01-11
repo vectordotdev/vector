@@ -124,7 +124,8 @@ itertools = { version = "0.10.0", optional = true }
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.19.0", optional = true }
-tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
+pad = { version = "0.1.6", optional = true }
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
@@ -310,6 +311,7 @@ api-client = [
   "number_prefix",
   "crossterm",
   "tui",
+  "pad"
 ]
 
 # Sources

@@ -8,13 +8,14 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
+use pad::PadStr;
 use std::io::stdout;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, Paragraph, Row, Table, Wrap},
+    text::{Span, Spans, Text},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
 
@@ -73,8 +74,6 @@ impl HumanFormatter for i64 {
     }
 }
 
-static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
-
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
@@ -121,11 +120,29 @@ impl<'a> Widgets<'a> {
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+        // Column calculations. Factor 8 chars for 6x columns + padding
+        let padding = 8;
+
+        let width = f.size().width;
+        let width_10: usize = ((width / (100 / 10)) - padding).into();
+        let width_20: usize = ((width / (100 / 20)) - padding).into();
+
+        // Header columns
+        let events = "Events".pad_to_width_with_alignment(width_20, pad::Alignment::Right);
+        let bytes = "Bytes".pad_to_width_with_alignment(width_20, pad::Alignment::Right);
+        let errors = "Errors".pad_to_width_with_alignment(width_10, pad::Alignment::Right);
+
+        let header = ["Name", "Kind", "Type", &events, &bytes, &errors]
+            .iter()
+            .map(|s| Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD)))
+            .collect::<Vec<_>>();
+
+        // Data columns
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
             let formatted_metrics = [
-                match r.processed_events_total {
+                (match r.processed_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -136,7 +153,8 @@ impl<'a> Widgets<'a> {
                         },
                         r.processed_events_throughput_sec.human_format()
                     ),
-                },
+                })
+                .pad_to_width_with_alignment(width_20, pad::Alignment::Right),
                 match r.processed_bytes_total {
                     0 => "N/A".to_string(),
                     v => format!(
@@ -157,12 +175,12 @@ impl<'a> Widgets<'a> {
             ];
 
             data.extend_from_slice(&formatted_metrics);
-            Row::StyledData(data.into_iter(), Style::default())
+            Row::new(data).style(Style::default())
         });
 
-        let w = Table::new(COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(items)
+            .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
-            .header_gap(1)
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(20),
