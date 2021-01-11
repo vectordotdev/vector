@@ -44,7 +44,7 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     remove_timestamp: bool,
     #[serde(default)]
-    out_of_order: OutOfOrderAction,
+    out_of_order_action: OutOfOrderAction,
 
     auth: Option<Auth>,
 
@@ -126,7 +126,7 @@ impl SinkConfig for LokiConfig {
             PartitionBuffer::new(LokiBuffer::new(
                 batch_settings.size,
                 Default::default(),
-                config.out_of_order.clone(),
+                config.out_of_order_action.clone(),
             )),
             request_settings,
             batch_settings.timeout,

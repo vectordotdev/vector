@@ -84,14 +84,14 @@ pub struct LokiBuffer {
     partition: Option<PartitionKey>,
     latest_timestamps: Option<HashMap<Labels, i64>>,
     global_timestamps: GlobalTimestamps,
-    out_of_order: OutOfOrderAction,
+    out_of_order_action: OutOfOrderAction,
 }
 
 impl LokiBuffer {
     pub fn new(
         settings: BatchSize<Self>,
         global_timestamps: GlobalTimestamps,
-        out_of_order: OutOfOrderAction,
+        out_of_order_action: OutOfOrderAction,
     ) -> Self {
         Self {
             num_bytes: WRAPPER_OVERHEAD,
@@ -101,7 +101,7 @@ impl LokiBuffer {
             partition: None,
             latest_timestamps: None,
             global_timestamps,
-            out_of_order,
+            out_of_order_action,
         }
     }
 }
@@ -153,7 +153,7 @@ impl Batch for LokiBuffer {
                 .cloned()
                 .unwrap_or(item.event.timestamp);
             if item.event.timestamp < latest_timestamp {
-                match self.out_of_order {
+                match self.out_of_order_action {
                     OutOfOrderAction::Drop => return PushResult::Ok(false),
                     OutOfOrderAction::RewriteTimestamp => {
                         item.event.timestamp =
@@ -196,7 +196,7 @@ impl Batch for LokiBuffer {
         Self::new(
             self.settings,
             self.global_timestamps.clone(),
-            self.out_of_order.clone(),
+            self.out_of_order_action.clone(),
         )
     }
 
