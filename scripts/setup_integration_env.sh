@@ -18,7 +18,7 @@ INTEGRATION=$1
 ACTION=$2
 
 # Check container tool and default to podman
-if [ -z ${CONTAINER_TOOL} ]; then
+if [ -z "${CONTAINER_TOOL}" ]; then
 	echo "Container tool is unset, defaulting to podman"
 	CONTAINER_TOOL="podman"
 else
