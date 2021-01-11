@@ -43,7 +43,7 @@ remap: functions: contains: {
 			title: "String contains (case insensitive)"
 			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = contains(.message, "needle", case_sensitive = false)
+				.contains = contains(.message, "needle", case_sensitive: false)
 				"""#
 			output: input & {
 				log: contains: true

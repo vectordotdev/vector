@@ -72,7 +72,7 @@ remap: functions: compact: {
 			title: "Compact an array"
 			input: log: array: ["foo", "bar", "", null, [], "buzz"]
 			source: #"""
-				.log = compact(.array, string = true, array = true, null = true)
+				.log = compact(.array, string: true, array: true, null: true)
 				"""#
 			output: log: array: ["foo", "bar", "buzz"]
 		},
@@ -85,7 +85,7 @@ remap: functions: compact: {
 				field4: null
 			}
 			source: #"""
-				.map = compact(.map, string = true, array = true, null = true)
+				.map = compact(.map, string: true, array: true, null: true)
 				"""#
 			output: map: field1: 1
 		},
