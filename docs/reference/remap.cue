@@ -661,6 +661,35 @@ remap: {
 			]
 		}
 
+		"Comments": {
+			href: "comments"
+
+			description: #"""
+				VRL scripts allow for comments. Anything after `//` in a given line is considered a
+				comment, which means that entire lines can be commented out or only the latter part
+				of a line:
+
+				```js
+				// An old standby placeholder:
+				.lorem = "ipsem"
+
+				.stooges = ["Larry", "Moe"] // No Curly this time, sorry
+				```
+
+				As VRL scripts are pre-compiled, the presence of comments has no effect on
+				processing speed, so feel free to use comments as liberally as you need to.
+				"""#
+
+			examples: [
+				"""
+				// This is not processed
+				""",
+				"""
+				.this_is_processed = 123 // But this is ignored
+				"""
+			]
+		}
+
 		"Operators": {
 			href: "operators"
 
