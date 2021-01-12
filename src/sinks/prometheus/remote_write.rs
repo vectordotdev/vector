@@ -19,7 +19,7 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{convert::TryFrom, task};
+use std::task;
 use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
@@ -46,7 +46,7 @@ pub(crate) struct RemoteWriteConfig {
     pub request: TowerRequestConfig,
 
     #[serde(default)]
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<Template>,
 
     pub tls: Option<TlsOptions>,
 }
@@ -79,11 +79,7 @@ impl SinkConfig for RemoteWriteConfig {
         let quantiles = self.quantiles.clone();
 
         let client = HttpClient::new(tls_settings)?;
-        let tenant_id = self
-            .tenant_id
-            .as_deref()
-            .map(Template::try_from)
-            .transpose()?;
+        let tenant_id = self.tenant_id.clone();
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
         let service = RemoteWriteService {
