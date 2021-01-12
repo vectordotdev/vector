@@ -15,7 +15,6 @@ use std::str::FromStr;
 
 pub use kind::Kind;
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
