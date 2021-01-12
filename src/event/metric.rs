@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    str::FromStr,
 };
 use std::{
     convert::TryFrom,
@@ -603,6 +602,7 @@ mod test {
     use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use remap::{Path, Value};
+    use std::str::FromStr;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
