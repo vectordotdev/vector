@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{AnyCondition, Condition},
+    conditions::{Condition, ConditionConfig},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::SwimlanesEventDiscarded,
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
-    condition: AnyCondition,
+    condition: Box<dyn ConditionConfig>,
 }
 
 #[async_trait::async_trait]
@@ -65,7 +65,7 @@ impl FunctionTransform for Swimlane {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
-    lanes: IndexMap<String, AnyCondition>,
+    lanes: IndexMap<String, Box<dyn ConditionConfig>>,
 }
 
 inventory::submit! {
