@@ -3,9 +3,7 @@ use derive_is_enum_variant::is_enum_variant;
 use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
