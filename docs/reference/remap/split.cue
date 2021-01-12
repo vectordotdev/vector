@@ -21,11 +21,13 @@ remap: functions: split: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Splits the given string whenever a given pattern is matched. If `limit` is specified, after `limit` has been reached
-		the remainder of the string is returned unsplit.
+		Splits the given `value` via the provided `pattern`.
+
+		If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.
 		"""#
 	examples: [
 		{

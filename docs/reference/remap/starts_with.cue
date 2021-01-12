@@ -22,11 +22,11 @@ remap: functions: starts_with: {
 			default: true
 		},
 	]
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "String"
 	description: #"""
-		Determines if a given string begins with a given `substring`.
-		The search can be optionally case insensitive.
+		Determines if a given `valuye` begins with the given `substring`.
 		"""#
 	examples: [
 		{

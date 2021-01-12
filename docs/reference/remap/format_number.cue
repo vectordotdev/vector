@@ -29,10 +29,11 @@ remap: functions: format_number: {
 			default: ","
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "Number"
 	description: #"""
-		Returns a string representation of the given number.
+		Formats the given `value` into a string representation of the number.
 		"""#
 	examples: [
 		{

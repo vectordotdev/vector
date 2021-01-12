@@ -15,11 +15,11 @@ remap: functions: includes: {
 			type: ["any"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["boolean"]
 	category: "Enumerate"
 	description: """
-		Determines whether an item is contained in an array. The item can be of any type and arrays
-		can be of mixed types.
+		Determines whether the provided `values` contains the provided `item`.
 		"""
 	examples: [
 		{
