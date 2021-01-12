@@ -1046,10 +1046,12 @@ components: {
 			}
 		}
 
-		telemetry: metrics: {
-			// Default metrics for each component
-			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		if Kind == "transform" {
+			telemetry: metrics: {
+				// Default metrics for each transform
+				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+			}
 		}
 	}}
 }
