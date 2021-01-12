@@ -22,7 +22,7 @@ remap: functions: parse_syslog_severity: {
 		{
 			title: "Concert Syslog level to severity"
 			input: log: level: "alert"
-			source: ".severity = to_syslog_severity(.level)"
+			source: ".severity = parse_syslog_severity(.level)"
 			output: input & {log: severity: 1}
 		},
 	]
