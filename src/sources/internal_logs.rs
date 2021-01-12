@@ -1,9 +1,9 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
-    Pipeline,
+    trace, Pipeline,
 };
-use futures::{SinkExt, StreamExt};
+use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::RecvError;
 
@@ -40,8 +40,12 @@ impl SourceConfig for InternalLogsConfig {
 }
 
 async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-    let mut subscriber = crate::trace::subscribe().take_until(shutdown);
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
+    let subscription = trace::subscribe();
+    let mut subscriber = subscription.receiver.take_until(shutdown);
+
+    out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
+        .await?;
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
@@ -60,20 +64,44 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::GlobalOptions, test_util::collect_ready};
-    use tokio::time::{delay_for, Duration};
+    use crate::{config::GlobalOptions, test_util::collect_ready, trace, Event};
+    use tokio::{
+        sync::mpsc::Receiver,
+        time::{delay_for, Duration},
+    };
 
     #[test]
     fn generates_config() {
         crate::test_util::test_generate_config::<InternalLogsConfig>();
     }
 
+    const ERROR_TEXT: &str = "This is not an error.";
+
     #[tokio::test]
     async fn receives_logs() {
-        const ERROR_TEXT: &str = "This is not an error.";
-
         let start = chrono::Utc::now();
-        crate::trace::init(false, false, "debug");
+        trace::init(false, false, "debug");
+
+        let rx = start_source().await;
+        info!(message = ERROR_TEXT);
+        let logs = collect_output(rx).await;
+
+        check_events(logs, start);
+    }
+
+    #[tokio::test]
+    async fn receives_early_logs() {
+        let start = chrono::Utc::now();
+        trace::init(false, false, "debug");
+        info!(message = ERROR_TEXT);
+
+        let rx = start_source().await;
+        let logs = collect_output(rx).await;
+
+        check_events(logs, start);
+    }
+
+    async fn start_source() -> Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
 
         let source = InternalLogsConfig {}
@@ -87,23 +115,28 @@ mod tests {
             .unwrap();
         tokio::spawn(source);
         delay_for(Duration::from_millis(1)).await;
+        trace::stop_buffering();
+        rx
+    }
 
-        error!(message = ERROR_TEXT);
-
+    async fn collect_output(rx: Receiver<Event>) -> Vec<Event> {
         delay_for(Duration::from_millis(1)).await;
-        let logs = collect_ready(rx).await;
+        collect_ready(rx).await
+    }
 
-        assert_eq!(logs.len(), 1);
+    fn check_events(events: Vec<Event>, start: chrono::DateTime<chrono::Utc>) {
+        let end = chrono::Utc::now();
 
-        let log = logs[0].as_log();
+        assert_eq!(events.len(), 1);
+
+        let log = events[0].as_log();
         assert_eq!(log["message"], ERROR_TEXT.into());
-        assert!(
-            log["timestamp"]
-                .as_timestamp()
-                .expect("timestamp isn't a timestamp")
-                > &start
-        );
+        let timestamp = *log["timestamp"]
+            .as_timestamp()
+            .expect("timestamp isn't a timestamp");
+        assert!(timestamp >= start);
+        assert!(timestamp <= end);
         assert_eq!(log["metadata.kind"], "event".into());
-        assert_eq!(log["metadata.level"], "ERROR".into());
+        assert_eq!(log["metadata.level"], "INFO".into());
     }
 }
