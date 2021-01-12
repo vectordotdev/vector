@@ -6,7 +6,6 @@ edition = "2018"
 description = "End-to-end tests of Vector in the Kubernetes environment"
 publish = false
 license = "MPL-2.0"
-license-file = "LICENSE"
 
 [dependencies]
 futures = "0.3"

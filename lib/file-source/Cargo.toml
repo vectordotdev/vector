@@ -5,7 +5,6 @@ authors = ["Vector Contributors <vector@timber.io>", "Mark Story <mark@mark-stor
 edition = "2018"
 publish = false
 license = "MIT"
-license-file = "LICENSE"
 
 [dependencies]
 bytes = "0.5"
