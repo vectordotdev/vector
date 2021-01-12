@@ -26,7 +26,7 @@ remap: functions: assert: {
 			title: "True assertion"
 			input: log: foo: "foo"
 			source: #"""
-				assert(.foo == "foo", message = "Foo must be foo!")
+				assert(.foo == "foo", message: "Foo must be foo!")
 				"""#
 			output: input
 		},
@@ -34,7 +34,7 @@ remap: functions: assert: {
 			title: "False assertion"
 			input: log: foo: "bar"
 			source: #"""
-				assert(.foo == "foo", message = "Foo must be foo!")
+				assert(.foo == "foo", message: "Foo must be foo!")
 				"""#
 			raises: "Foo must be foo!"
 		},

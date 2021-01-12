@@ -39,7 +39,7 @@ remap: functions: format_number: {
 			title: "Format a number (3 decimals)"
 			input: log: number: 1234567.89
 			source: #"""
-				.formatted = format_number(.number, 3, decimal_separator=".", grouping_separator=",")
+				.formatted = format_number(.number, 3, decimal_separator: ".", grouping_separator: ",")
 				"""#
 			output: log: number: "1,234,567.890"
 		},

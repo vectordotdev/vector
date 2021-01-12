@@ -33,7 +33,7 @@ remap: functions: sha3: {
 			title: "Success"
 			input: log: text: #"foo"#
 			source: #"""
-				.hash = sha3(.text, variant = "SHA3-224")
+				.hash = sha3(.text, variant: "SHA3-224")
 				"""#
 			output: input & {log: hash: "f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a"}
 		},
