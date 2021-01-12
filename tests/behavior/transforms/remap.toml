@@ -580,23 +580,23 @@
       "c.equals" = "ar"
       "d.equals" = "ooba"
 
-[transforms.remap_function_tokenize]
+[transforms.remap_function_parse_tokens]
   inputs = []
   type = "remap"
   source = """
-    .a = tokenize(.a)
-    .b = tokenize(.b)
+    .a = parse_tokens(.a)
+    .b = parse_tokens(.b)
   """
 [[tests]]
-  name = "remap_function_tokenize"
+  name = "remap_function_parse_tokens"
   [tests.input]
-    insert_at = "remap_function_tokenize"
+    insert_at = "remap_function_parse_tokens"
     type = "log"
     [tests.input.log_fields]
       a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
       b = "bar"
   [[tests.outputs]]
-    extract_from = "remap_function_tokenize"
+    extract_from = "remap_function_parse_tokens"
     [[tests.outputs.conditions]]
       "a.length_eq" = 7
       "a[0].equals" = "217.250.207.207"
@@ -1560,3 +1560,103 @@
       "a.equals" = "daemon"
       "b.equals" = "ftp"
       "c.equals" = "local7"
+
+[transforms.remap_function_to_unix_timestamp]
+  inputs = []
+  type = "remap"
+  source = """
+    .secs = to_unix_timestamp(to_timestamp(.time))
+    .millis = to_unix_timestamp(to_timestamp(.time), unit: "milliseconds")
+    .nanos = to_unix_timestamp(to_timestamp(.time), unit: "nanoseconds")
+  """
+[[tests]]
+  name = "remap_function_to_unix_timestamp"
+  [tests.input]
+    insert_at = "remap_function_to_unix_timestamp"
+    type = "log"
+    [tests.input.log_fields]
+      time = "2020-09-14T12:53:44+03:00"
+  [[tests.outputs]]
+    extract_from = "remap_function_to_unix_timestamp"
+    [[tests.outputs.conditions]]
+      "secs.equals" = 1600077224
+      "millis.equals" = 1600077224000
+      "nanos.equals" = 1600077224000000000
+
+[transforms.remap_function_push_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .result = push(parse_json(.fruits), .fruit)
+  """
+[[tests]]
+  name = "remap_function_push_to_array"
+  [tests.input]
+    insert_at = "remap_function_push_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits = '["apple", "orange", "banana"]'
+      fruit = "mango"
+  [[tests.outputs]]
+    extract_from = "remap_function_push_to_array"
+    [[tests.outputs.conditions]]
+      "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
+
+[transforms.remap_function_append_to_array]
+  inputs = []
+  type = "remap"
+  source = """
+    .result = append(parse_json(.fruits), parse_json(.other_fruits))
+  """
+[[tests]]
+  name = "remap_function_append_to_array"
+  [tests.input]
+    insert_at = "remap_function_append_to_array"
+    type = "log"
+    [tests.input.log_fields]
+      fruits = '["apple", "orange"]'
+      other_fruits = '["banana", "mango"]'
+  [[tests.outputs]]
+    extract_from = "remap_function_append_to_array"
+    [[tests.outputs.conditions]]
+      "result[0].equals" = "apple"
+      "result[1].equals" = "orange"
+      "result[2].equals" = "banana"
+      "result[3].equals" = "mango"
+
+[transforms.remap_function_encode_base64]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = encode_base64(.message)
+  '''
+[[tests]]
+  name = "remap_function_encode_base64"
+  [tests.input]
+    insert_at = "remap_function_encode_base64"
+    type = "raw"
+    value = "Bron-Y-Aur Stomp"
+  [[tests.outputs]]
+    extract_from = "remap_function_encode_base64"
+    [[tests.outputs.conditions]]
+    "result.equals" = "QnJvbi1ZLUF1ciBTdG9tcA=="
+
+[transforms.remap_function_decode_base64]
+  inputs = []
+  type = "remap"
+  source = '''
+    .result = decode_base64(.message)
+  '''
+[[tests]]
+  name = "remap_function_decode_base64"
+  [tests.input]
+    insert_at = "remap_function_decode_base64"
+    type = "raw"
+    value = "QnJvbi1ZLUF1ciBTdG9tcA=="
+  [[tests.outputs]]
+    extract_from = "remap_function_decode_base64"
+    [[tests.outputs.conditions]]
+    "result.equals" = "Bron-Y-Aur Stomp"

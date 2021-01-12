@@ -17,32 +17,28 @@ remap: functions: exists: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				field: 1
-			}
+			title: "Field exists"
+			input: log: field: 1
 			source: #"""
 				.exists = exists(.field)
 				.doesntexist = exists(.field2)
 				"""#
-			output: {
+			output: input & {log: {
 				exists:      true
 				doesntexist: false
-			}
+			}}
 		},
 		{
-			title: "Arrays"
-			input: {
-				array: [1, 2, 3]
-			}
+			title: "Array element exists"
+			input: log: array: [1, 2, 3]
 			source: #"""
 				.exists = exists(.array[2])
 				.doesntexist = exists(.array[3])
 				"""#
-			output: {
+			output: input & {log: {
 				exists:      true
 				doesntexist: false
-			}
+			}}
 		},
 	]
 }

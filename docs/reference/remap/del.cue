@@ -18,43 +18,19 @@ remap: functions: del: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				"field1": 1
-				"field2": 2
+			title: "Delete a field"
+			input: log: {
+				field1: 1
+				field2: 2
 			}
 			source: "del(.field1)"
-			output: {
-				"field2": 2
-			}
+			output: log: field2: 2
 		},
 		{
-			title: "Delete existing only"
-			input: {
-				"user_id": 1
-			}
-			source: #"""
-				.user.id = if exists(.user_id) {
-					del(.user_id)
-				} else {
-					"unknown"
-				}
-				"""#
-			output: {
-				user: {
-					"id": 1
-				}
-			}
-		},
-		{
-			title: "Rename field"
-			input: {
-				old_field: "please rename me"
-			}
+			title: "Rename a field"
+			input: log: old_field: "please rename me"
 			source: ".new_field = del(.old_field)"
-			output: {
-				new_field: "please rename me"
-			}
+			output: log: new_field: "please rename me"
 		},
 	]
 }

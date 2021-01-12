@@ -10,13 +10,11 @@ remap: functions: now: {
 	examples: [
 		{
 			title: "Success"
-			input: {}
+			input: log: {}
 			source: #"""
 				.timestamp = now()
 				"""#
-			output: {
-				timestamp: "21-Oct-2020 20:53"
-			}
+			output: log: timestamp: "21-Oct-2020 20:53"
 		},
 	]
 }

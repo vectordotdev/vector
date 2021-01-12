@@ -23,7 +23,7 @@ remap: functions: redact: {
 			required:    false
 			type: ["string"]
 			enum: {
-				full: "Replace the entire content with `****`."
+				full: "Replace the entire content with `****`. Exactly 4 characters are used as to not give away the length of the original value."
 			}
 		},
 		{
@@ -45,27 +45,19 @@ remap: functions: redact: {
 	examples: [
 		{
 			title: "Redact credit card number"
-			input: {
-				credit_card: "9876123454320123"
-			}
+			input: log: credit_card: "9876123454320123"
 			source: """
 				.credit_card = redact(.credit_card, filters = ["pattern"], redactor = "full", patterns = [/[0-9]{16}/])
 				"""
-			output: {
-				credit_card: "****"
-			}
+			output: log: credit_card: "****"
 		},
 		{
 			title: "Redact email address"
-			input: {
-				email: "ana@booper.com"
-			}
+			input: log: email: "ana@booper.com"
 			source: #"""
 				.email = redact(.email, filters = ["pattern"], redactor = "full", patterns = [/^\S+@\S+$/])
 				"""#
-			output: {
-				email: "****"
-			}
+			output: log: email: "****"
 		},
 	]
 }

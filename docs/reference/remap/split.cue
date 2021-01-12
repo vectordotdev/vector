@@ -29,42 +29,20 @@ remap: functions: split: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: "apples and pears and bananas"
-			}
+			title: "Split a string (no limit)"
+			input: log: text: "apples and pears and bananas"
 			source: #"""
-				.split = split(.text, " and ")
+				.text = split(.text, " and ")
 				"""#
-			output: {
-				text: "apples and pears and bananas"
-				split: ["apples", "pears", "bananas"]
-			}
+			output: log: text: ["apples", "pears", "bananas"]
 		},
 		{
-			title: "Split Limit"
-			input: {
-				text: "apples and pears and bananas"
-			}
+			title: "Split a string (with a limit)"
+			input: log: text: "apples and pears and bananas"
 			source: #"""
-				.split = split(.text, " and ", 1)
+				.text = split(.text, " and ", 1)
 				"""#
-			output: {
-				text: "apples and pears and bananas"
-				split: ["apples", "pears and bananas"]
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.split = split(.text, " and ")
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: text: ["apples", "pears and bananas"]
 		},
 	]
 }

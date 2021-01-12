@@ -33,27 +33,11 @@ remap: functions: sha2: {
 	examples: [
 		{
 			title: "Success"
-			input: {
-				text: #"foo"#
-			}
+			input: log: text: "foo"
 			source: #"""
 				.hash = sha2(.text, variant = "SHA-512/224")
 				"""#
-			output: {
-				hash: "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: #"foo"#
-			}
-			source: #"""
-					.hash = sha2(.text, variant = "SHA-NONE")
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: input & {log: hash: "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"}
 		},
 	]
 }
