@@ -172,8 +172,8 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
 
 #[cfg(test)]
 mod test {
-    use super::{FingerprintStrategy, Fingerprinter};
-    use std::fs;
+    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use std::{collections::HashSet, fs, io::Error, path::Path, time::Duration};
     use tempfile::tempdir;
 
     #[test]
@@ -328,5 +328,66 @@ mod test {
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn no_error_on_dir() {
+        let target_dir = tempdir().unwrap();
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::Checksum {
+                bytes: 256,
+                ignored_header_bytes: 0,
+            },
+            max_line_length: 1024,
+            ignore_not_found: false,
+        };
+
+        let mut buf = Vec::new();
+        let mut small_files = HashSet::new();
+        assert!(fingerprinter
+            .get_fingerprint_or_log_error(
+                &target_dir.path().to_owned(),
+                &mut buf,
+                &mut small_files,
+                &NoErrors
+            )
+            .is_none());
+    }
+
+    #[derive(Clone)]
+    struct NoErrors;
+
+    impl FileSourceInternalEvents for NoErrors {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_unwatched(&self, _: &Path) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_fingerprint_read_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            panic!();
+        }
+
+        fn emit_file_checkpoint_write_failed(&self, _: Error) {
+            panic!();
+        }
+
+        fn emit_files_open(&self, _: usize) {}
     }
 }
