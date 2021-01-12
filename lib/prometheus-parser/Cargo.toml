@@ -1,9 +1,11 @@
 [package]
 name = "prometheus-parser"
 version = "0.1.0"
-authors = ["Duy Do <juchiast@gmail.com>"]
+authors = ["Vector Contributors <vector@timber.io>", "Duy Do <juchiast@gmail.com>"]
 edition = "2018"
 publish = false
+license = "MPL-2.0"
+license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

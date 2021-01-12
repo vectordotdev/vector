@@ -1,9 +1,11 @@
 [package]
 name = "file-source"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@timber.io>"]
+authors = ["Vector Contributors <vector@timber.io>", "Mark Story <mark@mark-story.com>"]
 edition = "2018"
 publish = false
+license = "MIT"
+license-file = "LICENSE"
 
 [dependencies]
 bytes = "0.5"
