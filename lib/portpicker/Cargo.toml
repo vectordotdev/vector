@@ -5,7 +5,6 @@ authors = ["Vector Contributors <vector@timber.io>", "Hannes Karppila <hannes.ka
 edition = "2018"
 publish = false
 license = "Unlicense"
-license-file = "LICENSE"
 
 [dependencies]
 rand = "0.8.0"
