@@ -3,6 +3,7 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::HttpClient,
+    internal_events::PrometheusTemplateRenderingError,
     sinks::{
         self,
         util::{
@@ -99,13 +100,7 @@ impl SinkConfig for RemoteWriteConfig {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {
                         template
                             .render_string(&event)
-                            .map_err(|fields| {
-                                error!(
-                                    message = "Tenant template contains missing fields.",
-                                    ?fields,
-                                    rate_limit_secs = 30,
-                                )
-                            })
+                            .map_err(|fields| emit!(PrometheusTemplateRenderingError { fields }))
                             .ok()
                     });
                     let key = PartitionKey { tenant_id };
