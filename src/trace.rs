@@ -59,12 +59,17 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let _ = set_global_default(dispatch);
 }
 
+#[cfg(test)]
+pub fn reset_early_buffer() {
+    *early_buffer() = Some(Vec::new());
+}
+
 fn early_buffer() -> MutexGuard<'static, Option<Vec<Event>>> {
     BUFFER
         .get()
-        .expect("Internal logs buffer not initialized.")
+        .expect("Internal logs buffer not initialized")
         .lock()
-        .expect("Couldn't acquire lock on internal logs buffer.")
+        .expect("Couldn't acquire lock on internal logs buffer")
 }
 
 pub fn stop_buffering() {

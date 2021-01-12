@@ -83,7 +83,7 @@ mod tests {
         trace::init(false, false, "debug");
 
         let rx = start_source().await;
-        info!(message = ERROR_TEXT);
+        error!(message = ERROR_TEXT);
         let logs = collect_output(rx).await;
 
         check_events(logs, start);
@@ -93,7 +93,8 @@ mod tests {
     async fn receives_early_logs() {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
-        info!(message = ERROR_TEXT);
+        trace::reset_early_buffer();
+        error!(message = ERROR_TEXT);
 
         let rx = start_source().await;
         let logs = collect_output(rx).await;
@@ -137,6 +138,6 @@ mod tests {
         assert!(timestamp >= start);
         assert!(timestamp <= end);
         assert_eq!(log["metadata.kind"], "event".into());
-        assert_eq!(log["metadata.level"], "INFO".into());
+        assert_eq!(log["metadata.level"], "ERROR".into());
     }
 }
