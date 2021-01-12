@@ -550,7 +550,7 @@ remap: {
 				chains can be of any length. Here's a chain with three expressions:
 
 				```js
-				.status = to_string(del(.status)) ?? parse_syslog_level(del(.level)) && "ok"
+				.status = to_string(del(.status)) ?? parse_syslog_level(del(.level)) ?? "ok"
 				```
 				"""#
 		}
