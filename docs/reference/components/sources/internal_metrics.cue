@@ -429,6 +429,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		request_duration_nanoseconds: {
+			description:       "The total request duration in nanoseconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
 			type:              "counter"
