@@ -168,7 +168,13 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     group.finish();
 }
 
-criterion_group!(benches, protobuf, add_fields);
+criterion_group!(
+    name = benches;
+    // We've seen CI noise commonly be 5% so configure here
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = protobuf, add_fields
+);
 criterion_main! {
     benches,
 }

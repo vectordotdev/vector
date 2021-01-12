@@ -38,16 +38,18 @@
 #
 # To output records like:
 # ```
-# { "throughput": "32.852 MiB/s",  "change": "none",  "throughput_change": "-1.0800%",  "name": "transforms/transforms",  "time_change": "+1.0918%",  "time": "31.932 ms"}
-# { "throughput": null,  "change": "none",  "throughput_change": null,  "name": "complex/complex",  "time_change": "+0.8758%",  "time": "1.8391 s"}
+# { "throughput": "32.852 MiB/s",  "change": "none",  "throughput_change": "-1.0800%",  "name": "transforms/transforms",  "time_change": "+1.0918%",  "time": "31.932 ms", "p": "0.00"}
+# { "throughput": null,  "change": "none",  "throughput_change": null,  "name": "complex/complex",  "time_change": "+0.8758%",  "time": "1.8391 s", "p": "0.02"}
 # ```
 ###
 
 BEGIN {
   # match time:   [1.8272 s 1.8391 s 1.8498 s]
-  measurement_regex = "\\[(.+ .+) (.+ .+) (.+ .+)\\]"
-  # match change: [+0.1481% +0.8758% +1.5410%] (p = 0.01 < 0.05)
-  change_regex = "\\[(.+) (.+) (.+)\\]"
+  measurement_regex = "\\[(\\S+ \\S+) (\\S+ \\S+) (\\S+ \\S+)\\]"
+  # match time change: [+0.1481% +0.8758% +1.5410%] (p = 0.01 < 0.05)
+  time_change_regex = "\\[(\\S+) (\\S+) (\\S+)\\] \\(p = (\\S+) [<>] \\S+\\)"
+  # match thrpt change: [+0.1481% +0.8758% +1.5410%]
+  thrpt_change_regex = "\\[(\\S+) (\\S+) (\\S+)\\]"
 }
 
 function finish_benchmark(benchmark, change)
@@ -74,7 +76,7 @@ function finish_benchmark(benchmark, change)
 
 /^Benchmarking .*: Analyzing$/ {
   match($0, /^Benchmarking (.*): Analyzing$/, arr)
-  num_fields = split("name time time_change throughput throughput_change change", fields)
+  num_fields = split("name time time_change throughput throughput_change p change", fields)
   for (i=1; i<=num_fields; i++) benchmark[fields[i]] = "null"
   benchmark["name"] = arr[1]
   benchmark["change"] = "unknown"
@@ -84,12 +86,13 @@ function finish_benchmark(benchmark, change)
 in_bench && /change:$/ { in_change = 1 }
 
 in_change && /time: / {
-  match($0, change_regex, arr)
+  match($0, time_change_regex, arr)
   benchmark["time_change"] = arr[2]
+  benchmark["p"] = arr[4]
 }
 
 in_change && /\s+thrpt: / {
-  match($0, change_regex, arr)
+  match($0, thrpt_change_regex, arr)
   benchmark["throughput_change"] = arr[2]
 }
 
@@ -104,8 +107,9 @@ in_change && /\s+thrpt: / {
 }
 
 !in_change && /change: / {
-  match($0, change_regex, arr)
+  match($0, time_change_regex, arr)
   benchmark["time_change"] = arr[2]
+  benchmark["p"] = arr[4]
 }
 
 in_bench && /Performance has improved./ { finish_benchmark(benchmark, "improved") }

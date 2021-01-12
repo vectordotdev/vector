@@ -8,13 +8,13 @@ use crossterm::{
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
-use std::io::{stdout, Write};
+use std::io::stdout;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Paragraph, Row, Table, Wrap},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
 
@@ -73,7 +73,7 @@ impl HumanFormatter for i64 {
     }
 }
 
-static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
+static HEADER: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
@@ -121,6 +121,13 @@ impl<'a> Widgets<'a> {
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+        // Header columns
+        let header = HEADER
+            .iter()
+            .map(|s| Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD)))
+            .collect::<Vec<_>>();
+
+        // Data columns
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
@@ -157,12 +164,12 @@ impl<'a> Widgets<'a> {
             ];
 
             data.extend_from_slice(&formatted_metrics);
-            Row::StyledData(data.into_iter(), Style::default())
+            Row::new(data).style(Style::default())
         });
 
-        let w = Table::new(COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(items)
+            .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
-            .header_gap(1)
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(20),

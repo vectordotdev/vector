@@ -391,7 +391,7 @@ fn create_event(record: Record) -> Event {
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
         if let Value::Bytes(timestamp) = timestamp {
-            if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
+            if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
                 let timestamp = chrono::Utc.timestamp(
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
@@ -578,7 +578,6 @@ mod tests {
     use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
-        iter::FromIterator,
         task::{Context, Poll},
     };
     use tempfile::tempdir;
@@ -661,8 +660,8 @@ mod tests {
                 .expect("Could not set checkpoint");
         }
 
-        let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
-        let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
+        let include_units: HashSet<String> = iunits.iter().map(|&s| s.into()).collect();
+        let exclude_units: HashSet<String> = xunits.iter().map(|&s| s.into()).collect();
 
         let source = JournaldSource {
             include_units,

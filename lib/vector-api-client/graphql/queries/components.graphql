@@ -1,40 +1,44 @@
-query ComponentsQuery {
-  components {
-    __typename
-    name
-    componentType
-    ... on Source {
-      metrics {
-        __typename
-        processedEventsTotal {
-          processedEventsTotal
+query ComponentsQuery($first: Int!) {
+    components(first: $first) {
+        edges {
+            node {
+                __typename
+                name
+                componentType
+                ... on Source {
+                    metrics {
+                        __typename
+                        processedEventsTotal {
+                            processedEventsTotal
+                        }
+                        processedBytesTotal {
+                            processedBytesTotal
+                        }
+                    }
+                }
+                ... on Transform {
+                    metrics {
+                        __typename
+                        processedEventsTotal {
+                            processedEventsTotal
+                        }
+                        processedBytesTotal {
+                            processedBytesTotal
+                        }
+                    }
+                }
+                ... on Sink {
+                    metrics {
+                        __typename
+                        processedEventsTotal {
+                            processedEventsTotal
+                        }
+                        processedBytesTotal {
+                            processedBytesTotal
+                        }
+                    }
+                }
+            }
         }
-        processedBytesTotal {
-          processedBytesTotal
-        }
-      }
     }
-    ... on Transform {
-      metrics {
-        __typename
-        processedEventsTotal {
-          processedEventsTotal
-        }
-        processedBytesTotal {
-          processedBytesTotal
-        }
-      }
-    }
-    ... on Sink {
-      metrics {
-        __typename
-        processedEventsTotal {
-          processedEventsTotal
-        }
-        processedBytesTotal {
-          processedBytesTotal
-        }
-      }
-    }
-  }
 }

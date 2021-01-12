@@ -33,29 +33,12 @@ remap: functions: truncate: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"A rather long sentence."#
-			}
+			title: "Truncate a string"
+			input: log: message: #"A rather long sentence."#
 			source: #"""
-				.truncated = truncate(.text, limit = 11, ellipsis = true)
+				.message = truncate(.message, limit = 11, ellipsis = true)
 				"""#
-			output: {
-				text:      #"A rather long sentence."#
-				truncated: "A rather lo..."
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.truncated = truncate(.text, limit = 11, ellipsis = true)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "A rather lo..."
 		},
 	]
 }

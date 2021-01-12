@@ -43,6 +43,13 @@ remap: functions: compact: {
 			default:     true
 			type: ["boolean"]
 		},
+		{
+			name:        "nullish"
+			description: "Tests if the value is nullish."
+			required:    false
+			default:     false
+			type: ["boolean"]
+		},
 	]
 	return: ["array", "map"]
 	category: "Enumerate"
@@ -52,41 +59,35 @@ remap: functions: compact: {
 		`array`.
 		Specify recursive, if recursive structures should also be compacted, the routine
 		will recurse along and `Array`s or `Map`s and compact those structures.
+		The following are considered nullish in VRL:
+
+		* `null`
+		* A single dash (`"-"`)
+		* Any string that contains only whitespace characters as defined by the the [Unicode
+		  definition of the `White_Space` property](\(urls.unicode_whitespace)). That includes
+		  empty strings (`""`), common characters like `"\n"`, "\r", and others.
 		"""#
 	examples: [
 		{
-			title: "Array"
-			input: {
-				array: ["foo", "bar", "", null, [], "buzz"]
-			}
+			title: "Compact an array"
+			input: log: array: ["foo", "bar", "", null, [], "buzz"]
 			source: #"""
-				.compacted = compact(.array, string = true, array = true, null = true)
+				.log = compact(.array, string: true, array: true, null: true)
 				"""#
-			output: {
-				array: ["foo", "bar", "", null, [], "buzz"]
-				compacted: ["foo", "bar", "buzz"]
-			}
+			output: log: array: ["foo", "bar", "buzz"]
 		},
 		{
-			title: "Map"
-			input: {
-				map: {field1: 1
-						field2: ""
-					field3: []
-					field4: null
-				}
+			title: "Compact a map"
+			input: map: {
+				field1: 1
+				field2: ""
+				field3: []
+				field4: null
 			}
 			source: #"""
-				.compacted = compact(.map, string = true, array = true, null = true)
+				.map = compact(.map, string: true, array: true, null: true)
 				"""#
-			output: {
-				map: {field1: 1
-						field2: ""
-					field3: []
-					field4: null
-				}
-				compacted: {field1: 1}
-			}
+			output: map: field1: 1
 		},
 	]
 }

@@ -22,9 +22,7 @@ lazy_static! {
 
 /// Merge the paths coming from different cli flags with different formats into
 /// a unified list of paths with formats.
-pub fn merge_path_lists<'a>(
-    path_lists: Vec<(&'a [PathBuf], FormatHint)>,
-) -> Vec<(PathBuf, FormatHint)> {
+pub fn merge_path_lists(path_lists: Vec<(&[PathBuf], FormatHint)>) -> Vec<(PathBuf, FormatHint)> {
     path_lists
         .into_iter()
         .flat_map(|(paths, format)| paths.iter().cloned().map(move |path| (path, format)))

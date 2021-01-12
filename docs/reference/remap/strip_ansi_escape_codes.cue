@@ -16,28 +16,12 @@ remap: functions: strip_ansi_escape_codes: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"\e[46mfoo\e[0m bar"#
-			}
+			title: "Strip ANSI escape codes"
+			input: log: text: #"\e[46mfoo\e[0m bar"#
 			source: #"""
 				.text = strip_ansi_escape_codes(.text)
 				"""#
-			output: {
-				text: "foo bar"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 37
-			}
-			source: #"""
-					.text = strip_ansi_escape_codes(.text)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: text: "foo bar"
 		},
 	]
 }

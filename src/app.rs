@@ -8,11 +8,8 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    StreamExt,
-};
-use futures01::sync::mpsc;
+use futures::{compat::Future01CompatExt, StreamExt};
+use tokio::sync::mpsc;
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -121,6 +118,8 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
+                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
@@ -190,7 +189,7 @@ impl Application {
     pub fn run(self) {
         let mut rt = self.runtime;
 
-        let graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -221,7 +220,6 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
-            let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
                 tokio::select! {

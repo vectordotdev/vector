@@ -28,6 +28,7 @@ apt upgrade --yes
 
 # Deps
 apt install --yes \
+    awscli \
     build-essential \
     cmake \
     pkg-config \

@@ -81,7 +81,7 @@ impl DistributionStatistic {
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
     if quantiles
         .iter()
-        .all(|&quantile| 0.0 <= quantile && quantile <= 1.0)
+        .all(|&quantile| (0.0..=1.0).contains(&quantile))
     {
         Ok(())
     } else {
