@@ -34,7 +34,7 @@ remap: functions: ceil: {
 			title: "Ceil a number (with precision)"
 			input: log: number: 4.345
 			source: #"""
-				.number = ceil(.number, precision = 2)
+				.number = ceil(.number, precision: 2)
 				"""#
 			output: log: number: 4.35
 		},
