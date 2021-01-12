@@ -61,7 +61,7 @@ remap: functions: replace: {
 			title: "Replace first instance"
 			input: log: message: #"Bananas and Bananas"#
 			source: #"""
-				.message = replace(.message, "Bananas", "Pineapples", count = 1)
+				.message = replace(.message, "Bananas", "Pineapples", count: 1)
 				"""#
 			output: log: message: "Pineapples and Bananas"
 		},

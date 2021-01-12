@@ -2,8 +2,10 @@
   inputs = ["ignored"]
   type = "swimlanes"
   [transforms.foo.lanes.first]
+    type = "check_fields"
     "message.eq" = "test swimlane 1"
   [transforms.foo.lanes.second]
+    type = "check_fields"
     "message.eq" = "test swimlane 2"
   [transforms.foo.lanes.third]
     type = "is_log"
@@ -25,17 +27,20 @@
   [[tests.outputs]]
     extract_from = "foo.first"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test swimlane 1"
 
   [[tests.outputs]]
     extract_from = "bar"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test swimlane 1"
       "new_field.equals" = "new field added"
 
   [[tests.outputs]]
     extract_from = "foo.third"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test swimlane 1"
 
 [[tests]]
@@ -49,9 +54,11 @@
   [[tests.outputs]]
     extract_from = "foo.second"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test swimlane 2"
 
   [[tests.outputs]]
     extract_from = "foo.third"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test swimlane 2"

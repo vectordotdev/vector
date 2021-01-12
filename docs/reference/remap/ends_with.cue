@@ -33,7 +33,7 @@ remap: functions: ends_with: {
 			title: "String ends with"
 			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = ends_with(.message, "the haystack", case_sensitive = false)
+				.contains = ends_with(.message, "the haystack", case_sensitive: false)
 				"""#
 			output: input & {
 				log: contains: true

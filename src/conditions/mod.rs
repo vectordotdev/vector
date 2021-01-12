@@ -1,6 +1,5 @@
 use crate::config::component::ComponentDescription;
 use crate::Event;
-use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
 pub mod is_log;
@@ -35,19 +34,3 @@ dyn_clone::clone_trait_object!(ConditionConfig);
 pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(untagged)]
-pub enum AnyCondition {
-    FromType(Box<dyn ConditionConfig>),
-    NoTypeCondition(CheckFieldsConfig),
-}
-
-impl AnyCondition {
-    pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        match self {
-            Self::FromType(c) => c.build(),
-            Self::NoTypeCondition(c) => c.build(),
-        }
-    }
-}

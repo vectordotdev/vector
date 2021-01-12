@@ -41,7 +41,7 @@ remap: functions: starts_with: {
 			title: "String starts with (case insensitive)"
 			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.starts = starts_with(.message, \"the needle\", case_sensitive = false)
+				.starts = starts_with(.message, \"the needle\", case_sensitive: false)
 				"""#
 			output: input & {log: starts: true}
 		},

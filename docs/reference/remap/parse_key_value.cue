@@ -53,7 +53,7 @@ remap: functions: parse_key_value: {
 				path:"/cart_link", host:store.app.com, fwd: "102.30.171.16", dyno: web.1 connect:0ms, service:87ms, status:304, bytes:632, protocol:https
 				"""#
 			source: #"""
-				. = parse_key_value(del(.message), field_delimiter=",", key_value_delimiter=":")
+				. = parse_key_value(del(.message), field_delimiter: ",", key_value_delimiter: ":")
 				"""#
 			output: log: {
 				path:     "/cart_link"
