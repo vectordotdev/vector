@@ -25,5 +25,5 @@ dashmap = "4.0.0"
 
 [dev-dependencies]
 quickcheck = "0.9"
-rand = "0.7"
+rand = "0.8"
 tempfile = "3.1.0"
