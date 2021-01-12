@@ -47,7 +47,7 @@ remap: functions: merge: {
 				}
 			}
 			source: #"""
-				merge(.map1, .map2, deep = false)
+				merge(.map1, .map2, deep: false)
 				"""#
 			output: log: {
 				map1: {
@@ -79,7 +79,7 @@ remap: functions: merge: {
 				}
 			}
 			source: #"""
-				merge(.map1, .map2, deep = true)
+				merge(.map1, .map2, deep: true)
 				"""#
 			output: log: {
 				map1: {

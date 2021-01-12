@@ -56,6 +56,25 @@ pub(crate) fn capture_regex_to_map(
     indexed.chain(names).collect()
 }
 
+#[cfg(any(feature = "is_nullish", feature = "compact"))]
+pub(crate) fn is_nullish(value: &Value) -> bool {
+    match value {
+        Value::Bytes(v) => {
+            let s = &String::from_utf8_lossy(&v)[..];
+
+            match s {
+                "-" => true,
+                _ => {
+                    let has_whitespace = s.chars().all(char::is_whitespace);
+                    has_whitespace
+                }
+            }
+        }
+        Value::Null => true,
+        _ => false,
+    }
+}
+
 #[macro_export]
 macro_rules! map {
     () => (

@@ -36,7 +36,7 @@ remap: functions: slice: {
 			title: "Slice a string (positve index)"
 			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.text = slice(.text, start=5, end=13)
+				.text = slice(.text, start: 5, end: 13)
 				"""#
 			output: log: text: "califrag"
 		},
@@ -44,7 +44,7 @@ remap: functions: slice: {
 			title: "Slice a string (negative index)"
 			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.text = slice(.text, start=5, end=-14)
+				.text = slice(.text, start: 5, end: -14)
 				"""#
 			output: log: text: "califragilistic"
 		},

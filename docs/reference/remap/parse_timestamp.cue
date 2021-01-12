@@ -36,7 +36,7 @@ remap: functions: parse_timestamp: {
 			title: "Parse a timestamp (success)"
 			input: log: timestamp: "10-Oct-2020 16:00"
 			source: #"""
-				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
+				.timestamp = parse_timestamp(del(.timestamp), format: "%v %R")
 				"""#
 			output: log: timestamp: "2020-10-10T16:00:00Z"
 		},
@@ -44,7 +44,7 @@ remap: functions: parse_timestamp: {
 			title: "Parse a timestamp (error)"
 			input: log: timestamp_bad: "I am not a timestamp"
 			source: #"""
-				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
+				.timestamp = parse_timestamp(del(.timestamp), format: "%v %R")
 				"""#
 			raise: "Failed to parse"
 		},

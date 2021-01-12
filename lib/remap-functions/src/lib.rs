@@ -1,5 +1,7 @@
 mod util;
 
+#[cfg(feature = "append")]
+mod append;
 #[cfg(feature = "assert")]
 mod assert;
 #[cfg(feature = "ceil")]
@@ -8,10 +10,14 @@ mod ceil;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base64")]
+mod decode_base64;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base64")]
+mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "ends_with")]
@@ -78,6 +84,8 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "push")]
+mod push;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "replace")]
@@ -131,6 +139,8 @@ mod uuid_v4;
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
+#[cfg(feature = "append")]
+pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "ceil")]
@@ -139,10 +149,14 @@ pub use ceil::Ceil;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base64")]
+pub use decode_base64::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base64")]
+pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
@@ -205,6 +219,8 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "push")]
+pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
 #[cfg(feature = "redact")]
@@ -254,6 +270,8 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
+        #[cfg(feature = "append")]
+        Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -262,10 +280,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base64")]
+        Box::new(DecodeBase64),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base64")]
+        Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "ends_with")]
@@ -330,6 +352,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "push")]
+        Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "redact")]

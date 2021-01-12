@@ -89,7 +89,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 // Other ----------------------------------------------------------------------
 
-ident = @{ !(reserved_keyword ~ !ASCII_ALPHANUMERIC) ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+ident = @{ !(reserved_keyword ~ !(ASCII_ALPHANUMERIC | "_")) ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 field = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 bang  =  { "!" }
 block =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }

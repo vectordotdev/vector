@@ -30,29 +30,31 @@ apt upgrade --yes
 apt install --yes \
     awscli \
     build-essential \
-    cmake \
-    pkg-config \
-    libssl-dev \
-    python3-pip \
-    jq \
-    shellcheck \
-    locales \
     ca-certificates \
+    cmake \
+    cmark-gfm \
     curl \
+    gawk \
+    gnupg2 \
     gnupg-agent \
     gnuplot \
+    jq \
+    libclang-dev \
+    libsasl2-dev \
+    libssl-dev \
+    llvm \
+    locales \
     nodejs \
     npm \
-    ruby-bundler \
-    libsasl2-dev \
-    gnupg2 \
-    wget \
-    gawk \
-    yarn \
-    sudo \
-    cmark-gfm \
+    pkg-config \
+    python3-pip \
     rename \
-    rpm
+    rpm \
+    ruby-bundler \
+    shellcheck \
+    sudo \
+    wget \
+    yarn
 
 # Cue
 TEMP=$(mktemp -d)
