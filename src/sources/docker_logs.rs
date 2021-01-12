@@ -329,26 +329,15 @@ impl DockerLogsSource {
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
-        // Find out it's own container id, if it's inside a docker container.
-        // Since docker doesn't readily provide such information,
-        // various approaches need to be made. As such the solution is not
-        // exact, but probable.
-        // This is to be used only if source is in state of catching everything.
-        // Or in other words, if includes are used then this is not necessary.
         let include_containers_specified = config
             .include_containers
             .as_ref()
             .map(Vec::is_empty)
             .unwrap_or(false);
 
-        let exclude_containers_specified = config
-            .exclude_containers
-            .as_ref()
-            .map(Vec::is_empty)
-            .unwrap_or(false);
-
+        // This is to be used only if source is in state of catching everything.
+        // Or in other words, if includes are used then this is not necessary.
         let exclude_self = include_containers_specified
-            && !exclude_containers_specified
             && config.include_labels.clone().unwrap_or_default().is_empty();
 
         let backoff_secs = config.retry_backoff_secs;
@@ -547,6 +536,10 @@ impl DockerLogsSource {
     /// because it's a vector instance, probably this one.
     fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
         if self.exclude_self {
+            // Find out it's own container id, if it's inside a docker container.
+            // Since docker doesn't readily provide such information,
+            // various approaches need to be made. As such the solution is not
+            // exact, but probable.
             let hostname_hint = self
                 .hostname
                 .as_ref()
