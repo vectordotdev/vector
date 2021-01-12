@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: sha1: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -10,14 +9,15 @@ remap: functions: sha1: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Hash"
 	description: #"""
-		Calculates a sha1 hash of a given string.
+		Calculates a sha1 hash of the provided `value`.
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "Calculate sha1 hash"
 			input: log: text: #"foo"#
 			source: #"""
 				.hash = sha1(.text)

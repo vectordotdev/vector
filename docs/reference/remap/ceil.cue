@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: ceil: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -17,10 +16,11 @@ remap: functions: ceil: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""
-		Rounds the given number up to the given precision of decimal places.
+		Rounds the given number up to the specified `precision`.
 		"""#
 	examples: [
 		{

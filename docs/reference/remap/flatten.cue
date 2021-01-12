@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: flatten: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -10,10 +9,11 @@ remap: functions: flatten: {
 			type: ["array", "map"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["array", "map"]
 	category: "Enumerate"
 	description: #"""
-		Returns a nested array or map that has been flattened to a single level.
+		Returns a nested `array` or `map` that has been flattened to a single level.
 		"""#
 	examples: [
 		{

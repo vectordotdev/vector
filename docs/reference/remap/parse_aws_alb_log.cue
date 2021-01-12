@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: parse_aws_alb_log: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -9,6 +8,9 @@ remap: functions: parse_aws_alb_log: {
 			required:    true
 			type: ["string"]
 		},
+	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted AWS ALB log",
 	]
 	return: ["map"]
 	category: "Parse"

@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: md5: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -10,10 +9,11 @@ remap: functions: md5: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Hash"
 	description: #"""
-		Calculates an md5 hash of a given string.
+		Calculates an md5 hash of a given `value`.
 		"""#
 	examples: [
 		{

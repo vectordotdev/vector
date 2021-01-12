@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: parse_url: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -10,10 +9,13 @@ remap: functions: parse_url: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted URL",
+	]
 	return: ["map"]
 	category: "Parse"
 	description: #"""
-		Parses a url into it's constituent components.
+		Parses the provided `value` in URL format.
 		"""#
 	examples: [
 		{

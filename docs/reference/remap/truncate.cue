@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: truncate: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -22,15 +21,14 @@ remap: functions: truncate: {
 			type: ["boolean"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Truncates a string after a given number of characters. If `limit` is larger than the length of the string,
-		the string is returned unchanged.
+		Truncates the provided `value` up to the provided `limit`.
 
-		Optionally, an ellipsis (...) is appended if the string does get appended.
-		Note: this does increase the string length by 3, so if you need the result to fit in a certain length, specify
-		the limit as that length minus 3.
+		* If `limit` is larger than the length of the string, the string is returned unchanged.
+		* If `ellipsis` is `true`, then an ellipsis (...) will be appended to the string (beyond the specified limit).
 		"""#
 	examples: [
 		{

@@ -47,7 +47,7 @@ remap: {
 			}
 
 			arguments: [...#Argument] // Allow for empty list
-			fallible:                 bool // No default here, as we want this explicitly defined for each function
+			internal_failure_reasons: [...string]
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
 			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 			description: string

@@ -1,7 +1,6 @@
 package metadata
 
 remap: functions: match: {
-	fallible: true
 	arguments: [
 		{
 			name:        "value"
@@ -16,10 +15,11 @@ remap: functions: match: {
 			type: ["regex"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "String"
 	description: """
-		Determines whether a string matches the provided pattern.
+		Returns `true` if the provided `value` matches the provided `pattern`.
 		"""
 	examples: [
 		{
