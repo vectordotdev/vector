@@ -1,6 +1,5 @@
+use remap::Value;
 use std::collections::BTreeMap;
-
-use remap::{Result, Value};
 
 #[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
 #[inline]
@@ -24,26 +23,6 @@ where
 {
     let multiplier = 10_f64.powf(precision as f64);
     fun(num * multiplier as f64) / multiplier
-}
-
-#[cfg(any(
-    feature = "parse_json",
-    feature = "parse_timestamp",
-    feature = "to_timestamp",
-    feature = "to_string",
-    feature = "to_float",
-    feature = "to_int",
-    feature = "to_bool"
-))]
-#[inline]
-pub(crate) fn convert_value_or_default(
-    value: Result<Value>,
-    default: Option<Result<Value>>,
-    convert: impl Fn(Value) -> Result<Value> + Clone,
-) -> Result<Value> {
-    value
-        .and_then(convert.clone())
-        .or_else(|err| default.ok_or(err)?.and_then(|value| convert(value)))
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression
@@ -75,6 +54,25 @@ pub(crate) fn capture_regex_to_map(
         });
 
     indexed.chain(names).collect()
+}
+
+#[cfg(any(feature = "is_nullish", feature = "compact"))]
+pub(crate) fn is_nullish(value: &Value) -> bool {
+    match value {
+        Value::Bytes(v) => {
+            let s = &String::from_utf8_lossy(&v)[..];
+
+            match s {
+                "-" => true,
+                _ => {
+                    let has_whitespace = s.chars().all(char::is_whitespace);
+                    has_whitespace
+                }
+            }
+        }
+        Value::Null => true,
+        _ => false,
+    }
 }
 
 #[macro_export]

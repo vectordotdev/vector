@@ -152,7 +152,13 @@ impl Expression for Function {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.function.type_def(state)
+        let mut type_def = self.function.type_def(state);
+
+        if self.abort_on_error {
+            type_def.fallible = false;
+        }
+
+        type_def
     }
 }
 

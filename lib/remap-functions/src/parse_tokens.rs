@@ -2,11 +2,11 @@ use remap::prelude::*;
 use shared::tokenize;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Tokenize;
+pub struct ParseTokens;
 
-impl Function for Tokenize {
+impl Function for ParseTokens {
     fn identifier(&self) -> &'static str {
-        "tokenize"
+        "parse_tokens"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -20,23 +20,23 @@ impl Function for Tokenize {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
 
-        Ok(Box::new(TokenizeFn { value }))
+        Ok(Box::new(ParseTokensFn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct TokenizeFn {
+struct ParseTokensFn {
     value: Box<dyn Expression>,
 }
 
-impl TokenizeFn {
+impl ParseTokensFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
 }
 
-impl Expression for TokenizeFn {
+impl Expression for ParseTokensFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
         let string = value.try_bytes_utf8_lossy()?;
@@ -69,12 +69,12 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| TokenizeFn { value: Literal::from("foo").boxed() },
+            expr: |_| ParseTokensFn { value: Literal::from("foo").boxed() },
             def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         value_non_string {
-            expr: |_| TokenizeFn { value: Literal::from(10).boxed() },
+            expr: |_| ParseTokensFn { value: Literal::from(10).boxed() },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
@@ -84,7 +84,7 @@ mod tests {
     ];
 
     #[test]
-    fn tokenize() {
+    fn parse_tokens() {
         let cases = vec![(
                     map![],
                     Ok(vec![
@@ -97,7 +97,7 @@ mod tests {
                             "11881".into(),
 
                     ].into()),
-                    TokenizeFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
+                    ParseTokensFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
                 )];
 
         let mut state = state::Program::default();

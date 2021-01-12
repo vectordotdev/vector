@@ -17,26 +17,12 @@ remap: functions: upcase: {
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"Here Is A Message"#
-			}
+			title: "Upcase a string"
+			input: log: message: #"Here Is A Message"#
 			source: #"""
 				.message = upcase(.message)
 				"""#
-			output: {
-				message: "HERE IS A MESSAGE"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				message: 42
-			}
-			source: "upcase(.message)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "HERE IS A MESSAGE"
 		},
 	]
 }
