@@ -34,7 +34,7 @@ pub fn protobuf(c: &mut Criterion) {
             Wasm::new(
                 toml::from_str(
                     r#"
-                module = "target/wasm32-wasi/release/protobuf.wasm"
+                module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
                 artifact_cache = "target/artifacts/"
                 "#,
                 )
@@ -85,7 +85,7 @@ end
                 Wasm::new(
                     toml::from_str(
                         r#"
-module = "target/wasm32-wasi/release/add_fields.wasm"
+module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
 artifact_cache = "target/artifacts/"
 "#,
                     )
