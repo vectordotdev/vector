@@ -261,7 +261,7 @@ mod tests {
         let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
-            labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
+            labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}"}
             encoding = "json"
             remove_label_fields = true
         "#,
@@ -290,6 +290,8 @@ mod tests {
             record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
         );
+        // make sure we can reuse fields across labels.
+        assert_eq!(record.labels[2], ("label3".to_string(), "bar".to_string()));
     }
 
     #[test]
