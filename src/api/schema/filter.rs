@@ -65,9 +65,9 @@ where
                 || f.or().map_or_else(
                     || false,
                     |f| {
-                        f.into_iter().any(|f| {
+                        f.iter().any(|f| {
                             let items: SmallVec<[Item; 1]> = smallvec![(*c).clone()];
-                            filter_items(items.into_iter(), f).len() > 0
+                            !filter_items(items.into_iter(), f).is_empty()
                         })
                     },
                 )
@@ -83,8 +83,10 @@ mod test {
     fn string_equals() {
         let value = "test";
 
-        let mut sf = StringFilter::default();
-        sf.equals = value.to_string().into();
+        let sf = StringFilter {
+            equals: value.to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value(&value));
         assert!(!sf.filter_value("not found"));
@@ -95,8 +97,10 @@ mod test {
         let value = "value";
         let diff_value = "different value";
 
-        let mut sf = StringFilter::default();
-        sf.not_equals = diff_value.to_string().into();
+        let sf = StringFilter {
+            not_equals: diff_value.to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value(&value));
         assert!(!sf.filter_value(diff_value));
@@ -104,8 +108,10 @@ mod test {
 
     #[test]
     fn string_contains() {
-        let mut sf = StringFilter::default();
-        sf.contains = "234".to_string().into();
+        let sf = StringFilter {
+            contains: "234".to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value("12345"));
         assert!(!sf.filter_value("xxx"));
@@ -114,8 +120,11 @@ mod test {
     #[test]
     fn string_not_contains() {
         let contains = "xyz";
-        let mut sf = StringFilter::default();
-        sf.not_contains = contains.to_string().into();
+
+        let sf = StringFilter {
+            not_contains: contains.to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value("abc"));
         assert!(!sf.filter_value(contains));
@@ -123,8 +132,10 @@ mod test {
 
     #[test]
     fn string_starts_with() {
-        let mut sf = StringFilter::default();
-        sf.starts_with = "abc".to_string().into();
+        let sf = StringFilter {
+            starts_with: "abc".to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value("abcdef"));
         assert!(!sf.filter_value("xyz"));
@@ -132,8 +143,10 @@ mod test {
 
     #[test]
     fn string_ends_with() {
-        let mut sf = StringFilter::default();
-        sf.ends_with = "456".to_string().into();
+        let sf = StringFilter {
+            ends_with: "456".to_string().into(),
+            ..Default::default()
+        };
 
         assert!(sf.filter_value("123456"));
         assert!(!sf.filter_value("123"));
@@ -142,14 +155,14 @@ mod test {
     #[test]
     fn string_multiple_all_match() {
         let value = "123456";
-        let mut sf = StringFilter::default();
-
-        sf.equals = value.to_string().into();
-        sf.not_equals = "xyz".to_string().into();
-        sf.contains = "234".to_string().into();
-        sf.not_contains = "678".to_string().into();
-        sf.starts_with = "123".to_string().into();
-        sf.ends_with = "456".to_string().into();
+        let sf = StringFilter {
+            equals: value.to_string().into(),
+            not_equals: "xyz".to_string().into(),
+            contains: "234".to_string().into(),
+            not_contains: "678".to_string().into(),
+            starts_with: "123".to_string().into(),
+            ends_with: "456".to_string().into(),
+        };
 
         assert!(sf.filter_value(value));
         assert!(!sf.filter_value("should fail"));

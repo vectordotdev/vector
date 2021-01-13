@@ -50,7 +50,7 @@ impl CustomFilter<Component> for ComponentsFilter {
         filter_check!(self
             .name
             .as_ref()
-            .map(|f| f.into_iter().all(|f| f.filter_value(component.get_name()))));
+            .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))));
         true
     }
 
