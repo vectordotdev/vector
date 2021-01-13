@@ -177,7 +177,7 @@ jobs:
         env:
           VERSION: "3.15.5"
         run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-${{ matrix.arch }}.msi > cmake-installer.msi
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
       - name: "Install CMake"
         shell: cmd # msiexec fails when called from bash
         run: |
