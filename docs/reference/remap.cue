@@ -7,7 +7,7 @@ remap: {
 
 	{
 		description: """
-			**Vector Remap Language** (VRL) is a lean, single-purpose language for transforming observability data
+			**Vector Remap Language** (VRL) is a clean, single-purpose language for transforming observability data
 			(logs and metrics) in Vector. It features a simple [syntax](#syntax) and a rich set of built-in
 			[functions](#functions) tailored specifically to observability use cases. VRL is built on the following
 			two principles:
@@ -48,7 +48,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
+			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "System" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
