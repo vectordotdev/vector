@@ -1,7 +1,7 @@
 use crate::{
     diagnostic::{Diagnostic, Label, LabelMessage, Message, Note, Severity},
     expression, function,
-    parser::{self, Rule},
+    parser::Rule,
     path, program, value,
 };
 use std::error::Error as StdError;
@@ -74,12 +74,16 @@ impl<'a> From<(&'a str, program::Error)> for ProgramError<'a> {
         use program::Error::*;
 
         let diagnostic = match error {
-            Parse => Diagnostic {
-                severity: Severity::Error,
-                message: Message::Parse,
-                labels: vec![],
-                notes: vec![],
-            },
+            Parse(_) => {
+                let _ = ();
+
+                Diagnostic {
+                    severity: Severity::Error,
+                    message: Message::Parse,
+                    labels: vec![],
+                    notes: vec![],
+                }
+            }
 
             Fallible => Diagnostic {
                 severity: Severity::Error,
@@ -140,9 +144,6 @@ fn fmt_diagnostic(f: &mut fmt::Formatter<'_>, source: &str, diagnostic: Diagnost
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("parser error")]
-    Parser(#[from] parser::Error),
-
     #[error("program error")]
     Program(#[from] program::Error),
 

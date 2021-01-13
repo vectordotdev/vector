@@ -1,10 +1,13 @@
 use crate::error::ProgramError;
-use crate::{parser::Parser, value, Expr, Expression, Function, TypeDef};
+use crate::{
+    parser::{self, Parser},
+    value, Expr, Expression, Function, TypeDef,
+};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("unable to parse program")]
-    Parse,
+    Parse(#[from] parser::Error),
 
     #[error("unexpected return value")]
     ReturnValue { want: value::Kind, got: value::Kind },
@@ -56,7 +59,7 @@ impl<'a> Program<'a> {
 
         let expressions = parser
             .program_from_str(source)
-            .map_err(|_ /* TODO */| (source, Error::Parse))?;
+            .map_err(|err| (source, Error::Parse(err)))?;
 
         // optional type constraint checking
         if let Some(constraint) = constraint {
@@ -84,6 +87,12 @@ impl<'a> Program<'a> {
                 return Err((source, Error::Fallible).into());
             }
         }
+
+        let expressions = expressions
+            .into_inner()
+            .into_iter()
+            .map(|node| node.into_inner())
+            .collect();
 
         Ok(Self {
             source,
