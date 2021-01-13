@@ -731,7 +731,7 @@ fn config_to_endpoint(config: &Config) -> String {
         }
         // non_exhaustive enum
         _ => {
-            warn!("Unknown variant of TargetSessionAttrs");
+            warn!(r#"Unknown variant of "TargetSessionAttrs.""#);
         }
     }
 
@@ -742,7 +742,7 @@ fn config_to_endpoint(config: &Config) -> String {
         ChannelBinding::Require => params.push(("channel_binding", "require".to_owned())),
         // non_exhaustive enum
         _ => {
-            warn!("Unknown variant of ChannelBinding");
+            warn!(r#"Unknown variant of "ChannelBinding"."#);
         }
     }
 
