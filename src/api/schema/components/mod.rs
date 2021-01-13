@@ -4,10 +4,11 @@ pub mod state;
 pub mod transform;
 
 use crate::{
-    api::schema::{components::state::component_by_name, relay},
+    api::schema::{components::state::component_by_name, filter, relay},
     config::Config,
+    filter_check,
 };
-use async_graphql::{Interface, Object, Subscription};
+use async_graphql::{InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use tokio::stream::{Stream, StreamExt};
@@ -23,6 +24,37 @@ pub enum Component {
     Sink(sink::Sink),
 }
 
+impl Component {
+    fn get_name(&self) -> &str {
+        match self {
+            Component::Source(c) => c.0.name.as_str(),
+            Component::Transform(c) => c.0.name.as_str(),
+            Component::Sink(c) => c.0.name.as_str(),
+        }
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct ComponentsFilter {
+    name: Option<Vec<filter::StringFilter>>,
+    and: Option<Vec<Self>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<Component> for ComponentsFilter {
+    fn matches(&self, component: &Component) -> bool {
+        filter_check!(self
+            .name
+            .as_ref()
+            .map(|f| f.into_iter().all(|f| f.filter_value(component.get_name()))));
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
+    }
+}
+
 #[derive(Default)]
 pub struct ComponentsQuery;
 
@@ -35,9 +67,12 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        #[graphql(default)] filter: ComponentsFilter,
     ) -> relay::ConnectionResult<Component> {
+        let components = filter::filter_items(state::get_components().into_iter(), &filter);
+
         relay::query(
-            state::get_components().into_iter(),
+            components.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
