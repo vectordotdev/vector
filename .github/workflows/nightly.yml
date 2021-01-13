@@ -303,6 +303,7 @@ jobs:
 
   release-docker:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     needs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
@@ -359,6 +360,7 @@ jobs:
 
   release-s3:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
@@ -441,6 +443,7 @@ jobs:
 
   release-cloudsmith:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
@@ -555,6 +558,7 @@ jobs:
 
   release-helm:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     needs:
       # This is not strictly required, but ensures that Helm Chart doesn't
       # appear before the image it refers to.
