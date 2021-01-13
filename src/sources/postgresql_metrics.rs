@@ -63,6 +63,8 @@ macro_rules! gauge {
 enum BuildError {
     #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: PgError },
+    #[snafu(display("host missed"))]
+    HostMissed,
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
     #[snafu(display("failed to create tls connector: {}", source))]
@@ -290,6 +292,9 @@ impl PostgresqlMetrics {
         tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
         let config: Config = endpoint.parse().context(InvalidEndpoint)?;
+        if config.get_hosts().is_empty() {
+            return Err(BuildError::HostMissed);
+        }
         if config.get_hosts().len() > 1 {
             return Err(BuildError::MultipleHostsNotSupported {
                 hosts: config.get_hosts().to_owned(),
@@ -300,7 +305,7 @@ impl PostgresqlMetrics {
         tags.insert("endpoint".into(), config_to_endpoint(&config));
         tags.insert(
             "host".into(),
-            match &config.get_hosts()[0] {
+            match &config.get_hosts().get(0).expect("host is not missed") {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
                 Host::Unix(path) => path.to_string_lossy().to_string(),
