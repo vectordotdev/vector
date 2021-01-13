@@ -6,7 +6,7 @@ pub mod transform;
 use crate::{
     api::schema::{
         components::state::component_by_name,
-        filter::{filter_items, CustomFilter},
+        filter::{filter_items, CustomFilter, StringFilter},
         relay,
     },
     config::Config,
