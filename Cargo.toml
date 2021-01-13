@@ -565,8 +565,9 @@ disable-resolv-conf = []
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-add_fields", "transforms-wasm", "transforms-lua", "transforms-remap"]
 
 [[bench]]
 name = "default"
@@ -583,6 +584,11 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "language"
+harness = false
+required-features = ["language-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

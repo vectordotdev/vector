@@ -294,4 +294,26 @@ mod tests {
         )
         .await;
     }
+
+    #[tokio::test]
+    async fn vrl_announcement_example() {
+        crate::test_util::trace_init();
+        let span = span!(
+            tracing::Level::TRACE,
+            "transforms::wasm::vrl_announcement_example"
+        );
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/vrl_announcement_example/target/wasm32-wasi/release/vrl_announcement_example.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/vrl_announcement_example/fixtures/a/input.json",
+            "tests/data/wasm/vrl_announcement_example/fixtures/a/expected.json",
+        )
+        .await;
+    }
 }
