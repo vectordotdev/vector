@@ -28,8 +28,8 @@ pub(super) struct Parser<'a> {
 
 // -----------------------------------------------------------------------------
 
-/// A container type that wraps an [`Expr`] and adds the span within the source
-/// code this expression applies to.
+/// A container type that wraps a type `T` and adds the span pointing to the
+/// relevant position within the source where this type is referenced.
 ///
 /// This is used in error-reporting to be able to show the expression that
 /// caused the error.
@@ -122,12 +122,6 @@ impl<'a> From<&Pair<'a, R>> for Span {
     }
 }
 
-impl<'a> From<Pair<'a, R>> for Span {
-    fn from(pair: Pair<R>) -> Self {
-        (&pair).into()
-    }
-}
-
 impl From<pest::Span<'_>> for Span {
     fn from(span: pest::Span) -> Self {
         (span.start()..span.end()).into()
@@ -142,6 +136,8 @@ impl From<&str> for Span {
 
 // -----------------------------------------------------------------------------
 
+/// The parser error, containing both the span to which the error applies, and
+/// the error variant raised.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error {
     span: Span,
@@ -173,13 +169,14 @@ impl fmt::Display for Error {
 impl From<PestError<R>> for Error {
     fn from(error: PestError<R>) -> Self {
         let span = match error.location {
-            InputLocation::Pos(start) => (start..start).into(),
-            InputLocation::Span((start, end)) => (start..end).into(),
+            InputLocation::Pos(start) => start..start,
+            InputLocation::Span((start, end)) => start..end,
         };
 
-        let variant = Variant::Pest(error);
-
-        Self { span, variant }
+        Self {
+            span: span.into(),
+            variant: Variant::Pest(error),
+        }
     }
 }
 
@@ -368,7 +365,7 @@ impl<'a> Parser<'a> {
             R::boolean_expr => self.boolean_expr_from_pair(pair),
             R::block => self.block_from_pair(pair),
             R::if_statement => self.if_statement_from_pair(pair),
-            _ => Err(e(R::expression, pair)),
+            _ => Err(e(R::expression, &pair)),
         }
     }
 
