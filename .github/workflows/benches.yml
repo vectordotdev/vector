@@ -51,7 +51,13 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: |
+          whoami
+          echo "HOME: $HOME"
+          echo "GITHUB_PATH: $GITHUB_PATH"
+          env
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          which rustup
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Download baseline benchmarks
