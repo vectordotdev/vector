@@ -115,19 +115,19 @@ impl<'a> From<(&'a str, program::Error)> for ProgramError<'a> {
 
 fn fmt_diagnostic(f: &mut fmt::Formatter<'_>, source: &str, diagnostic: Diagnostic) -> fmt::Result {
     use codespan_reporting::files::SimpleFile;
-    use codespan_reporting::term::{self, DisplayStyle};
+    use codespan_reporting::term;
     use std::str::from_utf8;
     use termcolor::Buffer;
 
     let file = SimpleFile::new("<source>", source);
-    let mut config = term::Config::default();
-    config.display_style = if f.alternate() {
-        DisplayStyle::Short
+    let config = term::Config::default();
+
+    let mut buffer = if f.alternate() {
+        Buffer::ansi()
     } else {
-        DisplayStyle::Rich
+        Buffer::no_color()
     };
 
-    let mut buffer = Buffer::no_color();
     term::emit(&mut buffer, &config, &file, &diagnostic.into()).map_err(|_| fmt::Error)?;
 
     f.write_str(from_utf8(buffer.as_slice()).map_err(|_| fmt::Error)?)

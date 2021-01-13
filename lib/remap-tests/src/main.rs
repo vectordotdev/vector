@@ -4,6 +4,11 @@ use std::fs;
 use std::path::PathBuf;
 
 fn main() {
+    let verbose = std::env::args()
+        .nth(1)
+        .map(|s| s == "--verbose")
+        .unwrap_or_default();
+
     let mut failed_count = 0;
     let tests = fs::read_dir("tests").expect("dir exists");
 
@@ -31,6 +36,10 @@ fn main() {
 
                         if got == want {
                             println!("{}", Colour::Green.bold().paint("OK"));
+
+                            if verbose {
+                                println!("{:#}", value);
+                            }
                         } else {
                             println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
 
@@ -45,6 +54,10 @@ fn main() {
                         let got = err.to_string();
                         if got == want {
                             println!("{}", Colour::Green.bold().paint("OK"));
+
+                            if verbose {
+                                println!("{:#}", err);
+                            }
                         } else {
                             println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
                             println!("{}", err);
@@ -57,6 +70,10 @@ fn main() {
                 let want = want.trim().to_owned();
                 if got == want {
                     println!("{}", Colour::Green.bold().paint("OK"));
+
+                    if verbose {
+                        println!("{:#}", err);
+                    }
                 } else {
                     println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
 
