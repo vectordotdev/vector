@@ -4,7 +4,11 @@
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+	    ifeq ($(PROCESSOR_ARCHITECTURE),x86)
+            export RUST_TARGET ?= "i686-pc-windows-msvc"
+        else
+	    	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+		endif
     export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
@@ -193,6 +197,10 @@ build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/releas
 
 .PHONY: build-armv7-unknown-linux-musleabihf
 build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-i686-pc-windows-gnu
+build-i686-pc-windows-gnu: target/i686-pc-windows-gnu/release/vector ## Build a release binary for the i686-pc-windows-gnu triple.
 	@echo "Output to ${<}"
 
 .PHONY: build-graphql-schema
