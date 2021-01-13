@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
+  type: {{ default "ClusterIP" .Values.service.type }}
   ports:
     {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
   selector:

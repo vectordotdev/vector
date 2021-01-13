@@ -7,8 +7,14 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    {{- if eq (include "vector-aggregator.servicePortsPresent" .) "true" -}}
-      {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
-    {{- end }}
+{{- if .Values.vectorSource.enabled }}
+  - name: vector
+    port: {{ .Values.vectorSource.listenPort }}
+    protocol: TCP
+    targetPort: {{ .Values.vectorSource.listenPort }}
+{{- end }}
+{{- with .Values.service.ports }}
+{{ toYaml . | nindent 2 }}
+{{- end }}
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}

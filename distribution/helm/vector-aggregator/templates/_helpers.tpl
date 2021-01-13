@@ -6,6 +6,9 @@ Resolve effective service ports to use.
 {{- define "vector-aggregator.servicePorts" -}}
 {{- if .Values.vectorSource.enabled }}
 - name: vector
+{{- with .Values.vectorSource.nodePort }}
+  nodePort: {{ . }}
+{{- end }}
   port: {{ .Values.vectorSource.listenPort }}
   protocol: TCP
   targetPort: {{ .Values.vectorSource.listenPort }}
