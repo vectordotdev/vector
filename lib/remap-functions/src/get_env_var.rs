@@ -60,55 +60,27 @@ mod tests {
 
     remap::test_type_def![
         value_string {
-            expr: |_| GetEnvVarFn { value: Literal::from("foo").boxed() },
+            expr: |_| GetEnvVarFn { name: Literal::from("foo").boxed() },
             def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
         }
 
         fallible_expression {
-            expr: |_| GetEnvVarFn { value: Literal::from(10).boxed() },
+            expr: |_| GetEnvVarFn { name: Literal::from(10).boxed() },
             def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 
     #[test]
     fn get_env_var() {
-        let cases = vec![
-            (
-                map!["foo": ""],
-                Ok("".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "     "],
-                Ok("".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "hi there"],
-                Ok("hi there".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "           hi there        "],
-                Ok("hi there".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "],
-                Ok("❤❤ hi there ❤❤".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
-
         let mut state = state::Program::default();
+        let mut object: Value = map!["foo": "VAR1"].into();
+        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
+        let got = func.execute(&mut state, &mut object).map_err(|_| ());
+        assert_eq!(got, Err(()));
 
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
+        std::env::set_var("VAR2", "var");
+        let mut object: Value = map!["foo": "VAR2"].into();
+        let got = func.execute(&mut state, &mut object).map_err(|_| ());
+        assert_eq!(got, Ok("var".into()));
     }
 }
