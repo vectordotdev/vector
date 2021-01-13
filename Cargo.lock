@@ -6808,9 +6808,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d0added2aa84460ae186af15395f758b8ed7d3a278a1d94c59d9dd9e036e18f"
+checksum = "ac1bec5c0a4aa71e3459802c7a12e8912c2091ce2151004f9ce95cc5d1c6124e"
 dependencies = [
  "futures 0.3.8",
  "openssl",
@@ -6862,6 +6862,19 @@ dependencies = [
  "bytes 0.5.6",
  "futures-core",
  "tokio 0.2.24",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c7d205f6f59b03f9e824ac86eaba635a98395f287756ecc8a06464779c399bf"
+dependencies = [
+ "async-stream",
+ "bytes 1.0.0",
+ "futures-core",
+ "tokio 1.0.1",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -6953,13 +6966,15 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.3.1"
-source = "git+https://github.com/tower-rs/tower?rev=43168944220ed32dab83cb4f11f7b97abc5818d5#43168944220ed32dab83cb4f11f7b97abc5818d5"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0559727a849a4587762a6aeb3069bcaf47054ee3cfced88fd8b3cfa33eaf251f"
 dependencies = [
  "futures-core",
  "futures-util",
- "pin-project 0.4.27",
- "tokio 0.2.24",
+ "pin-project 1.0.2",
+ "tokio 1.0.1",
+ "tokio-stream",
  "tower-layer",
  "tower-service",
  "tracing 0.1.22",
@@ -6967,9 +6982,9 @@ dependencies = [
 
 [[package]]
 name = "tower-layer"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a35d656f2638b288b33495d1053ea74c40dc05ec0b92084dd71ca5566c4ed1dc"
+checksum = "343bc9466d3fe6b0f960ef45960509f84480bf4fd96f92901afe7ff3df9d3a62"
 
 [[package]]
 name = "tower-make"
@@ -6988,14 +7003,14 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tower-test"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
+checksum = "a4546773ffeab9e4ea02b8872faa49bb616a80a7da66afc2f32688943f97efa7"
 dependencies = [
  "futures-util",
- "pin-project 0.4.27",
- "tokio 0.2.24",
- "tokio-test",
+ "pin-project 1.0.2",
+ "tokio 1.0.1",
+ "tokio-test 0.4.0",
  "tower-layer",
  "tower-service",
 ]
@@ -7631,11 +7646,12 @@ dependencies = [
  "tokio-compat-02",
  "tokio-openssl",
  "tokio-stream",
- "tokio-test",
+ "tokio-test 0.2.1",
  "tokio-util 0.6.0",
  "tokio01-test",
  "toml",
  "tower",
+ "tower-layer",
  "tower-test",
  "tracing 0.1.22",
  "tracing-core 0.1.17",
