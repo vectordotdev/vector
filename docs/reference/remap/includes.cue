@@ -15,42 +15,38 @@ remap: functions: includes: {
 			type: ["any"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["boolean"]
 	category: "Enumerate"
 	description: """
-		Determines whether an item is contained in an array. The item can be of any type and arrays
-		can be of mixed types.
+		Determines whether the provided `values` contains the provided `item`.
 		"""
 	examples: [
 		{
-			title: "String array"
-			input: {
-				fruits: ["apple", "orange", "banana"]
-			}
+			title: "String array includes"
+			input: log: fruits: ["apple", "orange", "banana"]
 			source: #"""
 				.includes_banana = includes(.fruits, "banana")
 				.includes_mango = includes(.fruits, "mango")
 				"""#
-			output: {
+			output: input & {log: {
 				includes_banana: true
 				includes_mango:  false
-			}
+			}}
 		},
 		{
-			title: "Mixed array"
-			input: {
-				kitchen_sink: ["hello", 72.5, false, [1, 2, 3]]
-			}
+			title: "Mixed array includes"
+			input: log: kitchen_sink: ["hello", 72.5, false, [1, 2, 3]]
 			source: #"""
 				.includes_empty_list = includes(.kitchen_sink, [])
 				.includes_hello = includes(.kitchen_sink, "hello")
 				.includes_false = includes(.kitchen_sink, false)
 				"""#
-			output: {
+			output: input & {log: {
 				includes_empty_list: false
 				includes_hello:      true
 				includes_false:      true
-			}
+			}}
 		},
 	]
 }

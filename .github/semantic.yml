@@ -54,7 +54,7 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - remap # Anything related to the Timber Remap Language
+  - remap # Anything related to the Vector Remap Language
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector

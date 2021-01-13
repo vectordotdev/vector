@@ -34,7 +34,7 @@ pub fn protobuf(c: &mut Criterion) {
             Wasm::new(
                 toml::from_str(
                     r#"
-                module = "target/wasm32-wasi/release/protobuf.wasm"
+                module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
                 artifact_cache = "target/artifacts/"
                 "#,
                 )
@@ -85,7 +85,7 @@ end
                 Wasm::new(
                     toml::from_str(
                         r#"
-module = "target/wasm32-wasi/release/add_fields.wasm"
+module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
 artifact_cache = "target/artifacts/"
 "#,
                     )
@@ -168,7 +168,13 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     group.finish();
 }
 
-criterion_group!(benches, protobuf, add_fields);
+criterion_group!(
+    name = benches;
+    // We've seen CI noise commonly be 5% so configure here
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = protobuf, add_fields
+);
 criterion_main! {
     benches,
 }

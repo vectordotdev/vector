@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{AnyCondition, Condition},
+    conditions::{Condition, ConditionConfig},
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
@@ -39,8 +39,8 @@ pub struct ReduceConfig {
 
     /// An optional condition that determines when an event is the end of a
     /// reduce.
-    pub ends_when: Option<AnyCondition>,
-    pub starts_when: Option<AnyCondition>,
+    pub ends_when: Option<Box<dyn ConditionConfig>>,
+    pub starts_when: Option<Box<dyn ConditionConfig>>,
 }
 
 inventory::submit! {
@@ -310,6 +310,7 @@ mod test {
 group_by = [ "request_id" ]
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -367,6 +368,7 @@ merge_strategies.bar = "array"
 merge_strategies.baz = "max"
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -416,6 +418,7 @@ merge_strategies.baz = "max"
 group_by = [ "request_id" ]
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -472,6 +475,7 @@ merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )

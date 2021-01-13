@@ -295,64 +295,91 @@ mod tests {
 
             let client = make_client(server.addr());
 
-            let res = client.component_links_query().await.unwrap();
+            let res = client
+                .component_links_query(None, None, None, None)
+                .await
+                .unwrap();
+
             let data = res.data.unwrap();
+            let sources = data
+                .sources
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
+
+            let transforms = data
+                .transforms
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
+
+            let sinks = data
+                .sinks
+                .edges
+                .into_iter()
+                .flatten()
+                .filter_map(std::convert::identity)
+                .collect::<Vec<_>>();
 
             // should be a single source named "in1"
-            assert!(data.sources.len() == 1);
-            assert!(data.sources[0].name == "in1");
+            assert!(sources.len() == 1);
+            assert!(sources[0].node.name == "in1");
 
             // "in1" source should link to exactly one transform named "t1"
-            assert!(data.sources[0].transforms.len() == 1);
-            assert!(data.sources[0].transforms[0].name == "t1");
+            assert!(sources[0].node.transforms.len() == 1);
+            assert!(sources[0].node.transforms[0].name == "t1");
 
             // "in1" source should link to exactly one sink named "out2"
-            assert!(data.sources[0].sinks.len() == 1);
-            assert!(data.sources[0].sinks[0].name == "out1");
+            assert!(sources[0].node.sinks.len() == 1);
+            assert!(sources[0].node.sinks[0].name == "out1");
 
             // there should be 2 transforms
-            assert!(data.transforms.len() == 2);
+            assert!(transforms.len() == 2);
 
             // get a reference to "t1" and "t2"
-            let mut t1 = &data.transforms[0];
-            let mut t2 = &data.transforms[1];
+            let mut t1 = &transforms[0];
+            let mut t2 = &transforms[1];
 
             // swap if needed
-            if t1.name == "t2" {
-                t1 = &data.transforms[1];
-                t2 = &data.transforms[0];
+            if t1.node.name == "t2" {
+                t1 = &transforms[1];
+                t2 = &transforms[0];
             }
 
             // "t1" transform should link to exactly one source named "in1"
-            assert!(t1.sources.len() == 1);
-            assert!(t1.sources[0].name == "in1");
+            assert!(t1.node.sources.len() == 1);
+            assert!(t1.node.sources[0].name == "in1");
 
             // "t1" transform should link to exactly one transform named "t2"
-            assert!(t1.transforms.len() == 1);
-            assert!(t1.transforms[0].name == "t2");
+            assert!(t1.node.transforms.len() == 1);
+            assert!(t1.node.transforms[0].name == "t2");
 
             // "t1" transform should NOT link to any sinks
-            assert!(t1.sinks.is_empty());
+            assert!(t1.node.sinks.is_empty());
 
             // "t2" transform should link to exactly one sink named "out1"
-            assert!(t2.sinks.len() == 1);
-            assert!(t2.sinks[0].name == "out1");
+            assert!(t2.node.sinks.len() == 1);
+            assert!(t2.node.sinks[0].name == "out1");
 
             // "t2" transform should NOT link to any sources or transforms
-            assert!(t2.sources.is_empty());
-            assert!(t2.transforms.is_empty());
+            assert!(t2.node.sources.is_empty());
+            assert!(t2.node.transforms.is_empty());
 
             // should be a single sink named "out1"
-            assert!(data.sinks.len() == 1);
-            assert!(data.sinks[0].name == "out1");
+            assert!(sinks.len() == 1);
+            assert!(sinks[0].node.name == "out1");
 
             // "out1" sink should link to exactly one source named "in1"
-            assert!(data.sinks[0].sources.len() == 1);
-            assert!(data.sinks[0].sources[0].name == "in1");
+            assert!(sinks[0].node.sources.len() == 1);
+            assert!(sinks[0].node.sources[0].name == "in1");
 
             // "out1" sink should link to exactly one transform named "t2"
-            assert!(data.sinks[0].transforms.len() == 1);
-            assert!(data.sinks[0].transforms[0].name == "t2");
+            assert!(sinks[0].node.transforms.len() == 1);
+            assert!(sinks[0].node.transforms[0].name == "t2");
 
             assert_eq!(res.errors, None);
         })
@@ -838,14 +865,17 @@ mod tests {
             tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
 
             let client = make_client(server.addr());
-            let res = client.file_source_metrics_query().await;
+            let res = client
+                .file_source_metrics_query(None, None, None, None)
+                .await;
 
-            match &res.unwrap().data.unwrap().sources[0].metrics.on {
-                file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOn::FileSourceMetrics(
-                    file_source_metrics_query::FileSourceMetricsQuerySourcesMetricsOnFileSourceMetrics { files, .. },
+            match &res.unwrap().data.unwrap().sources.edges.into_iter().flatten().next().unwrap().unwrap().node.metrics.on {
+                file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOn::FileSourceMetrics(
+                    file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOnFileSourceMetrics { files, .. },
                 ) => {
-                    assert_eq!(files[0].name, path);
-                    assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                    let node = &files.edges.iter().flatten().next().unwrap().as_ref().unwrap().node;
+                    assert_eq!(node.name, path);
+                    assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
             }
@@ -886,5 +916,129 @@ mod tests {
                 "gen1"
             );
         })
+    }
+
+    #[test]
+    fn api_graphql_components_connection() {
+        metrics_test("tests::api_graphql_components_connection", async {
+            // Config with a total of 5 components
+            let conf = r#"
+                [api]
+                  enabled = true
+
+                [sources.gen1]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["1"]
+                  interval = 0.1
+
+                [sources.gen2]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["2"]
+                  interval = 0.1
+
+                [sources.gen3]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["3"]
+                  interval = 0.1
+
+                [sources.gen4]
+                  type = "generator"
+                  format = "shuffle"
+                  lines = ["4"]
+                  interval = 0.1
+
+                [sinks.out]
+                  type = "blackhole"
+                  inputs = ["gen1", "gen2", "gen3", "gen4"]
+                  print_amount = 100000
+            "#;
+
+            let topology = from_str_config(&conf).await;
+
+            let server = api::Server::start(topology.config());
+            let client = make_client(server.addr());
+
+            // Test after/first with a page size of 2, exhausting all results
+            let mut cursor: Option<String> = None;
+            for i in 0..3 {
+                // The components connection contains a `pageInfo` and `edges` -- we need
+                // both to assertion the result set matches expectations
+                let components = client
+                    .components_connection_query(cursor.clone(), None, Some(2), None)
+                    .await
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .components;
+
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
+
+                let page_info = components.page_info;
+
+                // Check prev/next paging is accurate
+                assert_eq!(
+                    (page_info.has_previous_page, page_info.has_next_page),
+                    match i {
+                        0 => (false, true),
+                        2 => (true, false),
+                        _ => (true, true),
+                    }
+                );
+
+                // The # of `edges` results should be 2, except the last page
+                assert_eq!(
+                    components.edges.iter().flatten().count(),
+                    match i {
+                        2 => 1,
+                        _ => 2,
+                    }
+                );
+
+                // Set the after cursor for the next iteration
+                cursor = page_info.end_cursor;
+            }
+
+            // Now use the last 'after' cursor as the 'before'
+            for i in 0..3 {
+                let components = client
+                    .components_connection_query(None, cursor, None, Some(2))
+                    .await
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .components;
+
+                // Total count should match the # of components
+                assert_eq!(components.total_count, 5);
+
+                let page_info = components.page_info;
+
+                // Check prev/next paging. Since we're using a `before` cursor, the last
+                // record won't be included, and therefore `has_next_page` will always be true.
+                assert_eq!(
+                    (page_info.has_previous_page, page_info.has_next_page),
+                    match i {
+                        0 => (true, true),
+                        _ => (false, true),
+                    }
+                );
+
+                // The # of `edges` results should be 2, and zero for the last iteration
+                assert_eq!(
+                    components.edges.iter().flatten().count(),
+                    match i {
+                        2 => 0,
+                        _ => 2,
+                    }
+                );
+
+                // Set the before cursor for the next iteration
+                cursor = page_info.start_cursor;
+            }
+        });
     }
 }

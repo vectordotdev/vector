@@ -82,7 +82,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -187,7 +187,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: [self-hosted, windows, x64]
+    runs-on: [self-hosted, windows, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:

@@ -5,7 +5,7 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 homepage = "https://vector.dev"
-license-file = "LICENSE"
+license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
@@ -35,27 +35,35 @@ depends = ""
 [workspace]
 members = [
   ".",
-  "lib/shared",
+  "lib/codec",
+  "lib/derive_is_enum_variant",
   "lib/file-source",
-  "lib/tracing-limit",
-  "lib/vector-wasm",
-  "lib/k8s-test-framework",
   "lib/k8s-e2e-tests",
+  "lib/k8s-test-framework",
+  "lib/portpicker",
   "lib/prometheus-parser",
   "lib/vector-api-client",
-  "lib/remap-lang",
   "lib/remap-cli",
+  "lib/remap-lang",
   "lib/remap-functions",
+  "lib/remap-lang",
+  "lib/shared",
+  "lib/tracing-limit",
+  "lib/vector-api-client",
+  "lib/vector-wasm",
 ]
 
 [dependencies]
 # Internal libs
-shared = { path = "lib/shared" }
 codec = { path = "lib/codec" }
+derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 file-source = { path = "lib/file-source", optional = true }
-tracing-limit = { path = "lib/tracing-limit" }
+portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+shared = { path = "lib/shared" }
+tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+remap-cli = { path = "lib/remap-cli", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -116,7 +124,7 @@ itertools = { version = "0.10.0", optional = true }
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.19.0", optional = true }
-tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
@@ -143,7 +151,6 @@ typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
 syslog_loose = "0.7.0"
-derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
@@ -186,7 +193,6 @@ cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
 k8s-openapi = { version = "0.10.0", features = ["v1_16"], optional = true }
-portpicker = "0.1.0"
 sha-1 = "0.9.2"
 sha2 = "0.9"
 sha3 = "0.9"
@@ -288,11 +294,15 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
+# VRL
+vrl-cli = ["remap-cli"]
+
 # API
 api = [
   "async-graphql",
   "async-graphql-warp",
   "itertools",
+  "base64",
 ]
 
 # API client
@@ -586,9 +596,5 @@ tower-layer = "0.3"
 [patch.crates-io]
 # TODO: update to next 0.12.x (after 0.12.0, if any)
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
-# Not maintained, our branch update `sync` and `quote` crates: https://github.com/fitzgen/derive_is_enum_variant/pull/3
-derive_is_enum_variant = { version = "0.1.1", git = "https://github.com/timberio/derive_is_enum_variant", rev = "e4550f8ca1366823b8366f0126a7d00ee8ffb080" }
 # TODO: update to the next 0.13.x (after 0.13.9, if any) or 0.14 (or higher)
 hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "a00cc20afc597cb55cbc62c70b0b25b46c82a0a6" }
-# Not maintained, our branch update `rand` crate: https://github.com/Dentosal/portpicker-rs/pull/3
-portpicker = { version = "0.1.0", git = "https://github.com/timberio/portpicker-rs", rev = "d15829e906516720881584ff3301a0dd04218fbb" }

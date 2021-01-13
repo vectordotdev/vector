@@ -41,4 +41,10 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_elasticsearch_index);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.20);
+    targets = bench_elasticsearch_index
+);

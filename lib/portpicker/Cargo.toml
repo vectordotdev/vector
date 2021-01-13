@@ -1,0 +1,10 @@
+[package]
+name = "portpicker"
+version = "1.0.0"
+authors = ["Vector Contributors <vector@timber.io>", "Hannes Karppila <hannes.karppila@gmail.com>"]
+edition = "2018"
+publish = false
+license = "Unlicense"
+
+[dependencies]
+rand = "0.8.0"

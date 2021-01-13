@@ -180,7 +180,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-            module = "target/wasm32-wasi/release/protobuf.wasm"
+            module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#;
 
@@ -199,7 +199,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-            module = "target/wasm32-wasi/release/protobuf.wasm"
+            module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#;
 
@@ -218,7 +218,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/add_fields.wasm"
+    module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
     artifact_cache = "target/artifacts"
     options.new_field = "new_value"
     options.new_field_2 = "new_value_2"
@@ -239,7 +239,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/drop.wasm"
+    module = "tests/data/wasm/drop/target/wasm32-wasi/release/drop.wasm"
     artifact_cache = "target/artifacts"
             "#;
 
@@ -258,7 +258,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/panic.wasm"
+    module = "tests/data/wasm/panic/target/wasm32-wasi/release/panic.wasm"
     artifact_cache = "target/artifacts"
             "#;
 
@@ -277,7 +277,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/assert_config.wasm"
+    module = "tests/data/wasm/assert_config/target/wasm32-wasi/release/assert_config.wasm"
     artifact_cache = "target/artifacts"
     options.takes_string = "test"
     options.takes_number = 123

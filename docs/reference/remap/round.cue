@@ -16,38 +16,28 @@ remap: functions: round: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""
-		Rounds the given number to the given number of decimal places. Rounds up or down
-		depending on which is nearest. Numbers that are half way (5) are rounded up.
+		Rounds the provided `value` to number to the specified `precision`.
 		"""#
 	examples: [
 		{
-			title: "Round up"
-			input: {
-				number: 4.345
-			}
+			title: "Round (without precision)"
+			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision = 2)
+				.number = floor(.number)
 				"""#
-			output: {
-				number: 4.345
-				floor:  4.35
-			}
+			output: log: number: 4
 		},
 		{
-			title: "Round down"
-			input: {
-				number: 4.344
-			}
+			title: "Round (with precision)"
+			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision = 2)
+				.number = floor(.number, precision: 2)
 				"""#
-			output: {
-				number: 4.344
-				floor:  4.34
-			}
+			output: log: number: 4.35
 		},
 	]
 }
