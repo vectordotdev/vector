@@ -64,7 +64,6 @@ default = [
     "md5",
     "merge",
     "now",
-    "ok",
     "only_fields",
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
@@ -132,7 +131,6 @@ match = ["regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = []
-ok = []
 only_fields = []
 parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription"]

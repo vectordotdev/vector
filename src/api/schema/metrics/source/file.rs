@@ -21,7 +21,7 @@ impl<'a> FileSourceMetricFile<'a> {
 }
 
 #[Object]
-impl FileSourceMetricFile<'_> {
+impl<'a> FileSourceMetricFile<'a> {
     /// File name
     async fn name(&self) -> &str {
         &*self.name
