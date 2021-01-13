@@ -50,7 +50,7 @@ components: sources: host_metrics: {
 			description: "Sets an arbitrary path to the system's Procfs root. Can be used to expose host metrics from within a container."
 			type: string: {
 				default: null
-				examples: "/mnt/host/proc"
+				examples: ["/mnt/host/proc"]
 			}
 		}
 
@@ -58,7 +58,7 @@ components: sources: host_metrics: {
 			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container."
 			type: string: {
                 default: null
-				examples: "/mnt/host/sys"
+				examples: ["/mnt/host/sys"]
 			}
 		}
     }
