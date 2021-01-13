@@ -325,7 +325,7 @@ impl PostgresqlMetrics {
     }
 
     async fn build_client(&mut self) -> Result<(), BuildError> {
-        self.client = Some(match &self.tls_config {
+        let client = match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
                     SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
@@ -355,10 +355,9 @@ impl PostgresqlMetrics {
                 tokio::spawn(connection);
                 client
             }
-        });
+        };
 
-        let version_row = self
-            .get_client()
+        let version_row = client
             .query_one("SELECT version()", &[])
             .await
             .with_context(|| VersionFailed {
@@ -371,11 +370,8 @@ impl PostgresqlMetrics {
             })?;
         debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
 
+        self.client = Some(client);
         Ok(())
-    }
-
-    fn get_client(&self) -> &Client {
-        self.client.as_ref().unwrap()
     }
 
     async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
@@ -385,7 +381,10 @@ impl PostgresqlMetrics {
         };
 
         let metrics = match build_client {
-            Ok(()) => self.collect_metrics().await.map_err(|err| err.to_string()),
+            Ok(()) => self
+                .collect_metrics(self.client.as_ref().expect("should exists at this point"))
+                .await
+                .map_err(|err| err.to_string()),
             Err(err) => Err(err.to_string()),
         };
 
@@ -405,20 +404,23 @@ impl PostgresqlMetrics {
         stream::once(ready(up_metric)).chain(metrics).boxed()
     }
 
-    async fn collect_metrics(&self) -> Result<impl Iterator<Item = Metric>, CollectError> {
+    async fn collect_metrics(
+        &self,
+        client: &Client,
+    ) -> Result<impl Iterator<Item = Metric>, CollectError> {
         try_join_all(vec![
-            self.collect_pg_stat_database().boxed(),
-            self.collect_pg_stat_database_conflicts().boxed(),
-            self.collect_pg_stat_bgwriter().boxed(),
+            self.collect_pg_stat_database(client).boxed(),
+            self.collect_pg_stat_database_conflicts(client).boxed(),
+            self.collect_pg_stat_bgwriter(client).boxed(),
         ])
         .map_ok(|metrics| metrics.into_iter().flatten())
         .await
     }
 
-    async fn collect_pg_stat_database(&self) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_pg_stat_database(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
-            .pg_stat_database(self.get_client())
+            .pg_stat_database(client)
             .await
             .context(QueryError)?;
 
@@ -538,10 +540,13 @@ impl PostgresqlMetrics {
         Ok(metrics)
     }
 
-    async fn collect_pg_stat_database_conflicts(&self) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_pg_stat_database_conflicts(
+        &self,
+        client: &Client,
+    ) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
-            .pg_stat_database_conflicts(self.get_client())
+            .pg_stat_database_conflicts(client)
             .await
             .context(QueryError)?;
 
@@ -580,9 +585,8 @@ impl PostgresqlMetrics {
         Ok(metrics)
     }
 
-    async fn collect_pg_stat_bgwriter(&self) -> Result<Vec<Metric>, CollectError> {
-        let row = self
-            .get_client()
+    async fn collect_pg_stat_bgwriter(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
+        let row = client
             .query_one("SELECT * FROM pg_stat_bgwriter", &[])
             .await
             .context(QueryError)?;
