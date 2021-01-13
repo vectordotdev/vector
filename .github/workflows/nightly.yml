@@ -127,10 +127,6 @@ jobs:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v1
-      - name: "Upgrade bash"
-        run: brew install bash
-      - name: "Install realpath dependency"
-        run: brew install coreutils
       - name: Add version variable
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
         shell: bash
@@ -195,6 +191,10 @@ jobs:
           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
           unzip wix-binaries.zip
           rm wix-binaries.zip
+      - name: Add target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.triple }}
       - name: "Build archive"
         shell: bash
         run: |
