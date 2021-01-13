@@ -7435,7 +7435,6 @@ dependencies = [
  "sha2 0.9.2",
  "sha3",
  "shared",
- "smallvec",
  "smpl_jwt",
  "snafu",
  "snap",

@@ -1,5 +1,4 @@
 use async_graphql::InputObject;
-use smallvec::{smallvec, SmallVec};
 
 /// Takes an &Option<bool> and returns early if false
 #[macro_export]
@@ -65,10 +64,8 @@ where
                 || f.or().map_or_else(
                     || false,
                     |f| {
-                        f.iter().any(|f| {
-                            let items: SmallVec<[Item; 1]> = smallvec![(*c).clone()];
-                            !filter_items(items.into_iter(), f).is_empty()
-                        })
+                        f.iter()
+                            .any(|f| !filter_items(vec![(*c).clone(); 1].into_iter(), f).is_empty())
                     },
                 )
         })
