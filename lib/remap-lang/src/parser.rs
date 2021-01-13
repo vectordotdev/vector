@@ -2,8 +2,10 @@
 
 use crate::{
     expression::{
-        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not,
-        Path, Target, Variable,
+        self,
+        if_statement::{self, IfCondition},
+        Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not, Path,
+        Target, Variable,
     },
     path, state, Expr, Expression, Function as Fn, Operator, Value,
 };
@@ -145,6 +147,10 @@ pub struct Error {
 }
 
 impl Error {
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
     pub fn variant(&self) -> &Variant {
         &self.variant
     }
@@ -180,11 +186,12 @@ impl From<PestError<R>> for Error {
     }
 }
 
-impl From<(pest::Span<'_>, Variant)> for Error {
-    fn from((span, variant): (pest::Span, Variant)) -> Self {
-        let span = (span.start()..span.end()).into();
-
-        Self { span, variant }
+impl<S: Into<Span>, V: Into<Variant>> From<(S, V)> for Error {
+    fn from((span, variant): (S, V)) -> Self {
+        Self {
+            span: span.into(),
+            variant: variant.into(),
+        }
     }
 }
 
@@ -207,6 +214,9 @@ pub enum Variant {
 
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
+
+    #[error("invalid if-statement")]
+    IfStatement(#[from] if_statement::Error),
 }
 
 // -----------------------------------------------------------------------------
@@ -522,7 +532,7 @@ impl<'a> Parser<'a> {
                 Some(R::block) | None => {
                     let conditional = self.if_condition_from_pair(pair)?.into_inner();
                     let true_expression = false_expression;
-                    false_expression = Expr::from(Noop);
+                    false_expression = Noop.into();
 
                     (conditional, true_expression)
                 }
@@ -536,44 +546,37 @@ impl<'a> Parser<'a> {
                 _ => return Err(e(R::if_statement, span)),
             };
 
-            // FIXME
-            false_expression = Expr::from(
-                IfStatement::new(
-                    Box::new(conditional),
-                    Box::new(true_expression),
-                    Box::new(false_expression),
-                    &self.compiler_state,
-                )
-                .unwrap(),
-            );
+            false_expression = IfStatement::new(
+                conditional,
+                Box::new(true_expression),
+                Box::new(false_expression),
+            )
+            .into();
         }
 
-        // TODO: change the span based on if the conditional is invalid, or
-        // another part of the if statement. Should match on the error variant
-        // and return the correct span here, so that the IfStatement initializer
-        // doesn't need to deal with spans. Could also create a new
-        // `IfCondition` type which can return an error and be used in the
-        // `if_condition_from_pair` parser function.
         let node = IfStatement::new(
-            Box::new(conditional),
+            conditional,
             Box::new(true_expression),
             Box::new(false_expression),
-            &self.compiler_state,
-        )
-        .unwrap(); // FIXME
+        );
 
         Ok((span, node).into())
     }
 
-    fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<IfCondition> {
         let span = Span::from(&pair);
         let mut pairs = pair.clone().into_inner();
 
-        if let Some(R::boolean_expr) = pairs.peek().map(|p| p.as_rule()) {
-            return self.expression_from_pair(pairs.next().ok_or(e(R::if_condition, span))?);
-        }
+        let (span, expression) = if let Some(R::boolean_expr) = pairs.peek().map(|p| p.as_rule()) {
+            let pair = pairs.next().ok_or(e(R::if_condition, span))?;
+            self.expression_from_pair(pair)?.take()
+        } else {
+            self.block_from_pair(pair)?.take()
+        };
 
-        self.block_from_pair(pair)
+        let condition = IfCondition::new(Box::new(expression), &self.compiler_state);
+
+        span_result(span, condition)
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.
@@ -1001,6 +1004,19 @@ impl<'a> Parser<'a> {
 }
 
 // -----------------------------------------------------------------------------
+
+#[inline]
+fn span_result<T, U, E>(span: impl Into<Span>, result: std::result::Result<U, E>) -> Result<T>
+where
+    U: Into<T>,
+    E: Into<Variant>,
+{
+    let span = span.into();
+
+    result
+        .map(|expr| (span, expr.into()).into())
+        .map_err(|err| (span, err.into()).into())
+}
 
 #[inline]
 fn e(rule: R, span: impl Into<Span>) -> Error {

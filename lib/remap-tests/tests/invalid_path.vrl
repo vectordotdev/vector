@@ -1,11 +1,7 @@
 # object: { "bar": "bar" }
 # result:
 #
-# remap error: parser error:  --> 2:6
-#   |
-# 2 | .foo.␊
-#   |      ^---
-#   |
-#   = expected path segment
+# error: parse error
+#  = see language documentation at: https://vector.dev
 
 .foo.

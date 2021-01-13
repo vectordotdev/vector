@@ -8,7 +8,7 @@ mod array;
 mod assignment;
 mod block;
 pub(crate) mod function;
-mod if_statement;
+pub(crate) mod if_statement;
 mod literal;
 mod map;
 mod noop;

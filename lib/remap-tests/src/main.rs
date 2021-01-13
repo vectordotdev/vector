@@ -10,7 +10,7 @@ fn main() {
     for file in tests {
         let mut test = Test::new(file.expect("file").path());
 
-        print!("{:.<30}", test.name);
+        print!("{:.<60}", test.name);
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));

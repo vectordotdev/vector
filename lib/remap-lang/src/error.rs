@@ -74,16 +74,7 @@ impl<'a> From<(&'a str, program::Error)> for ProgramError<'a> {
         use program::Error::*;
 
         let diagnostic = match error {
-            Parse(_) => {
-                let _ = ();
-
-                Diagnostic {
-                    severity: Severity::Error,
-                    message: Message::Parse,
-                    labels: vec![],
-                    notes: vec![],
-                }
-            }
+            Parse(ref err) => err.into(),
 
             Fallible => Diagnostic {
                 severity: Severity::Error,
@@ -108,7 +99,7 @@ impl<'a> From<(&'a str, program::Error)> for ProgramError<'a> {
                 Diagnostic {
                     severity: Severity::Error,
                     message: Message::ReturnValue,
-                    labels: vec![Label::primary(LabelMessage::ResolvesToKind(got), range)],
+                    labels: vec![Label::primary(LabelMessage::GotKind(got), range)],
                     notes: vec![Note::ExpectedKind(want), Note::CoerceValue],
                 }
             }
