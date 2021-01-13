@@ -310,6 +310,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get_env_var")]
+        Box::new(GetEnvVar),
         #[cfg(feature = "includes")]
         Box::new(Includes),
         #[cfg(feature = "ip_cidr_contains")]
