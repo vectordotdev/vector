@@ -12,7 +12,11 @@ ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
 	export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+	ifeq ($(OPERATING_SYSTEM),Darwin)
+		export RUST_TARGET ?= "x86_64-apple-darwin"
+	else
+		export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+	endif
     export DEFAULT_FEATURES = default
 endif
 
@@ -168,7 +172,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 ##@ Building
 .PHONY: build
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES} --target=${TARGET}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
