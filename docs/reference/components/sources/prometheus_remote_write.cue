@@ -70,12 +70,6 @@ components: sources: prometheus_remote_write: {
 		gauge:   output._passthrough_gauge
 	}
 
-	telemetry: metrics: {
-		parse_errors_total:     components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-	}
-
 	how_it_works: {
 		metric_types: {
 			title: "Metric type interpretation"
@@ -83,7 +77,7 @@ components: sources: prometheus_remote_write: {
 				The remote_write protocol used by this source transmits
 				only the metric tags, timestamp, and numerical value. No
 				explicit information about the original type of the
-				metric (ie counter, histogram, etc) is included. As
+				metric (i.e. counter, histogram, etc) is included. As
 				such, this source makes a guess as to what the original
 				metric type was.
 
@@ -92,5 +86,16 @@ components: sources: prometheus_remote_write: {
 				are emitted as gauges.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		requests_received_total:      components.sources.internal_metrics.output.metrics.requests_received_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
 	}
 }

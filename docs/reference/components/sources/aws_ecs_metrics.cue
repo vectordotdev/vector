@@ -237,4 +237,14 @@ components: sources: aws_ecs_metrics: {
 		network_transmit_packets_drop_total: _awsecs & _network_counter & {description: "Number of outbound packets dropped by the container."}
 		network_transmit_errs_total:         _awsecs & _network_counter & {description: "Errors sending packets."}
 	}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
+	}
 }
