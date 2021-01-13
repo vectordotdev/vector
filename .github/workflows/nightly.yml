@@ -146,8 +146,20 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
 
-  build-x86_64-pc-windows-msvc-packages:
+  build-windows-msvc-packages:
     runs-on: windows-2019
+    strategy:
+      matrix:
+        triple: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+        include:
+        - triple: x86_64-pc-windows-msvc
+          arch: win64-x64
+          perl: 64bit
+          msi: x64
+        - triple: i686-pc-windows-msvc
+          arch: win32-x86
+          perl: 32bit
+          msi: x86
     steps:
       - uses: actions/checkout@v1
       - name: "Add Vector version"
@@ -158,7 +170,7 @@ jobs:
         env:
           VERSION: "5.32.0.1"
         run: |
-          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-${{ perl }}.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -169,7 +181,7 @@ jobs:
         env:
           VERSION: "3.15.5"
         run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-${{ arch }}.msi > cmake-installer.msi
       - name: "Install CMake"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -192,7 +204,7 @@ jobs:
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
           export RUST_LTO=""
-          export TARGET="x86_64-pc-windows-msvc"
+          export TARGET=${{ triple }}
           export NATIVE_BUILD="true"
           make package
       - name: "Build package"
@@ -202,12 +214,12 @@ jobs:
           ./scripts/package-msi.sh
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip"
+          name: vector-${{ env.VECTOR_VERSION }}-${{ triple }}.zip
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ triple }}.zip"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-x64.msi
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
+          name: vector-${{ env.VECTOR_VERSION }}-${{ msi }}.msi
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ msi }}.msi"
 
   deb-verify:
     needs:
@@ -353,7 +365,7 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
+      - build-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
@@ -566,7 +578,7 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-gnu-packages
       - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
+      - build-windows-msvc-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - release-docker
