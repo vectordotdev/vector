@@ -78,11 +78,11 @@ components: sources: postgresql_metrics: {
 			required:    false
 			type: string: default: "postgresql"
 		}
-		included_databases: {
+		include_databases: {
 			description: """
 				A list of databases to match against `datname` column for which you want to collect metrics from.
-				This can beused in conjunction with [`excluded_databases`](#excluded_databases).
-				In case if `excluded_databases` is not empty databases from there will be removed from `included_databases`.
+				This can beused in conjunction with [`exclude_databases`](#exclude_databases).
+				In case if `exclude_databases` is not empty databases from there will be removed from `include_databases`.
 				"""
 			common:   false
 			required: false
@@ -91,10 +91,10 @@ components: sources: postgresql_metrics: {
 				items: type: string: examples: ["postgres", "vector"]
 			}
 		}
-		excluded_databases: {
+		exclude_databases: {
 			description: """
 				A list of databases to match against `datname` column for which you don't want to collect metrics from.
-				This can be used in conjunction with [`included_databases`](#included_databases).
+				This can be used in conjunction with [`include_databases`](#include_databases).
 				"""
 			common:   false
 			required: false

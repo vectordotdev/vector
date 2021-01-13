@@ -93,8 +93,8 @@ struct PostgresqlMetricsTlsConfig {
 #[serde(default, deny_unknown_fields)]
 struct PostgresqlMetricsConfig {
     endpoints: Vec<String>,
-    included_databases: Option<Vec<String>>,
-    excluded_databases: Option<Vec<String>>,
+    include_databases: Option<Vec<String>>,
+    exclude_databases: Option<Vec<String>>,
     scrape_interval_secs: u64,
     namespace: String,
     tls: Option<PostgresqlMetricsTlsConfig>,
@@ -104,8 +104,8 @@ impl Default for PostgresqlMetricsConfig {
     fn default() -> Self {
         Self {
             endpoints: vec![],
-            included_databases: None,
-            excluded_databases: None,
+            include_databases: None,
+            exclude_databases: None,
             scrape_interval_secs: 15,
             namespace: "postgresql".to_owned(),
             tls: None,
@@ -130,8 +130,8 @@ impl SourceConfig for PostgresqlMetricsConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let datname_filter = DatnameFilter::new(
-            self.included_databases.clone().unwrap_or_default(),
-            self.excluded_databases.clone().unwrap_or_default(),
+            self.include_databases.clone().unwrap_or_default(),
+            self.exclude_databases.clone().unwrap_or_default(),
         );
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
