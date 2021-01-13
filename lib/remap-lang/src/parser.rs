@@ -118,7 +118,7 @@ impl From<Range<usize>> for Span {
 
 impl<'a> From<&Pair<'a, R>> for Span {
     fn from(pair: &Pair<R>) -> Self {
-        span_from_pair(pair)
+        pair.as_span().into()
     }
 }
 
@@ -131,6 +131,12 @@ impl<'a> From<Pair<'a, R>> for Span {
 impl From<pest::Span<'_>> for Span {
     fn from(span: pest::Span) -> Self {
         (span.start()..span.end()).into()
+    }
+}
+
+impl From<&str> for Span {
+    fn from(source: &str) -> Self {
+        (0..source.bytes().len()).into()
     }
 }
 
@@ -214,10 +220,10 @@ macro_rules! operation_fns {
         $(
             paste::paste! {
                 fn [<$rule _from_pair>](&mut self, pair: Pair<R>) -> Result<Expr> {
-                    let span = span_from_pair(&pair);
+                    let span = Span::from(&pair);
                     let mut pairs = pair.into_inner();
 
-                    let next = pairs.next().ok_or(ee(R::$rule, &pairs))?;
+                    let next = pairs.next().ok_or(e(R::$rule, span))?;
                     let mut lhs = self.[<$next _from_pair>](next)?.into_inner();
                     let mut op = Operator::$head_op;
 
@@ -268,7 +274,7 @@ impl<'a> Parser<'a> {
     /// parser grammar.
     pub(crate) fn path_from_str(&mut self, path: &str) -> std::result::Result<path::Path, Error> {
         let mut pairs = self.pairs_from_str(R::rule_path, path)?.into_inner();
-        let pair = pairs.next().ok_or(ee(R::rule_path, &pairs))?;
+        let pair = pairs.next().ok_or(e(R::rule_path, path))?;
 
         match pair.as_rule() {
             R::path => self.path_from_pair(pair).map(ParsedNode::into_inner),
@@ -294,7 +300,7 @@ impl<'a> Parser<'a> {
         if let Ok(mut pairs) = Self::parse(R::rule_ident, field) {
             let field = pairs
                 .next()
-                .ok_or(ee(R::rule_ident, &pairs))?
+                .ok_or(e(R::rule_ident, field))?
                 .as_str()
                 .to_owned();
 
@@ -304,7 +310,7 @@ impl<'a> Parser<'a> {
         let field = self
             .pairs_from_str(R::rule_string_inner, field)?
             .next()
-            .ok_or(en(R::rule_string_inner))?
+            .ok_or(e(R::rule_string_inner, field))?
             .as_str()
             .to_owned();
 
@@ -367,13 +373,14 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+        let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
         let (target_span, target) = self
-            .target_from_pair(pairs.next().ok_or(ee(R::assignment, &pairs))?)?
+            .target_from_pair(pairs.next().ok_or(e(R::assignment, span))?)?
             .take();
         let (expression_span, expression) = self
-            .expression_from_pair(pairs.next().ok_or(ee(R::assignment, &pairs))?)?
+            .expression_from_pair(pairs.next().ok_or(e(R::assignment, span))?)?
             .take();
 
         let assignment_span = (target_span.start..expression_span.end).into();
@@ -453,17 +460,18 @@ impl<'a> Parser<'a> {
     }
 
     fn target_infallible_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+        let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
         let (ok_span, ok) = pairs
             .next()
-            .ok_or(ee(R::target_infallible, &pairs))
+            .ok_or(e(R::target_infallible, span))
             .and_then(|pair| Ok(self.target_from_pair(pair)?))?
             .take();
 
         let (err_span, err) = pairs
             .next()
-            .ok_or(ee(R::target_infallible, &pairs))
+            .ok_or(e(R::target_infallible, span))
             .and_then(|pair| Ok(self.target_from_pair(pair)?))?
             .take();
 
@@ -478,7 +486,7 @@ impl<'a> Parser<'a> {
 
     /// Parse block expressions.
     fn block_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut expressions = vec![];
 
         for pair in pair.into_inner() {
@@ -490,15 +498,15 @@ impl<'a> Parser<'a> {
 
     /// Parse if-statement expressions.
     fn if_statement_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
         // if condition
         let conditional = self
-            .if_condition_from_pair(pairs.next().ok_or(ee(R::if_statement, &pairs))?)?
+            .if_condition_from_pair(pairs.next().ok_or(e(R::if_statement, span))?)?
             .into_inner();
         let true_expression = self
-            .expression_from_pair(pairs.next().ok_or(ee(R::if_statement, &pairs))?)?
+            .expression_from_pair(pairs.next().ok_or(e(R::if_statement, span))?)?
             .into_inner();
 
         // else condition
@@ -509,11 +517,11 @@ impl<'a> Parser<'a> {
             .map(ParsedNode::into_inner)
             .unwrap_or_else(|| Expr::from(Noop));
 
-        let mut ppairs = pairs.clone().rev().peekable();
+        let mut pairs = pairs.rev().peekable();
 
         // optional if-else conditions
-        while let Some(pair) = ppairs.next() {
-            let (conditional, true_expression) = match ppairs.peek().map(Pair::as_rule) {
+        while let Some(pair) = pairs.next() {
+            let (conditional, true_expression) = match pairs.peek().map(Pair::as_rule) {
                 Some(R::block) | None => {
                     let conditional = self.if_condition_from_pair(pair)?.into_inner();
                     let true_expression = false_expression;
@@ -522,13 +530,13 @@ impl<'a> Parser<'a> {
                     (conditional, true_expression)
                 }
                 Some(R::if_condition) => {
-                    let next_pair = ppairs.next().ok_or(ee(R::if_statement, &pairs))?;
+                    let next_pair = pairs.next().ok_or(e(R::if_statement, span))?;
                     let conditional = self.if_condition_from_pair(next_pair)?.into_inner();
                     let true_expression = self.expression_from_pair(pair)?.into_inner();
 
                     (conditional, true_expression)
                 }
-                _ => return Err(ee(R::if_statement, &pairs)),
+                _ => return Err(e(R::if_statement, span)),
             };
 
             // FIXME
@@ -561,10 +569,11 @@ impl<'a> Parser<'a> {
     }
 
     fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+        let span = Span::from(&pair);
         let mut pairs = pair.clone().into_inner();
 
         if let Some(R::boolean_expr) = pairs.peek().map(|p| p.as_rule()) {
-            return self.expression_from_pair(pairs.next().ok_or(ee(R::if_condition, &pairs))?);
+            return self.expression_from_pair(pairs.next().ok_or(e(R::if_condition, span))?);
         }
 
         self.block_from_pair(pair)
@@ -572,7 +581,7 @@ impl<'a> Parser<'a> {
 
     /// Parse not operator, or fall-through to primary values or function calls.
     fn not_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let pairs = pair.into_inner();
 
         let mut count = 0;
@@ -615,7 +624,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a [`Value`] into a [`Literal`] expression.
     fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         match pair.as_rule() {
             R::string => self.string_from_pair(pair).map(ParsedNode::to_expr),
@@ -651,7 +660,7 @@ impl<'a> Parser<'a> {
     }
 
     fn array_from_pair(&mut self, pair: Pair<R>) -> Result<Array> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         let expressions = pair
             .into_inner()
@@ -671,7 +680,7 @@ impl<'a> Parser<'a> {
     }
 
     fn map_from_pair(&mut self, pair: Pair<R>) -> Result<Map> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         let map = pair
             .into_inner()
@@ -730,7 +739,7 @@ impl<'a> Parser<'a> {
 
     /// Parse into a vector of argument properties.
     fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Expr)>> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         let arguments = pair
             .into_inner()
@@ -742,7 +751,7 @@ impl<'a> Parser<'a> {
 
     /// Parse optional argument keyword and [`Argument`] value.
     fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Expr)> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut ident = None;
 
         for pair in pair.into_inner() {
@@ -757,17 +766,17 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Err(en(R::argument))
+        Err(e(R::argument, span))
     }
 
     /// Parse a [`Regex`] value
     fn regex_from_pair(&self, pair: Pair<R>) -> Result<Regex> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
         let pattern = inner
             .next()
-            .ok_or(ee(R::regex_inner, &inner))?
+            .ok_or(e(R::regex_inner, span))?
             .as_str()
             .replace("\\/", "/");
 
@@ -798,7 +807,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"
     fn path_from_pair(&self, pair: Pair<R>) -> Result<path::Path> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
         // If no segments are provided, it's the root path (e.g. `.`).
@@ -816,7 +825,7 @@ impl<'a> Parser<'a> {
     }
 
     fn path_segments_from_pair(&self, pair: Pair<R>) -> Result<Vec<path::Segment>> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         let segments: Vec<path::Segment> = pair
             .into_inner()
@@ -851,7 +860,7 @@ impl<'a> Parser<'a> {
     }
 
     fn path_coalesce_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         let fields = pair
             .into_inner()
@@ -891,12 +900,12 @@ impl<'a> Parser<'a> {
 
     /// Parse a [`Variable`] value, e.g. "$foo"
     fn variable_from_pair(&self, pair: Pair<R>) -> Result<Variable> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
         let ident = inner
             .next()
-            .ok_or(ee(R::variable, &inner))?
+            .ok_or(e(R::variable, span))?
             .as_str()
             .to_owned();
 
@@ -930,7 +939,7 @@ impl<'a> Parser<'a> {
     }
 
     fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
-        let span = span_from_pair(&pair);
+        let span = Span::from(&pair);
 
         // This is only executed once per string at parse time, and so I'm not
         // losing sleep over the reallocation. However, if we want to mutate the
@@ -996,35 +1005,10 @@ impl<'a> Parser<'a> {
 
 // -----------------------------------------------------------------------------
 
-fn span_from_pair(pair: &Pair<R>) -> Span {
-    pair.as_span().into()
-}
-
 #[inline]
 fn e(rule: R, span: impl Into<Span>) -> Error {
     Error {
         span: span.into(),
-        variant: Variant::Rule(rule),
-    }
-}
-
-#[inline]
-fn en(rule: R) -> Error {
-    Error {
-        span: (0..0).into(),
-        variant: Variant::Rule(rule),
-    }
-}
-
-#[inline]
-fn ee(rule: R, pairs: &Pairs<R>) -> Error {
-    let iter = pairs.clone();
-
-    let start = iter.peek().map(|p| p.as_span().start()).unwrap_or_default();
-    let end = iter.last().map(|p| p.as_span().end()).unwrap_or_default();
-
-    Error {
-        span: (start..end).into(),
         variant: Variant::Rule(rule),
     }
 }
