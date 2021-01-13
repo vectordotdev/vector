@@ -44,6 +44,7 @@ impl StringFilter {
     }
 }
 
+/// CustomFilter trait to determine whether to include/exclude fields based on matches.
 pub trait CustomFilter<T> {
     fn matches(&self, item: &T) -> bool;
     fn or(&self) -> Option<&Vec<Self>>
@@ -51,6 +52,7 @@ pub trait CustomFilter<T> {
         Self: Sized;
 }
 
+/// Filters items based on an implementation of `CustomFilter<T>`.
 pub fn filter_items<Item, Iter, Filter>(items: Iter, f: &Filter) -> Vec<Item>
 where
     Item: Clone,

@@ -4,7 +4,11 @@ pub mod state;
 pub mod transform;
 
 use crate::{
-    api::schema::{components::state::component_by_name, filter, relay},
+    api::schema::{
+        components::state::component_by_name,
+        filter::{filter_items, CustomFilter},
+        relay,
+    },
     config::Config,
     filter_check,
 };
@@ -36,12 +40,12 @@ impl Component {
 
 #[derive(Default, InputObject)]
 pub struct ComponentsFilter {
-    name: Option<Vec<filter::StringFilter>>,
+    name: Option<Vec<StringFilter>>,
     and: Option<Vec<Self>>,
     or: Option<Vec<Self>>,
 }
 
-impl filter::CustomFilter<Component> for ComponentsFilter {
+impl CustomFilter<Component> for ComponentsFilter {
     fn matches(&self, component: &Component) -> bool {
         filter_check!(self
             .name
@@ -67,9 +71,10 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
-        #[graphql(default)] filter: ComponentsFilter,
+        filter: Option<ComponentsFilter>,
     ) -> relay::ConnectionResult<Component> {
-        let components = filter::filter_items(state::get_components().into_iter(), &filter);
+        let filter = filter.unwrap_or_else(ComponentsFilter::default);
+        let components = filter_items(state::get_components().into_iter(), &filter);
 
         relay::query(
             components.into_iter(),
