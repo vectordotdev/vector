@@ -112,6 +112,7 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -191,8 +192,7 @@ mod tests {
                 ),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Distribution {
-                    values: vec![1.0, 2.0, 3.0],
-                    sample_rates: vec![100, 200, 300],
+                    samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                     statistic: StatisticKind::Histogram,
                 },
             }),

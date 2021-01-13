@@ -159,6 +159,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -238,8 +239,7 @@ mod test {
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![10.0],
-                sample_rates: vec![1],
+                samples: crate::samples![10.0 => 1],
                 statistic: StatisticKind::Histogram,
             },
         });

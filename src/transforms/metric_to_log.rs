@@ -107,6 +107,7 @@ mod tests {
         Metric, Value,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
 
     #[test]
@@ -225,8 +226,7 @@ mod tests {
             tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
-                values: vec![1.0, 2.0],
-                sample_rates: vec![10, 20],
+                samples: crate::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         };
@@ -267,8 +267,7 @@ mod tests {
             tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0],
-                counts: vec![10, 20],
+                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
@@ -314,14 +313,14 @@ mod tests {
             tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
-                quantiles: vec![50.0, 90.0],
-                values: vec![10.0, 20.0],
+                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
         };
 
         let log = do_transform(summary).unwrap();
+        dbg!(&log);
         let collected: Vec<_> = log.all_fields().collect();
 
         assert_eq!(
