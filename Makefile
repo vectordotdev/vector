@@ -3,13 +3,13 @@
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
-    export OPERATING_SYSTEM := Windows
-	    ifeq ($(PROCESSOR_ARCHITECTURE),x86)
+	export OPERATING_SYSTEM := Windows
+		ifeq ($(PROCESSOR_ARCHITECTURE),x86)
             export RUST_TARGET ?= "i686-pc-windows-msvc"
-        else
-	    	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+		else
+			export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
 		endif
-    export DEFAULT_FEATURES = default-msvc
+	export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
