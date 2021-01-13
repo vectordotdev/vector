@@ -10,10 +10,11 @@ remap: functions: exists: {
 			type: ["path"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["boolean"]
 	category: "Event"
 	description: #"""
-		Checks if the given path exists. Nested paths and arrays can also be checked.
+		Checks if the given `path` exists. Nested paths and arrays can also be checked.
 		"""#
 	examples: [
 		{

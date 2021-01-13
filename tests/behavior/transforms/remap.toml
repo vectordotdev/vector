@@ -1660,3 +1660,21 @@
     extract_from = "remap_function_decode_base64"
     [[tests.outputs.conditions]]
     "result.equals" = "Bron-Y-Aur Stomp"
+
+[transforms.remap_comments]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = 1 # .a = 2
+    # .a = 3
+  """
+[[tests]]
+  name = "remap_comments"
+  [tests.input]
+    insert_at = "remap_comments"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_comments"
+    [[tests.outputs.conditions]]
+      "a.equals" = 1

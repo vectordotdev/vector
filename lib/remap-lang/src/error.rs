@@ -137,6 +137,7 @@ impl fmt::Display for Rule {
             target_regular,
             value,
             variable,
+            COMMENT,
             WHITESPACE,
         ]
     }

@@ -15,12 +15,17 @@ remap: functions: parse_regex_all: {
 			type: ["regex"]
 		},
 	]
-	return: ["map"]
+	internal_failure_reasons: [
+		"`value` fails to parse via the provided `pattern`",
+	]
+	return: ["array"]
 	category: "Parse"
 	description: """
-		Searches within the text for capture groups specified by the provided regular expression. It will
-		return an array the capture groups corresponding to all matches in the text. If no match is found
-		an empty array is returned.
+		Parses the provided `value` via the provided Regex `pattern`.
+
+		* Capture groups are supported.
+		* Returns all capture groups corresponding to the leftmost matches in the text.
+		* If no match is found an empty map is returned.
 		"""
 	examples: [
 		{
