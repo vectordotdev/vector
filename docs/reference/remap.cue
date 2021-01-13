@@ -37,26 +37,22 @@ remap: {
 			#RemapExample: {
 				title: string
 				configuration?: [string]: string
-				input:  #Fields
-				source: string
-				output: #Fields
+				input:   #Event
+				source:  string
+				raises?: string
+
+				if raises == _|_ {
+					output: #Event
+				}
 			}
 
 			arguments: [...#Argument] // Allow for empty list
+			internal_failure_reasons: [...string]
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "Check" | "Coerce" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
+			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
-		}
-	}
-
-	errors: {
-		ArgumentError: {
-			description: "Raised when the provided input is not a supported type for that function."
-		}
-		ParseError: {
-			description: "Raised when the provided input cannot be parsed."
 		}
 	}
 

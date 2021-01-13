@@ -9,35 +9,20 @@ remap: functions: strip_ansi_escape_codes: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Removes the any ANSI escape codes from the provided string.
+		Strips any [ANSI escape codes](\(urls.ansi_escape_codes)) from the provided `value`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"\e[46mfoo\e[0m bar"#
-			}
+			title: "Strip ANSI escape codes"
+			input: log: text: #"\e[46mfoo\e[0m bar"#
 			source: #"""
 				.text = strip_ansi_escape_codes(.text)
 				"""#
-			output: {
-				text: "foo bar"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 37
-			}
-			source: #"""
-					.text = strip_ansi_escape_codes(.text)
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: text: "foo bar"
 		},
 	]
 }

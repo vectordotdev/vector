@@ -2,6 +2,7 @@
   inputs = ["ignored"]
   type = "filter"
   [transforms.filter_a.condition]
+    type = "check_fields"
     "message.eq" = "test filter 1"
 [transforms.filter_b]
   inputs = ["ignored"]
@@ -25,6 +26,7 @@
   [[tests.outputs]]
     extract_from = "filter_a"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test filter 1"
 
 [[tests]]
@@ -57,6 +59,7 @@
   [[tests.outputs]]
     extract_from = "filter_b"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test filter 2"
 
 [[tests]]
@@ -78,4 +81,5 @@
   [[tests.outputs]]
     extract_from = "filter_a"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "test filter 1"

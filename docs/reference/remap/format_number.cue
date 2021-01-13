@@ -29,34 +29,20 @@ remap: functions: format_number: {
 			default: ","
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "Number"
 	description: #"""
-		Returns a string representation of the given number.
+		Formats the given `value` into a string representation of the number.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				number: 1234567.89
-			}
+			title: "Format a number (3 decimals)"
+			input: log: number: 1234567.89
 			source: #"""
-				.formatted = format_number(.number, 3, decimal_separator=".", grouping_separator=",")
+				.formatted = format_number(.number, 3, decimal_separator: ".", grouping_separator: ",")
 				"""#
-			output: {
-				number:    1234567.89
-				formatted: "1,234,567.890"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				message: "A string with 42"
-			}
-			source: ".formatted = format_number(.number)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: number: "1,234,567.890"
 		},
 	]
 }

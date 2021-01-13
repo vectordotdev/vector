@@ -9,22 +9,20 @@ remap: functions: encode_json: {
 			type: ["any"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "Encode"
-
-	description: "Returns the JSON representation of the argument."
+	description: """
+		Encodes the provided `value` into JSON.
+		"""
 	examples: [
 		{
-			title: "Success"
-			input: {
-				object: {"age": 42}
-			}
+			title: "Encode data into JSON"
+			input: log: message: age: 42
 			source: #"""
-				.message = encode_json(.object)
+				.message = encode_json(.message)
 				"""#
-			output: {
-				message: #"{"age": 42}"#
-			}
+			output: log: mesage: #"{"age": 42}"#
 		},
 	]
 }

@@ -9,33 +9,22 @@ remap: functions: downcase: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Returns a copy of `string` that has been converted into lowercase.
+		Returns a copy of `value` that is entirely lowercase.
+
+		"Lowercase" is defined according to the terms of the Unicode Derived Core Property Lowercase.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: #"Here Is A Message"#
-			}
+			title: "Downcase a string"
+			input: log: message: #"Here Is A Message"#
 			source: #"""
 				.message = downcase(.message)
 				"""#
-			output: {
-				message: "here is a message"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				message: 42
-			}
-			source: "downcase(.message)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "here is a message"
 		},
 	]
 }

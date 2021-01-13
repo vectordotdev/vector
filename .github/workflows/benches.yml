@@ -72,11 +72,11 @@ jobs:
       - run: make slim-builds
         # build benchmarks on all CPUs, including isolated benchmarking CPU
       - name: Prebuild benchmarks
-        run: taskset -c "0-$(nproc)" make bench CARGO_BENCH_FLAGS="--no-run"
+        run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
         # run benchmarks on isolated CPU and with address randomization
         # disabled
       - name: Run benchmarks
-        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench | tee target/criterion/out
+        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:

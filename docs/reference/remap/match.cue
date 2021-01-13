@@ -15,33 +15,24 @@ remap: functions: match: {
 			type: ["regex"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "String"
 	description: """
-		Determines whether a string matches the provided pattern.
+		Returns `true` if the provided `value` matches the provided `pattern`.
 		"""
 	examples: [
 		{
-			title: "Successful match"
-			input: {
-				phrase: "I'm a little teapot"
-			}
+			title: "Successful Regex match on string"
+			input: log: phrase: "I'm a little teapot"
 			source: ".has_teapot = match(.phrase, /teapot/)"
-			output: {
-				has_teapot: true
-				phrase:     "I'm a little teapot"
-			}
+			output: input & {log: has_teapot: true}
 		},
 		{
-			title: "Unsuccessful match"
-			input: {
-				phrase: "Life is but a dream"
-			}
+			title: "Unsuccessful Regex match on string"
+			input: log: phrase: "Life is but a dream"
 			source: ".has_teapot = match(.phrase, /teapot/)"
-			output: {
-				has_teapot: false
-				phrase:     "Life is but a dream"
-			}
+			output: input & {log: has_teapot: false}
 		},
 	]
 }
