@@ -31,12 +31,13 @@ start_docker () {
 }
 
 stop_podman () {
+  podman rm --force vector_nginx 2>/dev/null; true
   podman pod stop vector-test-integration-nginx 2>/dev/null; true
   podman pod rm --force vector-test-integration-nginx 2>/dev/null; true
 }
 
 stop_docker () {
-  docker rm --force vector_nats 2>/dev/null; true
+  docker rm --force vector_nginx 2>/dev/null; true
   docker network rm vector-test-integration-nginx 2>/dev/null; true
 }
 
