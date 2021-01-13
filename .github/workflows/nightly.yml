@@ -170,7 +170,7 @@ jobs:
         env:
           VERSION: "5.32.0.1"
         run: |
-          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-${{ perl }}.msi > perl-installer.msi
+          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-${{ matrix.perl }}.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -181,7 +181,7 @@ jobs:
         env:
           VERSION: "3.15.5"
         run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-${{ arch }}.msi > cmake-installer.msi
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-${{ matrix.arch }}.msi > cmake-installer.msi
       - name: "Install CMake"
         shell: cmd # msiexec fails when called from bash
         run: |
@@ -204,7 +204,7 @@ jobs:
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
           export RUST_LTO=""
-          export TARGET=${{ triple }}
+          export TARGET=${{ matrix.triple }}
           export NATIVE_BUILD="true"
           make package
       - name: "Build package"
@@ -214,12 +214,12 @@ jobs:
           ./scripts/package-msi.sh
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-${{ triple }}.zip
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ triple }}.zip"
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.triple }}.zip
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.triple }}.zip"
       - uses: actions/upload-artifact@v1
         with:
-          name: vector-${{ env.VECTOR_VERSION }}-${{ msi }}.msi
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ msi }}.msi"
+          name: vector-${{ env.VECTOR_VERSION }}-${{ matrix.msi }}.msi
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-${{ matrix.msi }}.msi"
 
   deb-verify:
     needs:
