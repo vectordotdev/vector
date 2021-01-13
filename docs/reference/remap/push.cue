@@ -15,44 +15,40 @@ remap: functions: push: {
 			type: ["any"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["array"]
 	category: "Array"
 	description: """
-		Adds the specified item to the end of an array and returns the resulting array. The item
-		can be of any VRL type and is added even if an item with the same value is already present
-		in the array.
+		Adds the provided `item` to the end of the `value` array.
 
-		The `push` function does *not* change the array in place. In this example, the `push`
-		function would return an array with `apple`, `orange`, and `banana`, but the value of
-		`fruits` would be unchanged:
-
-		```js
-		.fruits = ["apple", "orange"]
-		push(.fruits, "banana")
-		.fruits
-		["apple", "orange"]
-		```
-
-		In order to change the value of `fruits`, you would need to store the resulting array in
-		the field:
-
-		```js
-		.fruits = push(.fruits, "banana")
-		```
+		The `push` function does _not_ change the array in place.
 		"""
 	examples: [
 		{
-			title: "Mixed array"
-			input: {
+			title: "Push an item onto an array (new array)"
+			input: log: {
 				kitchen_sink: [72.5, false, [1, 2, 3]]
 				item: "booper"
 			}
 			source: """
-				.kitchen_sink = push(.kitchen_sink, .item)
+				.added = push(.kitchen_sink, .item)
 				"""
-			output: {
-				kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
+			output: input & {log: {
+				added: [72.5, false, [1, 2, 3], "booper"]
+			}}
+		},
+		{
+			title: "Push an item onto an array (same array)"
+			input: log: {
+				kitchen_sink: [72.5, false, [1, 2, 3]]
+				item: "booper"
 			}
+			source: """
+				.new_kitchen_sink = push(.kitchen_sink, .item)
+				"""
+			output: input & {log: {
+				new_kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
+			}}
 		},
 	]
 }

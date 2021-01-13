@@ -22,11 +22,11 @@ remap: functions: contains: {
 			default: true
 		},
 	]
+	internal_failure_reason: null
 	return: ["boolean"]
 	category: "String"
 	description: #"""
-		Searches a string, `value` to determine if it contains a given `substring`.
-		The search can be optionally case insensitive.
+		Determines if the provided `value` contains a given `substring`.
 		"""#
 	examples: [
 		{

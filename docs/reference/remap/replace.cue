@@ -10,7 +10,7 @@ remap: functions: replace: {
 		},
 		{
 			name:        "pattern"
-			description: "Replace all matches of this pattern."
+			description: "Replace all matches of this pattern. Can be a static string or a regular expression."
 			required:    true
 			type: ["regex", "string"]
 		},
@@ -29,16 +29,11 @@ remap: functions: replace: {
 
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Replaces any matches of pattern with the provided string. Pattern can be either a fixed string or a regular expression.
-
-		Regular expressions take the form `/regex/flags` where flags are one of the following:
-
-		- *i* perform a case insensitive match.
-		- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
-		- *x* ignore whitespace and comments inside the regex.
+		Replaces any matching patterns in the provided `value` via the provided `pattern`.
 		"""#
 	examples: [
 		{

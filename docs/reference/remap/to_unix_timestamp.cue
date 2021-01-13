@@ -21,12 +21,14 @@ remap: functions: to_unix_timestamp: {
 			default: "seconds"
 		},
 	]
+	internal_failure_reasons: []
 	return: ["integer"]
 	category:    "Coerce"
 	description: """
-		Converts a timestamp to a [Unix time](\(urls.unix_timestamp)). By default, the number of
-		seconds since the Unix epoch is returned, but milliseconds or nanoseconds are options as
-		well.
+		Coerces the provided `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+
+		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
+		returned via the `unit` argument.
 		"""
 	examples: [
 		{

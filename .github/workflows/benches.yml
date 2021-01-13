@@ -76,7 +76,9 @@ jobs:
         # run benchmarks on isolated CPU and with address randomization
         # disabled
       - name: Run benchmarks
-        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
+        run: |
+          mkdir -p target/criterion
+          setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:

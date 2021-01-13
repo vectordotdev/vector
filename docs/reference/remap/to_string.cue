@@ -8,18 +8,12 @@ remap: functions: to_string: {
 			required:    true
 			type: ["any"]
 		},
-		{
-			name:        "default"
-			description: "If the value parameter errors, return this parameter instead."
-			required:    false
-			type: ["any"]
-		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Coerce"
 	description: #"""
-		Returns the string representation of the first parameter. If this parameter is an error, then
-		the second parameter is returned.
+		Coerces the provided `value` into a `string`.
 		"""#
 	examples: [
 		{
