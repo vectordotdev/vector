@@ -84,8 +84,8 @@ components: sources: postgresql_metrics: {
 				This can beused in conjunction with [`excluded_databases`](#excluded_databases).
 				In case if `excluded_databases` is not empty databases from there will be removed from `included_databases`.
 				"""
-			common:      false
-			required:    false
+			common:   false
+			required: false
 			type: array: {
 				default: null
 				items: type: string: examples: ["postgres", "vector"]
@@ -96,8 +96,8 @@ components: sources: postgresql_metrics: {
 				A list of databases to match against `datname` column for which you don't want to collect metrics from.
 				This can be used in conjunction with [`included_databases`](#included_databases).
 				"""
-			common:      false
-			required:    false
+			common:   false
+			required: false
 			type: array: {
 				default: null
 				items: type: string: examples: ["postgres", "vector"]
@@ -128,7 +128,7 @@ components: sources: postgresql_metrics: {
 			title: "Required Privileges"
 			body: """
 				PostgreSQL Metrics component collects metrics by making queries to the configured PostgreSQL server.
-				Ensure the configured user is allowed to make the following select queries:
+				Ensure the configured user is allowed to make the select queries against the following views:
 
 				- `pg_stat_database`
 				- `pg_stat_database_conflicts`
