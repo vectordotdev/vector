@@ -725,7 +725,10 @@ fn config_to_endpoint(config: &Config) -> String {
         TargetSessionAttrs::ReadWrite => {
             params.push(("target_session_attrs", "read-write".to_owned()))
         }
-        _ => {} // non_exhaustive
+        // non_exhaustive enum
+        _ => {
+            warn!("Unknown variant of TargetSessionAttrs");
+        }
     }
 
     // channel_binding, ignore default value (ChannelBinding::Prefer)
@@ -733,7 +736,10 @@ fn config_to_endpoint(config: &Config) -> String {
         ChannelBinding::Disable => params.push(("channel_binding", "disable".to_owned())),
         ChannelBinding::Prefer => {} // default, ignore
         ChannelBinding::Require => params.push(("channel_binding", "require".to_owned())),
-        _ => {} // non_exhaustive
+        // non_exhaustive enum
+        _ => {
+            warn!("Unknown variant of ChannelBinding");
+        }
     }
 
     format!(
