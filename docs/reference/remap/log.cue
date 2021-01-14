@@ -12,6 +12,7 @@ remap: functions: log: {
 			name:        "level"
 			description: "The log level."
 			required:    false
+			type: ["string"]
 			enum: {
 				trace: "Log at the `trace` level."
 				debug: "Log at the `debug` level."
@@ -24,7 +25,7 @@ remap: functions: log: {
 	]
 	internal_failure_reason: null
 	return: ["null"]
-	category: "Log"
+	category:    "Log"
 	description: "Logs the supplied error message at the specified log level."
 	examples: [
 		{
@@ -37,6 +38,6 @@ remap: functions: log: {
 				}
 				"""#
 			output: log: timestamp: "10-Oct-2020 1"
-		}
+		},
 	]
 }
