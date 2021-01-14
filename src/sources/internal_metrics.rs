@@ -35,11 +35,10 @@ impl SourceConfig for InternalMetricsConfig {
     ) -> crate::Result<super::Source> {
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         if interval < time::Duration::from_millis(500) {
-            return Err(format!(
-                "interval set too low ({} secs), use interval >= 0.5 secs",
+            warn!(
+                "Interval set too low ({} secs), use interval >= 0.5 secs.",
                 interval.as_secs_f64()
-            )
-            .into());
+            );
         }
 
         Ok(Box::pin(run(get_controller()?, interval, out, shutdown)))
