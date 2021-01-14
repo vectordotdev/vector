@@ -12,7 +12,7 @@ use structopt::StructOpt;
 pub struct Opts {
     /// The VRL script to execute. The script ".foo = true", for example, sets the event object's
     /// `foo` field to `true`.
-    #[structopt(name = "script")]
+    #[structopt(name = "SCRIPT")]
     script: Option<String>,
 
     /// The file containing the event object(s) to handle. The supported formats are JSON and jsonl.
