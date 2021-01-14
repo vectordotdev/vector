@@ -1698,10 +1698,17 @@
 [transforms.remap_comments]
   inputs = []
   type = "remap"
-  source = """
+  source = '''
     .a = 1 # .a = 2
     # .a = 3
-  """
+
+    .b = .a == 2 || \
+
+    # We should ignore this too.
+    # .a == 3 && \
+
+    .a == 1
+  '''
 [[tests]]
   name = "remap_comments"
   [tests.input]
@@ -1712,3 +1719,25 @@
     extract_from = "remap_comments"
     [[tests.outputs.conditions]]
       "a.equals" = 1
+      "b.equals" = true
+
+[transforms.remap_multiline]
+  inputs = []
+  type = "remap"
+  source = '''
+    .a = "A long " + \
+
+         "multiline " + \
+         "string"
+  '''
+[[tests]]
+  name = "remap_multiline"
+  [tests.input]
+    insert_at = "remap_multiline"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_multiline"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '.a == "A long multiline string"'
