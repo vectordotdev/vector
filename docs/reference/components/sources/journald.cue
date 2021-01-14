@@ -93,13 +93,6 @@ components: sources: journald: {
 				examples: ["/usr/local/bin/journalctl"]
 			}
 		}
-		remap_priority: {
-			common:      false
-			description: "If the record from journald contains a `PRIORITY` field, it will be remapped into the equivalent syslog priority level name using the standard (abbreviated) all-capitals names such as `EMERG` or `ERR`."
-			required:    false
-			warnings: []
-			type: bool: default: false
-		}
 	}
 
 	output: logs: {

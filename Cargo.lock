@@ -57,6 +57,12 @@ dependencies = [
 
 [[package]]
 name = "ansi_term"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
+
+[[package]]
+name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
@@ -193,9 +199,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.4.8"
+version = "2.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f01002772ab4d56f0d9823f0acd8b4f9cca02f37cc6f0ff2c12bb063eb5e176"
+checksum = "2bca9925915f7c4fbc2ef1747c5f826a4d3dc0fb86a90ecc8414f50370401f66"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -233,9 +239,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.4.8"
+version = "2.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173cb3180bdd3084f44bf855cd4962c5ff81fe6ccbefeddde04aa0c71aace18c"
+checksum = "6b4d239f96923345b5599de171b2df99e1ae2d187492b137b8cfc1d1adf5f674"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -272,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "2.4.8"
+version = "2.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92a4965c25148bb33dd49c1ea2ad070435209cf497159bce60c34fea43fa7c3f"
+checksum = "7008c02c690ba0e06a6eb83624fd33317030e3143fded38b480e8324b6727c8c"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -3214,9 +3220,9 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9367bdfa836b7e3cf895867f7a570283444da90562980ec2263d6e1569b16bc"
+checksum = "351a32417a12d5f7e82c368a66781e307834dae04c6ce0cd4456d52989229883"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi 0.3.9",
@@ -3363,7 +3369,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "lazy_static",
  "libc",
- "libloading 0.6.6",
+ "libloading 0.6.7",
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset 0.5.6",
@@ -4604,12 +4610,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettydiff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bc9e8bdfe446d34975ff774fbb4a2b944d17054f6b5845ec132d4fb9ff8f559"
+dependencies = [
+ "ansi_term 0.9.0",
+ "prettytable-rs",
+ "structopt 0.2.18",
+]
+
+[[package]]
 name = "prettytable-rs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fd04b170004fa2daccf418a7f8253aaf033c27760b5f225889024cf66d7ac2e"
 dependencies = [
  "atty",
+ "csv",
  "encode_unicode",
  "lazy_static",
  "term",
@@ -5205,7 +5223,7 @@ dependencies = [
  "remap-lang",
  "rustyline",
  "serde_json",
- "structopt",
+ "structopt 0.3.21",
  "thiserror",
 ]
 
@@ -5253,6 +5271,17 @@ dependencies = [
  "regex",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "remap-tests"
+version = "0.1.0"
+dependencies = [
+ "ansi_term 0.12.1",
+ "prettydiff",
+ "remap-functions",
+ "remap-lang",
+ "serde_json",
 ]
 
 [[package]]
@@ -6339,13 +6368,35 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "structopt"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16c2cdbf9cc375f15d1b4141bc48aeef444806655cd0e904207edc8d68d86ed7"
+dependencies = [
+ "clap",
+ "structopt-derive 0.2.18",
+]
+
+[[package]]
+name = "structopt"
 version = "0.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5277acd7ee46e63e5168a80734c9f6ee81b1367a7d8772a2d765df2a3705d28c"
 dependencies = [
  "clap",
  "lazy_static",
- "structopt-derive",
+ "structopt-derive 0.4.14",
+]
+
+[[package]]
+name = "structopt-derive"
+version = "0.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53010261a84b37689f9ed7d395165029f9cc7abb9f56bbfe86bee2597ed25107"
+dependencies = [
+ "heck",
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
 ]
 
 [[package]]
@@ -7482,7 +7533,7 @@ dependencies = [
  "snap",
  "stream-cancel",
  "strip-ansi-escapes",
- "structopt",
+ "structopt 0.3.21",
  "syslog",
  "syslog_loose",
  "tempfile",
