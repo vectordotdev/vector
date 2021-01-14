@@ -36,8 +36,7 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         if interval < time::Duration::from_millis(500) {
             warn!(
-                "Interval set too low ({} secs), use interval >= 0.5 secs.",
-                interval.as_secs_f64()
+                "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
 
