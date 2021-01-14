@@ -200,7 +200,7 @@ components: sources: docker_logs: {
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
-				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
+				described label's syntax in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
 			required:    false
 			type: array: {
