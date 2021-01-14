@@ -242,8 +242,7 @@ fn show_func_docs(line: &str, pattern: &Regex) {
 
     if funcs()
         .iter()
-        .find(|&f| f.identifier() == func_name)
-        .is_some()
+        .any(|f| f.identifier() == func_name)
     {
         let func_url = format!("{}/#{}", DOCS_URL, func_name);
         open_url(&func_url);
