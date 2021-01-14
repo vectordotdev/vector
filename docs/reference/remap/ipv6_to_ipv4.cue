@@ -11,7 +11,7 @@ remap: functions: ipv6_to_ipv4: {
 	]
 	internal_failure_reasons: [
 		"`ip` is not a valid IP address",
-		"`ipv6` address is not compatible with IPV4",
+		"`ip` is an IPv6 address that is not compatible with IPv4",
 	]
 	return: ["string"]
 	category: "IP"
