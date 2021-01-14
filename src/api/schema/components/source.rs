@@ -37,6 +37,9 @@ impl Data {
     pub fn get_name(&self) -> &str {
         self.name.as_str()
     }
+    pub fn get_component_type(&self) -> &str {
+        self.component_type.as_str()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,15 +87,24 @@ impl Source {
 #[derive(Default, InputObject)]
 pub struct SourcesFilter {
     name: Option<Vec<filter::StringFilter>>,
+    component_type: Option<Vec<filter::StringFilter>>,
+    output_type: Option<Vec<filter::EqualityFilter<SourceOutputType>>>,
     or: Option<Vec<Self>>,
 }
 
 impl filter::CustomFilter<Source> for SourcesFilter {
     fn matches(&self, source: &Source) -> bool {
-        filter_check!(self
-            .name
-            .as_ref()
-            .map(|f| f.iter().all(|f| f.filter_value(source.0.get_name()))));
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(source.0.get_name()))),
+            self.component_type.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(source.0.get_component_type()))),
+            self.output_type.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(source.0.output_type.into())))
+        );
         true
     }
 
