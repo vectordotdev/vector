@@ -80,17 +80,6 @@ mod tests {
     use value::Kind;
 
     test_type_def![
-        value_integer_non_fallible {
-            expr: |_| ToSyslogFacilityFn {
-                value: Literal::from(3).boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
         value_non_integer_fallible {
             expr: |_| ToSyslogFacilityFn {
                 value: Literal::from("foo").boxed(),

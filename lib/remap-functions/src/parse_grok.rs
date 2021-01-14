@@ -110,7 +110,7 @@ impl Expression for ParseGrokFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Array)
     }
 }
@@ -132,6 +132,7 @@ mod test {
         },
         def: TypeDef {
             kind: value::Kind::Array,
+            fallible: true,
             ..Default::default()
         },
     }];
