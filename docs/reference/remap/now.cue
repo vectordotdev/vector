@@ -2,21 +2,20 @@ package metadata
 
 remap: functions: now: {
 	arguments: []
-	category: "Timestamp"
+	internal_failure_reasons: []
 	return: ["timestamp"]
+	category: "Timestamp"
 	description: #"""
-		Returns the current timestamp in the Utc timezone.
+		Returns the current timestamp in the UTC timezone with nanosecond precision.
 		"""#
 	examples: [
 		{
 			title: "Success"
-			input: {}
+			input: log: {}
 			source: #"""
 				.timestamp = now()
 				"""#
-			output: {
-				timestamp: "21-Oct-2020 20:53"
-			}
+			output: log: timestamp: "2020-10-21T20:53:12.212221Z"
 		},
 	]
 }

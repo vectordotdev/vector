@@ -10,7 +10,7 @@ remap: functions: replace: {
 		},
 		{
 			name:        "pattern"
-			description: "Replace all matches of this pattern."
+			description: "Replace all matches of this pattern. Can be a static string or a regular expression."
 			required:    true
 			type: ["regex", "string"]
 		},
@@ -29,68 +29,36 @@ remap: functions: replace: {
 
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Replaces any matches of pattern with the provided string. Pattern can be either a fixed string or a regular expression.
-
-		Regular expressions take the form `/regex/flags` where flags are one of the following:
-
-		- *i* perform a case insensitive match.
-		- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
-		- *x* ignore whitespace and comments inside the regex.
+		Replaces any matching patterns in the provided `value` via the provided `pattern`.
 		"""#
 	examples: [
 		{
-			title: "Text match"
-			input: {
-				text: #"Apples and Bananas"#
-			}
+			title: "Replace literal text"
+			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.replaced = replace(.text, "and", "not")
+				.message = replace(.message, "and", "not")
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "Apples not Bananas"
-			}
+			output: log: message: "Apples not Bananas"
 		},
 		{
-			title: "Regular expression match"
-			input: {
-				text: #"Apples and Bananas"#
-			}
+			title: "Replace via regular expression"
+			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.replaced = replace(.text, /bananas/i, "Pineapples")
+				.message = replace(.message, /bananas/i, "Pineapples")
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "apples and Pineapples"
-			}
+			output: log: message: "apples and Pineapples"
 		},
 		{
 			title: "Replace first instance"
-			input: {
-				text: #"Bananas and Bananas"#
-			}
+			input: log: message: #"Bananas and Bananas"#
 			source: #"""
-				.replaced = replace(.text, "Bananas", "Pineapples", count = 1)
+				.message = replace(.message, "Bananas", "Pineapples", count: 1)
 				"""#
-			output: {
-				text:     #"Apples and Bananas"#
-				replaced: "Pineapples and Bananas"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: 42
-			}
-			source: #"""
-				.replaced = replace(.text, "42", "43")
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: message: "Pineapples and Bananas"
 		},
 	]
 }

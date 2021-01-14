@@ -16,24 +16,28 @@ remap: functions: ceil: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""
-		Rounds the given number up to the given precision of decimal places.
+		Rounds the given number up to the specified `precision`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				number: 4.345
-			}
+			title: "Ceil a number (without precision)"
+			input: log: number: 4.345
 			source: #"""
-				.ceil = ceil(.number, precision = 2)
+				.number = ceil(.number)
 				"""#
-			output: {
-				number: 4.345
-				ceil:   4.35
-			}
+			output: log: number: 4
+		},
+		{
+			title: "Ceil a number (with precision)"
+			input: log: number: 4.345
+			source: #"""
+				.number = ceil(.number, precision: 2)
+				"""#
+			output: log: number: 4.35
 		},
 	]
 }

@@ -227,7 +227,7 @@ fn protobuf() -> Result<()> {
     // Run the test.
     let mut module = WasmModule::build(WasmModuleConfig::new(
         Role::Transform,
-        "target/wasm32-wasi/release/protobuf.wasm",
+        "tests/data/wasm/add_fields/target/wasm32-wasi/release/protobuf.wasm",
         "target/artifacts",
         HashMap::new(),
         16 * 64 * 1024 * 10, // 10MB

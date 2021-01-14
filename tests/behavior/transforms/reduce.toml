@@ -3,6 +3,7 @@
   type = "reduce"
   group_by = [ "request_id" ]
   [transforms.reduce.ends_when]
+    type = "check_fields"
     "test_end_message.exists" = true
 
 [[tests]]
@@ -67,12 +68,14 @@
   [[tests.outputs]]
     extract_from = "reduce"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "first message value"
       "host.equals" = "host1"
       "request_id.equals" = "1"
       "counter.equals" = 21
       "timestamp_end.exists" = true
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "other reduce one"
       "host.equals" = "host3"
       "request_id.equals" = "2"
@@ -93,6 +96,7 @@
     "concat_array" = "concat"
 
   [transforms.reduce_strats.ends_when]
+    type = "check_fields"
     "test_end_message.exists" = true
 
 [[tests]]
@@ -167,6 +171,7 @@
   [[tests.outputs]]
     extract_from = "reduce_strats"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "first message value second message value third message value"
       "another.equals" = "foo\nbar baz\nqux\nquux"
       "host.equals" = "host1"
@@ -174,6 +179,7 @@
       "counter.equals" = 21
       "timestamp_end.exists" = true
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "other reduce one other reduce two other reduce three"
       "concat_array[0].equals" = "foo"
       "concat_array[1].equals" = "bar"
@@ -194,6 +200,7 @@
     "maxs" = "max"
 
   [transforms.reduce_numbers.ends_when]
+    type = "check_fields"
     "test_end_message.exists" = true
 
 [[tests]]
@@ -224,6 +231,7 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "mins.equals" = 5.1
       "maxs.equals" = 7.2
       "timestamp_end.exists" = true
@@ -256,6 +264,7 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "mins.equals" = 5
       "maxs.equals" = 7
       "timestamp_end.exists" = true
@@ -331,14 +340,17 @@
   [[tests.outputs]]
     extract_from = "ends_when_remap"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "request_id.equals" = "1"
       "counter.equals" = 6
       "timestamp_end.exists" = true
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "request_id.equals" = "2"
       "counter.equals" = 7
       "test_end_message.exists" = true
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "request_id.equals" = "3"
       "counter.equals" = 5
       "test_end_message.exists" = true
@@ -394,8 +406,10 @@
   [[tests.outputs]]
     extract_from = "ruby_exception"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
 
 ##------------------------------------------------------------------------------
@@ -443,10 +457,13 @@
   [[tests.outputs]]
     extract_from = "line_continuation"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "First-line"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "Second line\\ more second line\\      end of second line"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "third line"
 
 ##------------------------------------------------------------------------------
@@ -494,10 +511,13 @@
   [[tests.outputs]]
     extract_from = "line_termination"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "first line;"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "second line more of the second line end of second line;         "
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "third line;"
 
 ##------------------------------------------------------------------------------
@@ -545,10 +565,13 @@
   [[tests.outputs]]
     extract_from = "log_stream"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "<12> first line   more of the first line"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "<22> second line"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.equals" = "<17> third line"
 
 ##------------------------------------------------------------------------------
@@ -626,5 +649,6 @@
   [[tests.outputs]]
     extract_from = "java_exception"
     [[tests.outputs.conditions]]
+      type = "check_fields"
       "message.starts_with" = "2020-10-19 04:34:15,389"
       "message.ends_with" = "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]"

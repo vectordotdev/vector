@@ -9,32 +9,27 @@ remap: functions: to_syslog_level: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a valid Syslog level",
+	]
 	return: ["string"]
 	category:    "Coerce"
 	description: """
-		Converts a Syslog [severity level](\(urls.syslog_levels)) into its corresponding keyword,
+		Coerces the provided `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,
 		i.e. 0 into `"emerg"`, 1 into `"alert", etc.
 		"""
 	examples: [
 		{
-			title: "Success"
-			input: {
-				severity: "5"
-			}
+			title: "Convert Syslog severity to level"
+			input: log: severity: "5"
 			source: ".log_level = to_syslog_level(.severity)"
-			output: {
-				level: "notice"
-			}
+			output: input & {log: level: "notice"}
 		},
 		{
 			title: "Error"
-			input: {
-				severity: "1337"
-			}
+			input: log: severity: "1337"
 			source: ".log_level = to_syslog_level(.severity)"
-			output: {
-				error: remap.errors.ParseError
-			}
+			raise:  "Failed to parse"
 		},
 	]
 }
