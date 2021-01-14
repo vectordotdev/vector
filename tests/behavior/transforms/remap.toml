@@ -201,6 +201,63 @@
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
 
+[transforms.remap_infallible_assignment]
+  inputs = []
+  type = "remap"
+  source = """
+    .nope, .err1 = parse_json("{ INVALID }")
+    .ok, .err2 = parse_json("{ \\"foo\\": true }")
+  """
+[[tests]]
+  name = "remap_infallible_assignment"
+  [tests.input]
+    insert_at = "remap_infallible_assignment"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_infallible_assignment"
+    [[tests.outputs.conditions]]
+      "nope.equals" = "<null>"
+      "err1.equals" = "function call error: unable to parse json: key must be a string at line 1 column 3"
+      "ok.foo.equals" = true
+      "err2.equals" = "<null>"
+
+[transforms.remap_error_coalesce_operator]
+  inputs = []
+  type = "remap"
+  source = """
+    .val1 = parse_json("{ INVALID }") ?? "nope"
+    .val2 = parse_json("true") ?? "nope"
+  """
+[[tests]]
+  name = "remap_error_coalesce_operator"
+  [tests.input]
+    insert_at = "remap_error_coalesce_operator"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_error_coalesce_operator"
+    [[tests.outputs.conditions]]
+      "val1.equals" = "nope"
+      "val2.equals" = true
+
+[transforms.remap_bang_function]
+  inputs = []
+  type = "remap"
+  source = """
+    .val = parse_json!("{ INVALID }")
+  """
+[[tests]]
+  name = "remap_bang_function"
+  [tests.input]
+    insert_at = "remap_bang_function"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_bang_function"
+    [[tests.outputs.conditions]]
+      "val.exists" = false
+
 [transforms.remap_function_arguments]
   inputs = []
   type = "remap"
