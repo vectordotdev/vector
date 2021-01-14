@@ -193,9 +193,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.4.4"
+version = "2.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a790df528e46754fd6e2cac07bd185b90382c6fb2f83d4b53636da46f5350e82"
+checksum = "7f01002772ab4d56f0d9823f0acd8b4f9cca02f37cc6f0ff2c12bb063eb5e176"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -210,6 +210,7 @@ dependencies = [
  "futures-channel",
  "futures-timer",
  "futures-util",
+ "http",
  "indexmap",
  "log",
  "lru",
@@ -232,9 +233,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.4.3"
+version = "2.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b938025ca3bda492560d9dd88f9b2e2ab1d28b86ece7c7faf0fd1e0940d6720e"
+checksum = "173cb3180bdd3084f44bf855cd4962c5ff81fe6ccbefeddde04aa0c71aace18c"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -248,9 +249,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "2.1.2"
+version = "2.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee04e49c932b12a7a18163a59ee5596a83422e4b91cb64ca63e3545bd4c4560e"
+checksum = "7a33dd3bc63cff9e57ab8c1fb3d6a396d277fb051937ec0298281d8ad0ea39dd"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -271,9 +272,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "2.4.4"
+version = "2.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd150f2030d69f6341feefd1fad320227381065b041eac910934c84e6ebb7b7"
+checksum = "92a4965c25148bb33dd49c1ea2ad070435209cf497159bce60c34fea43fa7c3f"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -760,6 +761,12 @@ checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "bytes"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 
 [[package]]
 name = "bytesize"
@@ -2700,11 +2707,11 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84129d298a6d57d246960ff8eb831ca4af3f96d29e2e28848dae275408658e26"
+checksum = "7245cd7449cc792608c3c8a9eaf69bd4eabbabf802713748fd739c98b82f0747"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "fnv",
  "itoa",
 ]

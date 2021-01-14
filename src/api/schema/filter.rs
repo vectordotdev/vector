@@ -1,4 +1,4 @@
-use async_graphql::InputObject;
+use async_graphql::{Enum, InputObject, InputType};
 
 /// Takes an &Option<bool> and returns early if false
 #[macro_export]
@@ -38,6 +38,32 @@ impl StringFilter {
             self.starts_with.as_ref().map(|s| value.starts_with(s)),
             // Ends with
             self.ends_with.as_ref().map(|s| value.ends_with(s))
+        );
+        true
+    }
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum ComponentType {
+    Source,
+    Transform,
+    Sink,
+}
+
+#[derive(InputObject)]
+#[graphql(concrete(name = "ComponentTypeFilter", params(ComponentType)))]
+pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
+    equals: Option<T>,
+    not_equals: Option<T>,
+}
+
+impl<T: InputType + PartialEq + Eq> EqualityFilter<T> {
+    pub fn filter_value(&self, value: T) -> bool {
+        filter_check!(
+            // Equals
+            self.equals.as_ref().map(|s| value.eq(s)),
+            // Not equals
+            self.not_equals.as_ref().map(|s| !value.eq(s))
         );
         true
     }

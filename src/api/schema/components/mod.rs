@@ -6,7 +6,7 @@ pub mod transform;
 use crate::{
     api::schema::{
         components::state::component_by_name,
-        filter::{filter_items, CustomFilter, StringFilter},
+        filter::{self, filter_items},
         relay,
     },
     config::Config,
@@ -36,21 +36,34 @@ impl Component {
             Component::Sink(c) => c.0.name.as_str(),
         }
     }
+
+    fn get_filter_type(&self) -> filter::ComponentType {
+        match self {
+            Component::Source(_) => filter::ComponentType::Source,
+            Component::Transform(_) => filter::ComponentType::Transform,
+            Component::Sink(_) => filter::ComponentType::Sink,
+        }
+    }
 }
 
 #[derive(Default, InputObject)]
 pub struct ComponentsFilter {
-    name: Option<Vec<StringFilter>>,
+    name: Option<Vec<filter::StringFilter>>,
+    component_type: Option<Vec<filter::EqualityFilter<filter::ComponentType>>>,
     and: Option<Vec<Self>>,
     or: Option<Vec<Self>>,
 }
 
-impl CustomFilter<Component> for ComponentsFilter {
+impl filter::CustomFilter<Component> for ComponentsFilter {
     fn matches(&self, component: &Component) -> bool {
-        filter_check!(self
-            .name
-            .as_ref()
-            .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))));
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))),
+            self.component_type.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(component.get_filter_type())))
+        );
         true
     }
 
