@@ -75,7 +75,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "help docs" => open_url(DOCS_URL),
             Ok(line) if line == "exit" || line == "quit" => break,
-            // Capture "docs <func_name>"
+            // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => {
                 show_func_docs(line, func_docs_regex.clone())
             }
