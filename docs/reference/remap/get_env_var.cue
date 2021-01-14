@@ -19,7 +19,7 @@ remap: functions: get_env_var: {
 			title: "Get environment variable"
 			input: log: {}
 			source: #"""
-				.home = get_env_var("HOME")
+				.home = get_env_var!("HOME")
 				.not_found = get_env_var("SOME_VAR") ?? "default"
 				"""#
 			output: log: {
