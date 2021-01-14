@@ -150,6 +150,7 @@ mod test {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from("foo").boxed(),
                 padding: None,
+                charset: Charset::default(),
             },
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
@@ -158,6 +159,7 @@ mod test {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from("foo").boxed(),
                 padding: Some(Literal::from(false).boxed()),
+                charset: Charset::default(),
             },
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
@@ -166,6 +168,7 @@ mod test {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from("foo").boxed(),
                 padding: Some(Literal::from("foo").boxed()),
+                charset: Charset::default(),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
@@ -174,6 +177,7 @@ mod test {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from(127).boxed(),
                 padding: Some(Literal::from(true).boxed()),
+                charset: Charset::default(),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
@@ -182,6 +186,7 @@ mod test {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from(127).boxed(),
                 padding: Some(Literal::from("foo").boxed()),
+                charset: Charset::default(),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
