@@ -9,11 +9,14 @@ remap: functions: to_syslog_facility: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a valid Syslog facility code",
+	]
 	return: ["string"]
 	category:    "Coerce"
 	description: """
-		Converts a Syslog [facility code](\(urls.syslog_facility)) into its corresponding keyword,
-		i.e. 0 into `"kern"`, 1 into `"user", etc.
+		Coerces the provided `value`, a Syslog [facility code](\(urls.syslog_facility)), into its corresponding
+		Syslog keyword. i.e. 0 into `"kern"`, 1 into `"user", etc.
 		"""
 	examples: [
 		{

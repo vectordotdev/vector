@@ -9,10 +9,13 @@ remap: functions: to_syslog_level: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a valid Syslog level",
+	]
 	return: ["string"]
 	category:    "Coerce"
 	description: """
-		Converts a Syslog [severity level](\(urls.syslog_levels)) into its corresponding keyword,
+		Coerces the provided `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,
 		i.e. 0 into `"emerg"`, 1 into `"alert", etc.
 		"""
 	examples: [

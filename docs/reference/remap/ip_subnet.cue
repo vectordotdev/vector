@@ -3,7 +3,7 @@ package metadata
 remap: functions: ip_subnet: {
 	arguments: [
 		{
-			name:        "value"
+			name:        "ip"
 			description: "The ip address - either a v4 or a v6 address."
 			required:    true
 			type: ["string"]
@@ -18,12 +18,16 @@ remap: functions: ip_subnet: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`ip` is not a valid IP address",
+		"`subnet` is not a valid subnet.",
+	]
 	return: ["string"]
 	category: "IP"
 	description: #"""
-		Extracts the subnet address from a given IP address using a supplied subnet mask or prefix length.
-		Works with both IPv4 and IPv6 addresses. The IP version for the mask must be the same as the
-		supplied address.
+		Extracts the subnet address from the given `ip` using the supplied `subnet`.
+
+		Works with both IPv4 and IPv6 addresses. The IP version for the mask must be the same as the supplied address.
 		"""#
 	examples: [
 		{

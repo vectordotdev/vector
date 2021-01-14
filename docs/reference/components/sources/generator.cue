@@ -100,4 +100,8 @@ components: sources: generator: {
 	}
 
 	output: logs: {}
+
+	telemetry: metrics: {
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+	}
 }

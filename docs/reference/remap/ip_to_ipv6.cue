@@ -1,21 +1,25 @@
 package metadata
 
 remap: functions: ip_to_ipv6: {
+	internally_fallible: true // does not include argument errors
 	arguments: [
 		{
-			name:        "value"
+			name:        "ip"
 			description: "The ip address to convert to IPv6."
 			required:    true
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`ip` is not a valid IP address",
+	]
 	return: ["string"]
 	category: "IP"
 	description: #"""
-		Converts an address to an IPv6 address.
-		If the parameter is already an IPv6 address it is passed through
-		untouched. IPv4 addresses are converted to IPv4 mapped
-		IPv6 addresses.
+		Converts the provided `ip` to an IPv6 address.
+
+		If the parameter is already an IPv6 address it is passed through untouched. IPv4 addresses are converted to
+		IPv4 mapped IPv6 addresses.
 		"""#
 	examples: [
 		{

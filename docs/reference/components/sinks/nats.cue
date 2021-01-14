@@ -88,4 +88,11 @@ components: sinks: nats: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: metrics: {
+		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
+	}
 }

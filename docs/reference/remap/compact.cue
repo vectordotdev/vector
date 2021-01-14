@@ -45,34 +45,26 @@ remap: functions: compact: {
 		},
 		{
 			name:        "nullish"
-			description: "Tests if the value is nullish."
+			description: #"Tests if the value is "nullish" as defined by the `is_nullish` function."#
 			required:    false
 			default:     false
 			type: ["boolean"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["array", "map"]
 	category: "Enumerate"
 	description: #"""
-		Compacts an `Array` or `Map` by removing empty values. What is considered an
-		empty value can be specified with the parameters, `null`, `string`, `map`, and
-		`array`.
-		Specify recursive, if recursive structures should also be compacted, the routine
-		will recurse along and `Array`s or `Map`s and compact those structures.
-		The following are considered nullish in VRL:
+		Compacts an `array` or `map` by removing "empty" values.
 
-		* `null`
-		* A single dash (`"-"`)
-		* Any string that contains only whitespace characters as defined by the the [Unicode
-		  definition of the `White_Space` property](\(urls.unicode_whitespace)). That includes
-		  empty strings (`""`), common characters like `"\n"`, "\r", and others.
+		What is considered empty can be specified with the parameters.
 		"""#
 	examples: [
 		{
 			title: "Compact an array"
 			input: log: array: ["foo", "bar", "", null, [], "buzz"]
 			source: #"""
-				.log = compact(.array, string = true, array = true, null = true)
+				.log = compact(.array, string: true, array: true, null: true)
 				"""#
 			output: log: array: ["foo", "bar", "buzz"]
 		},
@@ -85,7 +77,7 @@ remap: functions: compact: {
 				field4: null
 			}
 			source: #"""
-				.map = compact(.map, string = true, array = true, null = true)
+				.map = compact(.map, string: true, array: true, null: true)
 				"""#
 			output: map: field1: 1
 		},
