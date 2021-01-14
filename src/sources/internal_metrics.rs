@@ -33,13 +33,12 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let interval = time::Duration::from_secs(self.scrape_interval_secs);
-        if interval < time::Duration::from_millis(500) {
+        if self.scrape_interval_secs == 0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
-
+        let interval = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(run(get_controller()?, interval, out, shutdown)))
     }
 
