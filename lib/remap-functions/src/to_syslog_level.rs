@@ -66,18 +66,16 @@ mod tests {
     use super::*;
     use value::Kind;
 
-    test_type_def![
-        value_non_integer_fallible {
-            expr: |_| ToSyslogLevelFn {
-                value: Literal::from("foo").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-    ];
+    test_type_def![value_non_integer_fallible {
+        expr: |_| ToSyslogLevelFn {
+            value: Literal::from("foo").boxed(),
+        },
+        def: TypeDef {
+            fallible: true,
+            kind: Kind::Bytes,
+            ..Default::default()
+        },
+    }];
 
     test_function![
         to_syslog_level => ToSyslogLevel;
