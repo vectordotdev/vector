@@ -98,7 +98,7 @@ where
 
             pin_mut!(stream);
             loop {
-                // Obtain an value from the watch stream.
+                // Obtain a value from the watch stream.
                 // If maintenance is requested, we perform it concurrently
                 // to reading items from the watch stream.
                 let maintenance_request = self.state_writer.maintenance_request();
@@ -307,7 +307,13 @@ mod tests {
 
     // A helper enum to encode expected mock watcher invocation.
     enum ExpInvRes {
-        Stream(Vec<WatchEvent<Pod>>),
+        Stream(Vec<ExpStmRes>),
+        Desync,
+    }
+
+    // A helper enum to encode expected mock watcher stream.
+    enum ExpStmRes {
+        WatchResponse(WatchEvent<Pod>),
         Desync,
     }
 
@@ -373,16 +379,16 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid0", "10")),
-                    WatchEvent::Added(make_pod("uid1", "15")),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Modified(make_pod("uid0", "20")),
-                    WatchEvent::Added(make_pod("uid2", "25")),
+                    ExpStmRes::WatchResponse(WatchEvent::Modified(make_pod("uid0", "20"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid2", "25"))),
                 ]),
             ),
             (
@@ -392,9 +398,9 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("25".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Bookmark {
+                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Bookmark {
                     resource_version: "50".into(),
-                }]),
+                })]),
             ),
             (
                 vec![
@@ -404,8 +410,8 @@ mod tests {
                 ],
                 Some("50".to_owned()),
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Deleted(make_pod("uid2", "55")),
-                    WatchEvent::Modified(make_pod("uid0", "60")),
+                    ExpStmRes::WatchResponse(WatchEvent::Deleted(make_pod("uid2", "55"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Modified(make_pod("uid0", "60"))),
                 ]),
             ),
         ];
@@ -415,9 +421,9 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync.
+    // Test the properies of the flow with desync during invocation.
     #[tokio::test]
-    async fn desync_test() {
+    async fn invocation_desync_test() {
         trace_init();
 
         let invocations = vec![
@@ -425,8 +431,8 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid0", "10")),
-                    WatchEvent::Added(make_pod("uid1", "15")),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
@@ -438,14 +444,105 @@ mod tests {
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid20", "1000")),
-                    WatchEvent::Added(make_pod("uid21", "1005")),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Modified(make_pod("uid21", "1010"))]),
+                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
+                    make_pod("uid21", "1010"),
+                ))]),
+            ),
+        ];
+        let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test the properies of the flow with desync during stream when bare desync arrives.
+    #[tokio::test]
+    async fn stream_desync_test_bare() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::Desync]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
+                Some("1005".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
+                    make_pod("uid21", "1010"),
+                ))]),
+            ),
+        ];
+        let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test the properies of the flow with desync during stream when desync arrives after an item.
+    #[tokio::test]
+    async fn stream_desync_test_with_item() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "20"))),
+                    ExpStmRes::Desync,
+                ]),
+            ),
+            (
+                vec![
+                    make_pod("uid0", "10"),
+                    make_pod("uid1", "15"),
+                    make_pod("uid1", "20"),
+                ],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
+                Some("1005".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
+                    make_pod("uid21", "1010"),
+                ))]),
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -927,9 +1024,9 @@ mod tests {
                 assert_eq!(watch_optional.resource_version, expected_resource_version);
 
                 // Determine the requested action from the test scenario.
-                let responses = match expected_invocation_response {
+                let actions = match expected_invocation_response {
                     // Stream is requested, continue with the current flow.
-                    ExpInvRes::Stream(responses) => responses,
+                    ExpInvRes::Stream(actions) => actions,
                     // Desync is requested, complete the invocation with the desync.
                     ExpInvRes::Desync => {
                         // Send the desync action to mock watcher.
@@ -950,20 +1047,34 @@ mod tests {
                     .await
                     .unwrap();
 
-                for response in responses {
+                for action in actions {
                     // Wait for watcher to request next item from the stream.
                     assert_eq!(
                         watcher_events_rx.next().await.unwrap(),
                         mock_watcher::ScenarioEvent::Stream
                     );
 
-                    // Send the requested action to the stream.
-                    watch_stream_tx
-                        .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                            response,
-                        )))
-                        .await
-                        .unwrap();
+                    // Determine the requested action from the test scenario.
+                    match action {
+                        // Watch response is requested, send it to the stream.
+                        ExpStmRes::WatchResponse(response) => {
+                            // Send the requested action to the stream.
+                            watch_stream_tx
+                                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
+                                    response,
+                                )))
+                                .await
+                                .unwrap();
+                        }
+                        // Desync is requested, send it to the stream.
+                        ExpStmRes::Desync => {
+                            // Send the desync action to mock watcher.
+                            watch_stream_tx
+                                .send(mock_watcher::ScenarioActionStream::ErrDesync)
+                                .await
+                                .unwrap();
+                        }
+                    };
                 }
 
                 // Wait for watcher to request next item from the stream.

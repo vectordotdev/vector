@@ -98,7 +98,6 @@ where
                 .send(ScenarioEvent::Invocation(watch_optional.into()))
                 .await
                 .unwrap();
-
             let action = self.invocation_rx.next().await.unwrap();
             match action {
                 ScenarioActionInvocation::Ok(mut stream_rx) => {
