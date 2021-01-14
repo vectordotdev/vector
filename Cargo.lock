@@ -5218,12 +5218,14 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "exitcode",
+ "regex",
  "remap-functions",
  "remap-lang",
  "rustyline",
  "serde_json",
  "structopt 0.3.21",
  "thiserror",
+ "webbrowser",
 ]
 
 [[package]]
@@ -7840,6 +7842,17 @@ checksum = "222b1ef9334f92a21d3fb53dc3fd80f30836959a90f9274a626d7e06315ba3c3"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webbrowser"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecad156490d6b620308ed411cfee90d280b3cbd13e189ea0d3fada8acc89158a"
+dependencies = [
+ "web-sys",
+ "widestring",
+ "winapi 0.3.9",
 ]
 
 [[package]]
