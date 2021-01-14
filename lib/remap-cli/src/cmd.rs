@@ -46,7 +46,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         // generic default object.
         let repl_objects = match &opts.input_file {
             Some(file) => read_into_objects(Some(file))?,
-            None => default_objects()
+            None => default_objects(),
         };
 
         repl(repl_objects)
