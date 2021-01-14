@@ -77,7 +77,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             Ok(line) if line == "exit" || line == "quit" => break,
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => {
-                show_func_docs(line, func_docs_regex.clone())
+                show_func_docs(line, &func_docs_regex)
             }
             Ok(line) => {
                 rl.add_history_entry(line);
@@ -236,7 +236,7 @@ fn open_url(url: &str) {
     }
 }
 
-fn show_func_docs(line: &str, pattern: Regex) {
+fn show_func_docs(line: &str, pattern: &Regex) {
     // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
     // "help docs <func_name>")
     let matches = pattern.captures(line).unwrap();
