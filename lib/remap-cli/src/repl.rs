@@ -228,8 +228,8 @@ fn open_url(url: &str) {
     if let Err(err) = webbrowser::open(url) {
         println!(
             "couldn't open default web browser: {}\n\
-            you can access the VRL documentation at {}",
-            err, DOCS_URL
+            you can access the desired documentation at {}",
+            err, url
         );
     }
 }
