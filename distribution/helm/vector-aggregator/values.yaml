@@ -152,6 +152,8 @@ psp:
 
 # Configuration for both regular and headless `Service`.
 service:
+  # Service type - defaults to `ClusterIP` (only relevant for the regular service).
+  type: "ClusterIP"
   # Additional ports to expose.
   ports: []
     # - name: http
@@ -188,6 +190,8 @@ vectorSource:
   listenPort: "9000"
   # Raw TOML config to embed at the vector source.
   rawConfig: null
+  # Specific node port to bind if `service.type` is set to `NodePort`.
+  nodePort: 0
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
