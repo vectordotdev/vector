@@ -31,6 +31,11 @@ pub struct Opts {
     /// The same result can be achieved by using `.` as the final expression.
     #[structopt(short = "o", long)]
     print_object: bool,
+
+    /// Open the VRL REPL. If you specify an input file, the objects in that file are passed to the
+    /// REPL. If no input file is provided, a generic {"foo": "bar"} object is provided.
+    #[structopt(short = "r", long)]
+    repl: bool
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -44,12 +49,21 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
-    let objects = read_into_objects(opts.input_file.as_ref())?;
-    let script = read_script(opts.script.as_deref(), opts.script_file.as_ref())?;
+    if opts.repl || (opts.script.is_none() && opts.script_file.is_none()) {
+        let repl_objects = match &opts.input_file {
+            Some(file) => read_into_objects(Some(file))?,
+            None => {
+                let mut map = BTreeMap::new();
+                map.insert("foo".into(), "bar".into());
+                vec![Value::Map(map)]
+            },
+        };
 
-    if script.is_empty() {
-        repl(objects)
+        repl(repl_objects)
     } else {
+        let objects = read_into_objects(opts.input_file.as_ref())?;
+        let script = read_script(opts.script.as_deref(), opts.script_file.as_ref())?;
+
         for mut object in objects {
             let result = execute(&mut object, &script).map(|v| {
                 if opts.print_object {
