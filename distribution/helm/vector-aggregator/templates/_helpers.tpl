@@ -29,7 +29,7 @@ Generate effective service ports omitting the 'nodePort' for headless definition
 {{- $headlessPorts = append $headlessPorts (omit $port "nodePort") -}}
 {{- end -}}
 ports:
-{{ $headlessPorts | toYaml }}
+{{ $headlessPorts | toYaml | indent 2 }}
 {{- end }}
 
 {{/*
