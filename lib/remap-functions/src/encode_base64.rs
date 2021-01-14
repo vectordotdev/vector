@@ -1,4 +1,5 @@
 use remap::prelude::*;
+use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeBase64;
@@ -20,14 +21,80 @@ impl Function for EncodeBase64 {
                 accepts: |v| matches!(v, Value::Boolean(_)),
                 required: false,
             },
+            Parameter {
+                keyword: "charset",
+                accepts: |v| matches!(v, Value::Bytes(_)),
+                required: false,
+            }
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
         let padding = arguments.optional("padding").map(Expr::boxed);
+        let charset = arguments
+            .optional_enum("charset", &Charset::all_str())?
+            .map(|c| Charset::from_str(&c).expect("validated enum"))
+            .unwrap_or_default();
 
-        Ok(Box::new(EncodeBase64Fn { value, padding }))
+        Ok(Box::new(EncodeBase64Fn { value, padding, charset }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Charset {
+    Standard,
+    UrlSafe,
+}
+
+impl Default for Charset {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl Charset {
+    fn all_str() -> Vec<&'static str> {
+        use Charset::*;
+
+        vec![Standard, UrlSafe]
+            .into_iter()
+            .map(|p| p.as_str())
+            .collect::<Vec<_>>()
+    }
+
+    const fn as_str(self) -> &'static str {
+        use Charset::*;
+
+        match self {
+            Standard => "standard",
+            UrlSafe => "url_safe",
+        }
+    }
+}
+
+impl Into<base64::CharacterSet> for Charset {
+    fn into(self) -> base64::CharacterSet {
+        use Charset::*;
+
+        match self {
+            Standard => base64::CharacterSet::Standard,
+            UrlSafe => base64::CharacterSet::UrlSafe,
+        }
+    }
+}
+
+impl FromStr for Charset {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use Charset::*;
+
+        match s {
+            "standard" => Ok(Standard),
+            "url_safe" => Ok(UrlSafe),
+            _ => Err("unknown charset"),
+        }
     }
 }
 
@@ -35,6 +102,7 @@ impl Function for EncodeBase64 {
 struct EncodeBase64Fn {
     value: Box<dyn Expression>,
     padding: Option<Box<dyn Expression>>,
+    charset: Charset,
 }
 
 impl Expression for EncodeBase64Fn {
@@ -51,11 +119,7 @@ impl Expression for EncodeBase64Fn {
             .transpose()?
             .unwrap_or(true);
 
-        let config = if padding {
-            base64::STANDARD
-        } else {
-            base64::STANDARD_NO_PAD
-        };
+        let config = base64::Config::new(self.charset.into(), padding);
 
         Ok(base64::encode_config(value, config).into())
     }
