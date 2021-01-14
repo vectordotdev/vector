@@ -1,6 +1,8 @@
 use crate::Error;
 use prettytable::{format, Cell, Row, Table};
+use regex::Regex;
 use remap::{state, Object, Program, Runtime, Value};
+use remap_functions::all as funcs;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
@@ -11,14 +13,19 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  help functions  Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  next            Load the next object or create a new one
-  prev            Load the previous object
-  exit            Terminate the program
+  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+  help docs         Navigate to the VRL docs on the Vector website
+  help docs <func>  Navigate to the VRL docs for the specified function
+  next              Load the next object or create a new one
+  prev              Load the previous object
+  exit              Terminate the program
 "#;
+
+const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
+    let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
@@ -53,11 +60,13 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > VRL REPL commands:
->   help            Learn more about VRL
->   help functions  Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
->   next            Load the next object or create a new one
->   prev            Load the previous object
->   exit            Terminate the program
+>   help              Learn more about VRL
+>   help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+>   help docs         Navigate to the VRL docs on the Vector website
+>   help docs <func>  Navigate to the VRL docs for the specified function
+>   next              Load the next object or create a new one
+>   prev              Load the previous object
+>   exit              Terminate the program
 >
 > Any other value is resolved to a VRL expression.
 >
@@ -68,12 +77,14 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
+            Ok(line) if line == "exit" || line == "quit" => break,
             Ok(line) if line == "help" => print_help_text(),
             Ok(line) if line == "help functions" || line == "help funcs" || line == "help fs" => {
                 print_function_list()
             }
-            Ok(line) if line == "exit" => break,
-            Ok(line) if line == "quit" => break,
+            Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help docs <func_name>"
+            Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
                 rl.add_history_entry(line);
 
@@ -248,4 +259,28 @@ fn print_function_list() {
 
 fn print_help_text() {
     println!("{}", HELP_TEXT);
+}
+
+fn open_url(url: &str) {
+    if let Err(err) = webbrowser::open(url) {
+        println!(
+            "couldn't open default web browser: {}\n\
+            you can access the desired documentation at {}",
+            err, url
+        );
+    }
+}
+
+fn show_func_docs(line: &str, pattern: &Regex) {
+    // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
+    // "help docs <func_name>")
+    let matches = pattern.captures(line).unwrap();
+    let func_name = matches.get(1).unwrap().as_str();
+
+    if funcs().iter().any(|f| f.identifier() == func_name) {
+        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        open_url(&func_url);
+    } else {
+        println!("function name {} not recognized", func_name);
+    }
 }
