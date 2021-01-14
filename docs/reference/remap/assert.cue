@@ -16,7 +16,7 @@ remap: functions: assert: {
 		},
 	]
 	internal_failure_reason: [
-		"`condition` evaluates to `false`"
+		"`condition` evaluates to `false`",
 	]
 	return: ["null"]
 	category: "Test"
