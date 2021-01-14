@@ -27,7 +27,9 @@ use std::{
 use super::{DataDirOpenError, Error};
 use crate::buffers::Acker;
 
-const MAX_UNCOMPACTED: f64 = 0.5;
+/// How much of disk buffer needs to be deleted before we trigger compaction.
+/// <0,1>
+const MAX_UNCOMPACTED: f64 = 0.1;
 
 #[derive(Copy, Clone, Debug)]
 struct Key(pub usize);
@@ -219,6 +221,7 @@ impl Stream for Reader {
 impl Drop for Reader {
     fn drop(&mut self) {
         self.delete_acked();
+        // Compact on every shutdown
         self.compact();
     }
 }
@@ -248,7 +251,9 @@ impl Reader {
             self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
 
             self.uncompacted_size += size_deleted;
-            if self.uncompacted_size as f64 > self.max_size as f64 * MAX_UNCOMPACTED {
+            if self.uncompacted_size as f64
+                > self.max_size as f64 * MAX_UNCOMPACTED / (1.0 - MAX_UNCOMPACTED)
+            {
                 self.compact();
             }
         }
@@ -275,6 +280,10 @@ impl super::DiskBuffer for Buffer {
     type Reader = Reader;
 
     fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
+        // New `max_size` of the buffer is used for storing the unacked events.
+        // The rest is used as a buffer which when filled triggers compaction.
+        let max_size = (max_size as f64 * (1.0 - MAX_UNCOMPACTED)) as usize;
+
         let mut options = Options::new();
         options.create_if_missing = true;
 
@@ -295,9 +304,6 @@ impl super::DiskBuffer for Buffer {
 
         let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
         let current_size = Arc::new(AtomicUsize::new(initial_size));
-        // We don't know what the real size is, but ,all things equal, it should have
-        // uniform distribution and one half of max is right in the middle of it.
-        let uncompacted_size = (initial_size as f64 * MAX_UNCOMPACTED * 0.5) as usize;
 
         let write_notifier = Arc::new(AtomicTask::new());
 
@@ -317,7 +323,7 @@ impl super::DiskBuffer for Buffer {
             current_size: Arc::clone(&current_size),
         };
 
-        let reader = Reader {
+        let mut reader = Reader {
             db: Arc::clone(&db),
             write_notifier: Arc::clone(&write_notifier),
             blocked_write_tasks,
@@ -326,10 +332,12 @@ impl super::DiskBuffer for Buffer {
             current_size,
             ack_counter,
             max_size,
-            uncompacted_size,
+            uncompacted_size: 1,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
         };
+        // Compact on every start
+        reader.compact();
 
         Ok((writer, reader, acker))
     }
