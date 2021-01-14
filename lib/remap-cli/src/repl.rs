@@ -57,12 +57,12 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >
 > To run the CLI in regular mode, add a program to your command.
 >
-> Type `help`             to learn more.
->      `next`             to either load the next object or create a new one.
->      `prev`             to load the previous object.
->      `help docs`        to navigate to the VRL documentation.
->      `help docs <func>` to navigate to the docs of the specified function.
->      `exit`             to terminate the program.
+> VRL REPL commands:
+>   help docs         Navigate to the VRL docs on the Vector website
+>   help docs <func>  Navigate to the VRL docs for the specified function
+>   next              Load the next object or create a new one
+>   prev              Load the previous object
+>   exit              Terminate the program
 >
 > Any other value is resolved to a TRL expression.
 >
@@ -73,10 +73,12 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => print_help_text(),
-            Ok(line) if line == "help docs" => open_docs_url(DOCS_URL),
+            Ok(line) if line == "help docs" => open_url(DOCS_URL),
             Ok(line) if line == "exit" || line == "quit" => break,
             // Capture "docs <func_name>"
-            Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, func_docs_regex.clone()),
+            Ok(line) if func_docs_regex.is_match(line) => {
+                show_func_docs(line, func_docs_regex.clone())
+            }
             Ok(line) => {
                 rl.add_history_entry(line);
 
@@ -224,7 +226,7 @@ fn print_help_text() {
     println!("{}", HELP_TEXT);
 }
 
-fn open_docs_url(url: &str) {
+fn open_url(url: &str) {
     if let Err(err) = webbrowser::open(url) {
         println!(
             "couldn't open default web browser: {}\n\
@@ -235,14 +237,14 @@ fn open_docs_url(url: &str) {
 }
 
 fn show_func_docs(line: &str, pattern: Regex) {
-    // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("docs" and a
-    // "docs <func_name>")
+    // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
+    // "help docs <func_name>")
     let matches = pattern.captures(line).unwrap();
     let func_name = matches.get(1).unwrap().as_str();
 
     if let Some(_) = funcs().iter().find(|&f| f.identifier() == func_name) {
         let func_url = format!("{}/#{}", DOCS_URL, func_name);
-        open_docs_url(&func_url);
+        open_url(&func_url);
     } else {
         println!("Function name {} not recognized", func_name);
     }
