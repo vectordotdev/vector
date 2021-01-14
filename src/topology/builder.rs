@@ -12,10 +12,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{
-    compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
-};
-use futures01::Stream as Stream01;
+use futures::{future, stream, FutureExt, StreamExt, TryFutureExt};
 use std::{
     collections::HashMap,
     future::ready,
@@ -130,22 +127,17 @@ pub async fn build_pieces(
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
-                    futures::stream::iter(buf.into_iter()).map(Ok)
+                    stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
                 .boxed(),
             Transform::Task(t) => {
                 let filtered = input_rx
-                    .map(Ok)
-                    .compat()
-                    .filter(move |event| filter_event_type(event, input_type))
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
                     .inspect(|_| emit!(EventProcessed));
-                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
-                    t.transform(Box::new(filtered));
-                transformed
-                    .forward(output.compat())
-                    .compat()
-                    .map_ok(|_| ())
+                t.transform(Box::pin(filtered))
+                    .map(Ok)
+                    .forward(output)
                     .boxed()
             }
         }

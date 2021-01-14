@@ -7,14 +7,14 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
-use futures::{
-    compat::{Compat, Compat01As03},
-    stream, StreamExt,
-};
+use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap};
-use std::time::{Duration, Instant};
+use std::{
+    collections::{hash_map, HashMap},
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
 mod merge_strategy;
 
@@ -244,8 +244,8 @@ impl Reduce {
 impl TaskTransform for Reduce {
     fn transform(
         self: Box<Self>,
-        input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
+        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
@@ -254,40 +254,35 @@ impl TaskTransform for Reduce {
         let poll_period = me.flush_period;
 
         let mut flush_stream = tokio::time::interval(poll_period);
-        let mut input_stream = Compat01As03::new(input_rx);
 
-        let stream = stream! {
-          loop {
-            let mut output = Vec::new();
-            let done = tokio::select! {
-                _ = flush_stream.next() => {
-                  me.flush_into(&mut output);
-                  false
-                }
-                maybe_event = input_stream.next() => {
-                  match maybe_event {
-                    None => {
-                      me.flush_all_into(&mut output);
-                      true
-                    }
-                    Some(Ok(event)) => {
-                      me.transform_one(&mut output, event);
+        Box::pin(
+            stream! {
+              loop {
+                let mut output = Vec::new();
+                let done = tokio::select! {
+                    _ = flush_stream.next() => {
+                      me.flush_into(&mut output);
                       false
                     }
-                    Some(Err(())) => panic!("Unexpected error reading channel"),
-                  }
-                }
-            };
-            yield stream::iter(output.into_iter());
-            if done { break }
-          }
-        }
-        .flatten();
-
-        // Needed for compat
-        let try_stream = Box::pin(stream.map::<Result<Event, ()>, _>(Ok));
-
-        Box::new(Compat::new(try_stream))
+                    maybe_event = input_rx.next() => {
+                      match maybe_event {
+                        None => {
+                          me.flush_all_into(&mut output);
+                          true
+                        }
+                        Some(event) => {
+                          me.transform_one(&mut output, event);
+                          false
+                        }
+                      }
+                    }
+                };
+                yield stream::iter(output.into_iter());
+                if done { break }
+              }
+            }
+            .flatten(),
+        )
     }
 }
 

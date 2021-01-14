@@ -6,7 +6,7 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
-use futures01::Stream as Stream01;
+use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ use snafu::ResultExt as _;
 use std::{
     collections::{hash_map::RandomState, HashSet},
     error, fmt,
+    future::ready,
+    pin::Pin,
 };
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
@@ -172,13 +174,13 @@ impl TransformConfig for Ec2Metadata {
 impl TaskTransform for Ec2MetadataTransform {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::new(task.filter_map(move |event| inner.transform_one(event)))
+        Box::pin(task.filter_map(move |event| ready(inner.transform_one(event))))
     }
 }
 
