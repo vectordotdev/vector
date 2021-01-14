@@ -28,25 +28,6 @@ impl DistributionStatistic {
             }
         }
 
-        Self::from_base(samples, quantiles)
-    }
-
-    pub fn from_values_counts(values: &[f64], counts: &[u32], quantiles: &[f64]) -> Option<Self> {
-        if values.len() != counts.len() {
-            return None;
-        }
-
-        let mut samples = Vec::new();
-        for (v, c) in values.iter().zip(counts.iter()) {
-            for _ in 0..*c {
-                samples.push(*v);
-            }
-        }
-
-        Self::from_base(samples, quantiles)
-    }
-
-    fn from_base(mut samples: Vec<f64>, quantiles: &[f64]) -> Option<Self> {
         if samples.is_empty() {
             return None;
         }
