@@ -290,7 +290,6 @@ impl TaskTransform for Reduce {
 mod test {
     use super::*;
     use crate::{config::TransformConfig, event::Value, Event};
-    use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
     #[test]
@@ -339,14 +338,14 @@ group_by = [ "request_id" ]
         e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
-        let in_stream = futures01::stream::iter_ok(inputs);
-        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         assert_eq!(output_1.as_log()["message"], "test message 1".into());
         assert_eq!(output_1.as_log()["counter"], Value::from(8));
 
-        let output_2 = out_stream.next().await.unwrap().unwrap();
+        let output_2 = out_stream.next().await.unwrap();
         assert_eq!(output_2.as_log()["message"], "test message 2".into());
         assert_eq!(output_2.as_log()["extra_field"], "value1".into());
         assert_eq!(output_2.as_log()["counter"], Value::from(7));
@@ -393,10 +392,10 @@ merge_strategies.baz = "max"
         e_3.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3];
-        let in_stream = futures01::stream::iter_ok(inputs);
-        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         assert_eq!(output_1.as_log()["message"], "test message 1".into());
         assert_eq!(output_1.as_log()["foo"], "first foo second foo".into());
         assert_eq!(
@@ -445,15 +444,15 @@ group_by = [ "request_id" ]
         e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
-        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
-        let mut out_stream = reduce.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["message"], "test message 1".into());
         assert_eq!(output_1["counter"], Value::from(8));
 
-        let output_2 = out_stream.next().await.unwrap().unwrap();
+        let output_2 = out_stream.next().await.unwrap();
         let output_2 = output_2.as_log();
         assert_eq!(output_2["message"], "test message 2".into());
         assert_eq!(output_2["extra_field"], "value1".into());
@@ -513,16 +512,16 @@ merge_strategies.bar = "concat"
         e_6.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5, e_6];
-        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
-        let mut out_stream = reduce.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
 
         assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["foo"], json!([[2, 4], [6, 8], "done"]).into());
         assert_eq!(output_1["bar"], json!([2, 4, 6, 8, "done"]).into());

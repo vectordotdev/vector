@@ -512,11 +512,7 @@ enum Ec2MetadataError {
 mod integration_tests {
     use super::*;
     use crate::{event::Event, test_util::trace_init};
-    use futures::{
-        compat::{Future01CompatExt, Stream01CompatExt},
-        StreamExt,
-    };
-    use futures01::Sink;
+    use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
 
@@ -535,16 +531,16 @@ mod integration_tests {
         };
         let transform = config.build().await.unwrap().into_task();
 
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
-        let mut rx = transform.transform(Box::new(rx)).compat();
+        let (mut tx, rx) = futures::channel::mpsc::channel(100);
+        let mut rx = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
-        tx.send(event).compat().await.unwrap();
+        tx.send(event).await.unwrap();
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
@@ -573,16 +569,16 @@ mod integration_tests {
         };
         let transform = config.build().await.unwrap().into_task();
 
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
-        let mut rx = transform.transform(Box::new(rx)).compat();
+        let (mut tx, rx) = futures::channel::mpsc::channel(100);
+        let mut rx = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
-        tx.send(event).compat().await.unwrap();
+        tx.send(event).await.unwrap();
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), None);
@@ -606,16 +602,16 @@ mod integration_tests {
             };
             let transform = config.build().await.unwrap().into_task();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(100);
-            let mut rx = transform.transform(Box::new(rx)).compat();
+            let (mut tx, rx) = futures::channel::mpsc::channel(100);
+            let mut rx = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             delay_for(Duration::from_secs(1)).await;
 
             let event = Event::new_empty_log();
-            tx.send(event).compat().await.unwrap();
+            tx.send(event).await.unwrap();
 
-            let event = rx.next().await.unwrap().unwrap();
+            let event = rx.next().await.unwrap();
             let log = event.as_log();
 
             assert_eq!(
@@ -637,16 +633,16 @@ mod integration_tests {
             };
             let transform = config.build().await.unwrap().into_task();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(100);
-            let mut rx = transform.transform(Box::new(rx)).compat();
+            let (mut tx, rx) = futures::channel::mpsc::channel(100);
+            let mut rx = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             delay_for(Duration::from_secs(1)).await;
 
             let event = Event::new_empty_log();
-            tx.send(event).compat().await.unwrap();
+            tx.send(event).await.unwrap();
 
-            let event = rx.next().await.unwrap().unwrap();
+            let event = rx.next().await.unwrap();
             let log = event.as_log();
 
             assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
