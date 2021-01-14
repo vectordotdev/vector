@@ -61,9 +61,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >
 > VRL REPL commands:
 >   help              Learn more about VRL
->   help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
->   help docs         Navigate to the VRL docs on the Vector website
->   help docs <func>  Navigate to the VRL docs for the specified function
 >   next              Load the next object or create a new one
 >   prev              Load the previous object
 >   exit              Terminate the program
