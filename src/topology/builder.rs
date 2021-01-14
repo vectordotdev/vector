@@ -15,7 +15,7 @@ use crate::{
 use futures::{
     compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
-use futures01::{Future as Future01, Stream as Stream01};
+use futures01::Stream as Stream01;
 use std::{
     collections::HashMap,
     future::ready,
@@ -123,36 +123,36 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let filtered = input_rx
-            .map(Ok)
-            .compat()
-            .filter(move |event| filter_event_type(event, input_type))
-            .inspect(|_| emit!(EventProcessed));
         let transform = match transform {
-            Transform::Function(mut t) => {
-                #[allow(deprecated)]
-                // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
-                let transformed = filtered
-                    .map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .boxed();
-                transformed.forward(output.compat())
-            }
+            Transform::Function(mut t) => input_rx
+                .filter(move |event| ready(filter_event_type(event, input_type)))
+                .inspect(|_| emit!(EventProcessed))
+                .flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    futures::stream::iter(buf.into_iter()).map(Ok)
+                })
+                .forward(output)
+                .boxed(),
             Transform::Task(t) => {
+                let filtered = input_rx
+                    .map(Ok)
+                    .compat()
+                    .filter(move |event| filter_event_type(event, input_type))
+                    .inspect(|_| emit!(EventProcessed));
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
                     t.transform(Box::new(filtered));
-                transformed.forward(output.compat())
+                transformed
+                    .forward(output.compat())
+                    .compat()
+                    .map_ok(|_| ())
+                    .boxed()
             }
         }
-        .map(|_| {
+        .map_ok(|_| {
             debug!("Finished.");
             TaskOutput::Transform
-        })
-        .compat();
+        });
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
