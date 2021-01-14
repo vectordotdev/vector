@@ -14,16 +14,16 @@ const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
 
 const HELP_TEXT: &str = "
 VRL REPL commands:
-  docs         Navigate to the VRL docs on the Vector website
-  docs <func>  Navigate to the VRL docs for the specified function
-  next         Load the next object or create a new one
-  prev         Load the previous object
-  exit         Terminate the program
+  help docs         Navigate to the VRL docs on the Vector website
+  help docs <func>  Navigate to the VRL docs for the specified function
+  next              Load the next object or create a new one
+  prev              Load the previous object
+  exit              Terminate the program
 ";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
-    let func_docs_regex = Regex::new(r"^docs\s(\w{1,})$").unwrap();
+    let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
@@ -57,12 +57,12 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >
 > To run the CLI in regular mode, add a program to your command.
 >
-> Type `help`        to learn more.
->      `next`        to either load the next object or create a new one.
->      `prev`        to load the previous object.
->      `docs`        to navigate to the VRL documentation.
->      `docs <func>` to navigate to the docs of the specified function.
->      `exit`        to terminate the program.
+> Type `help`             to learn more.
+>      `next`             to either load the next object or create a new one.
+>      `prev`             to load the previous object.
+>      `help docs`        to navigate to the VRL documentation.
+>      `help docs <func>` to navigate to the docs of the specified function.
+>      `exit`             to terminate the program.
 >
 > Any other value is resolved to a TRL expression.
 >
@@ -73,9 +73,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
             Ok(line) if line == "help" => print_help_text(),
-            Ok(line) if line == "docs" => open_docs_url(DOCS_URL),
-            Ok(line) if line == "exit" => break,
-            Ok(line) if line == "quit" => break,
+            Ok(line) if line == "help docs" => open_docs_url(DOCS_URL),
+            Ok(line) if line == "exit" || line == "quit" => break,
             // Capture "docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, func_docs_regex.clone()),
             Ok(line) => {
