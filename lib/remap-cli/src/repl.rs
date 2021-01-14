@@ -53,10 +53,11 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > To run the CLI in regular mode, add a program to your command.
 >
 > VRL REPL commands:
->   help       Learn more about VRL
->   next       Load the next object or create a new one
->   prev       Load the previous object
->   exit       Terminate the program
+>   help            Learn more about VRL
+>   help functions  Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+>   next            Load the next object or create a new one
+>   prev            Load the previous object
+>   exit            Terminate the program
 >
 > Any other value is resolved to a VRL expression.
 >
