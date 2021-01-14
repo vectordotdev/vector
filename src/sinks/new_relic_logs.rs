@@ -298,6 +298,7 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
+        encoding = "json"
 
         [batch]
         max_size = 8388600

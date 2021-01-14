@@ -156,8 +156,10 @@ impl HttpSink for LokiConfig {
             if let Ok(value) = template.render_string(&event) {
                 labels.push((key.clone(), value));
             }
+        }
 
-            if self.remove_label_fields {
+        if self.remove_label_fields {
+            for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
                         event.as_mut_log().remove(&field);
@@ -259,7 +261,7 @@ mod tests {
         let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
-            labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
+            labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}"}
             encoding = "json"
             remove_label_fields = true
         "#,
@@ -288,6 +290,8 @@ mod tests {
             record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
         );
+        // make sure we can reuse fields across labels.
+        assert_eq!(record.labels[2], ("label3".to_string(), "bar".to_string()));
     }
 
     #[test]

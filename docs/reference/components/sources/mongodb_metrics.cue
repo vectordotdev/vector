@@ -750,4 +750,11 @@ components: sources: mongodb_metrics: {
 			tags:              _mongodb_metrics_tags
 		}
 	}
+
+	telemetry: metrics: {
+		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		request_errors_total:         components.sources.internal_metrics.output.metrics.request_errors_total
+	}
 }

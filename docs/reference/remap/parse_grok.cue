@@ -22,12 +22,17 @@ remap: functions: parse_grok: {
 			type: ["boolean"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` fails to parse via the provided `pattern`",
+	]
 	return: ["map"]
 	category: "Parse"
 	description: #"""
-		Parses a string using the Rust [`grok` library](https://github.com/daschl/grok). All patterns
-		[listed here](https://github.com/daschl/grok/tree/master/patterns) are supported. It is recommended
-		to use maintained patterns when possible since they will be improved over time by the community.
+		Parses the provided `value` using the Rust [`grok` library](https://github.com/daschl/grok).
+
+		All patterns [listed here](https://github.com/daschl/grok/tree/master/patterns) are supported.
+		It is recommended to use maintained patterns when possible since they will be improved over time
+		by the community.
 		"""#
 	examples: [
 		{

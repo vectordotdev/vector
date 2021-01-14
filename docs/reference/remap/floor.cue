@@ -16,10 +16,11 @@ remap: functions: floor: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""
-		Rounds the given number down to the given precision of decimal places.
+		Rounds the given `value` down to the specified `precision`.
 		"""#
 	examples: [
 		{

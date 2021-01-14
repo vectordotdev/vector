@@ -23,12 +23,17 @@ remap: functions: parse_key_value: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted key/value string",
+	]
 	return: ["map"]
 	category: "Parse"
-	description: """
-		Parses a string in key value format.
-		Keys and values can be wrapped with a `"`. `"` characters within a delimited field can be escaped by `\\`.
-		"""
+	description: #"""
+		Parses the provided `value` in key value format. Also known as [logfmt](\(urls.logfmt)).
+
+		* Keys and values can be wrapped with `"`.
+		* `"` characters can be escaped by `\`.
+		"""#
 	examples: [
 		{
 			title: "Parse (logfmt)"

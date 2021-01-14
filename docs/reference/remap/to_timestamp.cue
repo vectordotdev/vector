@@ -7,11 +7,17 @@ remap: functions: to_timestamp: {
 			type: ["string", "integer", "timestamp"]
 		},
 	]
+	internal_failure_reasons: [
+		"When `value` is a `string`, it is not a valid timestamp format",
+		"When `value` is an `int`, it is not within the Unix timestamp range",
+	]
 	return: ["timestamp"]
 	category: "Coerce"
 	description: #"""
-		Returns a `timestamp` from the parameters. If parameter is `string`, the timestamp is parsed in these formats.
-		If parameter is `integer`, the timestamp is taken as that number of seconds after January 1st, 1970.
+		Coerces the provided `value` into a `timestamp`.
+
+		* If `value` is a `string`, the timestamp is parsed in these formats.
+		* If `value` is an `integer`, it assumed to be a Unix representation of the timestamp (the number of seconds after January 1st, 1970).
 		"""#
 	examples: [
 		{

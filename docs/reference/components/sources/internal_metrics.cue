@@ -77,6 +77,30 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		connection_established_total: {
+			description:       "The total number of times a connection has been established."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_failed_total: {
+			description:       "The total number of times a connection has failed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_send_errors_total: {
+			description:       "The total number of errors sending data via the connection."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_shutdown_total: {
+			description:       "The total number of times the connection has been shut down."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		quit_total: {
 			description:       "The total number of times the Vector instance has quit."
 			type:              "counter"
@@ -429,6 +453,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		request_duration_nanoseconds: {
+			description:       "The total request duration in nanoseconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
 			type:              "counter"
@@ -443,6 +473,12 @@ components: sources: internal_metrics: {
 		}
 		requests_received_total: {
 			description:       "The total number of requests received by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		send_errors_total: {
+			description:       "The total number of errors sending messages."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags

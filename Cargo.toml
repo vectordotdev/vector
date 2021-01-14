@@ -585,7 +585,7 @@ harness = false
 required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
-tower-layer = "0.3"
+tower-layer = "=0.3.0"
 
 [patch.crates-io]
 # TODO: update to next 0.12.x (after 0.12.0, if any)
