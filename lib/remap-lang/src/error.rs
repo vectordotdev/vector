@@ -92,6 +92,7 @@ impl fmt::Display for Rule {
             comparison,
             EOE: "",
             EOI: "",
+            empty_line,
             equality,
             expression,
             expressions,
@@ -137,6 +138,7 @@ impl fmt::Display for Rule {
             target_regular,
             value,
             variable,
+            COMMENT,
             WHITESPACE,
         ]
     }

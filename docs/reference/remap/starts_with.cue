@@ -22,11 +22,11 @@ remap: functions: starts_with: {
 			default: true
 		},
 	]
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "String"
 	description: #"""
-		Determines if a given string begins with a given `substring`.
-		The search can be optionally case insensitive.
+		Determines if a given `valuye` begins with the given `substring`.
 		"""#
 	examples: [
 		{
@@ -41,7 +41,7 @@ remap: functions: starts_with: {
 			title: "String starts with (case insensitive)"
 			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.starts = starts_with(.message, \"the needle\", case_sensitive = false)
+				.starts = starts_with(.message, \"the needle\", case_sensitive: false)
 				"""#
 			output: input & {log: starts: true}
 		},

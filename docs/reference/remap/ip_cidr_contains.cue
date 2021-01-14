@@ -9,17 +9,20 @@ remap: functions: ip_cidr_contains: {
 			type: ["string"]
 		},
 		{
-			name:        "value"
+			name:        "ip"
 			description: "The ip address - either a v4 or a v6 address."
 			required:    true
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`cidr` is not a valid CIDR",
+		"`ip` is not a valid IP address",
+	]
 	return: ["boolean"]
 	category: "IP"
 	description: #"""
-		Returns `true` if the given ip address is contained within the block referenced
-		by the given CIDR mask.
+		Returns `true` if the given `ip` is contained within the block referenced by the `cidr`.
 		"""#
 	examples: [
 		{

@@ -22,18 +22,18 @@ remap: functions: ends_with: {
 			default: true
 		},
 	]
+	internal_failure_reason: null
 	return: ["boolean"]
 	category: "String"
 	description: #"""
-		Determines if a given string ends with a given `substring`.
-		The search can be optionally case insensitive.
+		Determines if the provided `value` ends with a given `substring`.
 		"""#
 	examples: [
 		{
 			title: "String ends with"
 			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = ends_with(.message, "the haystack", case_sensitive = false)
+				.contains = ends_with(.message, "the haystack", case_sensitive: false)
 				"""#
 			output: input & {
 				log: contains: true

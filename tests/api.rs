@@ -873,8 +873,9 @@ mod tests {
                 file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOn::FileSourceMetrics(
                     file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOnFileSourceMetrics { files, .. },
                 ) => {
-                    assert_eq!(files[0].name, path);
-                    assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                    let node = &files.edges.iter().flatten().next().unwrap().as_ref().unwrap().node;
+                    assert_eq!(node.name, path);
+                    assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
             }

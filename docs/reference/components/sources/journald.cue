@@ -93,13 +93,6 @@ components: sources: journald: {
 				examples: ["/usr/local/bin/journalctl"]
 			}
 		}
-		remap_priority: {
-			common:      false
-			description: "If the record from journald contains a `PRIORITY` field, it will be remapped into the equivalent syslog priority level name using the standard (abbreviated) all-capitals names such as `EMERG` or `ERR`."
-			required:    false
-			warnings: []
-			type: bool: default: false
-		}
 	}
 
 	output: logs: {
@@ -194,5 +187,7 @@ components: sources: journald: {
 	telemetry: metrics: {
 		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

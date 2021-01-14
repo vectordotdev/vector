@@ -9,10 +9,12 @@ remap: functions: encode_json: {
 			type: ["any"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "Encode"
-
-	description: "Returns the JSON representation of the argument."
+	description: """
+		Encodes the provided `value` into JSON.
+		"""
 	examples: [
 		{
 			title: "Encode data into JSON"

@@ -36,18 +36,21 @@ remap: functions: redact: {
 			type: ["array"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: """
-		Obscures sensitive data, such as personal identification numbers or credit card numbers, in
-		Vector event data.
+		Redacts sensitive data in the provided `value` via the specified `patterns`.
+
+		This function is useful to redact personally identifiable information (PII) such as emails, credit card numbers,
+		and more.
 		"""
 	examples: [
 		{
 			title: "Redact credit card number"
 			input: log: credit_card: "9876123454320123"
 			source: """
-				.credit_card = redact(.credit_card, filters = ["pattern"], redactor = "full", patterns = [/[0-9]{16}/])
+				.credit_card = redact(.credit_card, filters: ["pattern"], redactor: "full", patterns: [/[0-9]{16}/])
 				"""
 			output: log: credit_card: "****"
 		},
@@ -55,7 +58,7 @@ remap: functions: redact: {
 			title: "Redact email address"
 			input: log: email: "ana@booper.com"
 			source: #"""
-				.email = redact(.email, filters = ["pattern"], redactor = "full", patterns = [/^\S+@\S+$/])
+				.email = redact(.email, filters: ["pattern"], redactor: "full", patterns: [/^\S+@\S+$/])
 				"""#
 			output: log: email: "****"
 		},

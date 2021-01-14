@@ -9,12 +9,14 @@ remap: functions: del: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["any"]
 	category: "Event"
 	description: #"""
-		Removes the field specified by the given path from the event object. If the field exists,
-		the field's value is returned by the delete operation, while `null` is returned if the field
-		doesn't exist.
+		Removes the field specified by the given path from the event object.
+
+		If the field exists, the field's value is returned by the delete operation, while `null` is returned if the
+		field doesn't exist.
 		"""#
 	examples: [
 		{

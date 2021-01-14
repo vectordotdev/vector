@@ -7,10 +7,13 @@ remap: functions: to_float: {
 			type: ["float", "integer", "boolean", "string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a supported float representation",
+	]
 	return: ["float"]
 	category: "Coerce"
 	description: #"""
-		Returns a `float` whose text representation is `string`.
+		Coerces the provided `values` into a `float`.
 		"""#
 	examples: [
 		{

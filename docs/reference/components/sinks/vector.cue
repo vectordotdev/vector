@@ -88,6 +88,8 @@ components: sinks: vector: {
 	how_it_works: components.sources.vector.how_it_works
 
 	telemetry: metrics: {
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

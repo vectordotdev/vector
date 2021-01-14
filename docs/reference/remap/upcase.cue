@@ -9,10 +9,13 @@ remap: functions: upcase: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Returns a copy of `string` that has been converted into uppercase.
+		Returns a copy of `value` that is entirely uppercase.
+
+		"Uppercase" is defined according to the terms of the Unicode Derived Core Property Uppercase.
 		"""#
 	examples: [
 		{

@@ -10,33 +10,26 @@ remap: functions: parse_timestamp: {
 		},
 		{
 			name:        "format"
-			description: "The format string the timestamp text is expected to be in."
+			description: "The timestamp format as represented by [Chrono library](\(urls.chrono_time_formats))."
 			required:    true
 			type: ["string"]
 		},
-		{
-			name:        "default"
-			description: "If `value` cannot be converted to a timestamp, if `default` is a string attempt to parse this. If it is a timestamp, return this timestamp."
-			required:    false
-			type: ["string", "timestamp"]
-		},
 
+	]
+	internal_failure_reasons: [
+		"`value` fails to parse via the provided `format`",
 	]
 	return: ["timestamp"]
 	category: "Parse"
 	description: #"""
-		Parses a string representing a timestamp using a provided format string. If the string is unable to be parsed, and a `default` is specified,
-		use this. `default` can be either a `string` or a `timestamp`. If a `string`, it is parsed and the result returned. If a `timestamp`, this
-		is returned.
-
-		The format string used is specified by the [Chrono library](\(urls.chrono_time_formats)).
+		Parses the provided `value` via the provided `format`.
 		"""#
 	examples: [
 		{
 			title: "Parse a timestamp (success)"
 			input: log: timestamp: "10-Oct-2020 16:00"
 			source: #"""
-				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
+				.timestamp = parse_timestamp(del(.timestamp), format: "%v %R")
 				"""#
 			output: log: timestamp: "2020-10-10T16:00:00Z"
 		},
@@ -44,7 +37,7 @@ remap: functions: parse_timestamp: {
 			title: "Parse a timestamp (error)"
 			input: log: timestamp_bad: "I am not a timestamp"
 			source: #"""
-				.timestamp = parse_timestamp(del(.timestamp), format="%v %R")
+				.timestamp = parse_timestamp(del(.timestamp), format: "%v %R")
 				"""#
 			raise: "Failed to parse"
 		},
