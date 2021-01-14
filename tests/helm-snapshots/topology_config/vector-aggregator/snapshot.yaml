@@ -1,10 +1,8 @@
-# This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector-aggregator" or the
-# documentation on our website at https://vector.dev/docs.
-# If you copied this file into you local setup - feel free to change it however
-# you please.
-# If you want to create a PR to the Vector's Kubernetes config - please do not
-# edit this file directly. Instead, apply your changes to the Helm Chart.
+# Do not edit!
+# This file is generated
+# - by "scripts/helm-snapshot-tests.sh"
+# - for the chart at "distribution/helm/vector-aggregator"
+# - with the values from "tests/helm-snapshots/topology_config/vector-aggregator/values.yaml"
 ---
 # Source: vector-aggregator/templates/serviceaccount.yaml
 apiVersion: v1
@@ -59,6 +57,67 @@ data:
       address = "0.0.0.0:9090"
       inputs = ["internal_metrics"]
       type = "prometheus"
+    
+    
+    [sources.source1]
+      option1 = "value1"
+      option2 = "value2"
+      type = "type1"
+      option = "value"
+      arbitrary text
+    
+    [sources.source2]
+      optionA = "valueA"
+      type = "type2"
+      [sources.source2.optionB]
+        suboption = "valueB"
+    [sources.source2]
+      arbitrary text 2
+    
+    [sources.source3]
+      type = "type3"
+    
+    [transforms.transform1]
+      inputs = ["input1", "input2"]
+      option1 = "value1"
+      option2 = "value2"
+      type = "type1"
+      option = "value"
+      arbitrary text
+    
+    [transforms.transform2]
+      inputs = ["input2", "input1"]
+      optionA = "valueA"
+      type = "type2"
+      [transforms.transform2.optionB]
+        suboption = "valueB"
+    [transforms.transform2]
+      arbitrary text 2
+    
+    [transforms.transform3]
+      inputs = []
+      type = "type3"
+    
+    [sinks.sink1]
+      inputs = ["input1", "input2"]
+      option1 = "value1"
+      option2 = "value2"
+      type = "type1"
+      option = "value"
+      arbitrary text
+    
+    [sinks.sink2]
+      inputs = ["input2", "input1"]
+      optionA = "valueA"
+      type = "type2"
+      [sinks.sink2.optionB]
+        suboption = "valueB"
+    [sinks.sink2]
+      arbitrary text 2
+    
+    [sinks.sink3]
+      inputs = []
+      type = "type3"
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
@@ -142,15 +201,13 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:latest-debian"
+          image: "timberio/vector:0.0.0-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
             - /etc/vector/*.toml
           env:
             
-            - name: LOG
-              value: info
           ports:
             - name: metrics
               containerPort: 9090
@@ -180,11 +237,5 @@ spec:
             sources:
               - configMap:
                   name: vector-aggregator
-                  optional: true
-              - configMap:
-                  name: vector-aggregator-config
-                  optional: true
-              - secret:
-                  name: vector-aggregator-config
                   optional: true
   volumeClaimTemplates:

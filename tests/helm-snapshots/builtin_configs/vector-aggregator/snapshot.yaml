@@ -1,10 +1,8 @@
-# This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector-aggregator" or the
-# documentation on our website at https://vector.dev/docs.
-# If you copied this file into you local setup - feel free to change it however
-# you please.
-# If you want to create a PR to the Vector's Kubernetes config - please do not
-# edit this file directly. Instead, apply your changes to the Helm Chart.
+# Do not edit!
+# This file is generated
+# - by "scripts/helm-snapshot-tests.sh"
+# - for the chart at "distribution/helm/vector-aggregator"
+# - with the values from "tests/helm-snapshots/builtin_configs/vector-aggregator/values.yaml"
 ---
 # Source: vector-aggregator/templates/serviceaccount.yaml
 apiVersion: v1
@@ -47,18 +45,27 @@ data:
     # Accept logs from Vector agents.
     [sources.vector]
       address = "0.0.0.0:9000"
+      option1 = "value1"
+      option2 = "value2"
       type = "vector"
+      arbitrary text 1
     
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
+      option1 = "value1"
+      option2 = "value2"
       type = "internal_metrics"
+      arbitrary text 1
     
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       address = "0.0.0.0:9090"
       inputs = ["internal_metrics"]
+      option1 = "value1"
+      option2 = "value2"
       type = "prometheus"
+      arbitrary text 1
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
@@ -142,15 +149,13 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:latest-debian"
+          image: "timberio/vector:0.0.0-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
             - /etc/vector/*.toml
           env:
             
-            - name: LOG
-              value: info
           ports:
             - name: metrics
               containerPort: 9090
@@ -180,11 +185,5 @@ spec:
             sources:
               - configMap:
                   name: vector-aggregator
-                  optional: true
-              - configMap:
-                  name: vector-aggregator-config
-                  optional: true
-              - secret:
-                  name: vector-aggregator-config
                   optional: true
   volumeClaimTemplates:
