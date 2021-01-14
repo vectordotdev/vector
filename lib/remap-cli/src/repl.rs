@@ -58,7 +58,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >   prev       Load the previous object
 >   exit       Terminate the program
 >
-> Any other value is resolved to a TRL expression.
+> Any other value is resolved to a VRL expression.
 >
 > Try it out now by typing `.` and hitting [enter] to see the result.
 "#
