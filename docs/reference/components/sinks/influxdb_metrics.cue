@@ -118,8 +118,11 @@ components: sinks: influxdb_metrics: {
 				name:      _name
 				namespace: "app"
 				distribution: {
-					values: [1.0, 5.0, 3.0]
-					sample_rates: [1, 2, 3]
+					samples: [
+						{value: 1.0, rate: 1},
+						{value: 5.0, rate: 2},
+						{value: 3.0, rate: 3},
+					]
 					statistic: "histogram"
 				}
 				tags: {
@@ -158,8 +161,11 @@ components: sinks: influxdb_metrics: {
 				kind: "absolute"
 				name: _name
 				histogram: {
-					buckets: [1.0, 2.1, 3.0]
-					counts: [2, 5, 10]
+					buckets: [
+						{upper_limit: 1.0, count: 2},
+						{upper_limit: 2.1, count: 5},
+						{upper_limit: 3.0, count: 10},
+					]
 					count: 17
 					sum:   46.2
 				}
@@ -196,8 +202,11 @@ components: sinks: influxdb_metrics: {
 				kind: "absolute"
 				name: _name
 				summary: {
-					quantiles: [0.01, 0.5, 0.99]
-					values: [1.5, 2.0, 3.0]
+					quantiles: [
+						{upper_limit: 0.01, value: 1.5},
+						{upper_limit: 0.5, value:  2.0},
+						{upper_limit: 0.99, value: 3.0},
+					]
 					count: 6
 					sum:   12.1
 				}

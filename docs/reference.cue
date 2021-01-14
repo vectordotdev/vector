@@ -169,9 +169,13 @@ _values: {
 }
 
 #MetricEventDistribution: {
-	values: [float, ...float]
-	sample_rates: [uint, ...uint]
+	samples: [#DistributionSample, ...#DistributionSample]
 	statistic: "histogram" | "summary"
+}
+
+#DistributionSample: {
+	value: float
+	rate:  uint
 }
 
 #MetricEventGauge: {
@@ -179,10 +183,14 @@ _values: {
 }
 
 #MetricEventHistogram: {
-	buckets: [float, ...float]
-	counts: [int, ...int]
-	count: int
+	buckets: [#HistogramBucket, ...#HistogramBucket]
+	count: uint
 	sum:   float
+}
+
+#HistogramBucket: {
+	upper_limit: float
+	count:       uint
 }
 
 #MetricEventSet: {
@@ -190,10 +198,14 @@ _values: {
 }
 
 #MetricEventSummary: {
-	quantiles: [float, ...float]
-	values: [float, ...float]
+	quantiles: [#SummaryQuantile, ...#SummaryQuantile]
 	count: int
 	sum:   float
+}
+
+#SummaryQuantile: {
+	upper_limit: float
+	value:       float
 }
 
 #MetricTags: [Name=string]: close({

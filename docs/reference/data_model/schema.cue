@@ -93,20 +93,35 @@ data_model: schema: {
 					type: object: {
 						examples: []
 						options: {
-							sample_rates: {
-								description: "The rate at which each individual value was sampled."
+							samples: {
+								description: "The set of sampled values."
 								required:    true
 								warnings: []
-								type: array: items: type: uint: {
-									examples: [12, 43, 25]
-									unit: null
+								type: array: items: type: object: {
+									examples: []
+									options: {
+										rate: {
+											description: "The rate at which this value was sampled."
+											required:    true
+											warnings: []
+											type: uint: {
+												examples: [12, 43, 25]
+												unit: null
+											}
+										}
+										value: {
+											description: "The value being sampled."
+											required:    true
+											warnings: []
+											// FIXME: making this float, as it should be, makes cue blow up
+											type: uint: {
+												// FIXME: Adding even empty examples makes cue blow up
+												// examples: [12.0, 43.3, 25.2]
+												unit: null
+											}
+										}
+									}
 								}
-							}
-							values: {
-								description: "The list of values contained within the distribution."
-								required:    true
-								warnings: []
-								type: array: items: type: float: examples: [12.0, 43.3, 25.2]
 							}
 							statistic: {
 								description: "The statistic to be calculated from the values."
@@ -163,25 +178,40 @@ data_model: schema: {
 						examples: []
 						options: {
 							buckets: {
-								description: "The buckets contained within this histogram."
+								description: "The set of buckets containing the histogram values."
 								required:    true
 								warnings: []
-								type: array: items: type: float: examples: [1.0, 2.0, 5.0, 10.0, 25.0]
+								type: array: items: type: object: {
+									examples: []
+									options: {
+										count: {
+											description: "The number of values contained within this bucket."
+											required:    true
+											warnings: []
+											type: uint: {
+												examples: [1, 10, 25, 100]
+												unit: null
+											}
+										}
+										upper_limit: {
+											description: "The upper limit of the samples within the bucket."
+											required:    true
+											warnings: []
+											// FIXME: making this float, as it should be, makes cue blow up
+											type: uint: {
+												// FIXME: Adding even empty examples makes cue blow up
+												// examples: [12.0, 43.3, 25.2]
+												unit: null
+											}
+										}
+									}
+								}
 							}
 							count: {
 								description: "The total number of values contained within the histogram."
 								required:    true
 								warnings: []
 								type: uint: {
-									examples: [1, 10, 25, 100]
-									unit: null
-								}
-							}
-							counts: {
-								description: "The number of values contained within each bucket."
-								required:    true
-								warnings: []
-								type: array: items: type: uint: {
 									examples: [1, 10, 25, 100]
 									unit: null
 								}
@@ -274,11 +304,35 @@ data_model: schema: {
 								}
 							}
 							quantiles: {
-								description: "The quantiles contained within the summary, where 0 ≤ quantile ≤ 1."
+								description: "The set of observations."
 								required:    true
 								warnings: []
-								type: array: {
-									items: type: float: examples: [0.1, 0.5, 0.75, 1.0]
+								type: array: items: type: object: {
+									examples: []
+									options: {
+										value: {
+											description: "The value of this quantile range."
+											required:    true
+											warnings: []
+											// FIXME: making this float, as it should be, makes cue blow up
+											type: uint: {
+												// FIXME: Adding even empty examples makes cue blow up
+												// examples: [2.1, 4.68, 23.02, 120.1]
+												unit: null
+											}
+										}
+										upper_limit: {
+											description: "The upper limit for this quantile range, where 0 ≤ upper_limit ≤ 1."
+											required:    true
+											warnings: []
+											// FIXME: making this float, as it should be, makes cue blow up
+											type: uint: {
+												// FIXME: Adding even empty examples makes cue blow up
+												// examples: [0.1, 0.5, 0.75, 1.0]
+												unit: null
+											}
+										}
+									}
 								}
 							}
 							sum: {
@@ -287,14 +341,6 @@ data_model: schema: {
 								warnings: []
 								type: float: {
 									examples: [1.0, 10.0, 25.0, 100.0]
-								}
-							}
-							values: {
-								description: "The values contained within the summary that align with the `quantiles`."
-								required:    true
-								warnings: []
-								type: array: {
-									items: type: float: examples: [2.1, 4.68, 23.02, 120.1]
 								}
 							}
 						}
