@@ -13,8 +13,8 @@ use tokio::time;
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
-    #[derivative(Default(value = "2.0"))]
-    scrape_interval_secs: f64,
+    #[derivative(Default(value = "2"))]
+    scrape_interval_secs: u64,
 }
 
 inventory::submit! {
@@ -33,7 +33,7 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let interval = time::Duration::from_secs_f64(self.scrape_interval_secs);
+        let interval = time::Duration::from_secs(self.scrape_interval_secs);
         if interval < time::Duration::from_millis(500) {
             return Err(format!(
                 "interval set too low ({} secs), use interval >= 0.5 secs",
