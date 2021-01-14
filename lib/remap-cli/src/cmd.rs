@@ -10,20 +10,20 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
-    /// Program to execute
-    ///
-    /// For example, ".foo = true" will set the object's `foo` field to `true`.
-    #[structopt(name = "PROGRAM")]
-    program: Option<String>,
+    /// The VRL script to execute. The script ".foo = true", for example, sets the event object's
+    /// `foo` field to `true`.
+    #[structopt(name = "script")]
+    script: Option<String>,
 
-    /// File containing the object(s) to manipulate, leave empty to use stdin
+    /// The file containing the event object(s) to handle. The supported formats are JSON and jsonl.
+    /// If no input file is specified, the object(s) are
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
-    /// File containing the program to execute, can be used instead of
-    /// "PROGRAM"
-    #[structopt(short, long = "program", conflicts_with("program"), parse(from_os_str))]
-    program_file: Option<PathBuf>,
+    /// The file containing the VRL script to execute. This can be used instead of the `script`
+    /// option.
+    #[structopt(short, long = "script", conflicts_with("script"), parse(from_os_str))]
+    script_file: Option<PathBuf>,
 
     /// Print the (modified) object, instead of the result of the final
     /// expression.
@@ -45,13 +45,13 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
 fn run(opts: &Opts) -> Result<(), Error> {
     let objects = read_into_objects(opts.input_file.as_ref())?;
-    let program = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+    let script = read_script(opts.script.as_deref(), opts.script_file.as_ref())?;
 
-    if program.is_empty() {
+    if script.is_empty() {
         repl(objects)
     } else {
         for mut object in objects {
-            let result = execute(&mut object, &program).map(|v| {
+            let result = execute(&mut object, &script).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -79,15 +79,15 @@ fn repl(object: Vec<Value>) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
-fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
+fn execute(object: &mut impl Object, script: &str) -> Result<Value, Error> {
     let state = state::Program::default();
     let mut runtime = Runtime::new(state);
-    let program = Program::new(program, &remap_functions::all(), None, true)?;
+    let script = Program::new(script, &remap_functions::all(), None, true)?;
 
-    runtime.execute(object, &program).map_err(Into::into)
+    runtime.execute(object, &script).map_err(Into::into)
 }
 
-fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
+fn read_script(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
     match source {
         Some(source) => Ok(source.to_owned()),
         None => match file {
