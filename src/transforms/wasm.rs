@@ -120,7 +120,7 @@ impl TaskTransform for Wasm {
 mod tests {
     use super::{Wasm, WasmConfig};
     use crate::{event::Event, transforms::TaskTransform};
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::{stream, StreamExt};
     use serde_json::Value;
     use std::{collections::HashMap, fs, io::Read, path::Path};
 
@@ -163,13 +163,11 @@ mod tests {
                 .collect();
 
         let actual = transform
-            .transform(Box::new(futures01::stream::iter_ok(input)))
-            .compat()
+            .transform(Box::pin(stream::iter(input)))
             .collect::<Vec<_>>()
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Vec<_>>();
 
         assert_eq!(actual, expected);
     }
