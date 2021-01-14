@@ -16,7 +16,6 @@ pub struct Opts {
     script: Option<String>,
 
     /// The file containing the event object(s) to handle. The supported formats are JSON and jsonl.
-    /// If no input file is specified, the object(s) are
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
@@ -25,10 +24,8 @@ pub struct Opts {
     #[structopt(short, long = "script", conflicts_with("script"), parse(from_os_str))]
     script_file: Option<PathBuf>,
 
-    /// Print the (modified) object, instead of the result of the final
-    /// expression.
-    ///
-    /// The same result can be achieved by using `.` as the final expression.
+    /// Print the (modified) event object instead of the result of the final expression. Setting
+    /// this flag is equivalent to using `.` as the final expression.
     #[structopt(short = "o", long)]
     print_object: bool,
 }
