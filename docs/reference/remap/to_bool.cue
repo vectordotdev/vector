@@ -7,18 +7,23 @@ remap: functions: to_bool: {
 			type: ["boolean", "integer", "float", "null", "string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a supported boolean representation",
+	]
 	return: ["float"]
 	category: "Coerce"
 	description: #"""
-		Converts the provided value to a Boolean. The conversion rules vary by type:
+		Coerces the provided `value` into a `boolean`.
 
-		Type    | Rule
-		:-------|:----
-		String  | These return `true`: `"true"`, `"t"`, `"yes"`, `"y"`. These return `false`: `"false"`, `"f"`, `"no"`, `"n"`, `"0"`.
-		Float   | `0.0` returns `false`; all other floats return `true`
-		Integer | `0` returns `false`; all other integers return `true`
-		Null    | `null` always returns `false`
-		Boolean | Returns the provided Boolean
+		The conversion rules vary by type:
+
+		| Type      | `true` values | `false` values |
+		|:----------|:--------------|:---------------|
+		| `string`  | `"true"`, `"t"`, `"yes"`, `"y"` | `"false"`, `"f"`, `"no"`, `"n"`, `"0"` |
+		| `float`   | == `0.0` | != `0.0` |
+		| `int`     | == `0` | != `0` |
+		| `null`    | | `null` |
+		| `boolean` | `true` | `false` |
 		"""#
 	examples: [
 		{

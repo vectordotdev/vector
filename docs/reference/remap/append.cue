@@ -15,12 +15,11 @@ remap: functions: append: {
 			type: ["array"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["array"]
 	category: "Array"
 	description: """
-		Adds each item from an array to the end of another array. The expression
-		`append([1, 2, 3], [4, 5, 6])`, for example, would produce the array `[1, 2, 3, 4, 5, 6]`.
-		The items in both arrays can be of any VRL type.
+		Adds each item from an array to the end of another array.
 		"""
 	examples: [
 		{

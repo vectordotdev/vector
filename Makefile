@@ -498,14 +498,13 @@ endif
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
 
-.PHONY: build-wasm-tests
+.PHONY: test-wasm-build-modules
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
 
 $(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
 $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
 	${MAYBE_ENVIRONMENT_EXEC} cargo build \
-		--target-dir target/ \
 		--manifest-path tests/data/wasm/${MODULE}/Cargo.toml \
 		--target wasm32-wasi \
 		--release \
@@ -525,7 +524,7 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-remap
-bench-remap: ## Run benchmarks in /benches
+bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
@@ -535,7 +534,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-all
-bench-all: ### Run default and WASM benches
+bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS)
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}

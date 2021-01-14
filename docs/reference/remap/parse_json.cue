@@ -9,14 +9,16 @@ remap: functions: parse_json: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a valid JSON formatted payload",
+	]
 	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
 	category: "Parse"
 	description: #"""
-		Returns an `object` whose text representation is a JSON
-		payload in `string` form.
+		Parses the provided `value` as JSON.
 
-		`string` must be the string representation of a JSON
-		payload. Otherwise, an `ParseError` will be raised.
+		Only JSON types are returned. If you need to convert a `string` into a `timestamp`, consider the
+		`parse_timestamp` function.
 		"""#
 	examples: [
 		{

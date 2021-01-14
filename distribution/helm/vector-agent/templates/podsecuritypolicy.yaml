@@ -13,12 +13,14 @@ spec:
     - 'hostPath'
     - 'configMap'
     - 'secret'
+    - 'projected'
   allowedHostPaths:
     - pathPrefix: "/var/log"
       readOnly: true
-    - pathPrefix: "/var/lib/docker/containers"
+    - pathPrefix: "/var/lib"
       readOnly: true
-    - pathPrefix: "/var/lib/vector/"
+    - pathPrefix: "/var/lib/vector"
+      readOnly: false
     {{- range .Values.extraVolumes }}
     {{- if .hostPath }}
     - pathPrefix: {{ .hostPath.path }}
@@ -28,7 +30,7 @@ spec:
   hostIPC: false
   hostPID: false
   runAsUser:
-    rule: 'MustRunAsNonRoot'
+    rule: 'RunAsAny'
   seLinux:
     rule: 'RunAsAny'
   supplementalGroups:

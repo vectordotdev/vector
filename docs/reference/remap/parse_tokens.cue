@@ -9,31 +9,32 @@ remap: functions: parse_tokens: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted tokenized string",
+	]
 	return: ["array"]
 	category: "Parse"
 	description: #"""
-		Splits the string up into an array of tokens. A token is considered to be:
-		- A word surrounded by whitespace.
-		- Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
-		- Text delimited by square brackets: `[..]`. Closing square brackets can be included in the token if they are escaped by a backslash (`\`).
+		Parses the provided `value` in token format.
+
+		A token is considered to be:
+
+		* A word surrounded by whitespace.
+		* Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
+		* Text delimited by square brackets: `[..]`. Closing square brackets can be included in the token if they are escaped by a backslash (`\`).
 		"""#
 	examples: [
 		{
 			title: "Success"
-			input: {
-				text: #"""
-					A sentence "with \"a\" sentence inside" and [some brackets]
-					"""#
-			}
+			input: log: text: #"""
+				A sentence "with \"a\" sentence inside" and [some brackets]
+				"""#
 			source: #"""
 				.tokens = parse_tokens(.text)
 				"""#
-			output: {
-				text: #"""
-					A sentence "with \"a\" sentence inside" and [some brackets]
-					"""#
+			output: input & {log: {
 				slice: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
-			}
+			}}
 		},
 	]
 }

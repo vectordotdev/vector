@@ -21,11 +21,13 @@ remap: functions: split: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Splits the given string whenever a given pattern is matched. If `limit` is specified, after `limit` has been reached
-		the remainder of the string is returned unsplit.
+		Splits the given `value` via the provided `pattern`.
+
+		If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.
 		"""#
 	examples: [
 		{
@@ -40,7 +42,7 @@ remap: functions: split: {
 			title: "Split a string (with a limit)"
 			input: log: text: "apples and pears and bananas"
 			source: #"""
-				.text = split(.text, " and ", 1)
+				.text = split(.text, " and ", limit: 1)
 				"""#
 			output: log: text: ["apples", "pears and bananas"]
 		},

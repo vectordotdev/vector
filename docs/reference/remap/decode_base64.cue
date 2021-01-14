@@ -9,9 +9,14 @@ remap: functions: decode_base64: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a valid encoded base64 string.",
+	]
 	return: ["string"]
 	category:    "Decode"
-	description: "Decodes the provided [Base64](\(urls.base64)) data to a string."
+	description: """
+		Decodes the provided `value` (a [Base64](\(urls.base64)) string) into it's original string.
+		"""
 	examples: [
 		{
 			title: "Decode Base64 data"
