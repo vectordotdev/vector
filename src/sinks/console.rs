@@ -244,7 +244,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }

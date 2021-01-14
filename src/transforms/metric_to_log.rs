@@ -238,19 +238,25 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("distribution.sample_rates[0]"),
+                    String::from("distribution.samples[0].rate"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("distribution.sample_rates[1]"),
+                    String::from("distribution.samples[0].value"),
+                    &Value::from(1.0)
+                ),
+                (
+                    String::from("distribution.samples[1].rate"),
                     &Value::from(20)
+                ),
+                (
+                    String::from("distribution.samples[1].value"),
+                    &Value::from(2.0)
                 ),
                 (
                     String::from("distribution.statistic"),
                     &Value::from("histogram")
                 ),
-                (String::from("distribution.values[0]"), &Value::from(1.0)),
-                (String::from("distribution.values[1]"), &Value::from(2.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("distro")),
                 (String::from("timestamp"), &Value::from(ts())),
@@ -280,22 +286,22 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0]"),
-                    &Value::from(1.0)
-                ),
-                (
-                    String::from("aggregated_histogram.buckets[1]"),
-                    &Value::from(2.0)
-                ),
-                (String::from("aggregated_histogram.count"), &Value::from(30)),
-                (
-                    String::from("aggregated_histogram.counts[0]"),
+                    String::from("aggregated_histogram.buckets[0].count"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.counts[1]"),
+                    String::from("aggregated_histogram.buckets[0].upper_limit"),
+                    &Value::from(1.0)
+                ),
+                (
+                    String::from("aggregated_histogram.buckets[1].count"),
                     &Value::from(20)
                 ),
+                (
+                    String::from("aggregated_histogram.buckets[1].upper_limit"),
+                    &Value::from(2.0)
+                ),
+                (String::from("aggregated_histogram.count"), &Value::from(30)),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("histo")),
@@ -320,7 +326,6 @@ mod tests {
         };
 
         let log = do_transform(summary).unwrap();
-        dbg!(&log);
         let collected: Vec<_> = log.all_fields().collect();
 
         assert_eq!(
@@ -328,22 +333,22 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0]"),
+                    String::from("aggregated_summary.quantiles[0].upper_limit"),
                     &Value::from(50.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1]"),
-                    &Value::from(90.0)
-                ),
-                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
-                (
-                    String::from("aggregated_summary.values[0]"),
+                    String::from("aggregated_summary.quantiles[0].value"),
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.values[1]"),
+                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    &Value::from(90.0)
+                ),
+                (
+                    String::from("aggregated_summary.quantiles[1].value"),
                     &Value::from(20.0)
                 ),
+                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("summary")),
                 (String::from("timestamp"), &Value::from(ts())),
