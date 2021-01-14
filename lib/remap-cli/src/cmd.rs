@@ -31,11 +31,6 @@ pub struct Opts {
     /// The same result can be achieved by using `.` as the final expression.
     #[structopt(short = "o", long)]
     print_object: bool,
-
-    /// Open the VRL REPL. If you specify an input file, the objects in that file are passed to the
-    /// REPL. If no input file is provided, a generic {"foo": "bar"} object is provided.
-    #[structopt(short = "r", long)]
-    repl: bool,
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -49,20 +44,13 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
-    // Either a script/script file can be specified or --repl, not both
-    if opts.repl && (opts.script_file.is_some() || opts.script_file.is_some()) {
-        return Err(Error::MixedArgs);
-    }
-
-    // Run the REPL if --repl is explicitly set or no script/script file is specified
-    if opts.repl || (opts.script.is_none() && opts.script_file.is_none()) {
+    // Run the REPL if no script or script file is specified
+    if opts.script.is_none() && opts.script_file.is_none() {
+        // If an input file is provided, use that for the REPL objects, otherwise provide a
+        // generic default object.
         let repl_objects = match &opts.input_file {
             Some(file) => read_into_objects(Some(file))?,
-            None => {
-                let mut map = BTreeMap::new();
-                map.insert("foo".into(), "bar".into());
-                vec![Value::Map(map)]
-            }
+            None => default_objects()
         };
 
         repl(repl_objects)
@@ -155,4 +143,10 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     reader.read_to_string(&mut buffer)?;
 
     Ok(buffer)
+}
+
+fn default_objects() -> Vec<Value> {
+    let mut map = BTreeMap::new();
+    map.insert("foo".into(), "bar".into());
+    vec![Value::Map(map)]
 }

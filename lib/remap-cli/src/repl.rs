@@ -12,7 +12,7 @@ const HELP_TEXT: &str = "
 VRL REPL commands:
   next      Load the next object or create a new one
   prev      Load the previous object
-  exit      Terminate the program
+  exit      Exit the REPL
 ";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
@@ -53,7 +53,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > Type `help` to learn more.
 >      `next` to either load the next object or create a new one.
 >      `prev` to load the previous object.
->      `exit` to terminate the program.
+>      `exit` to exit the REPL.
 >
 > Any other value is resolved to a TRL expression.
 >

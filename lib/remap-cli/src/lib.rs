@@ -18,7 +18,4 @@ pub enum Error {
     #[cfg(not(feature = "repl"))]
     #[error("repl feature disabled, program input required")]
     ReplFeature,
-
-    #[error("repl and script/script file args specified")]
-    MixedArgs,
 }
