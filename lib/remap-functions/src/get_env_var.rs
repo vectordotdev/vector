@@ -40,15 +40,14 @@ impl Expression for GetEnvVarFn {
         let bytes = self.name.execute(state, object)?.try_bytes()?;
         let name = String::from_utf8_lossy(&bytes);
 
-        let value = std::env::var(name.as_ref())
-            .map_err(|_| Error::Call(format!("Environment variable {:?} not found.", name)))?;
+        let value = std::env::var(name.as_ref()).map_err(|e| Error::Call(e.to_string()))?;
         Ok(value.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.name
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Bytes)
     }
 }
