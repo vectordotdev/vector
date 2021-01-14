@@ -138,11 +138,11 @@ vectorSink:
   # The name to use for the "built-in" vector sink.
   sinkId: vector_sink
   # Inputs of the built-in vector sink.
-  inputs: null # ["my_input_1", "my_input_2"]
+  inputs: null  # ["my_input_1", "my_input_2"]
   # The host of the Vector to send the data to.
-  host: null # "vector.internal"
+  host: null  # "vector.internal"
   # The port of the Vector to send the data to.
-  port: null # 9000
+  port: null  # 9000
   # Raw TOML config to embed at the vector sink.
   rawConfig: null
 
