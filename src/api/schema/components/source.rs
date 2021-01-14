@@ -1,9 +1,13 @@
 use super::{sink, state, transform, Component};
 use crate::{
-    api::schema::metrics::{self, IntoSourceMetrics},
+    api::schema::{
+        filter,
+        metrics::{self, IntoSourceMetrics},
+    },
     config::DataType,
+    filter_check,
 };
-use async_graphql::{Enum, Object};
+use async_graphql::{Enum, InputObject, Object};
 
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
@@ -27,6 +31,12 @@ pub struct Data {
     pub name: String,
     pub component_type: String,
     pub output_type: DataType,
+}
+
+impl Data {
+    pub fn get_name(&self) -> &str {
+        self.name.as_str()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,5 +78,25 @@ impl Source {
     /// Source metrics
     pub async fn metrics(&self) -> metrics::SourceMetrics {
         metrics::by_component_name(&self.0.name).to_source_metrics(&self.0.component_type)
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct SourcesFilter {
+    name: Option<Vec<filter::StringFilter>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<Source> for SourcesFilter {
+    fn matches(&self, source: &Source) -> bool {
+        filter_check!(self
+            .name
+            .as_ref()
+            .map(|f| f.iter().all(|f| f.filter_value(source.0.get_name()))));
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
     }
 }

@@ -12,7 +12,7 @@ use crate::{
     config::Config,
     filter_check,
 };
-use async_graphql::{InputObject, Interface, Object, Subscription};
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use tokio::stream::{Stream, StreamExt};
@@ -28,6 +28,14 @@ pub enum Component {
     Sink(sink::Sink),
 }
 
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+/// Type of component
+pub enum ComponentType {
+    Source,
+    Transform,
+    Sink,
+}
+
 impl Component {
     fn get_name(&self) -> &str {
         match self {
@@ -37,11 +45,11 @@ impl Component {
         }
     }
 
-    fn get_filter_type(&self) -> filter::ComponentType {
+    fn get_filter_type(&self) -> ComponentType {
         match self {
-            Component::Source(_) => filter::ComponentType::Source,
-            Component::Transform(_) => filter::ComponentType::Transform,
-            Component::Sink(_) => filter::ComponentType::Sink,
+            Component::Source(_) => ComponentType::Source,
+            Component::Transform(_) => ComponentType::Transform,
+            Component::Sink(_) => ComponentType::Sink,
         }
     }
 }
@@ -49,8 +57,7 @@ impl Component {
 #[derive(Default, InputObject)]
 pub struct ComponentsFilter {
     name: Option<Vec<filter::StringFilter>>,
-    component_type: Option<Vec<filter::EqualityFilter<filter::ComponentType>>>,
-    and: Option<Vec<Self>>,
+    component_type: Option<Vec<filter::EqualityFilter<ComponentType>>>,
     or: Option<Vec<Self>>,
 }
 
@@ -104,9 +111,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<source::SourcesFilter>,
     ) -> relay::ConnectionResult<source::Source> {
+        let filter = filter.unwrap_or_else(source::SourcesFilter::default);
+        let sources = filter_items(state::get_sources().into_iter(), &filter);
+
         relay::query(
-            state::get_sources().into_iter(),
+            sources.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -120,9 +131,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<transform::TransformsFilter>,
     ) -> relay::ConnectionResult<transform::Transform> {
+        let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
+        let transforms = filter_items(state::get_transforms().into_iter(), &filter);
+
         relay::query(
-            state::get_transforms().into_iter(),
+            transforms.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -136,9 +151,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<sink::SinksFilter>,
     ) -> relay::ConnectionResult<sink::Sink> {
+        let filter = filter.unwrap_or_else(sink::SinksFilter::default);
+        let sinks = filter_items(state::get_sinks().into_iter(), &filter);
+
         relay::query(
-            state::get_sinks().into_iter(),
+            sinks.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )

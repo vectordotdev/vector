@@ -1,4 +1,5 @@
-use async_graphql::{Enum, InputObject, InputType};
+use super::components::ComponentType;
+use async_graphql::{InputObject, InputType};
 
 /// Takes an &Option<bool> and returns early if false
 #[macro_export]
@@ -41,13 +42,6 @@ impl StringFilter {
         );
         true
     }
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum ComponentType {
-    Source,
-    Transform,
-    Sink,
 }
 
 #[derive(InputObject)]
