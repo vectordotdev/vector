@@ -33,7 +33,10 @@ where
     type InvocationError = <T as Watcher>::InvocationError;
 
     type StreamError = <T as Watcher>::StreamError;
-    type Stream = BoxStream<'static, Result<WatchResponse<Self::Object>, Self::StreamError>>;
+    type Stream = BoxStream<
+        'static,
+        Result<WatchResponse<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+    >;
 
     fn watch<'a>(
         &'a mut self,

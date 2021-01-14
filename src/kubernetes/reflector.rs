@@ -5,10 +5,7 @@ use super::{
     watcher::{self, Watcher},
 };
 use crate::internal_events::kubernetes::reflector as internal_events;
-use futures::{
-    pin_mut,
-    stream::{Stream, StreamExt},
-};
+use futures::{pin_mut, stream::StreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
     Metadata, WatchOptional, WatchResponse,
@@ -77,12 +74,16 @@ where
     ) -> Result<Infallible, Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>>
     {
         // Start the watch loop.
-        loop {
+        'outer: loop {
+            // For the next pause duration we won't get any updates.
+            // This is better than flooding k8s api server with requests.
+            delay_for(self.pause_between_requests).await;
+
             let invocation_result = self.issue_request().await;
             let stream = match invocation_result {
                 Ok(val) => val,
                 Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(internal_events::DesyncReceived { error: source });
+                    emit!(internal_events::InvocationDesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
                     self.resource_version.reset();
                     self.state_writer.resync().await;
@@ -115,9 +116,27 @@ where
                 trace!(message = "Got an item from watch stream.");
 
                 if let Some(item) = val {
-                    // A new item arrived from the watch response stream
-                    // first - process it.
-                    self.process_stream_item(item).await?;
+                    let response = match item {
+                        // We got a stream-level desync error, abort the stream
+                        // and handle the desync.
+                        Err(watcher::stream::Error::Desync { source }) => {
+                            emit!(internal_events::StreamDesyncReceived { error: source });
+                            // We got desynced, reset the state and retry fetching.
+                            self.resource_version.reset();
+                            self.state_writer.resync().await;
+                            continue 'outer;
+                        }
+                        // Any other streaming error means the protocol is in
+                        // an unxpected state.
+                        // This is considered a fatal error, do not attempt
+                        // to retry and just quit.
+                        Err(watcher::stream::Error::Other { source }) => {
+                            return Err(Error::Streaming { source });
+                        }
+                        // A fine watch respose arrived, we just pass it down.
+                        Ok(val) => val,
+                    };
+                    self.process_watch_response(response).await;
                 } else {
                     // Response stream has ended.
                     // Break the watch reading loop so the flow can
@@ -125,10 +144,6 @@ where
                     break;
                 }
             }
-
-            // For the next pause duration we won't get any updates.
-            // This is better than flooding k8s api server with requests.
-            delay_for(self.pause_between_requests).await;
         }
     }
 
@@ -150,15 +165,7 @@ where
     }
 
     /// Process an item from the watch response stream.
-    async fn process_stream_item(
-        &mut self,
-        item: <<W as Watcher>::Stream as Stream>::Item,
-    ) -> Result<(), Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>> {
-        // Any streaming error means the protocol is in an unxpected
-        // state. This is considered a fatal error, do not attempt
-        // to retry and just quit.
-        let response = item.map_err(|source| Error::Streaming { source })?;
-
+    async fn process_watch_response(&mut self, response: WatchResponse<<W as Watcher>::Object>) {
         // Unpack the event.
         let event = match response {
             WatchResponse::Ok(event) => event,
@@ -171,7 +178,7 @@ where
                 // TODO: add more details on the data here if we
                 // encounter these messages in practice.
                 warn!(message = "Got unexpected data in the watch response.");
-                return Ok(());
+                return;
             }
         };
 
@@ -183,7 +190,7 @@ where
             None => {
                 // This event doesn't have a resource version, this means
                 // it's not something we care about.
-                return Ok(());
+                return;
             }
         };
 
@@ -193,8 +200,6 @@ where
         // Record the resourse version for this event, so when we resume
         // it won't be redelivered.
         self.resource_version.update(resource_version_candidate);
-
-        Ok(())
     }
 
     /// Translate received watch event to the state update.
@@ -737,7 +742,7 @@ mod tests {
 
             // Send an error to the stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Err)
+                .send(mock_watcher::ScenarioActionStream::ErrOther)
                 .await
                 .unwrap();
         });

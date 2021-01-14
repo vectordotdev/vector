@@ -17,7 +17,8 @@ pub trait Watcher {
     type StreamError: std::error::Error + Send + 'static;
 
     /// The stream type produced by the watch request.
-    type Stream: Stream<Item = Result<WatchResponse<Self::Object>, Self::StreamError>> + Send;
+    type Stream: Stream<Item = Result<WatchResponse<Self::Object>, stream::Error<Self::StreamError>>>
+        + Send;
 
     /// Issues a single watch request and returns a stream results.
     fn watch<'a>(
@@ -26,8 +27,8 @@ pub trait Watcher {
     ) -> BoxFuture<'a, Result<Self::Stream, invocation::Error<Self::InvocationError>>>;
 }
 
-pub mod invocation {
-    //! Invocation errors.
+pub mod error {
+    //! Invocation and stream errors.
     use super::*;
 
     /// Error wrapper providing a semantic wrapper around invocation errors to
@@ -70,4 +71,22 @@ pub mod invocation {
             Self::Other { source }
         }
     }
+
+    impl<T> PartialEq for Error<T>
+    where
+        T: std::error::Error + Send + 'static + PartialEq,
+    {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Error::Desync { source: a }, Error::Desync { source: b })
+                | (Error::Other { source: a }, Error::Other { source: b }) => a.eq(b),
+                _ => false,
+            }
+        }
+    }
+
+    impl<T> Eq for Error<T> where T: std::error::Error + Send + 'static + Eq {}
 }
+
+pub use error as invocation;
+pub use error as stream;

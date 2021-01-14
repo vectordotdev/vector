@@ -40,8 +40,10 @@ where
 {
     /// Return a watch response.
     Ok(WatchResponse<T>),
-    /// Return an error.
-    Err,
+    /// Return a desync error.
+    ErrDesync,
+    /// Return an "other" (i.e. non-desync) error.
+    ErrOther,
     /// Complete the stream (return `None`).
     Done,
 }
@@ -78,7 +80,10 @@ where
     type Object = T;
 
     type StreamError = StreamError;
-    type Stream = BoxStream<'static, Result<WatchResponse<Self::Object>, Self::StreamError>>;
+    type Stream = BoxStream<
+        'static,
+        Result<WatchResponse<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+    >;
 
     type InvocationError = InvocationError;
 
@@ -108,17 +113,21 @@ where
                                 ScenarioActionStream::Ok(val) => {
                                     yield val
                                 },
-                                ScenarioActionStream::Err => {
-                                    Err(StreamError)?;
+                                ScenarioActionStream::ErrDesync => {
+                                    Err(watcher::stream::Error::desync(StreamError))?;
                                     break;
                                 },
+                                ScenarioActionStream::ErrOther => {
+                                    Err(watcher::stream::Error::other(StreamError))?;
+                                    break;
+                                }
                                 ScenarioActionStream::Done => break,
                             }
                         }
                     })
                         as BoxStream<
                             'static,
-                            Result<WatchResponse<Self::Object>, Self::StreamError>,
+                            Result<WatchResponse<Self::Object>, watcher::error::Error<StreamError>>,
                         >;
                     Ok(stream)
                 }
