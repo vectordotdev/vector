@@ -71,7 +71,6 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    
     - name: vector
       port: 9000
       protocol: TCP
@@ -92,12 +91,12 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 spec:
+  type: ClusterIP
   ports:
-    
-    - name: vector
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
+  - name: vector
+    port: 9000
+    protocol: TCP
+    targetPort: 9000
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
