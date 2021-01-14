@@ -72,30 +72,21 @@ mod tests {
     #[test]
     fn get_env_var() {
         let mut state = state::Program::default();
-
-        let mut object: Value = map!["foo": "VAR1"].into();
         let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
-        let got = func.execute(&mut state, &mut object).map_err(|_| ());
-        assert_eq!(got, Err(()));
-
         std::env::set_var("VAR2", "var");
-        let mut object: Value = map!["foo": "VAR2"].into();
-        let got = func.execute(&mut state, &mut object).map_err(|_| ());
-        assert_eq!(got, Ok("var".into()));
 
-        let mut object: Value = map!["foo": "="].into();
-        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
-        let got = func.execute(&mut state, &mut object).map_err(|_| ());
-        assert_eq!(got, Err(()));
+        let cases = vec![
+            (map!["foo": "VAR1"], Err(())),
+            (map!["foo": "VAR2"], Ok("var".into())),
+            (map!["foo": "="], Err(())),
+            (map!["foo": ""], Err(())),
+            (map!["foo": "a=b"], Err(())),
+        ];
 
-        let mut object: Value = map!["foo": "a=b"].into();
-        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
-        let got = func.execute(&mut state, &mut object).map_err(|_| ());
-        assert_eq!(got, Err(()));
-
-        let mut object: Value = map!["foo": ""].into();
-        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
-        let got = func.execute(&mut state, &mut object).map_err(|_| ());
-        assert_eq!(got, Err(()));
+        for (object, expected) in cases {
+            let mut object: Value = object.into();
+            let got = func.execute(&mut state, &mut object).map_err(|_| ());
+            assert_eq!(got, expected);
+        }
     }
 }
