@@ -49,6 +49,12 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
+    // Either a script/script file can be specified or --repl, not both
+    if opts.repl && (opts.script_file.is_some() || opts.script_file.is_some()) {
+        return Err(Error::MixedArgs);
+    }
+
+    // Run the REPL if --repl is explicitly set or no script/script file is specified
     if opts.repl || (opts.script.is_none() && opts.script_file.is_none()) {
         let repl_objects = match &opts.input_file {
             Some(file) => read_into_objects(Some(file))?,
