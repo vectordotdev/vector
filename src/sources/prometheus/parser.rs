@@ -1,4 +1,4 @@
-use crate::event::metric::{self, Metric, MetricKind, MetricValue};
+use crate::event::metric::{Bucket, Metric, MetricKind, MetricValue, Quantile};
 use indexmap::IndexMap;
 use std::collections::BTreeMap;
 
@@ -6,16 +6,14 @@ pub use prometheus_parser::*;
 
 #[derive(Default)]
 struct AggregatedHistogram {
-    buckets: Vec<f64>,
-    counts: Vec<u32>,
+    buckets: Vec<Bucket>,
     count: u32,
     sum: f64,
 }
 
 #[derive(Default)]
 struct AggregatedSummary {
-    quantiles: Vec<f64>,
-    values: Vec<f64>,
+    quantiles: Vec<Quantile>,
     count: u32,
     sum: f64,
 }
@@ -86,16 +84,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         HistogramMetricValue::Bucket { bucket, count } => {
                             // last bucket is implicit, because we store its value in 'count'
                             if bucket != f64::INFINITY {
-                                aggregate.buckets.push(bucket);
-                                aggregate.counts.push(count);
+                                let upper_limit = bucket;
+                                aggregate.buckets.push(Bucket { upper_limit, count });
                             }
                         }
                     }
                 }
 
                 for (tags, mut aggregate) in aggregates {
-                    for i in (1..aggregate.counts.len()).rev() {
-                        aggregate.counts[i] -= aggregate.counts[i - 1];
+                    for i in (1..aggregate.buckets.len()).rev() {
+                        aggregate.buckets[i].count -= aggregate.buckets[i - 1].count;
                     }
                     let hist = Metric {
                         name: group.name.clone(),
@@ -104,7 +102,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
-                            buckets: metric::zip_buckets(aggregate.buckets, aggregate.counts),
+                            buckets: aggregate.buckets,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -128,8 +126,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.sum = sum;
                         }
                         SummaryMetricValue::Quantile { quantile, value } => {
-                            aggregate.quantiles.push(quantile);
-                            aggregate.values.push(value);
+                            let upper_limit = quantile;
+                            aggregate.quantiles.push(Quantile { upper_limit, value });
                         }
                     }
                 }
@@ -142,7 +140,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedSummary {
-                            quantiles: metric::zip_quantiles(aggregate.quantiles, aggregate.values),
+                            quantiles: aggregate.quantiles,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
