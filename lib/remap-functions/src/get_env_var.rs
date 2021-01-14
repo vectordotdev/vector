@@ -60,7 +60,7 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| GetEnvVarFn { name: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
 
         fallible_expression {
@@ -72,6 +72,7 @@ mod tests {
     #[test]
     fn get_env_var() {
         let mut state = state::Program::default();
+
         let mut object: Value = map!["foo": "VAR1"].into();
         let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
         let got = func.execute(&mut state, &mut object).map_err(|_| ());
@@ -81,5 +82,20 @@ mod tests {
         let mut object: Value = map!["foo": "VAR2"].into();
         let got = func.execute(&mut state, &mut object).map_err(|_| ());
         assert_eq!(got, Ok("var".into()));
+
+        let mut object: Value = map!["foo": "="].into();
+        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
+        let got = func.execute(&mut state, &mut object).map_err(|_| ());
+        assert_eq!(got, Err(()));
+
+        let mut object: Value = map!["foo": "a=b"].into();
+        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
+        let got = func.execute(&mut state, &mut object).map_err(|_| ());
+        assert_eq!(got, Err(()));
+
+        let mut object: Value = map!["foo": ""].into();
+        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
+        let got = func.execute(&mut state, &mut object).map_err(|_| ());
+        assert_eq!(got, Err(()));
     }
 }
