@@ -35,7 +35,7 @@ pub struct Opts {
     /// Open the VRL REPL. If you specify an input file, the objects in that file are passed to the
     /// REPL. If no input file is provided, a generic {"foo": "bar"} object is provided.
     #[structopt(short = "r", long)]
-    repl: bool
+    repl: bool,
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -62,7 +62,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 let mut map = BTreeMap::new();
                 map.insert("foo".into(), "bar".into());
                 vec![Value::Map(map)]
-            },
+            }
         };
 
         repl(repl_objects)
@@ -95,7 +95,7 @@ fn repl(objects: Vec<Value>) -> Result<(), Error> {
 }
 
 #[cfg(not(feature = "repl"))]
-fn repl(object: Vec<Value>) -> Result<(), Error> {
+fn repl(_: Vec<Value>) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
