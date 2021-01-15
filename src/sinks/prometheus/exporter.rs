@@ -7,11 +7,12 @@ use crate::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -44,6 +45,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+    pub tls: Option<TlsConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -57,6 +59,7 @@ impl std::default::Default for PrometheusExporterConfig {
         Self {
             default_namespace: None,
             address: default_address(),
+            tls: None,
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
             flush_period_secs: default_flush_period_secs(),
@@ -205,7 +208,7 @@ impl PrometheusExporter {
         }
     }
 
-    fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) {
         if self.server_shutdown_trigger.is_some() {
             return;
         }
@@ -256,12 +259,26 @@ impl PrometheusExporter {
 
         let (trigger, tripwire) = Tripwire::new();
 
-        let server = Server::bind(&self.config.address)
-            .serve(new_service)
-            .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
-            .map_err(|error| eprintln!("Server error: {}", error));
+        let tls = self.config.tls.clone();
+        let address = self.config.address.clone();
 
-        tokio::spawn(server);
+        tokio::spawn(async move {
+            let tls = MaybeTlsSettings::from_config(&tls, true)
+                .map_err(|error| eprintln!("Server TLS error: {}", error))?;
+            let listener = tls
+                .bind(&address)
+                .await
+                .map_err(|error| eprintln!("Server bind error: {}", error))?;
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(new_service)
+                .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .await
+                .map_err(|error| eprintln!("Server error: {}", error))?;
+
+            Ok::<(), ()>(())
+        });
+
         self.server_shutdown_trigger = Some(trigger);
     }
 }
@@ -269,7 +286,7 @@ impl PrometheusExporter {
 #[async_trait]
 impl StreamSink for PrometheusExporter {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed();
+        self.start_server_if_needed().await;
         while let Some(event) = input.next().await {
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
