@@ -10,10 +10,11 @@ remap: functions: only_fields: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["null"]
 	category: "Event"
 	description: #"""
-		Remove any fields that are *not* specified by the given paths from the root `event` object. Multiple fields can be specified.
+		Remove any fields that are *not* specified by the given `paths` from the root `event` object. Multiple fields can be specified.
 		"""#
 	examples: [
 		{

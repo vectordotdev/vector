@@ -16,11 +16,11 @@ remap: functions: round: {
 			type: ["integer"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""
-		Rounds the given number to the given number of decimal places. Rounds up or down
-		depending on which is nearest. Numbers that are half way (5) are rounded up.
+		Rounds the provided `value` to number to the specified `precision`.
 		"""#
 	examples: [
 		{

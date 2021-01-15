@@ -14,10 +14,13 @@ remap: functions: to_int: {
 			type: ["integer", "float", "boolean", "string", "timestamp"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a supported integer representation",
+	]
 	return: ["integer"]
 	category: "Coerce"
 	description: #"""
-		Returns an `integer` whose text representation is `string`.
+		Coerces the provided `value` into a `string`.
 		"""#
 	examples: [
 		{

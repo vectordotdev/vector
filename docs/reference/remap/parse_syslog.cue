@@ -7,13 +7,18 @@ remap: functions: parse_syslog: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted Syslog 5424 or 3164 formatted log",
+	]
 	return: ["map"]
 	category: "Parse"
 	description: #"""
-		Parses a syslog message. The function makes a best effort to parse the various Syslog formats out in the wild.
-		This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164], and other
-		common variations (such as the Nginx Syslog style). If parsing fails, Vector will include the entire Syslog
-		line in the message field.
+		Parses the provided `value` in Syslog format.
+
+		The function makes a best effort to parse the various Syslog formats out in the wild. This includes
+		[RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164], and other
+		common variations (such as the Nginx Syslog style). If parsing fails, Vector will include the entire
+		Syslog line in the message field.
 		"""#
 	examples: [
 		{

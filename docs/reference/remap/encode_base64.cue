@@ -16,9 +16,12 @@ remap: functions: encode_base64: {
 			default: true
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category:    "Encode"
-	description: "Encodes the provided string to [Base64](\(urls.base64))."
+	description: """
+		Encodes the provided `value` to [Base64](\(urls.base64)) using the "standard" character set (`+` and `/`).
+		"""
 	examples: [
 		{
 			title: "Encode string"

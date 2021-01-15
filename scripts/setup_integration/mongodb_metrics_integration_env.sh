@@ -39,13 +39,13 @@ start_docker () {
 }
 
 stop_podman () {
-  podman rm --force vector_mongodb_metrics1 2>/dev/null; true
+  podman rm --force vector_mongodb_metrics1 vector_mongodb_metrics2 2>/dev/null; true
   podman pod stop vector-test-integration-mongodb_metrics 2>/dev/null; true
   podman pod rm --force vector-test-integration-mongodb_metrics 2>/dev/null; true
 }
 
 stop_docker () {
-  docker rm --force vector_mongodb_metrics1 2>/dev/null; true
+  docker rm --force vector_mongodb_metrics1 vector_mongodb_metrics2 2>/dev/null; true
   docker network rm vector-test-integration-mongodb_metrics 2>/dev/null; true
 }
 

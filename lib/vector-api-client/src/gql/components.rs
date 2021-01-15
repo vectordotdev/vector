@@ -1,7 +1,7 @@
 use crate::{BoxedSubscription, QueryResult};
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
-use serde::export::Formatter;
+use std::fmt;
 
 /// Components query for returning sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -115,8 +115,8 @@ impl components_query::ComponentsQueryComponentsEdgesNodeOn {
     }
 }
 
-impl std::fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             components_query::ComponentsQueryComponentsEdgesNodeOn::Source(_) => "source",
             components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(_) => "transform",
@@ -127,10 +127,8 @@ impl std::fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeO
     }
 }
 
-impl std::fmt::Display
-    for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source => {
                 "source"
@@ -147,10 +145,10 @@ impl std::fmt::Display
     }
 }
 
-impl std::fmt::Display
+impl fmt::Display
     for component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Source => {
                 "source"
