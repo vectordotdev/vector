@@ -1623,8 +1623,8 @@
         .result.subscription_filters == [] && \
         .result.log_group == "" && \
         .result.log_stream == "" && \
-        .result.log_events == [{ "id": "", 
-                                 "timestamp": to_timestamp("2020-09-14T19:00:03.794Z"), 
+        .result.log_events == [{ "id": "",
+                                 "timestamp": to_timestamp("2020-09-14T19:00:03.794Z"),
                                  "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
       '''
 
