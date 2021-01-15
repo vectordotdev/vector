@@ -51,7 +51,6 @@ impl Expression for ParseUrlFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
             .into_fallible(true) // URL parsing error
             .with_constraint(value::Kind::Map)
     }

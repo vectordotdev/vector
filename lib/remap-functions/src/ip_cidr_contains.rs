@@ -66,12 +66,8 @@ impl Expression for IpCidrContainsFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .merge(
-                self.cidr
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Bytes),
-            )
+            .merge(self.cidr.type_def(state).into_fallible(true))
+            .into_fallible(true)
             .with_constraint(value::Kind::Boolean)
     }
 }
@@ -88,6 +84,7 @@ mod tests {
         },
         def: TypeDef {
             kind: value::Kind::Boolean,
+            fallible: true,
             ..Default::default()
         },
     }];

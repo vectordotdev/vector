@@ -550,7 +550,8 @@ check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
-check-all: check-helm-lint check-helm-dependencies check-kubernetes-yaml
+check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
+check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -595,6 +596,10 @@ check-helm-lint: ## Check that Helm charts pass helm lint
 .PHONY: check-helm-dependencies
 check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
+
+.PHONY: check-helm-snapshots
+check-helm-snapshots: ## Check that the Helm template snapshots do not diverge from the Helm charts
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh check
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
@@ -786,6 +791,10 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 .PHONY: update-helm-dependencies
 update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
+
+.PHONY: update-helm-snapshots
+update-helm-snapshots: ## Update the Helm template snapshots from the Helm charts
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh update
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs

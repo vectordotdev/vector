@@ -43,7 +43,6 @@ impl Expression for ParseJsonFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes)
             .into_fallible(true) // JSON parsing errors
             .with_constraint(
                 Kind::Bytes

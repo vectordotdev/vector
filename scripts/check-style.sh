@@ -34,6 +34,7 @@ for FILE in $(git ls-files); do
     *sig) continue;;
     tests/data*) continue;;
     distribution/kubernetes/*/*.yaml) continue;;
+    tests/helm-snapshots/*/snapshot.yaml) continue;;
   esac
 
   # Skip all directories (usually theis only happens when we have symlinks).

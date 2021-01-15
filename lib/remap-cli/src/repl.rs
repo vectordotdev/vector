@@ -1,5 +1,8 @@
 use crate::Error;
+use prettytable::{format, Cell, Row, Table};
+use regex::Regex;
 use remap::{state, Object, Program, Runtime, Value};
+use remap_functions::all as funcs;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
@@ -8,22 +11,28 @@ use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Vali
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
-const HELP_TEXT: &str = "
+const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  next      Load the next object or create a new one
-  prev      Load the previous object
-  exit      Terminate the program
-";
+  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+  help docs         Navigate to the VRL docs on the Vector website
+  help docs <func>  Navigate to the VRL docs for the specified function
+  next              Load the next object or create a new one
+  prev              Load the previous object
+  exit              Terminate the program
+"#;
+
+const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
+    let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
     println!(
-        "
+        r#"
 > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
 > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
 > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
@@ -50,22 +59,29 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 >
 > To run the CLI in regular mode, add a program to your command.
 >
-> Type `help` to learn more.
->      `next` to either load the next object or create a new one.
->      `prev` to load the previous object.
->      `exit` to terminate the program.
+> VRL REPL commands:
+>   help              Learn more about VRL
+>   next              Load the next object or create a new one
+>   prev              Load the previous object
+>   exit              Terminate the program
 >
-> Any other value is resolved to a TRL expression.
+> Any other value is resolved to a VRL expression.
 >
-> Try it out now by typing `.` and hitting [enter] to see the result.\n"
+> Try it out now by typing `.` and hitting [enter] to see the result.
+"#
     );
 
     loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
+            Ok(line) if line == "exit" || line == "quit" => break,
             Ok(line) if line == "help" => print_help_text(),
-            Ok(line) if line == "exit" => break,
-            Ok(line) if line == "quit" => break,
+            Ok(line) if line == "help functions" || line == "help funcs" || line == "help fs" => {
+                print_function_list()
+            }
+            Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help docs <func_name>"
+            Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
                 rl.add_history_entry(line);
 
@@ -209,6 +225,59 @@ impl Validator for Repl {
     }
 }
 
+fn print_function_list() {
+    let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
+    let all_funcs = remap_functions::all();
+
+    let num_columns = 3;
+
+    let mut func_table = Table::new();
+    func_table.set_format(table_format);
+    all_funcs
+        .chunks(num_columns)
+        .map(|funcs| {
+            // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
+            // values when num_columns is 3. And so this logic below is necessary to avoid panics
+            // caused by inappropriately calling funcs.get(_) on a None.
+            let mut ids: Vec<Cell> = Vec::new();
+
+            for n in 0..num_columns {
+                if let Some(v) = funcs.get(n) {
+                    ids.push(Cell::new(v.identifier()));
+                }
+            }
+
+            func_table.add_row(Row::new(ids));
+        })
+        .for_each(drop);
+
+    func_table.printstd();
+}
+
 fn print_help_text() {
     println!("{}", HELP_TEXT);
+}
+
+fn open_url(url: &str) {
+    if let Err(err) = webbrowser::open(url) {
+        println!(
+            "couldn't open default web browser: {}\n\
+            you can access the desired documentation at {}",
+            err, url
+        );
+    }
+}
+
+fn show_func_docs(line: &str, pattern: &Regex) {
+    // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
+    // "help docs <func_name>")
+    let matches = pattern.captures(line).unwrap();
+    let func_name = matches.get(1).unwrap().as_str();
+
+    if funcs().iter().any(|f| f.identifier() == func_name) {
+        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        open_url(&func_url);
+    } else {
+        println!("function name {} not recognized", func_name);
+    }
 }
