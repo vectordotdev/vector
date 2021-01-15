@@ -1,0 +1,38 @@
+kubernetesLogsSource:
+  config:
+    option1: value1
+    option2: value2
+  rawConfig: |-
+    arbitrary text 1
+
+vectorSink:
+  enabled: true
+  inputs: ["my_input_1", "my_input_2"]
+  host: "vector.internal"
+  port: 9000
+  config:
+    option1: value1
+    option2: value2
+  rawConfig: |-
+    arbitrary text 1
+
+internalMetricsSource:
+  config:
+    option1: value1
+    option2: value2
+  rawConfig: |-
+    arbitrary text 1
+
+hostMetricsSource:
+  config:
+    option1: value1
+    option2: value2
+  rawConfig: |-
+    arbitrary text 1
+
+prometheusSink:
+  config:
+    option1: value1
+    option2: value2
+  rawConfig: |-
+    arbitrary text 1
