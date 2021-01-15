@@ -195,28 +195,28 @@ mod test {
         encode_base64 => EncodeBase64;
 
         with_defaults {
-            args: func_args![value: value!("some string value")],
-            want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU=")),
+            args: func_args![value: value!("some+=string/value")],
+            want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
         }
 
         with_padding_standard_charset {
-            args: func_args![value: value!("some string value"), padding: value!(true), charset: value!("standard")],
-            want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU=")),
+            args: func_args![value: value!("some+=string/value"), padding: value!(true), charset: value!("standard")],
+            want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
         }
 
         no_padding_standard_charset {
-            args: func_args![value: value!("some+string+value"), padding: value!(false), charset: value!("standard")],
-            want: Ok(value!("c29tZStzdHJpbmcrdmFsdWU")),
-        }
-
-        no_padding_urlsafe_charset {
-            args: func_args![value: value!("some+string+value"), padding: value!(false), charset: value!("url_safe")],
-            want: Ok(value!("c29tZStzdHJpbmcrdmFsdWU")),
+            args: func_args![value: value!("some+=string/value"), padding: value!(false), charset: value!("standard")],
+            want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
         }
 
         with_padding_urlsafe_charset {
-            args: func_args![value: value!("foo+bar+baz"), padding: value!(false), charset: value!("url_safe")],
-            want: Ok(value!("Zm9vK2JhcitiYXo")),
+            args: func_args![value: value!("some+=string/value"), padding: value!(true), charset: value!("url_safe")],
+            want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+        }
+
+        no_padding_urlsafe_charset {
+            args: func_args![value: value!("some+=string/value"), padding: value!(false), charset: value!("url_safe")],
+            want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
         }
 
         empty_string_standard_charset {
