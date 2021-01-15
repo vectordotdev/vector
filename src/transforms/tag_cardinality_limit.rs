@@ -9,12 +9,14 @@ use crate::{
     Event,
 };
 use bloom::{BloomFilter, ASMS};
-use futures01::Stream as Stream01;
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
+    fmt,
+    future::ready,
+    pin::Pin,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -116,8 +118,8 @@ enum TagValueSetStorage {
     Bloom(BloomFilter),
 }
 
-impl std::fmt::Debug for TagValueSetStorage {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for TagValueSetStorage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
             TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
@@ -255,13 +257,13 @@ impl TagCardinalityLimit {
 impl TaskTransform for TagCardinalityLimit {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
     }
 }
 
