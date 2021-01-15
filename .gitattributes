@@ -5,3 +5,5 @@ scripts/* linguist-detectable=false
 Makefile linguist-detectable=false
 
 distribution/helm/*/charts/*.tgz filter=lfs diff=lfs merge=lfs -text
+
+tests/helm-snapshots/**/snapshot.yaml linguist-generated=true
