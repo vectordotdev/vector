@@ -1006,6 +1006,10 @@ mod tests {
                 expected_invocation_response,
             ) in invocations
             {
+                // Advance the time to scroll pass the delay between
+                // the invocations.
+                tokio::time::advance(pause_between_requests * 2).await;
+
                 // Wait for watcher to request next invocation.
                 let invocation_event = watcher_events_rx.next().await.unwrap();
 
@@ -1093,10 +1097,6 @@ mod tests {
                     .send(mock_watcher::ScenarioActionStream::Done)
                     .await
                     .unwrap();
-
-                // Advance the time to scroll pass the delay till next
-                // invocation.
-                tokio::time::advance(pause_between_requests * 2).await;
             }
 
             // We're done with the test! Shutdown the stream and force an
