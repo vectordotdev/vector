@@ -1,18 +1,123 @@
-use crate::{
-    expression::if_statement,
-    parser,
-    value::{self, Kind},
-};
+use crate::value::Kind;
 use codespan_reporting::diagnostic;
 use std::fmt;
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range, RangeInclusive};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
-    pub(crate) severity: Severity,
-    pub(crate) message: Message,
-    pub(crate) labels: Vec<Label>,
-    pub(crate) notes: Vec<Note>,
+    severity: Severity,
+    message: String,
+    labels: Vec<Label>,
+    notes: Vec<Note>,
+}
+
+impl Diagnostic {
+    pub fn error(message: impl ToString) -> Self {
+        Self::new(Severity::Error, message, vec![], vec![])
+    }
+
+    pub fn bug(message: impl ToString) -> Self {
+        Self::new(Severity::Bug, message, vec![], vec![])
+    }
+
+    pub fn new(
+        severity: Severity,
+        message: impl ToString,
+        labels: Vec<Label>,
+        notes: Vec<Note>,
+    ) -> Self {
+        Self {
+            severity,
+            message: message.to_string(),
+            labels,
+            notes,
+        }
+    }
+
+    pub fn with_label(mut self, label: Label) -> Self {
+        self.labels.push(label);
+        self
+    }
+
+    pub fn with_primary(mut self, message: impl ToString, span: impl Into<Span>) -> Self {
+        self.labels.push(Label::primary(message, span.into()));
+        self
+    }
+
+    pub fn with_context(mut self, message: impl ToString, span: impl Into<Span>) -> Self {
+        self.labels.push(Label::context(message, span.into()));
+        self
+    }
+
+    pub fn with_note(mut self, note: Note) -> Self {
+        self.notes.push(note);
+        self
+    }
+
+    pub fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn notes(&self) -> &[Note] {
+        &self.notes
+    }
+
+    pub fn labels(&self) -> &[Label] {
+        &self.labels
+    }
+
+    /// Returns `true` if the diagnostic represents either an
+    /// [error](Variant::Error) or [bug](Variant::Bug).
+    #[inline]
+    pub fn is_problem(&self) -> bool {
+        self.severity.is_error() || self.severity.is_bug()
+    }
+
+    /// Returns `true` if the diagnostic represents a [bug](Variant::Bug).
+    #[inline]
+    pub fn is_bug(&self) -> bool {
+        self.severity.is_bug()
+    }
+
+    /// Returns `true` if the diagnostic represents an [error](Variant::Error).
+    #[inline]
+    pub fn is_error(&self) -> bool {
+        self.severity.is_error()
+    }
+
+    /// Returns `true` if the diagnostic represents a
+    /// [warning](Variant::Warning).
+    #[inline]
+    pub fn is_warning(&self) -> bool {
+        self.severity.is_warning()
+    }
+
+    /// Returns `true` if the diagnostic represents a [note](Variant::Note).
+    #[inline]
+    pub fn is_note(&self) -> bool {
+        self.severity.is_note()
+    }
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use codespan_reporting::files::SimpleFile;
+        use codespan_reporting::term;
+        use std::str::from_utf8;
+        use termcolor::Buffer;
+
+        let file = SimpleFile::new("", "");
+        let config = term::Config::default();
+        let mut buffer = Buffer::no_color();
+
+        term::emit(&mut buffer, &config, &file, &self.clone().into()).map_err(|_| fmt::Error)?;
+
+        f.write_str(from_utf8(buffer.as_slice()).map_err(|_| fmt::Error)?)
+    }
 }
 
 impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
@@ -30,42 +135,134 @@ impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
     }
 }
 
-impl From<&parser::Error> for Diagnostic {
-    fn from(err: &parser::Error) -> Self {
-        use parser::Variant::*;
+// -----------------------------------------------------------------------------
 
-        let span = err.span();
-        match err.variant() {
-            RegexAssignment => {}
-            RegexResult => {}
-            VariableAssignmentPath(_var, _path) => {}
-            Regex(_err) => {}
-            Pest(_err) => {}
-            Rule(_rule) => {}
-            IfStatement(err) => match err {
-                if_statement::Error::Conditional(err) => match err {
-                    value::Error::Expected(want, got) => {
-                        return Diagnostic {
-                            severity: Severity::Error,
-                            message: Message::IfConditionType,
-                            labels: vec![
-                                Label::primary(LabelMessage::GotKind(*got), span.into()),
-                                Label::context(LabelMessage::ExpectedKind(*want), span.into()),
-                            ],
-                            notes: vec![Note::CoerceValue],
-                        }
-                    }
-                    _err => {}
-                },
-            },
-        };
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DiagnosticList(Vec<Diagnostic>);
 
-        Diagnostic {
-            severity: Severity::Error,
-            message: Message::Parse,
-            labels: vec![],
-            notes: vec![],
+impl Deref for DiagnosticList {
+    type Target = Vec<Diagnostic>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for DiagnosticList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for DiagnosticList {
+    type Item = Diagnostic;
+    type IntoIter = std::vec::IntoIter<Diagnostic>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl DiagnosticList {
+    /// Returns `true` if there are any errors or bugs in the parsed source.
+    pub fn is_err(&self) -> bool {
+        self.0.iter().any(|d| d.is_problem())
+    }
+
+    /// Returns the list of bug-level diagnostics.
+    pub fn bugs(&self) -> Vec<&Diagnostic> {
+        self.0.iter().filter(|d| d.is_bug()).collect()
+    }
+
+    /// Returns the list of error-level diagnostics.
+    pub fn errors(&self) -> Vec<&Diagnostic> {
+        self.0.iter().filter(|d| d.is_error()).collect()
+    }
+
+    /// Returns the list of warning-level diagnostics.
+    pub fn warnings(&self) -> Vec<&Diagnostic> {
+        self.0.iter().filter(|d| d.is_warning()).collect()
+    }
+
+    /// Returns the list of note-level diagnostics.
+    pub fn notes(&self) -> Vec<&Diagnostic> {
+        self.0.iter().filter(|d| d.is_note()).collect()
+    }
+
+    /// Returns `true` if there are any bug diagnostics.
+    pub fn has_bugs(&self) -> bool {
+        self.0.iter().any(|d| d.is_bug())
+    }
+
+    /// Returns `true` if there are any error diagnostics.
+    pub fn has_errors(&self) -> bool {
+        self.0.iter().any(|d| d.is_error())
+    }
+
+    /// Returns `true` if there are any warning diagnostics.
+    pub fn has_warnings(&self) -> bool {
+        self.0.iter().any(|d| d.is_warning())
+    }
+
+    /// Returns `true` if there are any note diagnostics.
+    pub fn has_notes(&self) -> bool {
+        self.0.iter().any(|d| d.is_note())
+    }
+}
+
+impl From<Vec<Diagnostic>> for DiagnosticList {
+    fn from(diagnostics: Vec<Diagnostic>) -> Self {
+        Self(diagnostics)
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+/// A span pointing into the program source.
+///
+/// This exists because `Range` doesn't implement `Copy` and to make it easy to
+/// convert other types into spans.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl Span {
+    pub fn new(start: usize, end: usize) -> Self {
+        Span { start, end }
+    }
+}
+
+impl From<Span> for Range<usize> {
+    fn from(span: Span) -> Self {
+        span.start..span.end
+    }
+}
+
+impl From<Range<usize>> for Span {
+    fn from(range: Range<usize>) -> Self {
+        Span {
+            start: range.start,
+            end: range.end,
         }
+    }
+}
+
+impl From<RangeInclusive<usize>> for Span {
+    fn from(range: RangeInclusive<usize>) -> Self {
+        let (start, end) = range.into_inner();
+
+        Span {
+            start,
+            end: end + 1,
+        }
+    }
+}
+
+impl From<&str> for Span {
+    fn from(source: &str) -> Self {
+        (0..source.bytes().len().saturating_sub(1)).into()
     }
 }
 
@@ -77,6 +274,32 @@ pub enum Severity {
     Error,
     Warning,
     Note,
+}
+
+impl Severity {
+    /// Returns `true` if the severity is a [bug](Variant::Bug).
+    #[inline]
+    pub fn is_bug(self) -> bool {
+        matches!(self, Severity::Bug)
+    }
+
+    /// Returns `true` if the severity is an [error](Variant::Error).
+    #[inline]
+    pub fn is_error(self) -> bool {
+        matches!(self, Severity::Error)
+    }
+
+    /// Returns `true` if the severity is a [warning](Variant::Warning).
+    #[inline]
+    pub fn is_warning(self) -> bool {
+        matches!(self, Severity::Warning)
+    }
+
+    /// Returns `true` if the severity is a [note](Variant::Note).
+    #[inline]
+    pub fn is_note(self) -> bool {
+        matches!(self, Severity::Note)
+    }
 }
 
 impl Into<diagnostic::Severity> for Severity {
@@ -94,52 +317,15 @@ impl Into<diagnostic::Severity> for Severity {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Message {
-    Parse,
-    Fallible,
-    ReturnValue,
-    IfConditionType,
-}
-
-impl fmt::Display for Message {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Message::*;
-
-        match self {
-            Parse => f.write_str("parse error"),
-            Fallible => f.write_str("uncaught error"),
-            ReturnValue => f.write_str("unexpected return value"),
-            IfConditionType => f.write_str("invalid if-condition type"),
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum LabelMessage {
-    GotKind(Kind),
-    ExpectedKind(Kind),
-}
-
-impl fmt::Display for LabelMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use LabelMessage::*;
-
-        match self {
-            GotKind(kind) => write!(f, "got: {}", kind),
-            ExpectedKind(kind) => write!(f, "expected: {}", kind),
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Note {
     ExpectedKind(Kind),
     CoerceValue,
+    InfallibleAssignment {
+        ok: String,
+        err: String,
+    },
+    SeeErrDocs,
 
     #[doc(hidden)]
     SeeLangDocs,
@@ -154,6 +340,14 @@ impl fmt::Display for Note {
             CoerceValue => {
                 f.write_str("hint: coerce the value using one of the coercion functions")
             }
+            InfallibleAssignment { ok, err } => {
+                write!(
+                    f,
+                    r#"hint: assign to "{}", without assigning to "{}""#,
+                    ok, err
+                )
+            }
+            SeeErrDocs => f.write_str("see error handling documentation at: https://vector.dev"),
             SeeLangDocs => f.write_str("see language documentation at: https://vector.dev"),
         }
     }
@@ -161,27 +355,27 @@ impl fmt::Display for Note {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Label {
-    pub message: LabelMessage,
+    pub message: String,
     pub primary: bool,
-    pub range: (usize, usize),
+    pub span: Span,
 }
 
 impl Label {
-    pub fn primary(message: LabelMessage, range: Range<usize>) -> Self {
+    pub fn primary(message: impl ToString, span: impl Into<Span>) -> Self {
         Self {
-            message,
+            message: message.to_string(),
             primary: true,
-            range: (range.start, range.end),
+            span: span.into(),
         }
     }
 
-    pub fn context(message: LabelMessage, range: Range<usize>) -> Self {
+    pub fn context(message: impl ToString, span: impl Into<Span>) -> Self {
         Self {
-            message,
+            message: message.to_string(),
             primary: false,
-            range: (range.start, range.end),
+            span: span.into(),
         }
     }
 }
@@ -196,7 +390,7 @@ impl Into<diagnostic::Label<()>> for Label {
         diagnostic::Label {
             style,
             file_id: (),
-            range: self.range.0..self.range.1,
+            range: self.span.into(),
             message: self.message.to_string(),
         }
     }

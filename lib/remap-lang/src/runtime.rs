@@ -21,9 +21,12 @@ impl Runtime {
         let mut values = program
             .expressions
             .iter()
-            .map(|expression| expression.execute(&mut self.state, object))
-            .collect::<crate::Result<Vec<Value>>>()
-            .map_err(|err| RuntimeError::from((program.source, err)))?;
+            .map(|expr| {
+                expr.execute(&mut self.state, object)
+                    .map_err(|err| (expr, err))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|(expr, err)| RuntimeError::from((program.source, expr, err)))?;
 
         Ok(values.pop().unwrap_or(Value::Null))
     }

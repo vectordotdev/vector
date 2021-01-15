@@ -2,10 +2,10 @@
 # result: 
 #
 # error: invalid if-condition type
-#   ┌─ <source>:2:4
+#   ┌─ :2:4
 #   │
 # 2 │ if "nope" {
-#   │    ^^^^^^^
+#   │    ^^^^^^
 #   │    │
 #   │    got: string
 #   │    expected: boolean

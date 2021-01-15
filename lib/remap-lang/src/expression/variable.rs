@@ -2,6 +2,7 @@ use crate::{
     expression::{path, Error as ExprErr, Path},
     state, Error as E, Expression, Object, Result, TypeDef, Value,
 };
+use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -16,6 +17,18 @@ pub enum Error {
 pub struct Variable {
     ident: String,
     path: Option<Path>,
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.ident)?;
+
+        if let Some(path) = &self.path {
+            path.fmt(f)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Variable {

@@ -1,4 +1,4 @@
-use crate::parser::Parser;
+use crate::{parser::Parser, state, Diagnostic};
 use std::fmt;
 use std::str::FromStr;
 
@@ -8,11 +8,11 @@ pub enum Error {
     Alternative(String),
 
     #[error("unable to parse path")]
-    Parse(#[from] crate::parser::Error),
+    Parse(String),
 }
 
 /// Provide easy access to individual [`Segment`]s of a path.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 pub struct Path {
     segments: Vec<Segment>,
 }
@@ -26,12 +26,31 @@ impl FromStr for Path {
     /// This function fails if the provided path is invalid, as defined by the
     /// parser grammar.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parser = Parser::default();
+        let mut state = state::Compiler::default();
+        let parser = Parser::new(&[], &mut state, false);
         if s.starts_with('.') {
-            parser.path_from_str(s).map_err(Into::into)
+            parser
+                .path_from_str(s)
+                .map(|(path, _)| path)
+                .map_err(|mut diagnostics| {
+                    let err = diagnostics
+                        .pop()
+                        .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
+
+                    Error::Parse(err.to_string())
+                })
         } else {
             let s = format!(".{}", s);
-            parser.path_from_str(&s).map_err(Into::into)
+            parser
+                .path_from_str(&s)
+                .map(|(path, _)| path)
+                .map_err(|mut diagnostics| {
+                    let err = diagnostics
+                        .pop()
+                        .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
+
+                    Error::Parse(err.to_string())
+                })
         }
     }
 }
@@ -284,9 +303,17 @@ impl FromStr for Field {
     /// This function fails if the provided path is invalid, as defined by the
     /// parser grammar.
     fn from_str(field: &str) -> Result<Self, Self::Err> {
-        Parser::default()
+        let mut state = state::Compiler::default();
+        Parser::new(&[], &mut state, false)
             .path_field_from_str(field)
-            .map_err(Into::into)
+            .map(|(field, _)| field)
+            .map_err(|mut diagnostics| {
+                let err = diagnostics
+                    .pop()
+                    .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
+
+                Error::Parse(err.to_string())
+            })
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::error::ProgramError;
 use crate::{
-    parser::{self, Parser},
-    value, Expr, Expression, Function, TypeDef,
+    parser::{self, ParsedExpression, Parser},
+    state, value, Diagnostic, DiagnosticList, Expression, Function, TypeDef,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -45,7 +45,12 @@ pub struct TypeConstraint {
 #[derive(Debug, Clone)]
 pub struct Program<'a> {
     pub(crate) source: &'a str,
-    pub(crate) expressions: Vec<Expr>,
+    pub(crate) expressions: Vec<ParsedExpression>,
+
+    /// A list of diagnostic messages.
+    ///
+    /// This can include errors, warnings, or notices.
+    pub(crate) diagnostics: DiagnosticList,
 }
 
 impl<'a> Program<'a> {
@@ -55,17 +60,18 @@ impl<'a> Program<'a> {
         constraint: Option<TypeConstraint>,
         allow_regex_return: bool, // TODO: move this into a builder pattern
     ) -> Result<Self, ProgramError<'a>> {
-        let mut parser = Parser::new(function_definitions, allow_regex_return);
+        let mut state = state::Compiler::default();
+        let parser = Parser::new(function_definitions, &mut state, allow_regex_return);
 
-        let expressions = parser
+        let (expressions, mut diagnostics) = parser
             .program_from_str(source)
-            .map_err(|err| (source, Error::Parse(err)))?;
+            .map_err(|diagnostics| (source, diagnostics))?;
 
         // optional type constraint checking
         if let Some(constraint) = constraint {
             let mut type_defs = expressions
                 .iter()
-                .map(|e| e.type_def(&parser.compiler_state))
+                .map(|e| e.type_def(&state))
                 .collect::<Vec<_>>();
 
             let program_def = type_defs.pop().unwrap_or(TypeDef {
@@ -80,24 +86,42 @@ impl<'a> Program<'a> {
                 let want = constraint.type_def.kind;
                 let got = program_def.kind;
 
-                return Err((source, Error::ReturnValue { want, got }).into());
-            }
+                let span = expressions.last().map(|e| e.span()).unwrap_or_default();
 
-            if !constraint.type_def.is_fallible() && type_defs.iter().any(TypeDef::is_fallible) {
-                return Err((source, Error::Fallible).into());
+                diagnostics.push(
+                    Diagnostic::error("unexpected return value")
+                        .with_primary(format!("got: {}", got), span)
+                        .with_context(format!("expected: {}", want), span),
+                );
             }
         }
 
-        let expressions = expressions
-            .into_inner()
-            .into_iter()
-            .map(|node| node.into_inner())
-            .collect();
+        // TODO: this should point to the exact expression that is fallible,
+        // not the entire root expression.
+        expressions
+            .iter()
+            .filter(|e| !e.type_def(&state).is_fallible())
+            .for_each(|e| {
+                diagnostics.push(
+                    Diagnostic::error("uncaught error")
+                        .with_primary("expression can result in runtime error", e.span())
+                        .with_context("capture the error to guarantee runtime success", e.span()),
+                )
+            });
 
         Ok(Self {
             source,
             expressions,
+            diagnostics,
         })
+    }
+
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    pub fn expressions(&self) -> &[ParsedExpression] {
+        &self.expressions
     }
 }
 

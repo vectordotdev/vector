@@ -36,10 +36,6 @@ fn main() {
 
                         if got == want {
                             println!("{}", Colour::Green.bold().paint("OK"));
-
-                            if verbose {
-                                println!("{:#}", value);
-                            }
                         } else {
                             println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
 
@@ -49,18 +45,26 @@ fn main() {
 
                             failed_count += 1;
                         }
+
+                        if verbose {
+                            println!("{:#}", value);
+                        }
                     }
                     Err(err) => {
-                        let got = err.to_string();
+                        let got = err.to_string().trim().to_owned();
+                        let want = want.trim().to_owned();
+
                         if got == want {
                             println!("{}", Colour::Green.bold().paint("OK"));
-
-                            if verbose {
-                                println!("{:#}", err);
-                            }
                         } else {
                             println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
-                            println!("{}", err);
+
+                            let diff = prettydiff::diff_lines(&want, &got);
+                            println!("{}", diff);
+                        }
+
+                        if verbose {
+                            println!("{:#}", err);
                         }
                     }
                 }
@@ -68,17 +72,18 @@ fn main() {
             Err(err) => {
                 let got = err.to_string().trim().to_owned();
                 let want = want.trim().to_owned();
+
                 if got == want {
                     println!("{}", Colour::Green.bold().paint("OK"));
-
-                    if verbose {
-                        println!("{:#}", err);
-                    }
                 } else {
                     println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
 
                     let diff = prettydiff::diff_lines(&want, &got);
                     println!("{}", diff);
+                }
+
+                if verbose {
+                    println!("{:#}", err);
                 }
             }
         }

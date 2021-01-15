@@ -1,40 +1,185 @@
 #![allow(clippy::or_fun_call)]
 
 use crate::{
+    diagnostic::{Diagnostic, DiagnosticList, Label, Note, Span},
     expression::{
-        self,
+        self, function,
         if_statement::{self, IfCondition},
         Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Map, Noop, Not, Path,
         Target, Variable,
     },
-    path, state, Expr, Expression, Function as Fn, Operator, Value,
+    path, state, value, Expr, Expression, Function as Fn, Operator, Value,
 };
-use pest::error::{Error as PestError, InputLocation};
+use pest::error::InputLocation;
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
 use std::collections::BTreeMap;
 use std::fmt;
-use std::ops::{Deref, DerefMut, Range};
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-type R = Rule;
-type Result<T> = std::result::Result<ParsedNode<T>, Error>;
+pub(crate) type R = Rule;
+type IResult<T> = Result<ParsedNode<T>, ParserBug>;
+type PestError = pest::error::Error<R>;
+pub type ParseResult<T> = Result<(T, DiagnosticList), DiagnosticList>;
 
-#[derive(pest_derive::Parser, Default)]
+#[derive(pest_derive::Parser)]
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
     pub allow_regex_return: bool,
-    pub compiler_state: state::Compiler,
+    pub compiler_state: &'a mut state::Compiler,
+
+    /// This field keeps track of the *recoverable* errors the parser
+    /// encountered while parsing a program source.
+    ///
+    /// If the parser can continue after an error occurs, it is collected in
+    /// this field. If a *fatal* error is encountered, the parses tries to move
+    /// on to the next expression and records the failed expression as a
+    /// `ParserBug`.
+    ///
+    /// The field is added to the `ParseError` return value once parsing is
+    /// finished.
+    ///
+    /// All parsing functions take `self` such that this state cannot leak into
+    /// subsequent parsing calls.
+    diagnostics: DiagnosticList,
+}
+
+impl<'a> From<&Pair<'a, R>> for Span {
+    fn from(pair: &Pair<R>) -> Self {
+        pair.as_span().into()
+    }
+}
+
+impl From<pest::Span<'_>> for Span {
+    fn from(span: pest::Span) -> Self {
+        (span.start()..span.end()).into()
+    }
+}
+
+impl From<PestError> for Diagnostic {
+    fn from(err: PestError) -> Self {
+        let msg = "syntax error";
+
+        let span = match err.location {
+            InputLocation::Pos(start) => start..start,
+            InputLocation::Span((start, end)) => start..end,
+        };
+
+        let label = Label::primary("invalid token", span.clone());
+
+        match err.variant {
+            pest::error::ErrorVariant::ParsingError {
+                positives,
+                negatives,
+            } => {
+                let expected = if positives.len() == 1 {
+                    Label::context(format!("expected: {}", positives[0]), span.clone())
+                } else {
+                    Label::context(
+                        format!(
+                            "expected one of: {}",
+                            positives
+                                .iter()
+                                .map(|r| r.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        span.clone(),
+                    )
+                };
+
+                let unexpected = Label::primary(
+                    format!(
+                        "unexpected: {}",
+                        negatives
+                            .iter()
+                            .map(|r| r.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    span.clone(),
+                );
+
+                match () {
+                    _ if !positives.is_empty() => Diagnostic::error(msg)
+                        .with_label(label)
+                        .with_label(expected),
+                    _ if !negatives.is_empty() => Diagnostic::error(msg)
+                        .with_label(label)
+                        .with_label(unexpected),
+                    _ => Diagnostic::error(msg).with_primary("unexpected token", span.clone()),
+                }
+            }
+            pest::error::ErrorVariant::CustomError { message } => {
+                Diagnostic::error(msg).with_primary(message, span)
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-/// A container type that wraps a type `T` and adds the span pointing to the
-/// relevant position within the source where this type is referenced.
+/// A non-recoverable error raised by the parser.
 ///
-/// This is used in error-reporting to be able to show the expression that
-/// caused the error.
+/// The parser tries to recover the next expression it tries to parse, if
+/// possible.
+pub(crate) struct ParserBug(Span, R);
+
+impl From<ParserBug> for Diagnostic {
+    fn from(err: ParserBug) -> Self {
+        Diagnostic::bug("unexpected token").with_primary(err.1.to_string(), err.0)
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+/// A container type that wraps an [`Expression`] and adds a span pointing to
+/// the expression position within the parsed source.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParsedExpression {
+    span: Span,
+    expr: Expr,
+}
+
+impl ParsedExpression {
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    pub fn into_expression(self) -> Expr {
+        self.expr
+    }
+}
+
+impl Deref for ParsedExpression {
+    type Target = Expr;
+
+    fn deref(&self) -> &Self::Target {
+        &self.expr
+    }
+}
+
+impl DerefMut for ParsedExpression {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.expr
+    }
+}
+
+impl<T: Into<Expr>> From<ParsedNode<T>> for ParsedExpression {
+    fn from(node: ParsedNode<T>) -> Self {
+        Self {
+            span: node.span,
+            expr: node.inner.into(),
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+/// Similar to [`ParsedExpression`] except that it is private, generic over `T`
+/// and has an expanded API used within the parser.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ParsedNode<T> {
     span: Span,
@@ -77,62 +222,12 @@ impl<T> ParsedNode<T> {
     }
 }
 
-impl<T, U: Into<T>> From<(Span, U)> for ParsedNode<T> {
-    fn from((span, node): (Span, U)) -> Self {
+impl<T, U: Into<T>, S: Into<Span>> From<(S, U)> for ParsedNode<T> {
+    fn from((span, node): (S, U)) -> Self {
         Self {
-            span,
+            span: span.into(),
             inner: node.into(),
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-/// A span pointing into the program source.
-///
-/// This exists because `Range` doesn't implement `Copy`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
-
-impl Span {
-    pub fn new(start: usize, end: usize) -> Self {
-        Span { start, end }
-    }
-}
-
-impl From<Span> for Range<usize> {
-    fn from(span: Span) -> Self {
-        span.start..span.end
-    }
-}
-
-impl From<Range<usize>> for Span {
-    fn from(range: Range<usize>) -> Self {
-        Span {
-            start: range.start,
-            end: range.end,
-        }
-    }
-}
-
-impl<'a> From<&Pair<'a, R>> for Span {
-    fn from(pair: &Pair<R>) -> Self {
-        pair.as_span().into()
-    }
-}
-
-impl From<pest::Span<'_>> for Span {
-    fn from(span: pest::Span) -> Self {
-        (span.start()..span.end()).into()
-    }
-}
-
-impl From<&str> for Span {
-    fn from(source: &str) -> Self {
-        (0..source.bytes().len()).into()
     }
 }
 
@@ -154,10 +249,6 @@ impl Error {
     pub fn variant(&self) -> &Variant {
         &self.variant
     }
-
-    fn new(span: Span, variant: Variant) -> Self {
-        Self { span, variant }
-    }
 }
 
 impl std::error::Error for Error {
@@ -172,8 +263,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl From<PestError<R>> for Error {
-    fn from(error: PestError<R>) -> Self {
+impl From<PestError> for Error {
+    fn from(error: PestError) -> Self {
         let span = match error.location {
             InputLocation::Pos(start) => start..start,
             InputLocation::Span((start, end)) => start..end,
@@ -210,13 +301,25 @@ pub enum Variant {
     Regex(#[from] regex::Error),
 
     #[error(transparent)]
-    Pest(PestError<R>),
+    Pest(PestError),
 
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
 
     #[error("invalid if-statement")]
     IfStatement(#[from] if_statement::Error),
+
+    #[error("function error")]
+    Function {
+        ident: String,
+        source: function::Error,
+    },
+}
+
+impl From<(String, function::Error)> for Variant {
+    fn from((ident, source): (String, function::Error)) -> Self {
+        Variant::Function { ident, source }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -226,12 +329,12 @@ macro_rules! operation_fns {
     (@impl $($rule:tt => { op: [$head_op:path, $($tail_op:path),+ $(,)?], next: $next:tt, })+) => (
         $(
             paste::paste! {
-                fn [<$rule _from_pair>](&mut self, pair: Pair<R>) -> Result<Expr> {
+                fn [<$rule _from_pair>](&mut self, pair: Pair<R>) -> IResult<Expr> {
                     let span = Span::from(&pair);
                     let mut pairs = pair.into_inner();
 
                     let next = pairs.next().ok_or(e(R::$rule, span))?;
-                    let mut lhs = self.[<$next _from_pair>](next)?.into_inner();
+                    let (span, mut lhs) = self.[<$next _from_pair>](next)?.take();
                     let mut op = Operator::$head_op;
 
                     for pair in pairs {
@@ -261,32 +364,59 @@ macro_rules! operation_fns {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(function_definitions: &'a [Box<dyn Fn>], allow_regex_return: bool) -> Self {
+    pub fn new(
+        function_definitions: &'a [Box<dyn Fn>],
+        compiler_state: &'a mut state::Compiler,
+        allow_regex_return: bool,
+    ) -> Self {
         Self {
             function_definitions,
             allow_regex_return,
-            ..Default::default()
+            compiler_state,
+            diagnostics: DiagnosticList::default(),
         }
     }
 
-    pub(crate) fn program_from_str(&mut self, source: &'a str) -> Result<Vec<ParsedNode<Expr>>> {
-        let node = self.pairs_from_str(R::program, source)?;
-        self.pairs_to_expressions(node.into_inner())
+    /// Parse a source string into a valid [`Program`].
+    pub(crate) fn program_from_str(
+        mut self,
+        source: &'a str,
+    ) -> ParseResult<Vec<ParsedExpression>> {
+        let expressions = self
+            .pairs_from_str(R::program, source)
+            .and_then(|pairs| self.pairs_to_expressions(pairs.into_inner()))
+            .map(|node| node.into_inner())
+            .map(|nodes| nodes.into_iter().map(Into::into).collect::<Vec<_>>())
+            .map_err(|err| {
+                self.diagnostics.push(err.into());
+                DiagnosticList::from(self.diagnostics.clone())
+            })?;
+
+        if self.diagnostics.is_err() {
+            return Err(self.diagnostics);
+        }
+
+        Ok((expressions, self.diagnostics))
     }
 
     /// Parse a string path into a [`path::Path`] wrapper with easy access to
     /// individual path [`path::Segment`]s.
-    ///
-    /// This function fails if the provided path is invalid, as defined by the
-    /// parser grammar.
-    pub(crate) fn path_from_str(&mut self, path: &str) -> std::result::Result<path::Path, Error> {
-        let mut pairs = self.pairs_from_str(R::rule_path, path)?.into_inner();
-        let pair = pairs.next().ok_or(e(R::rule_path, path))?;
+    pub(crate) fn path_from_str(mut self, path: &'a str) -> ParseResult<path::Path> {
+        let path = self
+            .pairs_from_str(R::rule_path, path)
+            .and_then(|pairs| pairs.into_inner().next().ok_or(e(R::rule_path, path)))
+            .and_then(|pair| self.path_from_pair(pair))
+            .map(|node| node.into_inner())
+            .map_err(|err| {
+                self.diagnostics.push(err.into());
+                DiagnosticList::from(self.diagnostics.clone())
+            })?;
 
-        match pair.as_rule() {
-            R::path => self.path_from_pair(pair).map(ParsedNode::into_inner),
-            _ => unreachable!(),
+        if self.diagnostics.is_err() {
+            return Err(self.diagnostics);
         }
+
+        Ok((path, self.diagnostics))
     }
 
     /// Parse a string into a [`path::Field`] wrapper.
@@ -298,35 +428,32 @@ impl<'a> Parser<'a> {
     /// - An error if neither is true.
     ///
     /// These rules are defined by the Remap parser.
-    pub(crate) fn path_field_from_str(
-        &mut self,
-        field: &str,
-    ) -> std::result::Result<path::Field, Error> {
-        use pest::Parser;
+    pub(crate) fn path_field_from_str(mut self, field: &'a str) -> ParseResult<path::Field> {
+        let field = self
+            .pairs_from_str(R::rule_ident, field)
+            .and_then(|pairs| pairs.into_inner().next().ok_or(e(R::rule_ident, field)))
+            .map(|pair| path::Field::Regular(pair.as_str().to_owned()))
+            .or_else(|_| {
+                self.pairs_from_str(R::rule_string_inner, field)
+                    .map(|node| node.into_inner())
+                    .and_then(|mut pairs| pairs.next().ok_or(e(R::rule_string_inner, field)))
+                    .map(|pair| path::Field::Quoted(pair.as_str().to_owned()))
+            })
+            .map_err(|err| {
+                self.diagnostics.push(err.into());
+                DiagnosticList::from(self.diagnostics.clone())
+            })?;
 
-        if let Ok(mut pairs) = Self::parse(R::rule_ident, field) {
-            let field = pairs
-                .next()
-                .ok_or(e(R::rule_ident, field))?
-                .as_str()
-                .to_owned();
-
-            return Ok(path::Field::Regular(field));
+        if self.diagnostics.is_err() {
+            return Err(self.diagnostics);
         }
 
-        let field = self
-            .pairs_from_str(R::rule_string_inner, field)?
-            .next()
-            .ok_or(e(R::rule_string_inner, field))?
-            .as_str()
-            .to_owned();
-
-        Ok(path::Field::Quoted(field))
+        Ok((field, self.diagnostics))
     }
 
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
-    fn pairs_to_expressions(&mut self, pairs: Pairs<'a, R>) -> Result<Vec<ParsedNode<Expr>>> {
+    fn pairs_to_expressions(&mut self, pairs: Pairs<'a, R>) -> IResult<Vec<ParsedNode<Expr>>> {
         let mut nodes = vec![];
 
         for pair in pairs {
@@ -340,36 +467,39 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(node) = nodes.last() {
-            let type_def = node.type_def(&self.compiler_state);
+            let td = node.type_def(&self.compiler_state);
 
-            if !self.allow_regex_return
-                && !type_def.kind.is_all()
-                && type_def.scalar_kind().contains_regex()
-            {
-                let span = node.span.clone();
-                let variant = Variant::RegexResult;
-                return Err(Error { span, variant });
+            if !self.allow_regex_return && !td.kind.is_all() && td.scalar_kind().contains_regex() {
+                self.diagnostics.push(
+                    Diagnostic::error("invalid return value")
+                        .with_primary("regex return value not allowed", node.span),
+                );
             }
         }
 
         let start = nodes.first().map(|n| n.span.start).unwrap_or_default();
         let end = nodes.last().map(|n| n.span.end).unwrap_or_default();
 
-        Ok((Span::from(start..end), nodes).into())
+        Ok((start..end, nodes).into())
     }
 
-    fn pairs_from_str<'b>(&mut self, rule: R, source: &'b str) -> Result<Pairs<'b, R>> {
+    fn pairs_from_str<'b>(&mut self, rule: R, source: &'b str) -> IResult<Pairs<'b, R>> {
         use pest::Parser;
 
-        let span = (0..source.bytes().len()).into();
+        let span = 0..source.bytes().len() - 1;
+        let pairs = match Self::parse(rule, source) {
+            Ok(pairs) => pairs,
+            Err(err) => {
+                self.diagnostics.push(err.into());
+                pest::state("", |s| Ok(s)).unwrap()
+            }
+        };
 
-        Self::parse(rule, source)
-            .map_err(Into::into)
-            .map(|pairs| (span, pairs).into())
+        Ok((span, pairs).into())
     }
 
     /// Given a `Pair`, build a boxed [`Expression`] trait object from it.
-    fn expression_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn expression_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         match pair.as_rule() {
             R::assignment => self.assignment_from_pair(pair),
             R::boolean_expr => self.boolean_expr_from_pair(pair),
@@ -379,62 +509,36 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn assignment_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn assignment_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
-        let (target_span, target) = self
+        let (target_span, mut target) = self
             .target_from_pair(pairs.next().ok_or(e(R::assignment, span))?)?
             .take();
         let (expression_span, expression) = self
             .expression_from_pair(pairs.next().ok_or(e(R::assignment, span))?)?
             .take();
 
-        let assignment_span = (target_span.start..expression_span.end).into();
+        let assignment_span = target_span.start..expression_span.end;
 
-        // We explicitly reject assigning `Value::Regex` to an object.
-        //
-        // This makes it easier to implement `trait Object`, as you don't need
-        // to convert `Value::Regex` to a compatible type, such as a map in
-        // JSON.
-        if matches!(target, Target::Path(_)) {
-            match &expression {
-                Expr::Literal(literal) if !self.allow_regex_return && literal.is_regex() => {
-                    return Err(Error::new(expression_span, Variant::RegexAssignment))
-                }
-                Expr::Literal(literal) => {
-                    if let Some(array) = literal.as_array() {
-                        array.iter().try_for_each(|value| {
-                            if !self.allow_regex_return && value.is_regex() {
-                                Err(Error::new(
-                                    expression_span.clone(),
-                                    Variant::RegexAssignment,
-                                ))
-                            } else {
-                                Ok(())
-                            }
-                        })?
-                    }
-                }
-                Expr::Array(array)
-                    if array.expressions().iter().any(|expr| match expr {
-                        Expr::Literal(literal) if !self.allow_regex_return => literal.is_regex(),
-                        _ => false,
-                    }) =>
-                {
-                    return Err(Error::new(
-                        expression_span.clone(),
-                        Variant::RegexAssignment,
-                    ))
-                }
-                _ => {}
+        if let Target::Infallible { ok, err } = &target {
+            if !expression.type_def(&self.compiler_state).is_fallible() {
+                self.diagnostics.push(
+                    Diagnostic::error("unneeded error assignment")
+                        .with_primary("this error assignment is unneeded", target_span)
+                        .with_context("because this expression cannot fail", expression_span)
+                        .with_note(Note::InfallibleAssignment {
+                            ok: ok.to_string(),
+                            err: err.to_string(),
+                        }),
+                );
+
+                target = Target::Variable(Variable::new("_".to_owned(), None));
             }
         }
 
-        // FIXME: add `error::Expression` and have all expressions return that
-        // error.
-        let assignment =
-            Assignment::new(target, Box::new(expression), &mut self.compiler_state).unwrap();
+        let assignment = Assignment::new(target, Box::new(expression), &mut self.compiler_state);
 
         Ok((assignment_span, assignment).into())
     }
@@ -443,17 +547,27 @@ impl<'a> Parser<'a> {
     ///
     /// This can either return a `variable` or a `target_path` target, depending
     /// on the parser rule being processed.
-    fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+    fn target_from_pair(&mut self, pair: Pair<R>) -> IResult<Target> {
         match pair.as_rule() {
             R::variable => self.variable_from_pair(pair).and_then(|node| {
                 if let Some(path) = node.path() {
-                    return Err(Error::new(
-                        node.span.clone(),
-                        Variant::VariableAssignmentPath(node.ident().to_owned(), path.to_string()),
-                    ));
+                    let path_span = node.span.end - path.to_string().bytes().len()..node.span.end;
+                    let variable_span = node.span.start..path_span.start;
+
+                    self.diagnostics.push(
+                        Diagnostic::error("path-based variable assignment")
+                            .with_primary(
+                                "assignment to variable path currently unsupported",
+                                path_span,
+                            )
+                            .with_context(
+                                format!(r#"assign to "{}" instead"#, node.ident()),
+                                variable_span,
+                            ),
+                    );
                 }
 
-                Ok((node.span.clone(), Target::Variable(node.into_inner())).into())
+                Ok((node.span, Target::Variable(node.into_inner())).into())
             }),
             R::path => {
                 let (span, path) = self.path_from_pair(pair)?.take();
@@ -466,7 +580,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn target_infallible_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
+    fn target_infallible_from_pair(&mut self, pair: Pair<R>) -> IResult<Target> {
         let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
@@ -492,7 +606,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse block expressions.
-    fn block_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn block_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         let span = Span::from(&pair);
         let mut expressions = vec![];
 
@@ -504,7 +618,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse if-statement expressions.
-    fn if_statement_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn if_statement_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
+        self.compiler_state.track_changes();
+
         let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
@@ -512,6 +628,15 @@ impl<'a> Parser<'a> {
         let conditional = self
             .if_condition_from_pair(pairs.next().ok_or(e(R::if_statement, span))?)?
             .into_inner();
+
+        // If the conditional failed to parse, it has created an error
+        // diagnostic. We return a no-op expression. This allows us to continue
+        // parsing.
+        let conditional = match self.try_or_noop(conditional, span) {
+            Ok(conditional) => conditional,
+            Err(noop) => return noop,
+        };
+
         let true_expression = self
             .expression_from_pair(pairs.next().ok_or(e(R::if_statement, span))?)?
             .into_inner();
@@ -531,6 +656,11 @@ impl<'a> Parser<'a> {
             let (conditional, true_expression) = match pairs.peek().map(Pair::as_rule) {
                 Some(R::block) | None => {
                     let conditional = self.if_condition_from_pair(pair)?.into_inner();
+                    let conditional = match self.try_or_noop(conditional, span) {
+                        Ok(conditional) => conditional,
+                        Err(noop) => return noop,
+                    };
+
                     let true_expression = false_expression;
                     false_expression = Noop.into();
 
@@ -538,7 +668,13 @@ impl<'a> Parser<'a> {
                 }
                 Some(R::if_condition) => {
                     let next_pair = pairs.next().ok_or(e(R::if_statement, span))?;
+
                     let conditional = self.if_condition_from_pair(next_pair)?.into_inner();
+                    let conditional = match self.try_or_noop(conditional, span) {
+                        Ok(conditional) => conditional,
+                        Err(noop) => return noop,
+                    };
+
                     let true_expression = self.expression_from_pair(pair)?.into_inner();
 
                     (conditional, true_expression)
@@ -563,7 +699,7 @@ impl<'a> Parser<'a> {
         Ok((span, node).into())
     }
 
-    fn if_condition_from_pair(&mut self, pair: Pair<R>) -> Result<IfCondition> {
+    fn if_condition_from_pair(&mut self, pair: Pair<R>) -> IResult<Result<IfCondition, ()>> {
         let span = Span::from(&pair);
         let mut pairs = pair.clone().into_inner();
 
@@ -574,13 +710,16 @@ impl<'a> Parser<'a> {
             self.block_from_pair(pair)?.take()
         };
 
-        let condition = IfCondition::new(Box::new(expression), &self.compiler_state);
+        // If the condition is invalid, we add a diagnostic error. We also let
+        // the callee know parsing the condition failed.
+        let result = IfCondition::new(Box::new(expression), &self.compiler_state)
+            .map_err(|err| self.diagnostics.push((span, err).into()));
 
-        span_result(span, condition)
+        Ok((span, result).into())
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.
-    fn not_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn not_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         let span = Span::from(&pair);
         let pairs = pair.into_inner();
 
@@ -604,7 +743,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse one of possible primary expressions.
-    fn primary_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn primary_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         let span = Span::from(&pair);
         let pair = pair.into_inner().next().ok_or(e(R::primary, span))?;
 
@@ -623,7 +762,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a [`Value`] into a [`Literal`] expression.
-    fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn literal_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
         let span = Span::from(&pair);
 
         match pair.as_rule() {
@@ -652,20 +791,26 @@ impl<'a> Parser<'a> {
             R::map => self.map_from_pair(pair).map(ParsedNode::to_expr),
             R::regex => Ok((
                 span,
-                Literal::from(self.regex_from_pair(pair)?.into_inner()),
+                // If regex parsing fails, a diagnostic message is recorded, and
+                // we turn the regex into a no-op expression to allow parsing to
+                // continue.
+                match self.regex_from_pair(pair)?.into_inner() {
+                    Ok(regex) => regex.into(),
+                    Err(_) => value!(null),
+                },
             )
                 .into()),
             _ => Err(e(R::value, &pair)),
         }
     }
 
-    fn array_from_pair(&mut self, pair: Pair<R>) -> Result<Array> {
+    fn array_from_pair(&mut self, pair: Pair<R>) -> IResult<Array> {
         let span = Span::from(&pair);
 
         let expressions = pair
             .into_inner()
             .map(|pair| self.expression_from_pair(pair))
-            .collect::<std::result::Result<Vec<ParsedNode<Expr>>, Error>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok((
             span,
@@ -679,18 +824,18 @@ impl<'a> Parser<'a> {
             .into())
     }
 
-    fn map_from_pair(&mut self, pair: Pair<R>) -> Result<Map> {
+    fn map_from_pair(&mut self, pair: Pair<R>) -> IResult<Map> {
         let span = Span::from(&pair);
 
         let map = pair
             .into_inner()
             .map(|pair| self.kv_from_pair(pair).map(ParsedNode::into_inner))
-            .collect::<std::result::Result<BTreeMap<_, _>, Error>>()?;
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
         Ok((span, Map::new(map)).into())
     }
 
-    fn kv_from_pair(&mut self, pair: Pair<R>) -> Result<(String, Expr)> {
+    fn kv_from_pair(&mut self, pair: Pair<R>) -> IResult<(String, Expr)> {
         let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
@@ -704,11 +849,15 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse function call expressions.
-    fn call_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+    fn call_from_pair(&mut self, pair: Pair<R>) -> IResult<Expr> {
+        self.compiler_state.track_changes();
+
         let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
-        let ident = inner.next().ok_or(e(R::call, span))?.as_str().to_owned();
+        let ident = inner.next().ok_or(e(R::call, span))?.as_str();
+        let ident_span = span.start..=ident.bytes().len();
+
         let abort_on_error = match inner.peek().map(|p| p.as_rule()) {
             Some(R::bang) => {
                 inner.next();
@@ -717,40 +866,83 @@ impl<'a> Parser<'a> {
             _ => false,
         };
 
-        let arguments = inner
+        // FIXME: add required diagnostics.
+
+        let (arguments_span, arguments) = inner
             .next()
             .map(|pair| self.arguments_from_pair(pair))
             .transpose()?
-            .map(ParsedNode::into_inner)
-            .unwrap_or_default();
+            .map(|s| s.take())
+            .unwrap_or_else(|| (Span::default(), vec![]));
 
-        let f = Function::new(
+        let function = Function::new(
             ident,
             abort_on_error,
             arguments,
             &self.function_definitions,
             &self.compiler_state,
-        )
-        .map(|f| (span, f).into())
-        .unwrap(); // FIXME
+        );
 
-        Ok(f)
+        let expression: Expr = match function {
+            Ok(function) => function.into(),
+            Err(err) => {
+                self.compiler_state.revert_changes();
+
+                self.diagnostics.push(match err {
+                    function::Error::Undefined => Diagnostic::error("call to undefined function")
+                        .with_primary("undefined function", ident_span),
+                    function::Error::ArityMismatch { max, got } => {
+                        Diagnostic::error("function argument arity mismatch")
+                            .with_primary(format!("got: {}", got), arguments_span)
+                            .with_context(format!("expected: {} (at most)", max), arguments_span)
+                    }
+                    // TODO: have spans for each individual keyword
+                    function::Error::UnknownKeyword(kw) => {
+                        Diagnostic::error("unknown function argument keyword")
+                            .with_primary(format!("unknown keyword: {}", kw), arguments_span)
+                    }
+                    function::Error::AbortInfallible => {
+                        let bang_span = *ident_span.end() + 1..*ident_span.end() + 1;
+
+                        Diagnostic::error("cannot abort function that never fails")
+                            .with_primary("this function cannot fail", ident_span)
+                            .with_context("remove this abort-instruction", bang_span)
+                            .with_note(Note::SeeErrDocs)
+                    }
+                    function::Error::MissingArg { argument, .. } => {
+                        Diagnostic::error("function argument missing")
+                            .with_primary(format!("required argument missing: {}", argument), span)
+                    }
+                    function::Error::Compile(message) => {
+                        Diagnostic::error("unable to parse function").with_primary(message, span)
+                    }
+                    function::Error::Argument(arg, err) => {
+                        Diagnostic::error("function argument error")
+                            .with_primary(format!("{}: {}", arg, err), arguments_span)
+                    }
+                });
+
+                Noop.into()
+            }
+        };
+
+        Ok((span, expression).into())
     }
 
     /// Parse into a vector of argument properties.
-    fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Expr)>> {
+    fn arguments_from_pair(&mut self, pair: Pair<R>) -> IResult<Vec<(Option<String>, Expr)>> {
         let span = Span::from(&pair);
 
         let arguments = pair
             .into_inner()
             .map(|pair| self.argument_from_pair(pair).map(ParsedNode::into_inner))
-            .collect::<std::result::Result<Vec<(Option<String>, Expr)>, Error>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok((span, arguments).into())
     }
 
     /// Parse optional argument keyword and [`Argument`] value.
-    fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Expr)> {
+    fn argument_from_pair(&mut self, pair: Pair<R>) -> IResult<(Option<String>, Expr)> {
         let span = Span::from(&pair);
         let mut ident = None;
 
@@ -770,7 +962,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a [`Regex`] value
-    fn regex_from_pair(&self, pair: Pair<R>) -> Result<Regex> {
+    fn regex_from_pair(&mut self, pair: Pair<R>) -> IResult<Result<Regex, ()>> {
         let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
@@ -795,18 +987,31 @@ impl<'a> Parser<'a> {
             })
             .unwrap_or_default();
 
-        let regex = RegexBuilder::new(&pattern)
+        let result = RegexBuilder::new(&pattern)
             .case_insensitive(i)
             .multi_line(m)
             .ignore_whitespace(x)
             .build()
-            .map_err(|err| Error::new(span, err.into()))?;
+            .map_err(|err| {
+                let error = err
+                    .to_string()
+                    .split("error: ")
+                    .last()
+                    .unwrap_or_else(|| "unknown error")
+                    .to_owned();
 
-        Ok((span, regex).into())
+                self.diagnostics.push(
+                    Diagnostic::error("regex parsing unsuccessful")
+                        .with_primary("invalid regex", span)
+                        .with_primary(format!("error: {}", error), span),
+                )
+            });
+
+        Ok((span, result).into())
     }
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"
-    fn path_from_pair(&self, pair: Pair<R>) -> Result<path::Path> {
+    fn path_from_pair(&self, pair: Pair<R>) -> IResult<path::Path> {
         let span = Span::from(&pair);
         let mut pairs = pair.into_inner();
 
@@ -824,7 +1029,7 @@ impl<'a> Parser<'a> {
         Ok((span, path::Path::new_unchecked(segments.into_inner())).into())
     }
 
-    fn path_segments_from_pair(&self, pair: Pair<R>) -> Result<Vec<path::Segment>> {
+    fn path_segments_from_pair(&self, pair: Pair<R>) -> IResult<Vec<path::Segment>> {
         let span = Span::from(&pair);
 
         let segments: Vec<path::Segment> = pair
@@ -836,12 +1041,12 @@ impl<'a> Parser<'a> {
                     .map(ParsedNode::into_inner),
                 _ => Err(e(R::path_segments, &pair)),
             })
-            .collect::<std::result::Result<_, Error>>()?;
+            .collect::<Result<_, _>>()?;
 
         Ok((span, segments).into())
     }
 
-    fn path_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+    fn path_segment_from_pair(&self, pair: Pair<R>) -> IResult<path::Segment> {
         let span = Span::from(&pair);
         let segment = pair.into_inner().next().ok_or(e(R::path_segment, span))?;
 
@@ -852,25 +1057,25 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn path_field_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+    fn path_field_segment_from_pair(&self, pair: Pair<R>) -> IResult<path::Segment> {
         self.path_field_from_pair(pair).map(|node| {
             let (span, field) = node.take();
             (span, path::Segment::Field(field)).into()
         })
     }
 
-    fn path_coalesce_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+    fn path_coalesce_segment_from_pair(&self, pair: Pair<R>) -> IResult<path::Segment> {
         let span = Span::from(&pair);
 
         let fields = pair
             .into_inner()
             .map(|pair| self.path_field_from_pair(pair).map(ParsedNode::into_inner))
-            .collect::<std::result::Result<Vec<_>, Error>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok((span, path::Segment::Coalesce(fields)).into())
     }
 
-    fn path_field_from_pair(&self, pair: Pair<R>) -> Result<path::Field> {
+    fn path_field_from_pair(&self, pair: Pair<R>) -> IResult<path::Field> {
         let span = Span::from(&pair);
         let field = pair.into_inner().next().ok_or(e(Rule::path_field, span))?;
 
@@ -885,7 +1090,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn path_index_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+    fn path_index_from_pair(&self, pair: Pair<R>) -> IResult<path::Segment> {
         let span = Span::from(&pair);
         let index = pair
             .into_inner()
@@ -899,7 +1104,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a [`Variable`] value, e.g. "$foo"
-    fn variable_from_pair(&self, pair: Pair<R>) -> Result<Variable> {
+    fn variable_from_pair(&self, pair: Pair<R>) -> IResult<Variable> {
         let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
@@ -932,13 +1137,13 @@ impl<'a> Parser<'a> {
         Ok((span, Variable::new(ident, expr)).into())
     }
 
-    fn string_from_pair(&self, pair: Pair<R>) -> Result<String> {
+    fn string_from_pair(&self, pair: Pair<R>) -> IResult<String> {
         let span = Span::from(&pair);
         let string = pair.into_inner().next().ok_or(e(R::string, span))?;
         self.escaped_string_from_pair(string)
     }
 
-    fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
+    fn escaped_string_from_pair(&self, pair: Pair<R>) -> IResult<String> {
         let span = Span::from(&pair);
 
         // This is only executed once per string at parse time, and so I'm not
@@ -969,6 +1174,22 @@ impl<'a> Parser<'a> {
         }
 
         Ok((span, escaped_chars.into_iter().collect::<String>()).into())
+    }
+
+    /// Allows you to check if a result passed. If it did, the compiler starts
+    /// tracking new changes, if it didn't, the existing state is overwritten
+    /// with the previously recorded changes (if any).
+    fn try_or_noop<T, E>(&mut self, value: Result<T, E>, span: Span) -> Result<T, IResult<Expr>> {
+        match value {
+            Ok(value) => {
+                self.compiler_state.track_changes();
+                Ok(value)
+            }
+            Err(_) => {
+                self.compiler_state.revert_changes();
+                Err(span_with_noop(span))
+            }
+        }
     }
 
     // The operations are defined in reverse order, meaning boolean expressions are
@@ -1005,25 +1226,13 @@ impl<'a> Parser<'a> {
 
 // -----------------------------------------------------------------------------
 
-#[inline]
-fn span_result<T, U, E>(span: impl Into<Span>, result: std::result::Result<U, E>) -> Result<T>
-where
-    U: Into<T>,
-    E: Into<Variant>,
-{
-    let span = span.into();
-
-    result
-        .map(|expr| (span, expr.into()).into())
-        .map_err(|err| (span, err.into()).into())
+fn span_with_noop<S: Into<Span>>(span: S) -> IResult<Expr> {
+    Ok((span, Noop).into())
 }
 
 #[inline]
-fn e(rule: R, span: impl Into<Span>) -> Error {
-    Error {
-        span: span.into(),
-        variant: Variant::Rule(rule),
-    }
+fn e(rule: R, span: impl Into<Span>) -> ParserBug {
+    ParserBug(span.into(), rule)
 }
 
 #[cfg(test)]
@@ -1071,7 +1280,7 @@ mod tests {
     }
 
     #[allow(clippy::type_complexity)]
-    fn validate_rule(cases: Vec<(&str, Vec<&str>, Result<Vec<Expr>>)>) {
+    fn validate_rule(cases: Vec<(&str, Vec<&str>, IResult<Vec<Expr>>)>) {
         for (mut i, (source, compile_check, run_check)) in cases.into_iter().enumerate() {
             let compile_check: Vec<&str> = compile_check;
             i += 1;

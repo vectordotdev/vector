@@ -1,7 +1,7 @@
 use crate::{
-    diagnostic::{Diagnostic, Label, LabelMessage, Message, Note, Severity},
+    diagnostic::{Diagnostic, DiagnosticList},
     expression, function,
-    parser::Rule,
+    parser::{ParsedExpression, Rule},
     path, program, value,
 };
 use std::error::Error as StdError;
@@ -11,7 +11,6 @@ use std::fmt;
 pub struct RuntimeError<'a> {
     source: &'a str,
     diagnostic: Diagnostic,
-    error: Error,
 }
 
 impl RuntimeError<'_> {
@@ -22,104 +21,72 @@ impl RuntimeError<'_> {
 
 impl fmt::Display for RuntimeError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_diagnostic(f, self.source, self.diagnostic.clone())
+        let mut diagnostics = DiagnosticList::default();
+        diagnostics.push(self.diagnostic.clone());
+
+        fmt_diagnostic(f, self.source, diagnostics)
     }
 }
 
 impl StdError for RuntimeError<'_> {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        Some(&self.error)
+        None
     }
 }
 
-impl<'a> From<(&'a str, Error)> for RuntimeError<'a> {
-    fn from((source, error): (&'a str, Error)) -> Self {
-        // TODO
-        let diagnostic = Diagnostic {
-            severity: Severity::Error,
-            message: Message::ReturnValue,
-            labels: vec![],
-            notes: vec![],
-        };
+impl<'a> From<(&'a str, &'a ParsedExpression, Error)> for RuntimeError<'a> {
+    fn from((source, expr, error): (&'a str, &'a ParsedExpression, Error)) -> Self {
+        let diagnostic =
+            Diagnostic::error("program aborted").with_primary(error.to_string(), expr.span());
 
-        Self {
-            source,
-            diagnostic,
-            error,
-        }
+        Self { source, diagnostic }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProgramError<'a> {
     source: &'a str,
-    diagnostic: Diagnostic,
-    error: program::Error,
+    diagnostics: DiagnosticList,
 }
 
 impl ProgramError<'_> {
-    pub fn diagnostic(&self) -> &Diagnostic {
-        &self.diagnostic
+    pub fn diagnostics(&self) -> &DiagnosticList {
+        &self.diagnostics
     }
 }
 
 impl fmt::Display for ProgramError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt_diagnostic(f, self.source, self.diagnostic.clone())
+        fmt_diagnostic(f, self.source, self.diagnostics.clone())
     }
 }
 
-impl<'a> From<(&'a str, program::Error)> for ProgramError<'a> {
-    fn from((source, error): (&'a str, program::Error)) -> Self {
-        use program::Error::*;
+impl StdError for ProgramError<'_> {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        None
+    }
+}
 
-        let diagnostic = match error {
-            Parse(ref err) => err.into(),
-
-            Fallible => Diagnostic {
-                severity: Severity::Error,
-                message: Message::Fallible,
-                labels: vec![],
-                notes: vec![],
-            },
-
-            ReturnValue { want, got } => {
-                let range = {
-                    let mut start = 0;
-                    let mut iter = source.lines().peekable();
-                    while let Some(line) = iter.next() {
-                        if iter.peek().is_some() {
-                            start += line.bytes().len();
-                        }
-                    }
-
-                    start..source.bytes().len()
-                };
-
-                Diagnostic {
-                    severity: Severity::Error,
-                    message: Message::ReturnValue,
-                    labels: vec![Label::primary(LabelMessage::GotKind(got), range)],
-                    notes: vec![Note::ExpectedKind(want), Note::CoerceValue],
-                }
-            }
-        };
-
+impl<'a> From<(&'a str, DiagnosticList)> for ProgramError<'a> {
+    fn from((source, diagnostics): (&'a str, DiagnosticList)) -> Self {
         Self {
             source,
-            diagnostic,
-            error,
+            diagnostics,
         }
     }
 }
 
-fn fmt_diagnostic(f: &mut fmt::Formatter<'_>, source: &str, diagnostic: Diagnostic) -> fmt::Result {
+fn fmt_diagnostic(
+    f: &mut fmt::Formatter<'_>,
+    source: &str,
+    diagnostics: DiagnosticList,
+) -> fmt::Result {
     use codespan_reporting::files::SimpleFile;
     use codespan_reporting::term;
     use std::str::from_utf8;
     use termcolor::Buffer;
 
-    let file = SimpleFile::new("<source>", source);
+    let file = SimpleFile::new("", source);
     let config = term::Config::default();
 
     let mut buffer = if f.alternate() {
@@ -128,7 +95,9 @@ fn fmt_diagnostic(f: &mut fmt::Formatter<'_>, source: &str, diagnostic: Diagnost
         Buffer::no_color()
     };
 
-    term::emit(&mut buffer, &config, &file, &diagnostic.into()).map_err(|_| fmt::Error)?;
+    for diagnostic in diagnostics {
+        term::emit(&mut buffer, &config, &file, &diagnostic.into()).map_err(|_| fmt::Error)?;
+    }
 
     f.write_str(from_utf8(buffer.as_slice()).map_err(|_| fmt::Error)?)
 }

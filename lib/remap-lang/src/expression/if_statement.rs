@@ -1,9 +1,27 @@
-use crate::{state, value, Expr, Expression, Object, TypeDef, Value};
+use crate::{state, value, Diagnostic, Expr, Expression, Object, Span, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("conditional error")]
+    #[error("invalid if-condition type")]
     Conditional(#[from] value::Error),
+}
+
+impl From<(Span, Error)> for Diagnostic {
+    fn from((span, err): (Span, Error)) -> Self {
+        use crate::diagnostic::Note;
+
+        let message = err.to_string();
+
+        match err {
+            Error::Conditional(err) => match err {
+                value::Error::Expected(got, want) => Self::error(message)
+                    .with_primary(format!("got: {}", want), span)
+                    .with_context(format!("expected: {}", got), span)
+                    .with_note(Note::CoerceValue),
+                _ => Self::error(message).with_primary("unexpected value", span),
+            },
+        }
+    }
 }
 
 /// Wrapper type for an if condition.

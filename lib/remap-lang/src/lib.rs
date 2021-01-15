@@ -15,7 +15,7 @@ pub mod prelude;
 pub mod state;
 pub mod value;
 
-pub use diagnostic::Diagnostic;
+pub use diagnostic::{Diagnostic, DiagnosticList, Span};
 pub use error::Error;
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};

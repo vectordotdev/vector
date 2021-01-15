@@ -5,7 +5,7 @@ use std::fmt;
 mod argument;
 mod arithmetic;
 mod array;
-mod assignment;
+pub(crate) mod assignment;
 mod block;
 pub(crate) mod function;
 pub(crate) mod if_statement;
