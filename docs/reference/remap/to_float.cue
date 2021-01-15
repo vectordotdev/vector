@@ -7,31 +7,20 @@ remap: functions: to_float: {
 			type: ["float", "integer", "boolean", "string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a supported float representation",
+	]
 	return: ["float"]
 	category: "Coerce"
 	description: #"""
-		Returns a `float` whose text representation is `string`.
+		Coerces the provided `values` into a `float`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				float: "3.14"
-			}
+			title: "Convert string to float"
+			input: log: float: "3.14"
 			source: ".float = to_float(.float)"
-			output: {
-				float: 3.14
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				integer: "hi"
-			}
-			source: ".float = to_float(.float)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: log: float: 3.14
 		},
 	]
 }

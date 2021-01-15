@@ -1,7 +1,7 @@
 use crate::{BoxedSubscription, QueryResult};
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
-use serde::export::Formatter;
+use std::fmt;
 
 /// Components query for returning sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
@@ -32,13 +32,13 @@ pub struct ComponentRemovedSubscription;
 
 #[async_trait]
 pub trait ComponentsQueryExt {
-    async fn components_query(&self) -> crate::QueryResult<ComponentsQuery>;
+    async fn components_query(&self, first: i64) -> crate::QueryResult<ComponentsQuery>;
 }
 
 #[async_trait]
 impl ComponentsQueryExt for crate::Client {
-    async fn components_query(&self) -> QueryResult<ComponentsQuery> {
-        let request_body = ComponentsQuery::build_query(components_query::Variables);
+    async fn components_query(&self, first: i64) -> QueryResult<ComponentsQuery> {
+        let request_body = ComponentsQuery::build_query(components_query::Variables { first });
         self.query::<ComponentsQuery>(&request_body).await
     }
 }
@@ -67,22 +67,22 @@ impl ComponentsSubscriptionExt for crate::SubscriptionClient {
     }
 }
 
-impl components_query::ComponentsQueryComponentsOn {
+impl components_query::ComponentsQueryComponentsEdgesNodeOn {
     pub fn processed_events_total(&self) -> i64 {
         match self {
-            components_query::ComponentsQueryComponentsOn::Source(s) => s
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
                 .metrics
                 .processed_events_total
                 .as_ref()
                 .map(|p| p.processed_events_total as i64)
                 .unwrap_or(0),
-            components_query::ComponentsQueryComponentsOn::Transform(t) => t
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
                 .metrics
                 .processed_events_total
                 .as_ref()
                 .map(|p| p.processed_events_total as i64)
                 .unwrap_or(0),
-            components_query::ComponentsQueryComponentsOn::Sink(s) => s
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(s) => s
                 .metrics
                 .processed_events_total
                 .as_ref()
@@ -93,19 +93,19 @@ impl components_query::ComponentsQueryComponentsOn {
 
     pub fn processed_bytes_total(&self) -> i64 {
         match self {
-            components_query::ComponentsQueryComponentsOn::Source(s) => s
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
                 .metrics
                 .processed_bytes_total
                 .as_ref()
                 .map(|p| p.processed_bytes_total as i64)
                 .unwrap_or(0),
-            components_query::ComponentsQueryComponentsOn::Transform(t) => t
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
                 .metrics
                 .processed_bytes_total
                 .as_ref()
                 .map(|p| p.processed_bytes_total as i64)
                 .unwrap_or(0),
-            components_query::ComponentsQueryComponentsOn::Sink(s) => s
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(s) => s
                 .metrics
                 .processed_bytes_total
                 .as_ref()
@@ -115,22 +115,20 @@ impl components_query::ComponentsQueryComponentsOn {
     }
 }
 
-impl std::fmt::Display for components_query::ComponentsQueryComponentsOn {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
-            components_query::ComponentsQueryComponentsOn::Source(_) => "source",
-            components_query::ComponentsQueryComponentsOn::Transform(_) => "transform",
-            components_query::ComponentsQueryComponentsOn::Sink(_) => "sink",
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(_) => "source",
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(_) => "transform",
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(_) => "sink",
         };
 
         write!(f, "{}", res)
     }
 }
 
-impl std::fmt::Display
-    for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source => {
                 "source"
@@ -147,10 +145,10 @@ impl std::fmt::Display
     }
 }
 
-impl std::fmt::Display
+impl fmt::Display
     for component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Source => {
                 "source"

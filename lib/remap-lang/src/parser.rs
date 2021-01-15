@@ -16,6 +16,7 @@ use std::str::FromStr;
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
+    pub allow_regex_return: bool,
     pub compiler_state: state::Compiler,
 }
 
@@ -29,7 +30,7 @@ pub enum Error {
     #[error("cannot return regex from program")]
     RegexResult,
 
-    #[error(r#"path in variable assignment unsupported, use "${0}" without "{1}""#)]
+    #[error(r#"path in variable assignment unsupported, use "{0}" without "{1}""#)]
     VariableAssignmentPath(String, String),
 
     #[error("regex error")]
@@ -98,9 +99,10 @@ macro_rules! operation_fns {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(function_definitions: &'a [Box<dyn Fn>]) -> Self {
+    pub fn new(function_definitions: &'a [Box<dyn Fn>], allow_regex_return: bool) -> Self {
         Self {
             function_definitions,
+            allow_regex_return,
             ..Default::default()
         }
     }
@@ -171,7 +173,10 @@ impl<'a> Parser<'a> {
         if let Some(expression) = expressions.last() {
             let type_def = expression.type_def(&self.compiler_state);
 
-            if !type_def.kind.is_all() && type_def.scalar_kind().contains_regex() {
+            if !self.allow_regex_return
+                && !type_def.kind.is_all()
+                && type_def.scalar_kind().contains_regex()
+            {
                 return Err(Error::RegexResult.into());
             }
         }
@@ -206,13 +211,13 @@ impl<'a> Parser<'a> {
         // JSON.
         if matches!(target, Target::Path(_)) {
             match &expression {
-                Expr::Literal(literal) if literal.is_regex() => {
+                Expr::Literal(literal) if !self.allow_regex_return && literal.is_regex() => {
                     return Err(Error::RegexAssignment.into())
                 }
                 Expr::Literal(literal) => {
                     if let Some(array) = literal.as_array() {
                         array.iter().try_for_each(|value| {
-                            if value.is_regex() {
+                            if !self.allow_regex_return && value.is_regex() {
                                 Err(E::from(Error::RegexAssignment))
                             } else {
                                 Ok(())
@@ -222,7 +227,7 @@ impl<'a> Parser<'a> {
                 }
                 Expr::Array(array)
                     if array.expressions().iter().any(|expr| match expr {
-                        Expr::Literal(literal) => literal.is_regex(),
+                        Expr::Literal(literal) if !self.allow_regex_return => literal.is_regex(),
                         _ => false,
                     }) =>
                 {
@@ -232,7 +237,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(Assignment::new(target, Box::new(expression), &mut self.compiler_state).into())
+        Assignment::new(target, Box::new(expression), &mut self.compiler_state).map(Into::into)
     }
 
     /// Return the target type to which a value is being assigned.
@@ -253,8 +258,23 @@ impl<'a> Parser<'a> {
                 Ok(Target::Variable(variable))
             }),
             R::path => Ok(Target::Path(Path::new(self.path_from_pair(pair)?))),
+            R::target_infallible => self.target_infallible_from_pairs(pair.into_inner()),
             _ => Err(e(R::target)),
         }
+    }
+
+    fn target_infallible_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Target> {
+        let ok = pairs
+            .next()
+            .ok_or(e(R::target_infallible))
+            .and_then(|pair| Ok(Box::new(self.target_from_pair(pair)?)))?;
+
+        let err = pairs
+            .next()
+            .ok_or(e(R::target_infallible))
+            .and_then(|pair| Ok(Box::new(self.target_from_pair(pair)?)))?;
+
+        Ok(Target::Infallible { ok, err })
     }
 
     /// Parse block expressions.
@@ -418,13 +438,28 @@ impl<'a> Parser<'a> {
         let mut inner = pair.into_inner();
 
         let ident = inner.next().ok_or(e(R::call))?.as_str().to_owned();
+        let abort_on_error = match inner.peek().map(|p| p.as_rule()) {
+            Some(R::bang) => {
+                inner.next();
+                true
+            }
+            _ => false,
+        };
+
         let arguments = inner
             .next()
             .map(|pair| self.arguments_from_pair(pair))
             .transpose()?
             .unwrap_or_default();
 
-        Function::new(ident, arguments, &self.function_definitions).map(Expr::from)
+        Function::new(
+            ident,
+            abort_on_error,
+            arguments,
+            &self.function_definitions,
+            &self.compiler_state,
+        )
+        .map(Expr::from)
     }
 
     /// Parse into a vector of argument properties.
@@ -536,7 +571,7 @@ impl<'a> Parser<'a> {
 
         match field.as_rule() {
             R::string => Ok(path::Field::Quoted(self.string_from_pair(field)?)),
-            R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
+            R::field => Ok(path::Field::Regular(field.as_str().to_owned())),
             _ => Err(e(R::path_field)),
         }
     }
@@ -641,7 +676,7 @@ impl<'a> Parser<'a> {
         }
 
         boolean_expr => {
-            op: [And, Or],
+            op: [ErrorOr, And, Or],
             next: equality,
         }
     }
@@ -686,14 +721,7 @@ mod tests {
                 Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
             ),
             ("..", vec![" 1:2\n", "= expected path segment"], Ok(vec![])),
-            (
-                ". bar",
-                vec![
-                    " 1:3\n",
-                    "= expected assignment, if-statement, query, operator, or block",
-                ],
-                Ok(vec![]),
-            ),
+            (". bar", vec![" 1:3\n", "= expected operator"], Ok(vec![])),
             (
                 r#". "bar""#,
                 vec![" 1:2\n", "= expected path segment"], // TODO: improve error message
@@ -710,7 +738,7 @@ mod tests {
             let compile_check: Vec<&str> = compile_check;
             i += 1;
 
-            let mut parser = Parser::new(&[]);
+            let mut parser = Parser::new(&[], true);
             let pairs = parser.program_from_str(source).map_err(RemapError::from);
 
             match pairs {
@@ -754,7 +782,7 @@ mod tests {
                 ".foo bar",
                 vec![
                     " 1:6\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    "= expected operator",
                 ],
             ),
             (
@@ -772,24 +800,10 @@ mod tests {
                 ],
             ),
             (
-                ".foo = to_string",
-                vec![
-                    " 1:8\n",
-                    "= expected assignment, if-statement, query, or block",
-                ],
-            ),
-            (
-                r#"foo = "bar""#,
-                vec![
-                    " 1:1\n",
-                    "= expected assignment, if-statement, query, or block",
-                ],
-            ),
-            (
                 r#".foo.bar = "baz" and this"#,
                 vec![
                     " 1:18\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    "= expected operator",
                 ],
             ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected query"]),
@@ -817,12 +831,10 @@ mod tests {
                 // This message isn't great, ideally I'd like "expected closing bracket"
                 vec![
                     " 1:48\n",
-                    "= expected assignment, if-statement, query, operator, path index, or block",
+                    "= expected operator or path index",
                 ],
             ),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
-            ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
-            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument"]),
+            ("only_fields(.foo,)", vec![" 1:18\n", "= expected argument or path"]),
             ("only_fields(,)", vec![" 1:13\n", "= expected argument"]),
             (
                 // Due to the explicit list of allowed escape chars our grammar
@@ -842,8 +854,8 @@ mod tests {
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
                 vec![
-                    " 1:23\n",
-                    "= expected assignment, if-statement, query, or block",
+                    " 1:27\n",
+                    "= expected query",
                 ],
             ),
             (
@@ -861,7 +873,7 @@ mod tests {
                 r#"/ab/ = .foo"#,
                 vec![
                     " 1:6\n",
-                    "= expected assignment, if-statement, query, operator, or block",
+                    "= expected operator",
                 ],
             ),
             (
@@ -869,7 +881,7 @@ mod tests {
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
-                r#"$foo = /ab/"#,
+                r#"foo = /ab/"#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
@@ -878,22 +890,46 @@ mod tests {
             ),
             (
                 r#"
-                    $foo = /ab/
-                    [$foo]
+                    foo = /ab/
+                    [foo]
                 "#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
             (
                 r#"
-                    $foo = [/ab/]
-                    $foo
+                    foo = [/ab/]
+                    foo
                 "#,
                 vec!["remap error: parser error: cannot return regex from program"],
             ),
+            ("foo bar", vec![" 1:5\n", "= expected operator"]),
+            ("[true] [false]", vec![" 1:8\n", "= expected operator"]),
+
+            // reserved keywords
+            ("if = true", vec![" 1:4\n", "= expected query"]),
+            ("else = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("for = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("while = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("loop = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("abort = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("break = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("continue = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("return = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("as = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("type = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("let = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("until = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("then = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("impl = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("in = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("self = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("this = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("use = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
+            ("std = true", vec![" 1:1\n", "= expected assignment, if-statement, query, or block"]),
         ];
 
         for (source, exp_expressions) in cases {
-            let mut parser = Parser::new(&[]);
+            let mut parser = Parser::new(&[], false);
             let err = parser
                 .program_from_str(source)
                 .err()

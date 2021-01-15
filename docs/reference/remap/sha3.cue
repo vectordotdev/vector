@@ -23,35 +23,20 @@ remap: functions: sha3: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Hash"
 	description: #"""
-		Calculates a sha3 hash of a given string.
+		Calculates a sha3 hash of the provided `value`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				text: #"foo"#
-			}
+			title: "Calaculate sha3 hash"
+			input: log: text: #"foo"#
 			source: #"""
-				.hash = sha3(.text, variant = "SHA3-224")
+				.hash = sha3(.text, variant: "SHA3-224")
 				"""#
-			output: {
-				hash: "f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a"
-			}
-		},
-		{
-			title: "Error"
-			input: {
-				text: #"foo"#
-			}
-			source: #"""
-					.hash = sha3(.text, variant = "SHA-NONE")
-				"""#
-			output: {
-				error: remap.errors.ArgumentError
-			}
+			output: input & {log: hash: "f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a"}
 		},
 	]
 }

@@ -80,32 +80,27 @@ mod tests {
 
     remap::test_type_def![
         boolean_infallible {
-            expr: |_| ToIntFn { value: Literal::from(true).boxed() },
+            expr: |_| ToIntFn { value: lit!(true).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         integer_infallible {
-            expr: |_| ToIntFn { value: Literal::from(1).boxed() },
+            expr: |_| ToIntFn { value: lit!(1).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         float_infallible {
-            expr: |_| ToIntFn { value: Literal::from(1.0).boxed() },
+            expr: |_| ToIntFn { value: lit!(1.0).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         null_infallible {
-            expr: |_| ToIntFn { value: Literal::from(()).boxed() },
+            expr: |_| ToIntFn { value: lit!(null).boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         string_fallible {
-            expr: |_| ToIntFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: Kind::Integer, ..Default::default() },
-        }
-
-        timestamp_infallible {
-            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
+            expr: |_| ToIntFn { value: lit!("foo").boxed() },
             def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
@@ -117,6 +112,11 @@ mod tests {
         array_fallible {
             expr: |_| ToIntFn { value: array![].boxed() },
             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
     ];
 

@@ -10,13 +10,11 @@ impl Object for Value {
         Ok(self.get_by_path(path).cloned())
     }
 
-    fn paths(&self) -> Result<Vec<Path>, String> {
-        self.paths().map_err(|err| err.to_string())
-    }
-
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+        let value = self.get(path)?;
         self.remove_by_path(path, compact);
-        Ok(())
+
+        Ok(value)
     }
 }
 
@@ -24,7 +22,6 @@ impl Object for Value {
 mod tests {
     use super::*;
     use crate::{value, Field::*, Segment::*};
-    use std::str::FromStr;
 
     #[test]
     fn object_get() {
@@ -195,8 +192,16 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
+                vec![Field(Regular("baz".to_owned()))],
+                false,
+                None,
+                Some(value!({foo: "bar"})),
+            ),
+            (
+                value!({foo: "bar"}),
                 vec![Field(Regular("foo".to_owned()))],
                 false,
+                Some(value!("bar")),
                 Some(value!({})),
             ),
             (
@@ -206,30 +211,35 @@ mod tests {
                     Regular("foo".to_owned()),
                 ])],
                 false,
+                Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
                 vec![],
                 false,
+                Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar", baz: "qux"}),
                 vec![],
                 true,
+                Some(value!({foo: "bar", baz: "qux"})),
                 Some(value!({})),
             ),
             (
                 value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
+                Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
+                Some(value!(0)),
                 Some(value!({})),
             ),
             (
@@ -240,6 +250,7 @@ mod tests {
                     Index(0),
                 ],
                 false,
+                Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
@@ -250,65 +261,16 @@ mod tests {
                     Index(0),
                 ],
                 true,
+                Some(value!(0)),
                 Some(value!({bar: "baz"})),
             ),
         ];
 
-        for (mut object, segments, compact, expect) in cases {
+        for (mut object, segments, compact, value, expect) in cases {
             let path = Path::new_unchecked(segments);
 
-            assert_eq!(Object::remove(&mut object, &path, compact), Ok(()));
-            assert_eq!(Object::get(&object, &Path::root()), Ok(expect))
-        }
-    }
-
-    #[test]
-    fn object_paths() {
-        let cases = vec![
-            (value!({}), Ok(vec![". "])),
-            (
-                value!({"foo bar baz": "bar"}),
-                Ok(vec![". ", r#"."foo bar baz""#]),
-            ),
-            (
-                value!({foo: "bar", baz: "qux"}),
-                Ok(vec![". ", ".baz", ".foo"]),
-            ),
-            (
-                value!({foo: {bar: "baz"}}),
-                Ok(vec![". ", ".foo", ".foo.bar"]),
-            ),
-            (value!({a: [0, 1]}), Ok(vec![". ", ".a", ".a[0]", ".a[1]"])),
-            (
-                value!({a: {b: "c"}, d: 12, e: [{f: 1}, {g: 2}, {h: 3}]}),
-                Ok(vec![
-                    ". ", ".a", ".a.b", ".d", ".e", ".e[0]", ".e[0].f", ".e[1]", ".e[1].g",
-                    ".e[2]", ".e[2].h",
-                ]),
-            ),
-            (
-                value!({a: [{b: [{c: {d: {e: [[0, 1]]}}}]}]}),
-                Ok(vec![
-                    ". ",
-                    ".a",
-                    ".a[0]",
-                    ".a[0].b",
-                    ".a[0].b[0]",
-                    ".a[0].b[0].c",
-                    ".a[0].b[0].c.d",
-                    ".a[0].b[0].c.d.e",
-                    ".a[0].b[0].c.d.e[0]",
-                    ".a[0].b[0].c.d.e[0][0]",
-                    ".a[0].b[0].c.d.e[0][1]",
-                ]),
-            ),
-        ];
-
-        for (object, expect) in cases {
-            assert_eq!(
-                Object::paths(&object),
-                expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())
-            );
+            assert_eq!(Object::remove(&mut object, &path, compact), Ok(value));
+            assert_eq!(Object::get(&object, &Path::root()), Ok(expect));
         }
     }
 }

@@ -5,6 +5,7 @@ authors = ["Vector Contributors <vector@timber.io>", "Nick Fitzgerald <fitzgen@g
 edition = "2018"
 description = "Automatically derives `is_dog` and `is_cat` methods for `enum Pet { Dog, Cat }`."
 publish = false
+license = "Apache-2.0/MIT"
 
 [dependencies]
 heck = "0.3.0"

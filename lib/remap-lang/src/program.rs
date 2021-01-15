@@ -89,8 +89,9 @@ impl Program {
         source: &str,
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
+        allow_regex_return: bool, // TODO: move this into a builder pattern
     ) -> Result<Self, RemapError> {
-        let mut parser = Parser::new(function_definitions);
+        let mut parser = Parser::new(function_definitions, allow_regex_return);
         let expressions = parser.program_from_str(source)?;
 
         // optional type constraint checking
@@ -229,7 +230,7 @@ mod tests {
         ];
 
         for (source, constraint, expect) in cases {
-            let program = Program::new(source, &[], constraint)
+            let program = Program::new(source, &[], constraint, false)
                 .map(|_| ())
                 .map_err(|e| {
                     e.source()

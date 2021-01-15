@@ -157,4 +157,10 @@ fn benchmark_buffers(c: &mut Criterion) {
     //});
 }
 
-criterion_group!(benches, benchmark_buffers);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_buffers
+);

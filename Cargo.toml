@@ -5,7 +5,7 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 homepage = "https://vector.dev"
-license-file = "LICENSE"
+license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
@@ -45,6 +45,7 @@ members = [
   "lib/remap-cli",
   "lib/remap-functions",
   "lib/remap-lang",
+  "lib/remap-tests",
   "lib/shared",
   "lib/tracing-limit",
   "lib/vector-api-client",
@@ -61,6 +62,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+remap-cli = { path = "lib/remap-cli", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -121,7 +123,7 @@ itertools = { version = "0.10.0", optional = true }
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.19.0", optional = true }
-tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Remap Lang
 remap = { package = "remap-lang", path = "lib/remap-lang" }
@@ -289,11 +291,15 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
+# VRL
+vrl-cli = ["remap-cli"]
+
 # API
 api = [
   "async-graphql",
   "async-graphql-warp",
   "itertools",
+  "base64",
 ]
 
 # API client
@@ -578,7 +584,7 @@ harness = false
 required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
-tower-layer = "0.3"
+tower-layer = "=0.3.0"
 
 [patch.crates-io]
 # TODO: update to next 0.12.x (after 0.12.0, if any)

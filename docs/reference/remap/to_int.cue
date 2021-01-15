@@ -14,41 +14,26 @@ remap: functions: to_int: {
 			type: ["integer", "float", "boolean", "string", "timestamp"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a supported integer representation",
+	]
 	return: ["integer"]
 	category: "Coerce"
 	description: #"""
-		Returns an `integer` whose text representation is `string`.
+		Coerces the provided `value` into a `string`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				integer: "2"
-			}
+			title: "Convert string to int"
+			input: log: integer: "2"
 			source: ".integer = to_int(.integer)"
-			output: {
-				integer: 2
-			}
+			output: log: integer: 2
 		},
 		{
-			title: "Error"
-			input: {
-				integer: "hi"
-			}
-			source: ".integer = to_int(.integer)"
-			output: {
-				error: remap.errors.ArgumentError
-			}
-		},
-		{
-			title: "Timestamp"
-			input: {
-				timestamp: "2020-12-30 22:20:53.824727 UTC"
-			}
+			title: "Convert timestamp to int"
+			input: log: timestamp: "2020-12-30 22:20:53.824727 UTC"
 			source: ".timestamp = to_int(.timestamp)"
-			output: {
-				timestamp: 1609366853
-			}
+			output: log: timestamp: 1609366853
 		},
 	]
 }

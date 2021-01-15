@@ -8,41 +8,21 @@ remap: functions: to_string: {
 			required:    true
 			type: ["any"]
 		},
-		{
-			name:        "default"
-			description: "If the value parameter errors, return this parameter instead."
-			required:    false
-			type: ["any"]
-		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Coerce"
 	description: #"""
-		Returns the string representation of the first parameter. If this parameter is an error, then
-		the second parameter is returned.
+		Coerces the provided `value` into a `string`.
 		"""#
 	examples: [
 		{
-			title: "Success"
-			input: {
-				message: 52
-			}
+			title: "Convert number to string"
+			input: log: number: 52
 			source: #"""
-				.message = to_string(.message)
+				.number = to_string(.number)
 				"""#
-			output: {
-				message: "52"
-			}
-		},
-		{
-			title: "Default"
-			input: {
-				message: "Some invalid JSON"
-			}
-			source: "to_string(parse_json(.message), 42)"
-			output: {
-				message: 42
-			}
+			output: log: number: "52"
 		},
 	]
 }

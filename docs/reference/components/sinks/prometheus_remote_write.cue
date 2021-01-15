@@ -126,6 +126,17 @@ components: sinks: prometheus_remote_write: {
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
 			}
 		}
+		tenant_id: {
+			common:      false
+			description: "If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the text of this setting. This may be used by Cortex or other remote services to identify the tenant making the request."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["my-domain"]
+				templateable: true
+			}
+		}
 	}
 
 	input: {

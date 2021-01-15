@@ -1,5 +1,7 @@
 mod util;
 
+#[cfg(feature = "append")]
+mod append;
 #[cfg(feature = "assert")]
 mod assert;
 #[cfg(feature = "ceil")]
@@ -8,10 +10,14 @@ mod ceil;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
+#[cfg(feature = "decode_base64")]
+mod decode_base64;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
+#[cfg(feature = "encode_base64")]
+mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "ends_with")]
@@ -36,6 +42,8 @@ mod ip_subnet;
 mod ip_to_ipv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 mod ipv6_to_ipv4;
+#[cfg(feature = "is_nullish")]
+mod is_nullish;
 #[cfg(feature = "log")]
 mod log;
 #[cfg(feature = "match")]
@@ -46,10 +54,6 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
-#[cfg(feature = "ok")]
-mod ok;
-#[cfg(feature = "only_fields")]
-mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -72,8 +76,12 @@ mod parse_regex_all;
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
 mod parse_timestamp;
+#[cfg(feature = "parse_tokens")]
+mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "push")]
+mod push;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "replace")]
@@ -104,14 +112,16 @@ mod to_float;
 mod to_int;
 #[cfg(feature = "to_string")]
 mod to_string;
+#[cfg(feature = "to_syslog_facility")]
+mod to_syslog_facility;
 #[cfg(feature = "to_syslog_level")]
 mod to_syslog_level;
 #[cfg(feature = "to_syslog_severity")]
 mod to_syslog_severity;
 #[cfg(feature = "to_timestamp")]
 mod to_timestamp;
-#[cfg(feature = "tokenize")]
-mod tokenize;
+#[cfg(feature = "to_unix_timestamp")]
+mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
 #[cfg(feature = "upcase")]
@@ -125,6 +135,8 @@ mod uuid_v4;
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
+#[cfg(feature = "append")]
+pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
 #[cfg(feature = "ceil")]
@@ -133,10 +145,14 @@ pub use ceil::Ceil;
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
+#[cfg(feature = "decode_base64")]
+pub use decode_base64::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
+#[cfg(feature = "encode_base64")]
+pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
@@ -161,16 +177,14 @@ pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+#[cfg(feature = "is_nullish")]
+pub use is_nullish::IsNullish;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
-#[cfg(feature = "ok")]
-pub use ok::OK;
-#[cfg(feature = "only_fields")]
-pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -193,8 +207,12 @@ pub use parse_regex_all::ParseRegexAll;
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
 pub use parse_timestamp::ParseTimestamp;
+#[cfg(feature = "parse_tokens")]
+pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "push")]
+pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
 #[cfg(feature = "redact")]
@@ -225,14 +243,16 @@ pub use to_float::ToFloat;
 pub use to_int::ToInt;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
+#[cfg(feature = "to_syslog_facility")]
+pub use to_syslog_facility::ToSyslogFacility;
 #[cfg(feature = "to_syslog_level")]
 pub use to_syslog_level::ToSyslogLevel;
 #[cfg(feature = "to_syslog_severity")]
 pub use to_syslog_severity::ToSyslogSeverity;
 #[cfg(feature = "to_timestamp")]
 pub use to_timestamp::ToTimestamp;
-#[cfg(feature = "tokenize")]
-pub use tokenize::Tokenize;
+#[cfg(feature = "to_unix_timestamp")]
+pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
 #[cfg(feature = "upcase")]
@@ -242,10 +262,8 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn remap::Function>> {
     vec![
-        #[cfg(feature = "md5")]
-        Box::new(Md5),
-        #[cfg(feature = "sha1")]
-        Box::new(Sha1),
+        #[cfg(feature = "append")]
+        Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "ceil")]
@@ -254,10 +272,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Compact),
         #[cfg(feature = "contains")]
         Box::new(Contains),
+        #[cfg(feature = "decode_base64")]
+        Box::new(DecodeBase64),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
         Box::new(Downcase),
+        #[cfg(feature = "encode_base64")]
+        Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
         #[cfg(feature = "ends_with")]
@@ -286,16 +308,16 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_nullish")]
+        Box::new(IsNullish),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "md5")]
+        Box::new(Md5),
         #[cfg(feature = "merge")]
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
-        #[cfg(feature = "ok")]
-        Box::new(OK),
-        #[cfg(feature = "only_fields")]
-        Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -314,8 +336,12 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
         Box::new(ParseTimestamp),
+        #[cfg(feature = "parse_tokens")]
+        Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "push")]
+        Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "redact")]
@@ -324,6 +350,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Replace),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "sha1")]
+        Box::new(Sha1),
         #[cfg(feature = "sha2")]
         Box::new(Sha2),
         #[cfg(feature = "sha3")]
@@ -344,6 +372,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_syslog_facility")]
+        Box::new(ToSyslogFacility),
         #[cfg(feature = "to_syslog_level")]
         Box::new(ToSyslogLevel),
         #[cfg(feature = "to_syslog_severity")]
@@ -352,8 +382,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToString),
         #[cfg(feature = "to_timestamp")]
         Box::new(ToTimestamp),
-        #[cfg(feature = "tokenize")]
-        Box::new(Tokenize),
+        #[cfg(feature = "to_unix_timestamp")]
+        Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
         #[cfg(feature = "upcase")]

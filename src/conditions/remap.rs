@@ -40,8 +40,8 @@ impl ConditionConfig for RemapConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let program =
-            Program::new(&self.source, &functions, Some(constraint)).map_err(|e| e.to_string())?;
+        let program = Program::new(&self.source, &functions, Some(constraint), false)
+            .map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }

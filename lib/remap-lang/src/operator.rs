@@ -17,6 +17,7 @@ pub enum Operator {
     LessOrEqual,
     And,
     Or,
+    ErrorOr,
 }
 
 impl FromStr for Operator {
@@ -40,6 +41,7 @@ impl FromStr for Operator {
             "<=" => LessOrEqual,
             "&&" => And,
             "||" => Or,
+            "??" => ErrorOr,
             _ => return Err("unknown operator"),
         })
     }
@@ -64,6 +66,7 @@ impl AsRef<str> for Operator {
             LessOrEqual => "<=",
             And => "&&",
             Or => "||",
+            ErrorOr => "??",
         }
     }
 }
