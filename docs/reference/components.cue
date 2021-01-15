@@ -223,6 +223,8 @@ components: {
 	}
 
 	#FeaturesExpose: {
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
+
 		for: {
 			service:    #Service
 			interface?: #Interface
