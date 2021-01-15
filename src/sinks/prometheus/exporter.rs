@@ -260,7 +260,7 @@ impl PrometheusExporter {
         let (trigger, tripwire) = Tripwire::new();
 
         let tls = self.config.tls.clone();
-        let address = self.config.address.clone();
+        let address = self.config.address;
 
         tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&tls, true)

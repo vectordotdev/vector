@@ -329,6 +329,7 @@ mod test {
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
