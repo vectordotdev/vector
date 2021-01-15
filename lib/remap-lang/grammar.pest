@@ -136,7 +136,9 @@ reserved_keyword = @{
 
 COMMENT = _{ "#" ~ (!NEWLINE ~ ANY)* }
 
-WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }
+empty_line = _{ WHITESPACE* ~ NEWLINE | WHITESPACE* ~ COMMENT }
+
+WHITESPACE  = _{ " " | "\t" | ("\\" ~ empty_line* ) }
 
 // end of expression
 EOE = _{ NEWLINE | ";" }

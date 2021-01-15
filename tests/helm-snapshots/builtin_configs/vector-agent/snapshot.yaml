@@ -1,10 +1,8 @@
-# This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector-agent" or the
-# documentation on our website at https://vector.dev/docs.
-# If you copied this file into you local setup - feel free to change it however
-# you please.
-# If you want to create a PR to the Vector's Kubernetes config - please do not
-# edit this file directly. Instead, apply your changes to the Helm Chart.
+# Do not edit!
+# This file is generated
+# - by "scripts/helm-snapshot-tests.sh"
+# - for the chart at "distribution/helm/vector-agent"
+# - with the values from "tests/helm-snapshots/builtin_configs/vector-agent/values.yaml"
 ---
 # Source: vector-agent/templates/serviceaccount.yaml
 apiVersion: v1
@@ -46,22 +44,43 @@ data:
     
     # Ingest logs from Kubernetes.
     [sources.kubernetes_logs]
+      option1 = "value1"
+      option2 = "value2"
       type = "kubernetes_logs"
+      arbitrary text 1
+    
+    # Send logs to the aggregator.
+    [sinks.vector_sink]
+      address = "vector.internal:9000"
+      inputs = ["my_input_1", "my_input_2"]
+      option1 = "value1"
+      option2 = "value2"
+      type = "vector"
+      arbitrary text 1
     
     # Capture the metrics from the host.
     [sources.host_metrics]
+      option1 = "value1"
+      option2 = "value2"
       type = "host_metrics"
+      arbitrary text 1
     
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
+      option1 = "value1"
+      option2 = "value2"
       type = "internal_metrics"
+      arbitrary text 1
     
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       address = "0.0.0.0:9090"
       inputs = ["internal_metrics", "host_metrics"]
+      option1 = "value1"
+      option2 = "value2"
       type = "prometheus"
+      arbitrary text 1
 ---
 # Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.
@@ -135,7 +154,7 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:latest-debian"
+          image: "timberio/vector:0.0.0-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
@@ -158,8 +177,6 @@ spec:
             - name: SYSFS_ROOT
               value: /host/sys
             
-            - name: LOG
-              value: info
           ports:
             - name: metrics
               containerPort: 9090
@@ -213,12 +230,6 @@ spec:
             sources:
               - configMap:
                   name: vector-agent
-              - configMap:
-                  name: vector-agent-config
-                  optional: true
-              - secret:
-                  name: vector-agent-config
-                  optional: true
         # Host procsfs.
         - name: procfs
           hostPath:
