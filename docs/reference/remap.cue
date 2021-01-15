@@ -711,11 +711,11 @@ remap: {
 
 			examples: [
 				"""
-				# This is not processed
-				""",
+					# This is not processed
+					""",
 				"""
-				.this_is_processed = 123 # But this is ignored
-				"""
+					.this_is_processed = 123 # But this is ignored
+					""",
 			]
 		}
 
