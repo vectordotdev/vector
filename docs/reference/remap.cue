@@ -711,17 +711,10 @@ remap: {
 
 			examples: [
 				"""
-<<<<<<< HEAD
 					// This is not processed
 					""",
 				"""
 					.this_is_processed = 123 // But this is ignored
-=======
-					# This is not processed
-					""",
-				"""
-					.this_is_processed = 123 # But this is ignored
->>>>>>> 5b0cfecc96abd077cfa6975dc97d606a8e4b5174
 					""",
 			]
 		}
