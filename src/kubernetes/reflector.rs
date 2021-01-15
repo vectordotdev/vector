@@ -1000,7 +1000,7 @@ mod tests {
         // Run test logic.
         let logic = tokio::spawn(async move {
             // Process the invocations.
-            for (
+            'invocation: for (
                 expected_state_before_op,
                 expected_resource_version,
                 expected_invocation_response,
@@ -1073,6 +1073,11 @@ mod tests {
                                 .send(mock_watcher::ScenarioActionStream::ErrDesync)
                                 .await
                                 .unwrap();
+                            // After the desync, expect the reflector to go
+                            // immediately to the next invocation, skipping the
+                            // rest of the stream content, and not polling it
+                            // anymore.
+                            continue 'invocation;
                         }
                     };
                 }
