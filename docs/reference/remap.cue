@@ -6,23 +6,25 @@ remap: {
 	#RemapReturnTypes: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "string" | "timestamp"
 
 	{
-		description: """
+		description: #"""
 			**Vector Remap Language** (VRL) is a lean, single-purpose language for transforming observability data
 			(logs and metrics) in Vector. It features a simple [syntax](#syntax) and a rich set of built-in
 			[functions](#functions) tailored specifically to observability use cases. VRL is built on the following
 			two principles:
 
-			1. **Performance** - Built with Rust, VRL allows anyone to transform observability data with the speed and
-			   efficiency of Rust. Because VRL tightly integrates with Vector, it pays no performance penalty while
-			   events pass through the language, making it up 10x faster than alternatives. In addition, thoughtful
-			   ergonomics prevent users from writing slow scripts, avoiding the need to optimize VRL scripts, delivering
-			   on real-world production performance.
-			2. **Safety** - Explicit design decisions make VRL safe. Compile-time type and error safety ensure VRL
-			   scripts work expected, and thoughtful limitations prevent common footguns found in alternatives. Finally,
-			   memory safety ensures VRL is secure in even the most sensitive environments.
+			1. **Performance** — VRL is implemented in the very fast and efficient [Rust](\(urls.rust)) language and
+			   VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to
+			   transform observability with a minimal per-event performance penalty vis-à-vis pure Rust. In addition,
+			   ergonomic features such as compile-time correctness checks and the lack of language constructs like
+			   loops make it difficult to write scripts that are slow or buggy or require optimization.
+			2. **Safety** - VRL is a safe language in several senses: VRL scripts have access only to the event data
+			   that they handle and not, for example, to the Internet or the host; VRL provides the same strong memory
+			   safety guarantees as Rust; and, as mentioned above, compile-time correctness checks prevent VRL
+			   scripts from behaving in unexpected or sub-optimal ways. These factors distinguish VRL from other
+			   available event data transformation languages and runtimes.
 
-			Checkout the [announcement blog post](...) for more details.
-			"""
+			For a more in-depth picture, see the [announcement blog post](\(urls.vrl_announcement)) for more details.
+			"""#
 
 		functions: [Name=string]: {
 			#Argument: {
@@ -68,28 +70,31 @@ remap: {
 	types: {
 		"array": {
 			description: """
-				A list of values. Items in an array can be of any VRL type, including other arrays
-				and `null` (which is a value in VRL). Values inside VRL arrays can be accessed via
-				index (beginning with 0). For the array `$primary = ["magenta", "yellow", "cyan"]`,
-				for example, `$primary[0` yields `"magenta"`.
+				A list of values. Items in a VRL array can be of any type, including other arrays
+				and `null` (which is a value in VRL). You can access values insude arrays via
+				index (beginning with 0). For the array `primary = [\"magenta\", \"yellow\",
+				\"cyan\"]`, for example, `primary[0]` yields `\"magenta\"`.
 
 				You can also assign values to arrays by index:
 
-				```
-				$stooges = ["Larry", "Moe"]
-				$stooges[2] = "Curly"
+				```js
+				stooges = [\"Larry\", \"Moe\"]
+				stooges[2] = \"Curly\"
 				```
 
 				You can even assign values to arbitrary indices in arrays; indices that need to be
 				created are back-filled as `null`. For example, if the `hobbies` field doesn't
-				exist, the expression `.hobbies[2] = "Pogs"` sets the `hobbies` field to
-				`[null, null, "Pogs"]`.
+				exist, the expression `.hobbies[2] = \"Pogs\"` sets the `hobbies` field to the array
+				`[null, null, \"Pogs\"]`.
 
-				Because all expressions in VRL return a value, you can put expressions in arrays:
+				And because all expressions in VRL are technically values, if you put expressions
+				in arrays, the expressions are evaluated.
 
+				```js
+				.strange = [false || \"booper\", 1 + 1, 1 == 2]
 				```
-				.strange = [(false || "booper"), "foo", $bar, .baz]
-				```
+
+				In this case, `.strange` would evalue to `[\"booper\", 2, false]`.
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -97,6 +102,7 @@ remap: {
 				#"["error", "warn", "emerg"]"#,
 				"[[1, 2, 3], [4, 5, 6]]",
 				#"[true, 10, {"foo": "bar"}, [10], 47.5]"#,
+				#"[1 + 1, 2 == 5, "hello" + " " + "world"]"#,
 			]
 		}
 		"boolean": {
@@ -121,17 +127,29 @@ remap: {
 		"map": {
 			description: """
 				A key-value map in which keys are strings and values can be of any VRL type,
-				including other maps. And as with arrays, you can use expressions to provide the
-				value for a key:
+				including other maps.
 
+				As with arrays, you can use expressions to provide the value for a key:
+
+				```js
+				.user = { \"username\": exists(.username) || \"none\" }
 				```
-				.user = { "username": exists(.username) || "none" }
+
+				Nested maps are supported:
+
+				```js
+				.user = {
+					\"username\": \"thrillho\",
+					\"metadata\": {
+						\"level\": \"warrior\"
+					}
+				}
 				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
 				#"{"code": 200, "error_type": "insufficient_resources"}"#,
-				"""
+				#"""
 					{
 					  "user": {
 					    "id": "tonydanza1337",
@@ -139,7 +157,7 @@ remap: {
 						"boss": true
 					  }
 					}
-					""",
+					"""#,
 			]
 		}
 		"integer": {
@@ -155,22 +173,22 @@ remap: {
 			description: """
 				No value. In VRL, you can assign `null` to fields and variables:
 
-				```
+				```js
 				.hostname = null
-				$code = null
+				code = null
 				```
 
-				`null` is also the return value of expressions that don't return any other value.
-				The [`del`](#del) function for removing fields, for example, always returns `null`.
+				`null` is the return value of expressions that don't return any other value, such
+				as any invocation of the [`assert`](#assert) function.
 
-				`null` is also convertable to other types using `to_*` functions like `to_string`:
+				`null` is convertable to other types using `to_*` functions like `to_string`:
 
-				Type | Conversion
+				Function | Output
 				:----|:----------
-				string | `""`
-				integer | `0`
-				Boolean | `false`
-				float | `0`
+				`to_string` | `""`
+				`to_int` | `0`
+				`to_bool` | `false`
+				`to_float` | `0`
 				"""
 			use: ["parameter", "return"]
 			examples: [
@@ -183,8 +201,8 @@ remap: {
 				use [Rust regex syntax](\(urls.rust_regex_syntax)). Here's an example usage of a
 				regular expression:
 
-				```
-				match("happy", /(happy|sad)/)
+				```js
+				text_matches = match("happy", /(happy|sad)/)
 				```
 
 				### Flags
@@ -209,14 +227,14 @@ remap: {
 
 				* You can't assign a regex to an object path. Thus, `.pattern = /foo|bar/i` is not
 					allowed.
-				* Expressions can't return regexes. Thus, you can't, for example, dynamically create
-					regexes.
+				* Expressions can't return regexes. Thus you can't, for example, dynamically create
+					regular expressions.
 				"""
 			use: ["parameter"]
 			examples: [
 				#"/^http\://[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(/\S*)?$/"#,
 				#"""
-					$has_foo_or_bar = match("does contain foo", /(foo|bar)/)
+					has_foo_or_bar = match("does contain foo", /(foo|bar)/)
 					"""#,
 			]
 		}
@@ -226,23 +244,23 @@ remap: {
 
 				* VRL converts strings in scripts to [UTF-8](\(urls.utf8)) and replaces any invalid
 					sequences with `U+FFFD REPLACEMENT CHARACTER` (�).
-				* Strings can be escaped using a backslash (`/`), as in `\"The song is called
+				* Strings can be escaped using a forward slash (`\\`), as in `\"The song is called
 					\"My name is Jonas\"\"`.
 				* Multi-line strings *are* allowed and don't require any special syntax. See the
 					multi-line example below.
 
 				You can concatenate strings using plus (`+`). Here's an example:
 
-				```
-				$name = \"Vector Vic\"
-				.message = $name + \" is a pretty great mascot\" + \" (though we're a bit biased)\"
+				```js
+				name = \"Vector Vic\"
+				.message = name + \" is a pretty great mascot\" + \" (though we're a bit biased)\"
 				```
 				"""
 			use: ["parameter", "return"]
 			examples: [
 				"\"I am a teapot\"",
 				#"""
-					"I am split
+					"I am split \
 					across multiple lines"
 					"""#,
 				#"This is not escaped, \"but this is\""#,
@@ -321,7 +339,7 @@ remap: {
 				`.status_code`, `.username`, and `.message`. You can assign new values to the
 				existing fields (`.message = "something different"`), add new fields (`.new_field =
 				"new value"`), delete fields (`del(.username)`), store those values in variables
-				(`$code = .status_code`), and more.
+				(`code = .status_code`), and more.
 
 				### Nested values
 
@@ -351,7 +369,7 @@ remap: {
 				In the examples above, all paths have used literals à la `.foo.bar`. But path
 				segments can also be quoted, as in this example:
 
-				```
+				```js
 				user.preferences."favorite color" = "chartreuse"
 				```
 
@@ -360,13 +378,13 @@ remap: {
 				### Indexing
 
 				Values inside VRL arrays can be accessed via index (beginning with 0). For the array
-				`$primary = ["magenta", "yellow", "cyan"]`, `$primary[0]` would yield `"magenta"`.
+				`primary = ["magenta", "yellow", "cyan"]`, `primary[0]` would yield `"magenta"`.
 
 				You can also assign values to arrays by index:
 
-				```
-				$stooges = ["Larry", "Moe"]
-				$stooges[2] = "Curly"
+				```js
+				stooges = ["Larry", "Moe"]
+				stooges[2] = "Curly"
 				```
 
 				You can even assign values to arbitrary indices in arrays; any indices that need to
@@ -379,13 +397,13 @@ remap: {
 				All of the path methods above can be combined in any way. Here's an example of a
 				complex path:
 
-				```
+				```js
 				.transaction.(metadata | info).orders[0] = "a1b2c3d4e5f6"
 				```
 
-				This sets the first element of `.transaction.metadata.orders` to `"a1b2c3d4e5f6"`
-				*if* `.transaction.metadata` exist; if not, it sets `.transaction.info.orders` to
-				that value.
+				This sets the first element of `.transaction.metadata.orders[0]` to `"a1b2c3d4e5f6"`
+				*if* `.transaction.metadata` exists; if not, it sets `.transaction.info.orders[0]`
+				to `"a1b2c3d4e5f6"` instead. If neither exists,
 				"""
 			examples: [
 				".",
@@ -419,7 +437,7 @@ remap: {
 				{in: #"contains("emergency", "this is an emergency")"#, out:     "boolean"},
 				{
 					in: """
-						$is_success = { $code = .status_code; del(.status_code); $code == 200 }
+						is_success = { code = .status_code; del(.status_code); code == 200 }
 						"""
 					out: "boolean"
 				},
@@ -432,7 +450,7 @@ remap: {
 			description: #"""
 				VRL expressions can be split across multiple lines using a backslash (`\`):
 
-				```
+				```js
 				del(.one, .two, .three, .four \
 					.five, .six)
 				```
@@ -443,8 +461,8 @@ remap: {
 				Conversely, multiple expressions can be collapsed into a single line using a
 				semicolon (`;`) as the separator:
 
-				```
-				$success_code = 200; .success = .success_code == $success_code; del(.success_code)
+				```js
+				success_code = 200; .success = .success_code == success_code; del(.success_code)
 				```
 
 				You can also use line collapsing via semicolon in [control flow
@@ -476,7 +494,7 @@ remap: {
 				be called on any expression that returns a Boolean. Here's a generic example of the
 				syntax:
 
-				```
+				```js
 				if (condition) {
 					...
 				} else if (other_condition) {
@@ -489,9 +507,12 @@ remap: {
 				Any number of expressions can be combined inside of a block if they're separated by
 				a semicolon (`;`), provided that the last expression resolves to a Boolean:
 
-				```
-				if ($keyword = "sesame"; .password == $keyword) {
+				```js
+				.password = "sesame"
+
+				if (keyword = "sesame"; .password == keyword) {
 					.entry = true
+					del(.password)
 				}
 				```
 				"""
@@ -507,30 +528,74 @@ remap: {
 			]
 		}
 
+		"Error handling": {
+			href: "error-handling"
+
+			description: #"""
+				In VRL, functions that throw errors are known as *fallible* and functions that don't
+				are known as *infallible*. When functions are fallible—and most functions are—you
+				need to handle the errors that they throw.
+
+				### Error coalescing
+
+				In VRL, you can *coalesce* errors using the `??` operator. Coalescence means that if
+				a function throws an error, you can defer to another function using `??`. Here's an
+				example:
+
+				```js
+				.code = to_int(del(.status)) ?? 200
+				```
+
+				Here, if the `status` field doesn't exist, the `to_int` call fails; with the `??` in
+				place, the error is ignored and the next function is called. These coalescence
+				chains can be of any length. Here's a chain with three expressions:
+
+				```js
+				.status = to_string(del(.status)) ?? parse_syslog_level(del(.level)) ?? "ok"
+				```
+				"""#
+		}
+
 		"Assignment": {
 			href: "assignment"
 
-			description: """
+			description: #"""
 				You can assign values to object fields or [variables](#variables) using a single
 				equals sign (`=`). Some examples:
 
 				* `.is_success = .code > 200 && .code <= 299`
-				* `$pattern = /foo|bar/i`
-				* `. = parse_json(.)`
 				* `.request.id = uuid_v4()`
+				* `is_severe = to_syslog_level(.severity) == "severity"
 
-				In VRL, `=` represents assignment, while `==` is a [comparison
-				operator](#operators), as in many programming languages.
+				In VRL, `=` represents assignment while `==` is a [comparison operator](#operators),
+				as in many programming languages.
 
 				If you assign a value to an object field that doesn't already exist, the field is
 				created; if the field does exist, the value is re-assigned.
-				"""
+
+				### Conditional assignment
+
+				In VRL, *conditional* assignment is assignment to a field or variable only if the
+				right-hand-side expression succeeds. This form of assignment uses the `??=`
+				operator (a combination of `=` for assignment and `??` for
+				[coalescence](#coalescence)). Here's an example:
+
+				```js
+				. ??= parse_json(.message)
+				```
+
+				In this case, the root event field is assigned the parsed JSON value of the
+				`message` *only if JSON parsing succeeds*; if it fails, the assignment doesn't
+				occur.
+				"""#
 
 			examples: [
 				".request_id = uuid_v4()",
-				"$average = .total / .number",
+				"average = to_float(.total / .number)",
 				".partition_id = .status_code",
 				".is_server_error = .status_code == 500",
+				". ??= parse_json(.message)",
+				".timestamp ??= to_unix_timestamp(.timestamp)",
 			]
 		}
 
@@ -538,33 +603,44 @@ remap: {
 			href: "variables"
 
 			description: """
-				You can assign values to variables in VRL. Variables in VRL are prefixed with a `$`
-				and their names need to be [snake case](\(urls.snake_case)), as in `$myvar`,
-				`$my_var`, `$this_is_my_variable123`, etc. Here's an example usage of a variable:
+				You can assign values to variables in VRL. You can use any bare word for a variable
+				in VRL, with the exception of VLR's [reserved terms](#reserved-terms). Here's an
+				example usage of a variable:
 
-				```
-				$log_level = "critical"
-				.log_level = $log_level
+				```js
+				log_level = "critical"
+				.log_level = log_level
 				```
 
 				### Assignment using expressions
 
-				Because all VRL expressions return a value (by definition), you can assign using
-				expressions as well:
+				Because all VRL expressions return a value (by definition), you can assign the
+				result of expressions to variables as well:
 
+				```js
+				is_success = .status_code == 200
+				has_buzzword = contains(.message, "serverless")
 				```
-				$is_success = .status_code == 200
-				$has_buzzword = contains(.message, "serverless")
-				```
+
+				### Reserved terms
+
+				The following terms are reserved in VRL and thus can't be used as variable names:
+				`if`, `else`, `for`, `while`, `loop`, `abort`, `break`, `continue`, `return`, `as`,
+				`type`, `let`, `until`, `then`, `impl`, `in`, `self`, `this`, `use`, `std`, `null`,
+				`boolean`.
+
+				Note that of these terms are not currently used in the language, but may be in the
+				future. The goal of pre-reserving these terms is to provide as much backward
+				compatibility as possible as VRL changes over time.
 				"""
 
 			examples: [
-				"$status_code = .code",
-				#"$is_critical = .log_level == "critical""#,
-				#"$creepy_greeting = "Hello, Clarice""#,
+				"status_code = .code",
+				#"is_critical = .log_level == "critical""#,
+				#"creepy_greeting = "Hello, Clarice""#,
 				#"""
-					$is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
-					.has_proper_format = $is_url
+					is_url = match(.url, /^http(s):\/\/[a-zA-Z0-9\-\.]+\.[a-zA-Z]{2,3}(\/\S*)?$/)
+					.has_proper_format = is_url
 					del(.url)
 					"""#,
 			]
@@ -576,44 +652,69 @@ remap: {
 			description: """
 				VRL supports organizing expressions into blocks using curly braces. Everything
 				inside of a block is evaluated as a single expression. In this example, the value
-				assigned to the variable `$success` is `true` if the value of the `status_code`
+				assigned to the variable `success` is `true` if the value of the `status_code`
 				field is `201`:
 
-				```
-				$very_important = {
-					$fail_code = .status_code >= 500
-					$paying_customer = .user.plan == "enterprise"
+				```js
+				.very_important_event = {
+					fail_code = .status_code >= 500
+					paying_customer = .user.plan == \"enterprise\"
 
-					$fail_code && $paying_custmer
+					fail_code && paying_customer
 				}
 				```
-
-				Blocks are particularly useful in conjunction with variables, as in the example
-				above.
 
 				You can also collapse blocks into a single line by separating the expressions with a
 				semicolon (`;`), as in this block:
 
-				```
-				$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }
+				```js
+				not_important = { success_code = .status_code == 200; debug_msg = .level == \"debug\"; success_code && debug_msg }
 				```
 				"""
 
 			examples: [
-				#"$not_important = { $success_code = .status_code == 200; $debug = .level == "debug"; $success_code && $debug }"#,
-				"""
-					$very_important = {
-						$fail_code = .status_code >= 500
+				#"""
+					very_important = {
+						fail_code = .status_code >= 500
 						del(.status_code)
-						$paying_customer = .user.plan == "enterprise"
+						paying_customer = .user.plan == "enterprise"
 						del(.user)
 
-						$fail_code && $paying_custmer
+						fail_code && paying_customer
 					}
 
-					.if ($very_important) {
+					if very_important {
 						.important = true
 					}
+					"""#,
+			]
+		}
+
+		"Comments": {
+			href: "comments"
+
+			description: #"""
+				VRL scripts allow for comments. Anything after `#` in a given line is considered a
+				comment, which means that entire lines can be commented out or only the latter part
+				of a line:
+
+				```js
+				# An old standby placeholder:
+				.lorem = "ipsem"
+
+				.stooges = ["Larry", "Moe"] # No Curly this time, sorry
+				```
+
+				As VRL scripts are pre-compiled, the presence of comments has no effect on
+				processing speed, so feel free to use comments as liberally as you need to.
+				"""#
+
+			examples: [
+				"""
+					// This is not processed
+					""",
+				"""
+					.this_is_processed = 123 // But this is ignored
 					""",
 			]
 		}
@@ -658,6 +759,10 @@ remap: {
 					"/": "Divide by"
 					"*": "Multiply by"
 					"%": "Modulo"
+				}
+				"Error handling and assignment": {
+					"??=": "[Conditional assignment](#conditional-assignment)"
+					"??":  "[Error coalescence](#error-coalescence)"
 				}
 			}
 		}

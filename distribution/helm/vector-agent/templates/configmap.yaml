@@ -9,40 +9,28 @@ data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
   managed.toml: |
-    # Configuration for vector.
-    # Docs: https://vector.dev/docs/
+    {{- include "libvector.vectorConfigHeader" . | nindent 4 -}}
 
-    # Data dir is location controlled at the `DaemonSet`.
-    data_dir = "{{ .Values.globalOptions.dataDir }}"
-
-    {{- with .Values.logSchema }}
-    [log_schema]
-      host_key = "{{ .hostKey }}"
-      message_key = "{{ .messageKey }}"
-      source_type_key = "{{ .sourceTypeKey }}"
-      timestamp_key = "{{ .timestampKey }}"
-    {{- end }}
-
-    {{- if .Values.kubernetesLogsSource.enabled }}
+    {{- with .Values.kubernetesLogsSource }}
+    {{- if .enabled }}
     # Ingest logs from Kubernetes.
-    [sources.{{ .Values.kubernetesLogsSource.sourceId }}]
-      type = "kubernetes_logs"
-
-      {{- with .Values.kubernetesLogsSource.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "kubernetes_logs" -}}
+    {{- $_ := set $value "rawConfig" .rawConfig -}}
+    {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
+    {{- end }}
     {{- end }}
 
-    {{- if .Values.vectorSink.enabled }}
+    {{- with .Values.vectorSink -}}
+    {{- if .enabled }}
     # Send logs to the aggregator.
-    [sinks.{{ .Values.vectorSink.sinkId }}]
-      type = "vector"
-      inputs = {{ required "You must specify the `inputs` for the built-in vector sink" .Values.vectorSink.inputs | toJson }}
-      address = "{{ include "vector-agent.vectorSinkAddress" . }}"
-
-      {{- with .Values.vectorSink.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "vector" -}}
+    {{- $_ := set $value "inputs" (required "You must specify the `inputs` for the built-in vector sink" .inputs) -}}
+    {{- $_ := set $value "address" (include "vector-agent.vectorSinkAddress" $) -}}
+    {{- $_ := set $value "rawConfig" .rawConfig -}}
+    {{- tuple .sinkId $value | include "libvector.vectorSinkConfig" | nindent 4 -}}
+    {{- end }}
     {{- end }}
 
     {{- $prometheusInputs := (list) -}}
@@ -50,44 +38,15 @@ data:
     {{- if .enabled }}
     {{- $prometheusInputs = prepend $prometheusInputs .sourceId }}
     # Capture the metrics from the host.
-    [sources.{{ .sourceId }}]
-      type = "host_metrics"
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "host_metrics" -}}
+    {{- $_ := set $value "rawConfig" .rawConfig -}}
+    {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
+    {{- end -}}
+    {{- end -}}
 
-      {{- with .rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
-    {{- end }}
-    {{- end }}
+    {{- merge . (dict "prometheusInputs" $prometheusInputs) | include "libvector.metricsConfigPartial" | nindent 4 -}}
 
-    {{- merge . (dict "prometheusInputs" $prometheusInputs) | include "libvector.metricsConfigPartial" | nindent 4  }}
-
-    {{- range $sourceId, $source := .Values.sources }}
-    [sources.{{ $sourceId }}]
-      type = "{{ $source.type }}"
-
-      {{- with $source.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
-    {{- end }}
-
-    {{- range $transformId, $transform := .Values.transforms }}
-    [transforms.{{ $transformId }}]
-      type = "{{ $transform.type }}"
-      inputs = {{ $transform.inputs | toJson }}
-
-      {{- with $transform.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
-    {{- end }}
-
-    {{- range $sinkId, $sink := .Values.sinks }}
-    [sinks.{{ $sinkId }}]
-      type = "{{ $sink.type }}"
-      inputs = {{ $sink.inputs | toJson }}
-
-      {{- with $sink.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
-    {{- end }}
+    {{- include "libvector.vectorTopology" .Values | nindent 4 -}}
 
 {{- end }}
