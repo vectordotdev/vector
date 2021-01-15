@@ -22,12 +22,16 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectFailed<'a> {
     pub error: String,
-    pub endpoint: &'a String,
+    pub endpoint: Option<&'a String>,
 }
 
 impl<'a> InternalEvent for PostgresqlMetricsCollectFailed<'a> {
     fn emit_logs(&self) {
-        error!(message = "PostgreSQL query error.", endpoint = %self.endpoint, error = %self.error)
+        let message = "PostgreSQL query error.";
+        match self.endpoint {
+            Some(endpoint) => error!(message, error = %self.error, %endpoint),
+            None => error!(message, error = %self.error),
+        }
     }
 
     fn emit_metrics(&self) {

@@ -63,8 +63,8 @@ macro_rules! gauge {
 enum BuildError {
     #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: PgError },
-    #[snafu(display("host missed"))]
-    HostMissed,
+    #[snafu(display("host missing"))]
+    HostMissing,
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
     #[snafu(display("failed to create tls connector: {}", source))]
@@ -292,25 +292,25 @@ impl PostgresqlMetrics {
         tls_config: Option<PostgresqlMetricsTlsConfig>,
     ) -> Result<Self, BuildError> {
         let config: Config = endpoint.parse().context(InvalidEndpoint)?;
-        if config.get_hosts().is_empty() {
-            return Err(BuildError::HostMissed);
-        }
-        if config.get_hosts().len() > 1 {
-            return Err(BuildError::MultipleHostsNotSupported {
-                hosts: config.get_hosts().to_owned(),
-            });
-        }
 
-        let mut tags = BTreeMap::new();
-        tags.insert("endpoint".into(), config_to_endpoint(&config));
-        tags.insert(
-            "host".into(),
-            match &config.get_hosts().get(0).expect("host is not missed") {
+        let hosts = config.get_hosts();
+        let host = match hosts.len() {
+            0 => return Err(BuildError::HostMissing),
+            1 => match &hosts[0] {
                 Host::Tcp(host) => host.clone(),
                 #[cfg(unix)]
                 Host::Unix(path) => path.to_string_lossy().to_string(),
             },
-        );
+            _ => {
+                return Err(BuildError::MultipleHostsNotSupported {
+                    hosts: config.get_hosts().to_owned(),
+                })
+            }
+        };
+
+        let mut tags = BTreeMap::new();
+        tags.insert("endpoint".into(), config_to_endpoint(&config));
+        tags.insert("host".into(), host);
 
         let mut this = Self {
             config,
@@ -394,7 +394,7 @@ impl PostgresqlMetrics {
                 self.client = None;
                 emit!(PostgresqlMetricsCollectFailed {
                     error,
-                    endpoint: self.tags.get("endpoint").expect("should be defined"),
+                    endpoint: self.tags.get("endpoint"),
                 });
                 (0.0, stream::empty().boxed())
             }
@@ -690,7 +690,10 @@ fn config_to_endpoint(config: &Config) -> String {
         SslMode::Disable => params.push(("sslmode", "disable".to_string())),
         SslMode::Prefer => {} // default, ignore
         SslMode::Require => params.push(("sslmode", "require".to_string())),
-        _ => {} // non_exhaustive
+        // non_exhaustive enum
+        _ => {
+            warn!(r#"Unknown variant of "SslMode.""#);
+        }
     };
 
     // host
