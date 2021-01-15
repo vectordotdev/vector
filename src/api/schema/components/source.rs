@@ -112,3 +112,70 @@ impl filter::CustomFilter<Source> for SourcesFilter {
         self.or.as_ref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::DataType;
+
+    /// Generate component fixes for use with tests
+    fn source_fixtures() -> Vec<Source> {
+        vec![
+            Source(Data {
+                name: "gen1".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Any,
+            }),
+            Source(Data {
+                name: "gen2".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Log,
+            }),
+            Source(Data {
+                name: "gen3".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            }),
+        ]
+    }
+
+    #[test]
+    fn filter_output_type() {
+        struct Test {
+            name: &'static str,
+            output_type: SourceOutputType,
+        }
+
+        let tests = vec![
+            Test {
+                name: "gen1",
+                output_type: SourceOutputType::Any,
+            },
+            Test {
+                name: "gen2",
+                output_type: SourceOutputType::Log,
+            },
+            Test {
+                name: "gen3",
+                output_type: SourceOutputType::Metric,
+            },
+        ];
+
+        for t in tests {
+            let filter = SourcesFilter {
+                name: Some(vec![filter::StringFilter {
+                    equals: Some(t.name.to_string()),
+                    ..Default::default()
+                }]),
+                output_type: Some(vec![filter::EqualityFilter {
+                    equals: Some(t.output_type),
+                    not_equals: None,
+                }]),
+                ..Default::default()
+            };
+
+            let sources = filter::filter_items(source_fixtures().into_iter(), &filter);
+            assert_eq!(sources.len(), 1);
+        }
+    }
+}
