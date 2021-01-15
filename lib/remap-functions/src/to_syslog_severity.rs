@@ -58,7 +58,7 @@ impl Expression for ToSyslogSeverityFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(Kind::Integer)
     }
 }
@@ -68,21 +68,16 @@ mod tests {
     use super::*;
     use value::Kind;
 
-    test_type_def![
-        value_string_infallible {
-            expr: |_| ToSyslogSeverityFn {
-                value: Literal::from("warning").boxed(),
-            },
-            def: TypeDef { fallible: false, kind: Kind::Integer, ..Default::default() },
-        }
-
-        value_not_string_fallible {
-            expr: |_| ToSyslogSeverityFn {
-                value: Literal::from(27).boxed(),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
-        }
-    ];
+    test_type_def![value_not_string_fallible {
+        expr: |_| ToSyslogSeverityFn {
+            value: Literal::from(27).boxed(),
+        },
+        def: TypeDef {
+            fallible: true,
+            kind: Kind::Integer,
+            ..Default::default()
+        },
+    }];
 
     test_function![
         to_level => ToSyslogSeverity;

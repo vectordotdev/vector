@@ -122,35 +122,6 @@
       "result_c.equals" = true
       "result_d.equals" = false
 
-[transforms.remap_delete_only_fields]
-  inputs = []
-  type = "remap"
-  source = """
-    only_fields(.foo, .bar, .buz.second)
-    del(.foo.second)
-  """
-[[tests]]
-  name = "remap_delete_only_fields"
-  [tests.input]
-    insert_at = "remap_delete_only_fields"
-    type = "log"
-    [tests.input.log_fields]
-      "foo.first" = "foo first value"
-      "foo.second" = "foo second value"
-      bar = "bar value"
-      baz = "baz value"
-      "buz.first" = "buz first value"
-      "buz.second" = "buz second value"
-  [[tests.outputs]]
-    extract_from = "remap_delete_only_fields"
-    [[tests.outputs.conditions]]
-      "foo.first.equals" = "foo first value"
-      "foo.second.exists" = false
-      "bar.equals" = "bar value"
-      "baz.exists" = false
-      "buz.first.exists" = false
-      "buz.second.equals" = "buz second value"
-
 [transforms.remap_coercion]
   inputs = []
   type = "remap"

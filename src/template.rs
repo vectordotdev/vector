@@ -149,12 +149,15 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .get(1)
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
-            if let Some(val) = event.as_log().get(&key) {
-                val.to_string_lossy()
-            } else {
+            match event {
+                Event::Metric(_) => None, // See issue #5985
+                Event::Log(log) => log.get(&key),
+            }
+            .map(|val| val.to_string_lossy())
+            .unwrap_or_else(|| {
                 missing_fields.push(key.to_owned());
                 String::new()
-            }
+            })
         })
         .into_owned();
     if missing_fields.is_empty() {
