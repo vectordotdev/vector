@@ -318,8 +318,6 @@ struct DockerLogsSource {
     main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
-    /// True if self needs to be excluded
-    exclude_self: bool,
     backoff_duration: Duration,
 }
 
@@ -329,17 +327,6 @@ impl DockerLogsSource {
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
-        let include_containers_specified = config
-            .include_containers
-            .as_ref()
-            .map(Vec::is_empty)
-            .unwrap_or(false);
-
-        // This is to be used only if source is in state of catching everything.
-        // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = include_containers_specified
-            && config.include_labels.clone().unwrap_or_default().is_empty();
-
         let backoff_secs = config.retry_backoff_secs;
 
         let host_key = config.host_key.clone();
@@ -379,7 +366,6 @@ impl DockerLogsSource {
             containers: HashMap::new(),
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
-            exclude_self,
             backoff_duration: Duration::from_secs(backoff_secs),
         })
     }
@@ -414,7 +400,8 @@ impl DockerLogsSource {
 
                 trace!(message = "Found already running container.", id = %id, names = ?names);
 
-                if !self.exclude_vector(id.as_str(), image.as_str()) {
+                if self.exclude_vector(id.as_str(), image.as_str()) {
+                    info!(message = "Excluded vector container.", id = %id);
                     return;
                 }
 
@@ -430,7 +417,7 @@ impl DockerLogsSource {
                         }
                     }),
                 ) {
-                    trace!(message = "Container excluded.", id = %id);
+                    info!(message = "Container excluded.", id = %id);
                     return;
                 }
 
@@ -535,27 +522,20 @@ impl DockerLogsSource {
     /// True if container with the given id and image must be excluded from logging,
     /// because it's a vector instance, probably this one.
     fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
-        if self.exclude_self {
-            // Find out it's own container id, if it's inside a docker container.
-            // Since docker doesn't readily provide such information,
-            // various approaches need to be made. As such the solution is not
-            // exact, but probable.
-            let hostname_hint = self
-                .hostname
-                .as_ref()
-                .map(|maybe_short_id| id.starts_with(maybe_short_id))
-                .unwrap_or(false);
-            let image_hint = image
-                .into()
-                .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
-                .unwrap_or(false);
-            if hostname_hint || image_hint {
-                // This container is probably itself.
-                info!(message = "Detected self container.", id = %id);
-                return false;
-            }
-        }
-        true
+        // Find out it's own container id, if it's inside a docker container.
+        // Since docker doesn't readily provide such information,
+        // various approaches need to be made. As such the solution is not
+        // exact, but probable.
+        let match_hostname = self
+            .hostname
+            .as_ref()
+            .map(|maybe_short_id| id.starts_with(maybe_short_id))
+            .unwrap_or(false);
+        let match_image = image
+            .into()
+            .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
+            .unwrap_or(false);
+        match_hostname || match_image
     }
 }
 
