@@ -25,19 +25,20 @@ impl Function for EncodeBase64 {
                 keyword: "charset",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
-            }
+            },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
         let padding = arguments.optional("padding").map(Expr::boxed);
-        let charset = arguments
-            .optional_enum("charset", &Charset::all_str())?
-            .map(|c| Charset::from_str(&c).expect("validated enum"))
-            .unwrap_or_default();
+        let charset = arguments.optional("charset").map(Expr::boxed);
 
-        Ok(Box::new(EncodeBase64Fn { value, padding, charset }))
+        Ok(Box::new(EncodeBase64Fn {
+            value,
+            padding,
+            charset,
+        }))
     }
 }
 
@@ -50,26 +51,6 @@ enum Charset {
 impl Default for Charset {
     fn default() -> Self {
         Self::Standard
-    }
-}
-
-impl Charset {
-    fn all_str() -> Vec<&'static str> {
-        use Charset::*;
-
-        vec![Standard, UrlSafe]
-            .into_iter()
-            .map(|p| p.as_str())
-            .collect::<Vec<_>>()
-    }
-
-    const fn as_str(self) -> &'static str {
-        use Charset::*;
-
-        match self {
-            Standard => "standard",
-            UrlSafe => "url_safe",
-        }
     }
 }
 
@@ -102,7 +83,7 @@ impl FromStr for Charset {
 struct EncodeBase64Fn {
     value: Box<dyn Expression>,
     padding: Option<Box<dyn Expression>>,
-    charset: Charset,
+    charset: Option<Box<dyn Expression>>,
 }
 
 impl Expression for EncodeBase64Fn {
@@ -119,7 +100,19 @@ impl Expression for EncodeBase64Fn {
             .transpose()?
             .unwrap_or(true);
 
-        let config = base64::Config::new(self.charset.into(), padding);
+        let charset = self
+            .charset
+            .as_ref()
+            .map(|c| {
+                c.execute(state, object)
+                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
+            })
+            .transpose()?
+            .map(|c| Charset::from_str(&String::from_utf8_lossy(&c)))
+            .transpose()?
+            .unwrap_or_default();
+
+        let config = base64::Config::new(charset.into(), padding);
 
         Ok(base64::encode_config(value, config).into())
     }
@@ -132,10 +125,16 @@ impl Expression for EncodeBase64Fn {
             .as_ref()
             .map(|padding| padding.type_def(state).fallible_unless(Kind::Boolean));
 
+        let charset_def = self
+            .charset
+            .as_ref()
+            .map(|charset| charset.type_def(state).fallible_unless(Kind::Bytes));
+
         self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
             .merge_optional(padding_def)
+            .merge_optional(charset_def)
             .with_constraint(Kind::Bytes)
     }
 }
@@ -146,29 +145,38 @@ mod test {
     use value::Kind;
 
     test_type_def![
-        value_string_padding_unspecified_infallible {
+        value_string_padding_unspecified_charset_unspecified_infallible {
             expr: |_| EncodeBase64Fn {
-                value: Literal::from("foo").boxed(),
+                value: lit!("foo").boxed(),
                 padding: None,
-                charset: Charset::default(),
+                charset: None,
             },
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_string_padding_boolean_infallible {
+        value_string_padding_boolean_charset_specified_infallible {
             expr: |_| EncodeBase64Fn {
-                value: Literal::from("foo").boxed(),
-                padding: Some(Literal::from(false).boxed()),
-                charset: Charset::default(),
+                value: lit!("foo").boxed(),
+                padding: Some(lit!(false).boxed()),
+                charset: Some(lit!("standard").boxed()),
             },
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_string_padding_non_boolean_fallible {
+        padding_non_boolean_fallible {
             expr: |_| EncodeBase64Fn {
-                value: Literal::from("foo").boxed(),
-                padding: Some(Literal::from("foo").boxed()),
-                charset: Charset::default(),
+                value: lit!("foo").boxed(),
+                padding: Some(lit!("foo").boxed()),
+                charset: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        }
+
+        charset_non_string_fallible {
+            expr: |_| EncodeBase64Fn {
+                value: lit!("foo").boxed(),
+                padding: None,
+                charset: Some(lit!(127).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
@@ -176,17 +184,17 @@ mod test {
         value_non_string_fallible {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from(127).boxed(),
-                padding: Some(Literal::from(true).boxed()),
-                charset: Charset::default(),
+                padding: None,
+                charset: None,
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
-        both_types_wrong_fallible {
+        all_types_wrong_fallible {
             expr: |_| EncodeBase64Fn {
                 value: Literal::from(127).boxed(),
-                padding: Some(Literal::from("foo").boxed()),
-                charset: Charset::default(),
+                padding: Some(lit!("foo").boxed()),
+                charset: Some(lit!(127).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
@@ -195,24 +203,44 @@ mod test {
     test_function![
         encode_base64 => EncodeBase64;
 
-        string_value_with_padding {
-            args: func_args![value: value!("some string value"), padding: value!(true)],
-            want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU=")),
-        }
-
-        string_value_with_default_padding {
+        with_defaults {
             args: func_args![value: value!("some string value")],
             want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU=")),
         }
 
-        string_value_no_padding {
-            args: func_args![value: value!("some string value"), padding: value!(false)],
-            want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU")),
+        with_padding_standard_charset {
+            args: func_args![value: value!("some string value"), padding: value!(true), charset: value!("standard")],
+            want: Ok(value!("c29tZSBzdHJpbmcgdmFsdWU=")),
         }
 
-        empty_string_value {
-            args: func_args![value: value!("")],
+        no_padding_standard_charset {
+            args: func_args![value: value!("some+string+value"), padding: value!(false), charset: value!("standard")],
+            want: Ok(value!("c29tZStzdHJpbmcrdmFsdWU")),
+        }
+
+        no_padding_urlsafe_charset {
+            args: func_args![value: value!("some+string+value"), padding: value!(false), charset: value!("url_safe")],
+            want: Ok(value!("c29tZStzdHJpbmcrdmFsdWU")),
+        }
+
+        with_padding_urlsafe_charset {
+            args: func_args![value: value!("foo+bar+baz"), padding: value!(false), charset: value!("url_safe")],
+            want: Ok(value!("Zm9vK2JhcitiYXo")),
+        }
+
+        empty_string_standard_charset {
+            args: func_args![value: value!(""), charset: value!("standard")],
             want: Ok(value!("")),
+        }
+
+        empty_string_urlsafe_charset {
+            args: func_args![value: value!(""), charset: value!("url_safe")],
+            want: Ok(value!("")),
+        }
+
+        invalid_charset_error {
+            args: func_args![value: value!("some string value"), padding: value!(false), charset: value!("foo")],
+            want: Err("function call error: unknown charset"),
         }
     ];
 }
