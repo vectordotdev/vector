@@ -521,7 +521,7 @@ mod tests {
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "20"))),
+                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid2", "20"))),
                     ExpStmRes::Desync,
                 ]),
             ),
@@ -529,7 +529,7 @@ mod tests {
                 vec![
                     make_pod("uid0", "10"),
                     make_pod("uid1", "15"),
-                    make_pod("uid1", "20"),
+                    make_pod("uid2", "20"),
                 ],
                 None,
                 ExpInvRes::Stream(vec![
