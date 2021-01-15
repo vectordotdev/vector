@@ -20,7 +20,7 @@ components: sources: postgresql_metrics: {
 					name:     "PostgreSQL Server"
 					thing:    "an \(name)"
 					url:      urls.postgresql
-					versions: null
+					versions: "9.6-13"
 				}
 
 				interface: {

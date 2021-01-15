@@ -504,20 +504,33 @@ impl PostgresqlMetrics {
                     counter!(row_get_value::<i64>(row, "deadlocks")?),
                     tags!(self.tags, "db" => db),
                 ),
-                self.create_metric(
-                    "pg_stat_database_checksum_failures_total",
-                    counter!(row_get_value::<Option<i64>>(row, "checksum_failures")?.unwrap_or(0)),
-                    tags!(self.tags, "db" => db),
-                ),
-                self.create_metric(
-                    "pg_stat_database_checksum_last_failure",
-                    gauge!(
-                        row_get_value::<Option<DateTime<Utc>>>(row, "checksum_last_failure")?
-                            .map(|t| t.timestamp())
-                            .unwrap_or(0)
+            ]);
+            if row
+                .columns()
+                .iter()
+                .any(|column| column.name() == "checksum_failures")
+            {
+                metrics.extend_from_slice(&[
+                    self.create_metric(
+                        "pg_stat_database_checksum_failures_total",
+                        counter!(
+                            row_get_value::<Option<i64>>(row, "checksum_failures")?.unwrap_or(0)
+                        ),
+                        tags!(self.tags, "db" => db),
                     ),
-                    tags!(self.tags, "db" => db),
-                ),
+                    self.create_metric(
+                        "pg_stat_database_checksum_last_failure",
+                        gauge!(row_get_value::<Option<DateTime<Utc>>>(
+                            row,
+                            "checksum_last_failure"
+                        )?
+                        .map(|t| t.timestamp())
+                        .unwrap_or(0)),
+                        tags!(self.tags, "db" => db),
+                    ),
+                ]);
+            }
+            metrics.extend_from_slice(&[
                 self.create_metric(
                     "pg_stat_database_blk_read_time_seconds_total",
                     counter!(row_get_value::<f64>(row, "blk_read_time")? / 1000f64),
