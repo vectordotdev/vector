@@ -1,7 +1,7 @@
-use crate::error::ProgramError;
 use crate::{
+    diagnostic::{self, Note},
     parser::{self, ParsedExpression, Parser},
-    state, value, Diagnostic, DiagnosticList, Expression, Function, TypeDef,
+    state, value, Diagnostic, Expression, Function, TypeDef,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -46,11 +46,6 @@ pub struct TypeConstraint {
 pub struct Program<'a> {
     pub(crate) source: &'a str,
     pub(crate) expressions: Vec<ParsedExpression>,
-
-    /// A list of diagnostic messages.
-    ///
-    /// This can include errors, warnings, or notices.
-    pub(crate) diagnostics: DiagnosticList,
 }
 
 impl<'a> Program<'a> {
@@ -59,13 +54,11 @@ impl<'a> Program<'a> {
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
         allow_regex_return: bool, // TODO: move this into a builder pattern
-    ) -> Result<Self, ProgramError<'a>> {
+    ) -> diagnostic::Result<Self> {
         let mut state = state::Compiler::default();
         let parser = Parser::new(function_definitions, &mut state, allow_regex_return);
 
-        let (expressions, mut diagnostics) = parser
-            .program_from_str(source)
-            .map_err(|diagnostics| (source, diagnostics))?;
+        let (expressions, mut diagnostics) = parser.program_from_str(source)?;
 
         // optional type constraint checking
         if let Some(constraint) = constraint {
@@ -100,24 +93,27 @@ impl<'a> Program<'a> {
         // not the entire root expression.
         expressions
             .iter()
-            .filter(|e| !e.type_def(&state).is_fallible())
+            .filter(|e| e.type_def(&state).is_fallible())
             .for_each(|e| {
                 diagnostics.push(
-                    Diagnostic::error("uncaught error")
+                    Diagnostic::error("unhandled error")
                         .with_primary("expression can result in runtime error", e.span())
-                        .with_context("capture the error to guarantee runtime success", e.span()),
+                        .with_context("handle the error case to ensure runtime success", e.span())
+                        .with_note(Note::SeeErrDocs),
                 )
             });
 
-        Ok(Self {
-            source,
-            expressions,
-            diagnostics,
-        })
-    }
+        if diagnostics.is_err() {
+            return Err(diagnostics);
+        }
 
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
+        Ok((
+            Self {
+                source,
+                expressions,
+            },
+            diagnostics,
+        ))
     }
 
     pub fn expressions(&self) -> &[ParsedExpression] {

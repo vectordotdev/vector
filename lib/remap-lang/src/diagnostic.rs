@@ -3,6 +3,66 @@ use codespan_reporting::diagnostic;
 use std::fmt;
 use std::ops::{Deref, DerefMut, Range, RangeInclusive};
 
+/// A result type in which the `Ok` variant contains `T` and a list of zero or
+/// more non-error diagnostics. The `Err` variant contains a list of one or more
+/// diagnostics (errors and warnings).
+pub type Result<T> = std::result::Result<(T, DiagnosticList), DiagnosticList>;
+
+/// A formatter to display diagnostics tied to a given source.
+pub struct Formatter<'a> {
+    source: &'a str,
+    diagnostics: DiagnosticList,
+    color: bool,
+}
+
+impl<'a> Formatter<'a> {
+    pub fn new(source: &'a str, diagnostics: impl Into<DiagnosticList>) -> Self {
+        Self {
+            source,
+            diagnostics: diagnostics.into(),
+            color: false,
+        }
+    }
+
+    pub fn enable_colors(&mut self, color: bool) {
+        self.color = color
+    }
+}
+
+impl<'a> fmt::Display for Formatter<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use codespan_reporting::files::SimpleFile;
+        use codespan_reporting::term;
+        use std::str::from_utf8;
+        use termcolor::Buffer;
+
+        let file = SimpleFile::new("", self.source);
+        let config = term::Config::default();
+        let mut buffer = if self.color {
+            Buffer::ansi()
+        } else {
+            Buffer::no_color()
+        };
+
+        for diagnostic in self.diagnostics.iter() {
+            term::emit(&mut buffer, &config, &file, &diagnostic.to_owned().into())
+                .map_err(|_| fmt::Error)?;
+        }
+
+        f.write_str(from_utf8(buffer.as_slice()).map_err(|_| fmt::Error)?)
+    }
+}
+
+impl<'a> From<(&'a str, DiagnosticList)> for Formatter<'a> {
+    fn from((source, diagnostics): (&'a str, DiagnosticList)) -> Self {
+        Self {
+            source,
+            diagnostics,
+            color: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
     severity: Severity,
@@ -103,23 +163,6 @@ impl Diagnostic {
     }
 }
 
-impl fmt::Display for Diagnostic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use codespan_reporting::files::SimpleFile;
-        use codespan_reporting::term;
-        use std::str::from_utf8;
-        use termcolor::Buffer;
-
-        let file = SimpleFile::new("", "");
-        let config = term::Config::default();
-        let mut buffer = Buffer::no_color();
-
-        term::emit(&mut buffer, &config, &file, &self.clone().into()).map_err(|_| fmt::Error)?;
-
-        f.write_str(from_utf8(buffer.as_slice()).map_err(|_| fmt::Error)?)
-    }
-}
-
 impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
     fn into(self) -> diagnostic::Diagnostic<()> {
         let mut notes = self.notes.to_vec();
@@ -139,29 +182,6 @@ impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DiagnosticList(Vec<Diagnostic>);
-
-impl Deref for DiagnosticList {
-    type Target = Vec<Diagnostic>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for DiagnosticList {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl IntoIterator for DiagnosticList {
-    type Item = Diagnostic;
-    type IntoIter = std::vec::IntoIter<Diagnostic>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
 
 impl DiagnosticList {
     /// Returns `true` if there are any errors or bugs in the parsed source.
@@ -210,9 +230,38 @@ impl DiagnosticList {
     }
 }
 
+impl Deref for DiagnosticList {
+    type Target = Vec<Diagnostic>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for DiagnosticList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for DiagnosticList {
+    type Item = Diagnostic;
+    type IntoIter = std::vec::IntoIter<Diagnostic>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl From<Vec<Diagnostic>> for DiagnosticList {
     fn from(diagnostics: Vec<Diagnostic>) -> Self {
         Self(diagnostics)
+    }
+}
+
+impl From<Diagnostic> for DiagnosticList {
+    fn from(diagnostic: Diagnostic) -> Self {
+        Self(vec![diagnostic])
     }
 }
 
@@ -325,6 +374,7 @@ pub enum Note {
         ok: String,
         err: String,
     },
+    SeeFuncDocs(&'static str),
     SeeErrDocs,
 
     #[doc(hidden)]
@@ -347,8 +397,12 @@ impl fmt::Display for Note {
                     ok, err
                 )
             }
-            SeeErrDocs => f.write_str("see error handling documentation at: https://vector.dev"),
-            SeeLangDocs => f.write_str("see language documentation at: https://vector.dev"),
+            SeeFuncDocs(func) => write!(f, 
+                "see function documentation at: https://master.vector.dev/docs/reference/remap/#{}",
+                func
+            ),
+            SeeErrDocs => f.write_str("see error handling documentation at: https://vector.dev/docs/reference/vrl/"),
+            SeeLangDocs => f.write_str("see language documentation at: https://vector.dev/docs/reference/vrl/"),
         }
     }
 }

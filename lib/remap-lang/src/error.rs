@@ -1,8 +1,8 @@
 use crate::{
-    diagnostic::{Diagnostic, DiagnosticList},
+    diagnostic::{Diagnostic, DiagnosticList, Note},
     expression, function,
     parser::{ParsedExpression, Rule},
-    path, program, value,
+    path, program, value, Expr,
 };
 use std::error::Error as StdError;
 use std::fmt;
@@ -36,8 +36,26 @@ impl StdError for RuntimeError<'_> {
 
 impl<'a> From<(&'a str, &'a ParsedExpression, Error)> for RuntimeError<'a> {
     fn from((source, expr, error): (&'a str, &'a ParsedExpression, Error)) -> Self {
-        let diagnostic =
-            Diagnostic::error("program aborted").with_primary(error.to_string(), expr.span());
+        let span = expr.span();
+        let mut diagnostic = Diagnostic::error("program aborted");
+
+        diagnostic = match error {
+            Error::Call(err) => {
+                diagnostic = diagnostic
+                    .with_primary("function call error", span)
+                    .with_primary(err, span);
+
+                if let Expr::Function(func) = expr.expression() {
+                    diagnostic = diagnostic.with_note(Note::SeeFuncDocs(func.ident()))
+                };
+
+                diagnostic
+            }
+            Error::Function(err) => match err {
+                _ => diagnostic.with_primary("todo", expr.span()),
+            },
+            _ => diagnostic.with_primary(error.to_string(), expr.span()),
+        };
 
         Self { source, diagnostic }
     }
@@ -47,12 +65,6 @@ impl<'a> From<(&'a str, &'a ParsedExpression, Error)> for RuntimeError<'a> {
 pub struct ProgramError<'a> {
     source: &'a str,
     diagnostics: DiagnosticList,
-}
-
-impl ProgramError<'_> {
-    pub fn diagnostics(&self) -> &DiagnosticList {
-        &self.diagnostics
-    }
 }
 
 impl fmt::Display for ProgramError<'_> {

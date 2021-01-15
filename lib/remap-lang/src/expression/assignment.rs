@@ -25,20 +25,6 @@ pub enum Target {
     Infallible { ok: Box<Target>, err: Box<Target> },
 }
 
-impl Target {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Target::Path(_) => "path",
-            Target::Variable(_) => "variable",
-            Target::Infallible { ok, .. } => match ok.as_ref() {
-                Target::Path(_) => "infallible path",
-                Target::Variable(_) => "infallible variable",
-                Target::Infallible { .. } => unimplemented!("nested infallible target"),
-            },
-        }
-    }
-}
-
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

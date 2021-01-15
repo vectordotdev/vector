@@ -1,4 +1,4 @@
-use crate::{parser::Parser, state, Diagnostic};
+use crate::{diagnostic::Formatter, parser::Parser, state};
 use std::fmt;
 use std::str::FromStr;
 
@@ -32,25 +32,13 @@ impl FromStr for Path {
             parser
                 .path_from_str(s)
                 .map(|(path, _)| path)
-                .map_err(|mut diagnostics| {
-                    let err = diagnostics
-                        .pop()
-                        .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
-
-                    Error::Parse(err.to_string())
-                })
+                .map_err(|diagnostics| Error::Parse(Formatter::new(s, diagnostics).to_string()))
         } else {
             let s = format!(".{}", s);
             parser
                 .path_from_str(&s)
                 .map(|(path, _)| path)
-                .map_err(|mut diagnostics| {
-                    let err = diagnostics
-                        .pop()
-                        .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
-
-                    Error::Parse(err.to_string())
-                })
+                .map_err(|diagnostics| Error::Parse(Formatter::new(&s, diagnostics).to_string()))
         }
     }
 }
@@ -307,13 +295,7 @@ impl FromStr for Field {
         Parser::new(&[], &mut state, false)
             .path_field_from_str(field)
             .map(|(field, _)| field)
-            .map_err(|mut diagnostics| {
-                let err = diagnostics
-                    .pop()
-                    .unwrap_or_else(|| Diagnostic::bug("missing diagnostic"));
-
-                Error::Parse(err.to_string())
-            })
+            .map_err(|diagnostics| Error::Parse(Formatter::new(field, diagnostics).to_string()))
     }
 }
 

@@ -1,4 +1,3 @@
-use super::Error as E;
 use crate::{path, state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
@@ -62,10 +61,7 @@ impl Path {
 
 impl Expression for Path {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = object
-            .get(&self.path)
-            .map_err(|e| E::from(Error::Resolve(e)))?
-            .unwrap_or(Value::Null);
+        let value = object.get(&self.path).ok().flatten().unwrap_or(Value::Null);
 
         Ok(value)
     }
@@ -74,10 +70,11 @@ impl Expression for Path {
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        state.path_query_type(self).cloned().unwrap_or(TypeDef {
-            fallible: true,
-            ..Default::default()
-        })
+        state
+            .path_query_type(self)
+            .cloned()
+            .unwrap_or_default()
+            .into_fallible(false)
     }
 }
 

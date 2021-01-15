@@ -145,6 +145,10 @@ impl Function {
     pub fn abort_on_error(&self) -> bool {
         self.abort_on_error
     }
+
+    pub fn ident(&self) -> &'static str {
+        self.ident
+    }
 }
 
 impl Expression for Function {

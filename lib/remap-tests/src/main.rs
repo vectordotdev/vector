@@ -1,5 +1,5 @@
 use ansi_term::Colour;
-use remap::{prelude::*, Program, Runtime};
+use remap::{diagnostic::Formatter, prelude::*, Program, Runtime};
 use std::fs;
 use std::path::PathBuf;
 
@@ -27,7 +27,8 @@ fn main() {
         let want = test.result.to_string();
 
         match program {
-            Ok(program) => {
+            Ok((program, diagnostics)) => {
+                let mut formatter = Formatter::new(&test.source, diagnostics);
                 let result = runtime.run(&mut test.object, &program);
 
                 match result {
@@ -47,7 +48,9 @@ fn main() {
                         }
 
                         if verbose {
-                            println!("{:#}", value);
+                            formatter.enable_colors(true);
+                            println!("{}", formatter);
+                            println!("{}", value);
                         }
                     }
                     Err(err) => {
@@ -69,8 +72,9 @@ fn main() {
                     }
                 }
             }
-            Err(err) => {
-                let got = err.to_string().trim().to_owned();
+            Err(diagnostics) => {
+                let mut formatter = Formatter::new(&test.source, diagnostics);
+                let got = formatter.to_string().trim().to_owned();
                 let want = want.trim().to_owned();
 
                 if got == want {
@@ -83,7 +87,8 @@ fn main() {
                 }
 
                 if verbose {
-                    println!("{:#}", err);
+                    formatter.enable_colors(true);
+                    println!("{:#}", formatter);
                 }
             }
         }

@@ -1,7 +1,7 @@
 #![allow(clippy::or_fun_call)]
 
 use crate::{
-    diagnostic::{Diagnostic, DiagnosticList, Label, Note, Span},
+    diagnostic::{self, Diagnostic, DiagnosticList, Label, Note, Span},
     expression::{
         self, function,
         if_statement::{self, IfCondition},
@@ -21,7 +21,6 @@ use std::str::FromStr;
 pub(crate) type R = Rule;
 type IResult<T> = Result<ParsedNode<T>, ParserBug>;
 type PestError = pest::error::Error<R>;
-pub type ParseResult<T> = Result<(T, DiagnosticList), DiagnosticList>;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "../grammar.pest"]
@@ -146,6 +145,10 @@ pub struct ParsedExpression {
 impl ParsedExpression {
     pub fn span(&self) -> Span {
         self.span
+    }
+
+    pub fn expression(&self) -> &Expr {
+        &self.expr
     }
 
     pub fn into_expression(self) -> Expr {
@@ -381,7 +384,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn program_from_str(
         mut self,
         source: &'a str,
-    ) -> ParseResult<Vec<ParsedExpression>> {
+    ) -> diagnostic::Result<Vec<ParsedExpression>> {
         let expressions = self
             .pairs_from_str(R::program, source)
             .and_then(|pairs| self.pairs_to_expressions(pairs.into_inner()))
@@ -401,7 +404,7 @@ impl<'a> Parser<'a> {
 
     /// Parse a string path into a [`path::Path`] wrapper with easy access to
     /// individual path [`path::Segment`]s.
-    pub(crate) fn path_from_str(mut self, path: &'a str) -> ParseResult<path::Path> {
+    pub(crate) fn path_from_str(mut self, path: &'a str) -> diagnostic::Result<path::Path> {
         let path = self
             .pairs_from_str(R::rule_path, path)
             .and_then(|pairs| pairs.into_inner().next().ok_or(e(R::rule_path, path)))
@@ -428,7 +431,7 @@ impl<'a> Parser<'a> {
     /// - An error if neither is true.
     ///
     /// These rules are defined by the Remap parser.
-    pub(crate) fn path_field_from_str(mut self, field: &'a str) -> ParseResult<path::Field> {
+    pub(crate) fn path_field_from_str(mut self, field: &'a str) -> diagnostic::Result<path::Field> {
         let field = self
             .pairs_from_str(R::rule_ident, field)
             .and_then(|pairs| pairs.into_inner().next().ok_or(e(R::rule_ident, field)))
@@ -550,9 +553,14 @@ impl<'a> Parser<'a> {
     fn target_from_pair(&mut self, pair: Pair<R>) -> IResult<Target> {
         match pair.as_rule() {
             R::variable => self.variable_from_pair(pair).and_then(|node| {
-                if let Some(path) = node.path() {
-                    let path_span = node.span.end - path.to_string().bytes().len()..node.span.end;
-                    let variable_span = node.span.start..path_span.start;
+                let (span, mut variable) = node.take();
+
+                // track an error diagnostic and re-assign variable to a
+                // variable without a path, since we don't support this
+                // currently.
+                if let Some(path) = variable.path() {
+                    let path_span = span.end - path.to_string().bytes().len()..span.end;
+                    let variable_span = span.start..path_span.start;
 
                     self.diagnostics.push(
                         Diagnostic::error("path-based variable assignment")
@@ -561,13 +569,15 @@ impl<'a> Parser<'a> {
                                 path_span,
                             )
                             .with_context(
-                                format!(r#"assign to "{}" instead"#, node.ident()),
+                                format!(r#"assign to "{}" instead"#, variable.ident()),
                                 variable_span,
                             ),
                     );
+
+                    variable = Variable::new("_".to_owned(), None);
                 }
 
-                Ok((node.span, Target::Variable(node.into_inner())).into())
+                Ok((span, Target::Variable(variable)).into())
             }),
             R::path => {
                 let (span, path) = self.path_from_pair(pair)?.take();
