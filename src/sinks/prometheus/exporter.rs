@@ -367,6 +367,8 @@ mod tests {
 
         let (_name, event) = create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
+        let (_name, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        tx.send(event).expect("Failed to send.");
 
         time::delay_for(time::Duration::from_millis(100)).await;
 
@@ -523,7 +525,7 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let uri = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
+        let url = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
