@@ -1014,6 +1014,18 @@ mod tests {
                 expected_invocation_response,
             ) in invocations
             {
+                // Validate that there's a delay before the invocation, and
+                // that some time has to pass before the actual invocation is
+                // issued.
+                // Wait for a quater of the expected delay, and assert that the
+                // invocation is still not yet requested.
+                tokio::time::advance(pause_between_requests / 4).await;
+                tokio::task::yield_now().await;
+                assert!(
+                    watcher_events_rx.try_next().is_err(),
+                    "expected a delay before the invocation, but it was called without a delay"
+                );
+
                 // Advance the time to scroll pass the delay between
                 // the invocations.
                 tokio::time::advance(pause_between_requests * 2).await;
