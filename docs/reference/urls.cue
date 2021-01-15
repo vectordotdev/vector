@@ -450,6 +450,7 @@ urls: {
 	vector_twitter:                                           "https://twitter.com/vectordotdev"
 	vector_version_branches:                                  "https://github.com/timberio/vector/branches/all?query=v"
 	vector_website:                                           "https://vector.dev"
+	vrl_announcement:                                         "https://vector.dev/blog/vector-remap-language"
 	vote_feature:                                             "https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22"
 	wasm:                                                     "https://webassembly.org/"
 	wasm_languages:                                           "https://github.com/appcypher/awesome-wasm-langs"
