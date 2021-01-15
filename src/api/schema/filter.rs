@@ -72,25 +72,23 @@ pub trait CustomFilter<T> {
         Self: Sized;
 }
 
+/// Returns true if a provided `Item` passes all 'AND' or 'OR' filter rules, recursively.
+fn filter_one<Item, Filter>(item: &Item, f: &Filter) -> bool
+where
+    Filter: CustomFilter<Item>,
+{
+    f.matches(item)
+        || f.or()
+            .map_or_else(|| false, |f| f.iter().any(|f| filter_one(item, f)))
+}
+
 /// Filters items based on an implementation of `CustomFilter<T>`.
 pub fn filter_items<Item, Iter, Filter>(items: Iter, f: &Filter) -> Vec<Item>
 where
-    Item: Clone,
     Iter: Iterator<Item = Item>,
     Filter: CustomFilter<Item>,
 {
-    items
-        .filter(|c| {
-            f.matches(c)
-                || f.or().map_or_else(
-                    || false,
-                    |f| {
-                        f.iter()
-                            .any(|f| !filter_items(vec![(*c).clone(); 1].into_iter(), f).is_empty())
-                    },
-                )
-        })
-        .collect()
+    items.filter(|c| filter_one(c, f)).collect()
 }
 
 #[cfg(test)]
