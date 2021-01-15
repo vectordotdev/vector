@@ -12,7 +12,7 @@ remap: functions: get_env_var: {
 	return: ["string"]
 	category: "System"
 	description: #"""
-		Get an environment variable. If not exists, a `Call` error will be raised.
+		Get the value of an environment variable. If the variable does not exists, an error is returned.
 		"""#
 	examples: [
 		{
