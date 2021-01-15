@@ -128,7 +128,7 @@ impl Expression for EncodeBase64Fn {
         let charset_def = self
             .charset
             .as_ref()
-            .map(|charset| charset.type_def(state).fallible_unless(Kind::Bytes));
+            .map(|charset| charset.type_def(state).into_fallible(true));
 
         self.value
             .type_def(state)
@@ -154,13 +154,13 @@ mod test {
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
-        value_string_padding_boolean_charset_specified_infallible {
+        valid_charset_fallible {
             expr: |_| EncodeBase64Fn {
                 value: lit!("foo").boxed(),
                 padding: Some(lit!(false).boxed()),
                 charset: Some(lit!("standard").boxed()),
             },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         padding_non_boolean_fallible {
@@ -168,15 +168,6 @@ mod test {
                 value: lit!("foo").boxed(),
                 padding: Some(lit!("foo").boxed()),
                 charset: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        charset_non_string_fallible {
-            expr: |_| EncodeBase64Fn {
-                value: lit!("foo").boxed(),
-                padding: None,
-                charset: Some(lit!(127).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
