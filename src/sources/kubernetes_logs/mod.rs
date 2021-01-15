@@ -35,10 +35,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{
-    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
-};
-use futures01::Stream as Stream01;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
@@ -322,9 +319,10 @@ impl Source {
             futures::stream::iter(buf)
         });
 
-        let event_processing_loop = partial_events_merger.transform(
-            Box::new(events.map(Ok).compat())
-        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
+        let event_processing_loop = partial_events_merger
+            .transform(Box::pin(events))
+            .map(Ok)
+            .forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

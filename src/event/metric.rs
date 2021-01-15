@@ -1,12 +1,9 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use remap::{Object, Path, Segment};
+use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, BTreeSet};
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
@@ -538,28 +535,6 @@ impl Object for Metric {
         }
     }
 
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        let mut result = Vec::new();
-
-        result.push(Path::from_str("name").expect("invalid path"));
-        if self.namespace.is_some() {
-            result.push(Path::from_str("namespace").expect("invalid path"));
-        }
-        if self.timestamp.is_some() {
-            result.push(Path::from_str("timestamp").expect("invalid path"));
-        }
-        if let Some(tags) = &self.tags {
-            result.push(Path::from_str("tags").expect("invalid path"));
-            for name in tags.keys() {
-                result.push(Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
-            }
-        }
-        result.push(Path::from_str("kind").expect("invalid path"));
-        result.push(Path::from_str("type").expect("invalid path"));
-
-        Ok(result)
-    }
-
     fn remove(
         &mut self,
         path: &remap::Path,
@@ -625,6 +600,7 @@ mod test {
     use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use remap::{Path, Value};
+    use std::str::FromStr;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -963,38 +939,6 @@ mod test {
                 .into()
             )),
             metric.get(&Path::from_str(".").unwrap())
-        );
-    }
-
-    #[test]
-    fn object_metric_paths() {
-        let metric = Metric {
-            name: "zub".into(),
-            namespace: Some("zoob".into()),
-            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
-            tags: Some({
-                let mut map = BTreeMap::new();
-                map.insert("tig".to_string(), "tog".to_string());
-                map
-            }),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.23 },
-        };
-
-        assert_eq!(
-            Ok([
-                "name",
-                "namespace",
-                "timestamp",
-                "tags",
-                "tags.tig",
-                "kind",
-                "type"
-            ]
-            .iter()
-            .map(|path| Path::from_str(path).expect("invalid path"))
-            .collect()),
-            metric.paths()
         );
     }
 

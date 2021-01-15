@@ -7,11 +7,12 @@ use crate::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -44,6 +45,7 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
+    pub tls: Option<TlsConfig>,
     #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -57,6 +59,7 @@ impl std::default::Default for PrometheusExporterConfig {
         Self {
             default_namespace: None,
             address: default_address(),
+            tls: None,
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
             flush_period_secs: default_flush_period_secs(),
@@ -205,7 +208,7 @@ impl PrometheusExporter {
         }
     }
 
-    fn start_server_if_needed(&mut self) {
+    async fn start_server_if_needed(&mut self) {
         if self.server_shutdown_trigger.is_some() {
             return;
         }
@@ -256,12 +259,26 @@ impl PrometheusExporter {
 
         let (trigger, tripwire) = Tripwire::new();
 
-        let server = Server::bind(&self.config.address)
-            .serve(new_service)
-            .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
-            .map_err(|error| eprintln!("Server error: {}", error));
+        let tls = self.config.tls.clone();
+        let address = self.config.address;
 
-        tokio::spawn(server);
+        tokio::spawn(async move {
+            let tls = MaybeTlsSettings::from_config(&tls, true)
+                .map_err(|error| eprintln!("Server TLS error: {}", error))?;
+            let listener = tls
+                .bind(&address)
+                .await
+                .map_err(|error| eprintln!("Server bind error: {}", error))?;
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(new_service)
+                .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .await
+                .map_err(|error| eprintln!("Server error: {}", error))?;
+
+            Ok::<(), ()>(())
+        });
+
         self.server_shutdown_trigger = Some(trigger);
     }
 }
@@ -269,7 +286,7 @@ impl PrometheusExporter {
 #[async_trait]
 impl StreamSink for PrometheusExporter {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.start_server_if_needed();
+        self.start_server_if_needed().await;
         while let Some(event) = input.next().await {
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
@@ -317,21 +334,93 @@ impl StreamSink for PrometheusExporter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        event::{Metric, MetricValue},
+        http::HttpClient,
+        test_util::{random_string, trace_init},
+        tls::MaybeTlsSettings,
+    };
+    use tokio::{sync::mpsc, time};
+
+    const PROMETHEUS_ADDRESS_TLS: &str = "127.0.0.1:9102";
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusExporterConfig>();
+    }
+
+    #[tokio::test]
+    async fn prometheus_tls() {
+        trace_init();
+
+        let mut tls_config = TlsConfig::test_config();
+        tls_config.options.verify_hostname = Some(false);
+
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
+            tls: Some(tls_config.clone()),
+            ..Default::default()
+        };
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(rx)));
+
+        let (_name, event) = create_metric_gauge(None, 123.4);
+        tx.send(event).expect("Failed to send.");
+        let (_name, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        tx.send(event).expect("Failed to send.");
+
+        time::delay_for(time::Duration::from_millis(100)).await;
+
+        let request = Request::get(format!("https://{}/metrics", PROMETHEUS_ADDRESS_TLS))
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let settings = MaybeTlsSettings::from_config(&Some(tls_config), false).unwrap();
+        let result = HttpClient::new(settings)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not fetch query");
+
+        assert!(result.status().is_success());
+    }
+
+    pub fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
+        create_metric(name, MetricValue::Gauge { value })
+    }
+
+    pub fn create_metric_set(name: Option<String>, values: Vec<&'static str>) -> (String, Event) {
+        create_metric(
+            name,
+            MetricValue::Set {
+                values: values.into_iter().map(Into::into).collect(),
+            },
+        )
+    }
+
+    pub fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
+        let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
+        let event = Metric {
+            name: name.clone(),
+            namespace: None,
+            timestamp: None,
+            tags: Some(
+                vec![("some_tag".to_owned(), "some_value".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+            kind: MetricKind::Incremental,
+            value,
+        }
+        .into();
+        (name, event)
     }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{
-        event::{Metric, MetricValue},
-        http::HttpClient,
-        test_util::{random_string, trace_init},
-    };
+    use crate::{http::HttpClient, test_util::trace_init};
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
@@ -358,7 +447,7 @@ mod integration_tests {
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(sink.run(Box::pin(rx)));
 
-        let (name, event) = create_metric_gauge(None, 123.4);
+        let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
@@ -391,9 +480,9 @@ mod integration_tests {
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(sink.run(Box::pin(rx)));
 
-        let (name1, event) = create_metric_set(None, vec!["0", "1", "2"]);
+        let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
-        let (name2, event) = create_metric_set(None, vec!["3", "4", "5"]);
+        let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
@@ -414,9 +503,9 @@ mod integration_tests {
         // Wait a bit for expired metrics
         time::delay_for(time::Duration::from_secs(3)).await;
 
-        let (name1, event) = create_metric_set(Some(name1), vec!["6", "7"]);
+        let (name1, event) = tests::create_metric_set(Some(name1), vec!["6", "7"]);
         tx.send(event).expect("Failed to send.");
-        let (name2, event) = create_metric_set(Some(name2), vec!["8", "9"]);
+        let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
@@ -436,10 +525,8 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let uri = format!("http://127.0.0.1:9090/api/v1/query?query={}", query)
-            .parse::<http::Uri>()
-            .expect("Invalid query URL");
-        let request = Request::post(uri)
+        let url = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
+        let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
         let result = HttpClient::new(None)
@@ -452,36 +539,5 @@ mod integration_tests {
             .expect("Error fetching body");
         let result = String::from_utf8_lossy(&result);
         serde_json::from_str(result.as_ref()).expect("Invalid JSON from prometheus")
-    }
-
-    fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
-        create_metric(name, MetricValue::Gauge { value })
-    }
-
-    fn create_metric_set(name: Option<String>, values: Vec<&'static str>) -> (String, Event) {
-        create_metric(
-            name,
-            MetricValue::Set {
-                values: values.into_iter().map(Into::into).collect(),
-            },
-        )
-    }
-
-    fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
-        let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
-        let event = Metric {
-            name: name.clone(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(
-                vec![("some_tag".to_owned(), "some_value".to_owned())]
-                    .into_iter()
-                    .collect(),
-            ),
-            kind: MetricKind::Incremental,
-            value,
-        }
-        .into();
-        (name, event)
     }
 }

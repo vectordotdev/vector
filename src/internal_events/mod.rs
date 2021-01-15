@@ -73,6 +73,8 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "sources-postgresql_metrics")]
+mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
@@ -190,6 +192,8 @@ pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
+#[cfg(feature = "sources-postgresql_metrics")]
+pub(crate) use self::postgresql_metrics::*;
 pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
