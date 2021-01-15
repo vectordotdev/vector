@@ -659,11 +659,16 @@ mod tests {
         let watcher = InstrumentingWatcher::new(watcher);
 
         // Prepare reflector.
+        let pause_between_requests = Duration::from_secs(1);
         let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+            Reflector::new(watcher, state_writer, None, None, pause_between_requests);
 
         // Run test logic.
         let logic = tokio::spawn(async move {
+            // Advance the time to scroll pass the delay between
+            // the invocations.
+            tokio::time::advance(pause_between_requests * 2).await;
+
             // Wait for watcher to request next invocation.
             assert!(matches!(
                 watcher_events_rx.next().await.unwrap(),
@@ -765,6 +770,9 @@ mod tests {
                 .await
                 .unwrap();
 
+            // Advance the time to scroll pass the delay between
+            // the invocations.
+            tokio::time::advance(pause_between_requests * 2).await;
             // Wait for next invocation and send an error to terminate the
             // flow.
             assert!(matches!(
