@@ -29,7 +29,7 @@ remap: functions: encode_base64: {
 	]
 	internal_failure_reason: null
 	return: ["string"]
-	category:    "Encode"
+	category: "Encode"
 	description: #"""
 		Encodes the provided `value` to [Base64](\(urls.base64)) either padded or non-padded and
 		using the specified character set.
@@ -67,6 +67,6 @@ remap: functions: encode_base64: {
 				message: "please encode me, but safe for URLs"
 				encoded: "cGxlYXNlIGVuY29kZSBtZSwgYnV0IHNhZmUgZm9yIFVSTHM="
 			}
-		}
+		},
 	]
 }
