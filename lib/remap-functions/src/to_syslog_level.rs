@@ -56,7 +56,7 @@ impl Expression for ToSyslogLevelFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Integer)
+            .into_fallible(true)
             .with_constraint(Kind::Bytes)
     }
 }
@@ -66,29 +66,16 @@ mod tests {
     use super::*;
     use value::Kind;
 
-    test_type_def![
-        value_integer_non_fallible {
-            expr: |_| ToSyslogLevelFn {
-                value: Literal::from(3).boxed(),
-            },
-            def: TypeDef {
-                fallible: false,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        value_non_integer_fallible {
-            expr: |_| ToSyslogLevelFn {
-                value: Literal::from("foo").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-    ];
+    test_type_def![value_non_integer_fallible {
+        expr: |_| ToSyslogLevelFn {
+            value: Literal::from("foo").boxed(),
+        },
+        def: TypeDef {
+            fallible: true,
+            kind: Kind::Bytes,
+            ..Default::default()
+        },
+    }];
 
     test_function![
         to_syslog_level => ToSyslogLevel;

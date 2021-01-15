@@ -94,12 +94,8 @@ impl Expression for IpSubnetFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .merge(
-                self.subnet
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Bytes),
-            )
+            .merge(self.subnet.type_def(state).into_fallible(true))
+            .into_fallible(true)
             .with_constraint(value::Kind::Bytes)
     }
 }
@@ -168,6 +164,7 @@ mod tests {
         },
         def: TypeDef {
             kind: value::Kind::Bytes,
+            fallible: true,
             ..Default::default()
         },
     }];

@@ -528,16 +528,44 @@ remap: {
 			]
 		}
 
+		"Error handling": {
+			href: "error-handling"
+
+			description: #"""
+				In VRL, functions that throw errors are known as *fallible* and functions that don't
+				are known as *infallible*. When functions are fallible—and most functions are—you
+				need to handle the errors that they throw.
+
+				### Error coalescing
+
+				In VRL, you can *coalesce* errors using the `??` operator. Coalescence means that if
+				a function throws an error, you can defer to another function using `??`. Here's an
+				example:
+
+				```js
+				.code = to_int(del(.status)) ?? 200
+				```
+
+				Here, if the `status` field doesn't exist, the `to_int` call fails; with the `??` in
+				place, the error is ignored and the next function is called. These coalescence
+				chains can be of any length. Here's a chain with three expressions:
+
+				```js
+				.status = to_string(del(.status)) ?? parse_syslog_level(del(.level)) ?? "ok"
+				```
+				"""#
+		}
+
 		"Assignment": {
 			href: "assignment"
 
-			description: """
+			description: #"""
 				You can assign values to object fields or [variables](#variables) using a single
 				equals sign (`=`). Some examples:
 
 				* `.is_success = .code > 200 && .code <= 299`
 				* `.request.id = uuid_v4()`
-				* `is_severe = to_syslog_level(.severity) == \"severity\"
+				* `is_severe = to_syslog_level(.severity) == "severity"
 
 				In VRL, `=` represents assignment while `==` is a [comparison operator](#operators),
 				as in many programming languages.
@@ -559,7 +587,7 @@ remap: {
 				In this case, the root event field is assigned the parsed JSON value of the
 				`message` *only if JSON parsing succeeds*; if it fails, the assignment doesn't
 				occur.
-				"""
+				"""#
 
 			examples: [
 				".request_id = uuid_v4()",
@@ -683,10 +711,17 @@ remap: {
 
 			examples: [
 				"""
+<<<<<<< HEAD
 					// This is not processed
 					""",
 				"""
 					.this_is_processed = 123 // But this is ignored
+=======
+					# This is not processed
+					""",
+				"""
+					.this_is_processed = 123 # But this is ignored
+>>>>>>> 5b0cfecc96abd077cfa6975dc97d606a8e4b5174
 					""",
 			]
 		}
