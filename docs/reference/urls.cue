@@ -290,6 +290,7 @@ urls: {
 	papertrail:                                               "https://www.papertrail.com/"
 	papertrail_syslog:                                        "https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages"
 	perl_windows:                                             "https://www.perl.org/get.html#win32"
+	postgresql:                                               "https://www.postgresql.org/"
 	postgresql_csvlog:                                        "https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG"
 	prometheus:                                               "https://prometheus.io/"
 	prometheus_client:                                        "https://prometheus.io/docs/instrumenting/clientlibs/"

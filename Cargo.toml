@@ -207,6 +207,8 @@ indoc = "1.0.3"
 avro-rs = { version = "0.12.0", optional = true }
 dirs-next = { version = "2.0.0", optional = true }
 fakedata_generator = "0.2.4"
+postgres-openssl = { version = "0.3.0", optional = true }
+tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "with-chrono-0_4"] }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -330,6 +332,7 @@ sources = [
   "sources-heroku_logs",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
+  "sources-postgresql_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -355,6 +358,7 @@ sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_p
 sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
+sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
@@ -518,6 +522,7 @@ all-integration-tests = [
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -554,6 +559,7 @@ loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
