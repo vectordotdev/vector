@@ -51,7 +51,7 @@ remap: {
 			arguments: [...#Argument] // Allow for empty list
 			internal_failure_reasons: [...string]
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
+			category:    "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Log" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
