@@ -23,14 +23,15 @@ remap: functions: sha3: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Hash"
 	description: #"""
-		Calculates a sha3 hash of a given string.
+		Calculates a sha3 hash of the provided `value`.
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "Calaculate sha3 hash"
 			input: log: text: #"foo"#
 			source: #"""
 				.hash = sha3(.text, variant: "SHA3-224")

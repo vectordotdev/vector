@@ -122,35 +122,6 @@
       "result_c.equals" = true
       "result_d.equals" = false
 
-[transforms.remap_delete_only_fields]
-  inputs = []
-  type = "remap"
-  source = """
-    only_fields(.foo, .bar, .buz.second)
-    del(.foo.second)
-  """
-[[tests]]
-  name = "remap_delete_only_fields"
-  [tests.input]
-    insert_at = "remap_delete_only_fields"
-    type = "log"
-    [tests.input.log_fields]
-      "foo.first" = "foo first value"
-      "foo.second" = "foo second value"
-      bar = "bar value"
-      baz = "baz value"
-      "buz.first" = "buz first value"
-      "buz.second" = "buz second value"
-  [[tests.outputs]]
-    extract_from = "remap_delete_only_fields"
-    [[tests.outputs.conditions]]
-      "foo.first.equals" = "foo first value"
-      "foo.second.exists" = false
-      "bar.equals" = "bar value"
-      "baz.exists" = false
-      "buz.first.exists" = false
-      "buz.second.equals" = "buz second value"
-
 [transforms.remap_coercion]
   inputs = []
   type = "remap"
@@ -200,6 +171,63 @@
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
+
+[transforms.remap_infallible_assignment]
+  inputs = []
+  type = "remap"
+  source = """
+    .nope, .err1 = parse_json("{ INVALID }")
+    .ok, .err2 = parse_json("{ \\"foo\\": true }")
+  """
+[[tests]]
+  name = "remap_infallible_assignment"
+  [tests.input]
+    insert_at = "remap_infallible_assignment"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_infallible_assignment"
+    [[tests.outputs.conditions]]
+      "nope.equals" = "<null>"
+      "err1.equals" = "function call error: unable to parse json: key must be a string at line 1 column 3"
+      "ok.foo.equals" = true
+      "err2.equals" = "<null>"
+
+[transforms.remap_error_coalesce_operator]
+  inputs = []
+  type = "remap"
+  source = """
+    .val1 = parse_json("{ INVALID }") ?? "nope"
+    .val2 = parse_json("true") ?? "nope"
+  """
+[[tests]]
+  name = "remap_error_coalesce_operator"
+  [tests.input]
+    insert_at = "remap_error_coalesce_operator"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_error_coalesce_operator"
+    [[tests.outputs.conditions]]
+      "val1.equals" = "nope"
+      "val2.equals" = true
+
+[transforms.remap_bang_function]
+  inputs = []
+  type = "remap"
+  source = """
+    .val = parse_json!("{ INVALID }")
+  """
+[[tests]]
+  name = "remap_bang_function"
+  [tests.input]
+    insert_at = "remap_bang_function"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_bang_function"
+    [[tests.outputs.conditions]]
+      "val.exists" = false
 
 [transforms.remap_function_arguments]
   inputs = []
@@ -1238,29 +1266,6 @@
     "a.equals" = "fbaro"
     "b.equals" = "fbarbar"
 
-[transforms.remap_function_ok]
-  inputs = []
-  type = "remap"
-  source = """
-    .pass = ok(.a = .a * 3)
-    .fail = ok(.b = true * false)
-  """
-[[tests]]
-  name = "remap_function_ok"
-  [tests.input]
-    insert_at = "remap_function_ok"
-    type = "log"
-    [tests.input.log_fields]
-      a = "a"
-      b = "nope"
-  [[tests.outputs]]
-    extract_from = "remap_function_ok"
-    [[tests.outputs.conditions]]
-    "a.equals" = "aaa"
-    "b.equals" = "nope"
-    "pass.equals" = true
-    "fail.equals" = false
-
 [transforms.remap_function_parse_aws_alb_log]
   inputs = []
   type = "remap"
@@ -1664,10 +1669,17 @@
 [transforms.remap_comments]
   inputs = []
   type = "remap"
-  source = """
+  source = '''
     .a = 1 # .a = 2
     # .a = 3
-  """
+
+    .b = .a == 2 || \
+
+    # We should ignore this too.
+    # .a == 3 && \
+
+    .a == 1
+  '''
 [[tests]]
   name = "remap_comments"
   [tests.input]
@@ -1678,3 +1690,25 @@
     extract_from = "remap_comments"
     [[tests.outputs.conditions]]
       "a.equals" = 1
+      "b.equals" = true
+
+[transforms.remap_multiline]
+  inputs = []
+  type = "remap"
+  source = '''
+    .a = "A long " + \
+
+         "multiline " + \
+         "string"
+  '''
+[[tests]]
+  name = "remap_multiline"
+  [tests.input]
+    insert_at = "remap_multiline"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_multiline"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '.a == "A long multiline string"'

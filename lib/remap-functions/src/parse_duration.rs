@@ -119,7 +119,6 @@ impl Expression for ParseDurationFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
             .merge(output_def)
             .into_fallible(true) // parsing errors
             .with_constraint(value::Kind::Float)

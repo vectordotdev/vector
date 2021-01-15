@@ -191,4 +191,14 @@ components: sources: apache_metrics: {
 	}
 
 	how_it_works: {}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
+	}
 }

@@ -9,16 +9,19 @@ remap: functions: parse_duration: {
 			type: ["string"]
 		},
 		{
-			name:        "output"
+			name:        "unit"
 			description: "The string of the duration unit the number should be output as."
 			required:    true
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"`value` is not a properly formatted duration",
+	]
 	return: ["float"]
 	category: "Parse"
 	description: #"""
-		Parses a string representing a duration and returns a number of this duration in another specified unit.
+		Parses the provided `value` representing a duration in the specified `unit`.
 
 		Available units:
 		- **ns** - nanoseconds (1 billion nanoseconds in a second)

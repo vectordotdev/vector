@@ -22,13 +22,15 @@ remap: functions: merge: {
 			type: ["boolean"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Map"
 	description: #"""
-		Merges the `from` map provided into the `to` path specified, which must specify an existing map.
-		If a key exists in both maps, the field from the `from` map is chosen.
-		If `deep` is specified, if a key exists in both maps, and both these fields are also maps merge will recursively
-		merge these fields.
+		Merges the `from` map provided into the `to` map.
+
+		* If a key exists in both maps, the field from the `from` map is chosen.
+		* If `deep` is specified, and a key exists in both maps, and both these fields are also maps, then those maps
+		  will merge recursively as well.
 		"""#
 	examples: [
 		{

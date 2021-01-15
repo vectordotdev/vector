@@ -25,14 +25,15 @@ remap: functions: sha2: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Hash"
 	description: #"""
-		Calculates a sha2 hash of a given string.
+		Calculates a sha2 hash of the provided `value`.
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "Calculate sha2 hash"
 			input: log: text: "foo"
 			source: #"""
 				.hash = sha2(.text, variant = "SHA-512/224")

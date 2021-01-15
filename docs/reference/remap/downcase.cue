@@ -9,10 +9,13 @@ remap: functions: downcase: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "String"
 	description: #"""
-		Returns a copy of `string` that has been converted into lowercase.
+		Returns a copy of `value` that is entirely lowercase.
+
+		"Lowercase" is defined according to the terms of the Unicode Derived Core Property Lowercase.
 		"""#
 	examples: [
 		{

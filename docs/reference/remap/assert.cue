@@ -15,11 +15,15 @@ remap: functions: assert: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reason: [
+		"`condition` evaluates to `false`",
+	]
 	return: ["null"]
 	category: "Test"
 	description: #"""
-		Checks a given condition. If that condition evaluates to false the event is aborted with
-		an error message provided.
+		Checks a given condition.
+
+		If that condition evaluates to `false` the event is aborted with the provided `message`.
 		"""#
 	examples: [
 		{

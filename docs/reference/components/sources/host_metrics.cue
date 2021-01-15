@@ -406,4 +406,8 @@ components: sources: host_metrics: {
 		}
 		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
 	}
+
+	telemetry: metrics: {
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+	}
 }

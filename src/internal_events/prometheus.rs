@@ -158,3 +158,22 @@ impl InternalEvent for PrometheusServerRequestComplete {
         counter!("requests_received_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct PrometheusTemplateRenderingError {
+    pub fields: Vec<String>,
+}
+
+impl InternalEvent for PrometheusTemplateRenderingError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to render templated value; discarding value.",
+            fields = ?self.fields,
+            internal_log_rate_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1);
+    }
+}

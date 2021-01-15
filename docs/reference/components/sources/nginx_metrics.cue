@@ -172,4 +172,11 @@ components: sources: nginx_metrics: {
 			tags:              _nginx_metrics_tags
 		}
 	}
+
+	telemetry: metrics: {
+		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+	}
 }

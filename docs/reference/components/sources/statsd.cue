@@ -127,5 +127,7 @@ components: sources: statsd: {
 		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
 		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

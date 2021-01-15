@@ -10,16 +10,16 @@ remap: functions: format_timestamp: {
 		},
 		{
 			name:        "format"
-			description: "The format string"
+			description: "The format string as decribed by the [Chrono library](\(urls.chrono_time_formats))."
 			required:    true
 			type: ["string"]
 		},
 	]
+	internal_failure_reason: null
 	return: ["string"]
 	category: "Timestamp"
 	description: #"""
-		Formats a `timestamp` as a given string.
-		The format string used is specified by the [Chrono library](\(urls.chrono_time_formats)).
+		Formats the provided `value` into a `string` as described by `format`.
 		"""#
 	examples: [
 		{

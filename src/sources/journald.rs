@@ -75,8 +75,9 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    /// Deprecated
     #[serde(default)]
-    pub remap_priority: bool,
+    remap_priority: bool,
 }
 
 inventory::submit! {
@@ -97,6 +98,10 @@ impl SourceConfig for JournaldConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        if self.remap_priority {
+            warn!("Option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+        }
+
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
