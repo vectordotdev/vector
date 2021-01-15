@@ -19,7 +19,7 @@ pub struct Opts {
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
-    /// The file containing the VRL script to execute. This can be used instead of `PROGRAM`.
+    /// The file containing the VRL script to execute. This can be used instead of `SCRIPT`.
     #[structopt(short, long = "script", conflicts_with("script"), parse(from_os_str))]
     script_file: Option<PathBuf>,
 
