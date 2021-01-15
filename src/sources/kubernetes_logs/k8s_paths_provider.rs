@@ -3,10 +3,10 @@
 #![deny(missing_docs)]
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes as k8s;
+use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
-use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use k8s_openapi::api::core::v1::Pod;
 use std::path::PathBuf;
 
 /// A paths provider implementation that uses the state obtained from the
@@ -93,19 +93,6 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
     };
 
     Some(build_pod_logs_directory(&namespace, &name, &uid))
-}
-
-/// Extract the static pod config hashsum from the mirror pod annotations.
-///
-/// This part of Kubernetes changed a bit over time, so we're implemeting
-/// support up to 1.14, which is an MSKV at this time.
-///
-/// See: https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81
-fn extract_static_pod_config_hashsum(metadata: &ObjectMeta) -> Option<&str> {
-    let annotations = metadata.annotations.as_ref()?;
-    annotations
-        .get("kubernetes.io/config.mirror")
-        .map(String::as_str)
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
