@@ -20,10 +20,10 @@ remap: functions: parse_duration: {
 				ms: "Milliseconds (1 thousand microseconds in a second)"
 				cs: "Centiseconds (100 centiseconds in a second)"
 				ds: "Deciseconds (10 deciseconds in a second)"
-				s: "Seconds"
-				m: "Minutes (60 seconds in a minute)"
-				h: "Hours (60 minutes in an hour)"
-				d: "Days (24 hours in a day)"
+				s:  "Seconds"
+				m:  "Minutes (60 seconds in a minute)"
+				h:  "Hours (60 minutes in an hour)"
+				d:  "Days (24 hours in a day)"
 			}
 		},
 	]
