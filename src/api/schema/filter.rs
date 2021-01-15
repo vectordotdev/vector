@@ -16,12 +16,12 @@ macro_rules! filter_check {
 #[derive(Default, InputObject)]
 /// Filter for String values
 pub struct StringFilter {
-    equals: Option<String>,
-    not_equals: Option<String>,
-    contains: Option<String>,
-    not_contains: Option<String>,
-    starts_with: Option<String>,
-    ends_with: Option<String>,
+    pub equals: Option<String>,
+    pub not_equals: Option<String>,
+    pub contains: Option<String>,
+    pub not_contains: Option<String>,
+    pub starts_with: Option<String>,
+    pub ends_with: Option<String>,
 }
 
 impl StringFilter {
@@ -48,8 +48,8 @@ impl StringFilter {
 #[graphql(concrete(name = "ComponentTypeFilter", params(ComponentType)))]
 #[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
 pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
-    equals: Option<T>,
-    not_equals: Option<T>,
+    pub equals: Option<T>,
+    pub not_equals: Option<T>,
 }
 
 impl<T: InputType + PartialEq + Eq> EqualityFilter<T> {

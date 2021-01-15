@@ -279,3 +279,121 @@ pub fn update_config(config: &Config) {
     // Override the old component state
     state::update(new_components);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::DataType;
+
+    /// Generate component fixes for use with tests
+    fn component_fixtures() -> Vec<Component> {
+        vec![
+            Component::Source(source::Source(source::Data {
+                name: "gen1".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen2".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen3".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Transform(transform::Transform(transform::Data {
+                name: "parse_json".to_string(),
+                component_type: "json".to_string(),
+                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+            })),
+            Component::Sink(sink::Sink(sink::Data {
+                name: "devnull".to_string(),
+                component_type: "blackhole".to_string(),
+                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+            })),
+        ]
+    }
+
+    #[test]
+    fn components_filter_contains() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                contains: Some("gen".to_string()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 3);
+    }
+
+    #[test]
+    fn components_filter_equals_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            or: Some(vec![ComponentsFilter {
+                name: Some(vec![filter::StringFilter {
+                    equals: Some("devnull".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn components_filter_and() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_type: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentType::Source),
+                not_equals: None,
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 1);
+    }
+
+    #[test]
+    fn components_filter_and_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_type: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentType::Source),
+                not_equals: None,
+            }]),
+            or: Some(vec![ComponentsFilter {
+                component_type: Some(vec![filter::EqualityFilter {
+                    equals: Some(ComponentType::Sink),
+                    not_equals: None,
+                }]),
+                ..Default::default()
+            }]),
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
+}
