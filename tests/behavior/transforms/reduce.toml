@@ -70,20 +70,20 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .message == "first message value" && \
-            .host == "host1" && \
-            .request_id == "1" && \
-            .counter == 21 && \
-            exists(.timestamp_end)
+        .message == "first message value" && \
+        .host == "host1" && \
+        .request_id == "1" && \
+        .counter == 21 && \
+        exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .message == "other reduce one" && \
-            .host == "host3" && \
-            .request_id == "2" && \
-            .counter == 20 && \
-            exists(.timestamp_end)
+        .message == "other reduce one" && \
+        .host == "host3" && \
+        .request_id == "2" && \
+        .counter == 20 && \
+        exists(.timestamp_end)
       '''
 
 ##------------------------------------------------------------------------------
@@ -177,22 +177,22 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .message == "first message value second message value third message value" && \
-            .another == "foo\nbar baz\nqux\nquux" && \
-            .host == "host1" && \
-            .request_id == "1" && \
-            .counter == 21 && \
-            exists(.timestamp_end)
+        .message == "first message value second message value third message value" && \
+        .another == "foo\nbar baz\nqux\nquux" && \
+        .host == "host1" && \
+        .request_id == "1" && \
+        .counter == 21 && \
+        exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .message == "other reduce one other reduce two other reduce three" && \
-            .concat_array == ["foo", "bar", "baz"] && \
-            .host == "host3" && \
-            .request_id == "2" && \
-            .counter == 20 && \
-            exists(.timestamp_end)
+        .message == "other reduce one other reduce two other reduce three" && \
+        .concat_array == ["foo", "bar", "baz"] && \
+        .host == "host3" && \
+        .request_id == "2" && \
+        .counter == 20 && \
+        exists(.timestamp_end)
       '''
 
 ##------------------------------------------------------------------------------
@@ -239,9 +239,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .mins == 5.1 && \
-            .maxs == 7.2 && \
-            exists(.timestamp_end)
+        .mins == 5.1 && \
+        .maxs == 7.2 && \
+        exists(.timestamp_end)
       '''
 
 [[tests]]
@@ -274,9 +274,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .mins == 5 && \
-            .maxs == 7 && \
-            exists(.timestamp_end)
+        .mins == 5 && \
+        .maxs == 7 && \
+        exists(.timestamp_end)
       '''
 
 ##------------------------------------------------------------------------------
@@ -352,16 +352,16 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .request_id == "1" && \
-            .counter == 6 && \
-            exists(.timestamp_end)
+        .request_id == "1" && \
+        .counter == 6 && \
+        exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .request_id == "2" && \
-            .counter == 7 && \
-            exists(.test_end_message)
+        .request_id == "2" && \
+        .counter == 7 && \
+        exists(.test_end_message)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
@@ -369,7 +369,7 @@
         .request_id == "3" && \
         .counter == 5 && \
         exists(.test_end_message)
-      ''' 
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -427,7 +427,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-             .message == "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
+        .message == "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
       '''
 
 ##------------------------------------------------------------------------------
@@ -487,11 +487,11 @@
 ##------------------------------------------------------------------------------
 
 [transforms.line_termination]
-    inputs = []
-    type = "reduce"
-    merge_strategies.message = "concat"
-    ends_when.type = "remap"
-    ends_when.source = """ends_with(strip_whitespace(.message), ";")"""
+  inputs = []
+  type = "reduce"
+  merge_strategies.message = "concat"
+  ends_when.type = "remap"
+  ends_when.source = """ends_with(strip_whitespace(.message), ";")"""
 
 [[tests]]
   name = "reduce_line_termination"
@@ -669,6 +669,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            starts_with(.message, "2020-10-19 04:34:15,389") && \
-            ends_with(.message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
+        starts_with(.message, "2020-10-19 04:34:15,389") && \
+        ends_with(.message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
       '''

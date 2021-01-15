@@ -100,11 +100,11 @@
     insert_at = "remap_arithmetic_error"
     type = "log"
     [tests.input.log_fields]
-        type = "remap"
-        source = '''
-          .a = 10 && \
-          .b = 0
-        '''
+      type = "remap"
+      source = '''
+        .a = 10 && \
+        .b = 0
+      '''
 
 [transforms.remap_boolean_arithmetic]
   inputs = []
@@ -128,13 +128,13 @@
   [[tests.outputs]]
     extract_from = "remap_boolean_arithmetic"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-           .result_a == true && \
-           .result_b == false && \
-           .result_c == true && \
-           .result_d == false
-        '''
+      type = "remap"
+      source = '''
+        .result_a == true && \
+        .result_b == false && \
+        .result_c == true && \
+        .result_d == false
+      '''
 
 [transforms.remap_coercion]
   inputs = []
@@ -161,14 +161,14 @@
   [[tests.outputs]]
     extract_from = "remap_coercion"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo == "10" && \
-            .bar == 20 && \
-            .baz == 30.3 && \
-            .bev == true && \
-            .a == "2020-09-14 09:53:44 UTC"
-        '''
+      type = "remap"
+      source = '''
+        .foo == "10" && \
+        .bar == 20 && \
+        .baz == 30.3 && \
+        .bev == true && \
+        .a == "2020-09-14 09:53:44 UTC"
+      '''
 
 [transforms.remap_quoted_path]
   inputs = []
@@ -187,10 +187,10 @@
   [[tests.outputs]]
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a."b.c" == "baz"
-        '''
+      type = "remap"
+      source = '''
+        .a."b.c" == "baz"
+      '''
 
 [transforms.remap_infallible_assignment]
   inputs = []
@@ -271,15 +271,15 @@
   [[tests.outputs]]
     extract_from = "remap_function_arguments"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "10" && \
-            .b == "10" && \
-            .c == "" && \
-            .d == "" && \
-            .e == "30" && \
-            .f == "30"
-        '''
+      type = "remap"
+      source = '''
+        .a == "10" && \
+        .b == "10" && \
+        .c == "" && \
+        .d == "" && \
+        .e == "30" && \
+        .f == "30"
+      '''
 
 [transforms.remap_function_upcase]
   inputs = []
@@ -290,7 +290,7 @@
     .c.c = upcase(.c.c)
 
     if upcase(.f) == "F" {
-        .f = "ff"
+      .f = "ff"
     }
   """
 [[tests]]
@@ -306,13 +306,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_upcase"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-          .a == "A" && \
-          .b == "BBB BB" && \
-          .c.c == "C.C" && \
-          .f == "ff"
-        '''
+      type = "remap"
+      source = '''
+        .a == "A" && \
+        .b == "BBB BB" && \
+        .c.c == "C.C" && \
+        .f == "ff"
+      '''
 
 [transforms.remap_function_upcase_error]
   inputs = []
@@ -342,7 +342,7 @@
     .c.c = downcase(.c.c)
 
     if downcase(.f) == "f" {
-        .f = "FF"
+      .f = "FF"
     }
   """
 [[tests]]
@@ -358,13 +358,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_downcase"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "a" && \
-            .b == "bbb bb" && \
-            .c.c == "c.c" && \
-            .f == "FF"
-        '''
+      type = "remap"
+      source = '''
+        .a == "a" && \
+        .b == "bbb bb" && \
+        .c.c == "c.c" && \
+        .f == "FF"
+      '''
 
 [transforms.remap_function_downcase_error]
   inputs = []
@@ -391,7 +391,7 @@
     .a = uuid_v4()
 
     if uuid_v4() != "" {
-        .b = "bar"
+      .b = "bar"
     }
   """
 [[tests]]
@@ -404,11 +404,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_uuid_v4"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            match(.a, /(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/) && \
-            .b == "bar"
-        '''
+      type = "remap"
+      source = '''
+        match(.a, /(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/) && \
+        .b == "bar"
+      '''
 
 [transforms.remap_function_sha1]
   inputs = []
@@ -417,7 +417,7 @@
     .a = sha1(.a)
 
     if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-        .b = sha1(.a + .b + "baz")
+      .b = sha1(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -431,11 +431,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_sha1"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-          .a == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33" && \
-          .b == "6f74c252bb7f19f553115af5e49a733b9ff17138"
-        '''
+      type = "remap"
+      source = '''
+        .a == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33" && \
+        .b == "6f74c252bb7f19f553115af5e49a733b9ff17138"
+      '''
 
 [transforms.remap_function_sha1_error]
   inputs = []
@@ -462,7 +462,7 @@
     .a = md5(.a)
 
     if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
-        .b = md5(.a + .b + "baz")
+      .b = md5(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -476,12 +476,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_md5"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "acbd18db4cc2f85cedef654fccc4a4d8" && \
-            .b == "223cfa6567e4c0599c9a23628bf7a234"
-        '''
-        
+      type = "remap"
+      source = '''
+        .a == "acbd18db4cc2f85cedef654fccc4a4d8" && \
+        .b == "223cfa6567e4c0599c9a23628bf7a234"
+      '''
 
 [transforms.remap_function_md5_error]
   inputs = []
@@ -516,10 +515,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_now"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            ends_with(to_string(.a), "UTC")
-        '''
+      type = "remap"
+      source = '''
+        ends_with(to_string(.a), "UTC")
+      '''
 
 [transforms.remap_function_format_timestamp]
   inputs = []
@@ -537,10 +536,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_format_timestamp"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "1970-01-01T00:00:10+00:00"
-        '''
+      type = "remap"
+      source = '''
+        .a == "1970-01-01T00:00:10+00:00"
+      '''
 
 [transforms.remap_function_contains]
   inputs = []
@@ -566,16 +565,16 @@
   [[tests.outputs]]
     extract_from = "remap_function_contains"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == false && \
-            .b == true && \
-            .c == false && \
-            .d == true && \
-            .e == true && \
-            .f == false && \
-            .g == true
-        '''
+      type = "remap"
+      source = '''
+        .a == false && \
+        .b == true && \
+        .c == false && \
+        .d == true && \
+        .e == true && \
+        .f == false && \
+        .g == true
+      '''
 
 [transforms.remap_function_starts_with]
   inputs = []
@@ -598,14 +597,14 @@
   [[tests.outputs]]
     extract_from = "remap_function_starts_with"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == true && \
-            .b == true && \
-            .c == false && \
-            .d == false && \
-            .e == true
-        '''
+      type = "remap"
+      source = '''
+        .a == true && \
+        .b == true && \
+        .c == false && \
+        .d == false && \
+        .e == true
+      '''
 
 [transforms.remap_function_ends_with]
   inputs = []
@@ -628,14 +627,14 @@
   [[tests.outputs]]
     extract_from = "remap_function_ends_with"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == true && \
-            .b == true && \
-            .c == false && \
-            .d == false && \
-            .e == true
-        '''
+      type = "remap"
+      source = '''
+        .a == true && \
+        .b == true && \
+        .c == false && \
+        .d == false && \
+        .e == true
+      '''
 
 [transforms.remap_function_slice]
   inputs = []
@@ -657,13 +656,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_slice"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "oobar" && \
-            .b == "f" && \
-            .c == "ar" && \
-            .d == "ooba"
-        '''
+      type = "remap"
+      source = '''
+        .a == "oobar" && \
+        .b == "f" && \
+        .c == "ar" && \
+        .d == "ooba"
+      '''
 
 [transforms.remap_function_parse_tokens]
   inputs = []
@@ -671,7 +670,7 @@
   source = '''
     .a = parse_tokens(.a)
     .b = parse_tokens(.b)
-  ''' 
+  '''
 [[tests]]
   name = "remap_function_parse_tokens"
   [tests.input]
@@ -683,16 +682,16 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_tokens"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == ["217.250.207.207", \
-                   null, \
-                   null, \
-                   "07/Sep/2020:16:38:00 -0400", \
-                   "DELETE /deliverables/next-generation/user-centric HTTP/1.1", \
-                   "205", "11881" ] && \
-            .b == ["bar"]
-        '''
+      type = "remap"
+      source = '''
+        .a == ["217.250.207.207", \
+               null, \
+               null, \
+               "07/Sep/2020:16:38:00 -0400", \
+               "DELETE /deliverables/next-generation/user-centric HTTP/1.1", \
+               "205", "11881" ] && \
+        .b == ["bar"]
+      '''
 
 [transforms.remap_function_sha2]
   inputs = []
@@ -701,7 +700,7 @@
     .a = sha2(.a)
 
     if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
-        .b = sha2(.a + .b + "baz")
+      .b = sha2(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -715,11 +714,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_sha2"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d" && \
-            .b == "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
-        '''
+      type = "remap"
+      source = '''
+        .a == "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d" && \
+        .b == "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
+      '''
 
 [transforms.remap_function_sha3]
   inputs = []
@@ -728,7 +727,7 @@
     .a = sha3(.a)
 
     if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
-        .b = sha3(.a + .b + "baz")
+      .b = sha3(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -742,11 +741,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_sha3"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7" && \
-            .b == "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
-        '''
+      type = "remap"
+      source = '''
+        .a == "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7" && \
+        .b == "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
+      '''
 
 [transforms.remap_function_parse_duration]
   inputs = []
@@ -766,11 +765,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_duration"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == 2000 && \
-            .b == 0.1
-        '''
+      type = "remap"
+      source = '''
+        .a == 2000 && \
+        .b == 0.1
+      '''
 
 [transforms.remap_function_format_number]
   inputs = []
@@ -788,10 +787,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_format_number"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "1.234,56"
-        '''
+      type = "remap"
+      source = '''
+        .a == "1.234,56"
+      '''
 
 [transforms.remap_function_parse_url]
   inputs = []
@@ -809,18 +808,17 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_url"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            # "parts.query.length_eq" = 1 && \
-            .parts.scheme == "https" && \
-            .parts.username == "" && \
-            .parts.password == "" && \
-            .parts.host == "master.vector.dev" && \
-            .parts.port == null && \
-            .parts.path == "/docs/reference/transforms/merge/" && \
-            .parts.query.hello == "world" && \
-            .parts.fragment == "configuration"
-        '''
+      type = "remap"
+      source = '''
+        .parts.scheme == "https" && \
+        .parts.username == "" && \
+        .parts.password == "" && \
+        .parts.host == "master.vector.dev" && \
+        .parts.port == null && \
+        .parts.path == "/docs/reference/transforms/merge/" && \
+        .parts.query.hello == "world" && \
+        .parts.fragment == "configuration"
+      '''
 
 [transforms.remap_function_ceil]
   inputs = []
@@ -840,12 +838,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_ceil"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == 93 && \
-            .b == 92.5 && \
-            .c == 92.49
-        '''
+      type = "remap"
+      source = '''
+        .a == 93 && \
+        .b == 92.5 && \
+        .c == 92.49
+      '''
 
 [transforms.remap_function_floor]
   inputs = []
@@ -865,12 +863,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_floor"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == 92 && \
-            .b == 92.4 && \
-            .c == 92.48
-        '''
+      type = "remap"
+      source = '''
+        .a == 92 && \
+        .b == 92.4 && \
+        .c == 92.48
+      '''
 
 [transforms.remap_function_round]
   inputs = []
@@ -890,18 +888,18 @@
   [[tests.outputs]]
     extract_from = "remap_function_round"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == 92 && \
-            .b == 92.5 && \
-            .c == 92.49
-        '''
+      type = "remap"
+      source = '''
+        .a == 92 && \
+        .b == 92.5 && \
+        .c == 92.49
+      '''
 
 [transforms.remap_function_parse_syslog]
   inputs = []
   type = "remap"
   source = """
-   .a = parse_syslog(.a)
+     .a = parse_syslog(.a)
    """
 [[tests]]
   name = "remap_function_parse_syslog"
@@ -913,16 +911,16 @@
   [[tests.outputs]]
   extract_from = "remap_function_parse_syslog"
   [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a.facility == "daemon" && \
-            .a.severity == "warning" && \
-            .a.timestamp == to_timestamp("2020-05-22T17:59:09.250Z") && \
-            .a.hostname == "OX-XXX-MX204" && \
-            .a.appname == "OX-XXX-CONTEUDO:rpd" && \
-            .a.procid == 6589 && \
-            .a.message == "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
-        '''
+    type = "remap"
+    source = '''
+      .a.facility == "daemon" && \
+      .a.severity == "warning" && \
+      .a.timestamp == to_timestamp("2020-05-22T17:59:09.250Z") && \
+      .a.hostname == "OX-XXX-MX204" && \
+      .a.appname == "OX-XXX-CONTEUDO:rpd" && \
+      .a.procid == 6589 && \
+      .a.message == "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+    '''
 
 [transforms.remap_function_split_regex]
   inputs=[]
@@ -940,12 +938,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_split_regex"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo[0] == "bar" && \
-            .foo[1] == "bat" && \
-            .foo[2] == "fizzaxbbuzz"
-        '''
+      type = "remap"
+      source = '''
+        .foo[0] == "bar" && \
+        .foo[1] == "bat" && \
+        .foo[2] == "fizzaxbbuzz"
+      '''
 
 [transforms.remap_function_split_string]
   inputs=[]
@@ -963,12 +961,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_split_string"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-    .foo[0] == "bar" && \
-    .foo[1] == "bat" && \
-    .foo[2] == "fizz buzz"
-        '''
+      type = "remap"
+      source = '''
+        .foo[0] == "bar" && \
+        .foo[1] == "bat" && \
+        .foo[2] == "fizz buzz"
+      '''
 
 [transforms.remap_function_parse_timestamp]
   inputs = []
@@ -985,10 +983,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_timestamp"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo == to_timestamp("1970-01-01T00:00:10Z")
-        '''
+      type = "remap"
+      source = '''
+        .foo == to_timestamp("1970-01-01T00:00:10Z")
+      '''
 
 [transforms.remap_function_truncate]
   inputs = []
@@ -1006,11 +1004,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_truncate"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo == "foo" && \
-            .bar == "foob..."
-        '''
+      type = "remap"
+      source = '''
+        .foo == "foo" && \
+        .bar == "foob..."
+      '''
 
 [transforms.remap_function_strip_whitespace]
   inputs = []
@@ -1027,10 +1025,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_strip_whitespace"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo == "foobar"
-        '''
+      type = "remap"
+      source = '''
+        .foo == "foobar"
+      '''
 
 [transforms.remap_function_parse_grok]
   inputs = []
@@ -1049,17 +1047,17 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_grok"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .grokked.timestamp == "2020-10-02T23:22:12.223222Z" && \
-            .grokked.level == "info" && \
-            .grokked.message == "Hello world" && \
-            .grokked.email == "" && \
-            .grokked2.timestamp == "2020-10-02T23:22:12.223222Z" && \
-            .grokked2.level == "info" && \
-            !exists(.grokked2.email) && \
-            .grokked2.message == "Hello world"
-        '''
+      type = "remap"
+      source = '''
+        .grokked.timestamp == "2020-10-02T23:22:12.223222Z" && \
+        .grokked.level == "info" && \
+        .grokked.message == "Hello world" && \
+        .grokked.email == "" && \
+        .grokked2.timestamp == "2020-10-02T23:22:12.223222Z" && \
+        .grokked2.level == "info" && \
+        !exists(.grokked2.email) && \
+        .grokked2.message == "Hello world"
+      '''
 
 [transforms.remap_function_ip_subnet]
   inputs = []
@@ -1079,13 +1077,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_ip_subnet"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "192.168.0.0" && \
-            .b == "192.0.0.0" && \
-            .c == "2404:6800::" && \
-            .d == "2404::"
-        '''
+      type = "remap"
+      source = '''
+        .a == "192.168.0.0" && \
+        .b == "192.0.0.0" && \
+        .c == "2404:6800::" && \
+        .d == "2404::"
+      '''
 
 [transforms.remap_function_ip_cidr_contains]
   inputs = []
@@ -1105,13 +1103,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_ip_cidr_contains"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == true && \
-            .b == false && \
-            .c == true && \
-            .d == false
-        '''
+      type = "remap"
+      source = '''
+        .a == true && \
+        .b == false && \
+        .c == true && \
+        .d == false
+      '''
 
 [transforms.remap_function_ip_to_ipv6]
   inputs = []
@@ -1128,10 +1126,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_ip_to_ipv6"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "::ffff:192.168.10.2"
-        '''
+      type = "remap"
+      source = '''
+        .a == "::ffff:192.168.10.2"
+      '''
 
 [transforms.remap_function_ipv6_to_ipv4]
   inputs = []
@@ -1148,10 +1146,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_ipv6_to_ipv4"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "192.168.10.2"
-        '''
+      type = "remap"
+      source = '''
+        .a == "192.168.10.2"
+      '''
 
 [transforms.remap_function_exists]
   inputs = []
@@ -1178,10 +1176,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_exists"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a  && !.b  && .c && !.d  && .e && !.f 
-        '''
+      type = "remap"
+      source = '''
+        .a  && !.b  && .c && !.d  && .e && !.f
+      '''
 
 [transforms.remap_function_compact]
   inputs = []
@@ -1202,27 +1200,27 @@
     type = "log"
     [tests.input.log_fields]
       arr = """
-          [null, "", [], 1]
-          """
+        [null, "", [], 1]
+      """
       map = """
-          {"field1": null,
-           "field2": 32,
-           "field3": "",
-           "field4": { "nested1": 3,
-                       "nested2": null } }
-            """
+        {"field1": null,
+         "field2": 32,
+         "field3": "",
+         "field4": { "nested1": 3,
+                     "nested2": null } }
+      """
   [[tests.outputs]]
     extract_from = "remap_function_compact"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == false && \
-            .b == true && \
-            .c == false && \
-            .d == true && \
-            .e == false && \
-            .compactarr[0] == 1
-        '''
+      type = "remap"
+      source = '''
+        .a == false && \
+        .b == true && \
+        .c == false && \
+        .d == true && \
+        .e == false && \
+        .compactarr[0] == 1
+      '''
 
 [transforms.remap_function_assert_pass]
   inputs = []
@@ -1242,10 +1240,10 @@
   [[tests.outputs]]
   extract_from = "remap_function_assert_pass"
   [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-  .check == "checked"
-        '''
+    type = "remap"
+    source = '''
+      .check == "checked"
+    '''
 
 [transforms.remap_function_assert_fail]
   inputs = []
@@ -1279,10 +1277,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_log"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .foo == "this should be unchanged"
-        '''
+      type = "remap"
+      source = '''
+        .foo == "this should be unchanged"
+      '''
 
 [transforms.remap_function_merge]
   inputs=[]
@@ -1307,21 +1305,21 @@
   [[tests.outputs]]
     extract_from = "remap_function_merge"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .bar.field1 == "ook" && \
-            .bar.field2 == "ook ook"
-        '''
+      type = "remap"
+      source = '''
+        .bar.field1 == "ook" && \
+        .bar.field2 == "ook ook"
+      '''
 
 [transforms.remap_function_flatten]
   inputs = []
   type = "remap"
   source = """
-      .arr = flatten(parse_json(.arr))
-      .map = flatten(parse_json(.map))
-      .a = .map."field1.field2"
-      .b = .map."field1.field3"
-      """
+    .arr = flatten(parse_json(.arr))
+    .map = flatten(parse_json(.map))
+    .a = .map."field1.field2"
+    .b = .map."field1.field3"
+  """
 [[tests]]
   name = "remap_function_flatten"
   [tests.input]
@@ -1335,17 +1333,17 @@
   [[tests.outputs]]
     extract_from = "remap_function_flatten"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .arr[0] == 1 && \
-            .arr[1] == 2 && \
-            .arr[2] == 3 && \
-            .arr[3] == 4 && \
-            .arr[4] == 5 && \
-            .arr[5] == 6 && \
-            .a == 1 && \
-            .b == 2
-        '''
+      type = "remap"
+      source = '''
+        .arr[0] == 1 && \
+        .arr[1] == 2 && \
+        .arr[2] == 3 && \
+        .arr[3] == 4 && \
+        .arr[4] == 5 && \
+        .arr[5] == 6 && \
+        .a == 1 && \
+        .b == 2
+      '''
 
 [transforms.remap_function_redact]
   inputs = []
@@ -1367,14 +1365,14 @@
   [[tests.outputs]]
     extract_from = "remap_function_redact"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "**** world, **** universe" && \
-            .b == "**** ****ld, **** universe" && \
-            .c == "hello ****, hello ****" && \
-            .d == "hello world, hello universe" && \
-            .e == "**** w****rld, **** ****n****v****rs****"
-        '''
+      type = "remap"
+      source = '''
+        .a == "**** world, **** universe" && \
+        .b == "**** ****ld, **** universe" && \
+        .c == "hello ****, hello ****" && \
+        .d == "hello world, hello universe" && \
+        .e == "**** w****rld, **** ****n****v****rs****"
+      '''
 
 [transforms.remap_function_replace]
   inputs = []
@@ -1393,11 +1391,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_replace"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "fbaro" && \
-            .b == "fbarbar"
-        '''
+      type = "remap"
+      source = '''
+        .a == "fbaro" && \
+        .b == "fbarbar"
+      '''
 
 [transforms.remap_function_parse_aws_alb_log]
   inputs = []
@@ -1415,38 +1413,38 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_aws_alb_log"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .parts.type == "http" && \
-            .parts.timestamp == "2018-11-30T22:23:00.186641Z" && \
-            .parts.elb == "app/my-loadbalancer/50dc6c495c0c9188" && \
-            .parts.client_host == "192.168.131.39:2817" && \
-            .parts.target_host == null && \
-            .parts.request_processing_time == 0.0 && \
-            .parts.target_processing_time == 0.001 && \
-            .parts.response_processing_time == 0.0 && \
-            .parts.elb_status_code == "200" && \
-            .parts.target_status_code == "200" && \
-            .parts.received_bytes == 34 && \
-            .parts.sent_bytes == 366 && \
-            .parts.request_method == "GET" && \
-            .parts.request_url == "http://www.example.com:80/" && \
-            .parts.request_protocol == "HTTP/1.1" && \
-            .parts.user_agent == "curl/7.46.0" && \
-            .parts.ssl_cipher == null && \
-            .parts.ssl_protocol == null && \
-            .parts.target_group_arn == "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067" && \
-            .parts.trace_id == "Root=1-58337364-23a8c76965a2ef7629b185e3" && \
-            .parts.domain_name == null && \
-            .parts.chosen_cert_arn == null && \
-            .parts.matched_rule_priority == "0" && \
-            .parts.request_creation_time == "2018-11-30T22:22:48.364000Z" && \
-            .parts.actions_executed == "forward" && \
-            .parts.redirect_url == null && \
-            .parts.error_reason == null && \
-            .parts.classification == null && \
-            .parts.classification_reason == null
-        '''
+      type = "remap"
+      source = '''
+        .parts.type == "http" && \
+        .parts.timestamp == "2018-11-30T22:23:00.186641Z" && \
+        .parts.elb == "app/my-loadbalancer/50dc6c495c0c9188" && \
+        .parts.client_host == "192.168.131.39:2817" && \
+        .parts.target_host == null && \
+        .parts.request_processing_time == 0.0 && \
+        .parts.target_processing_time == 0.001 && \
+        .parts.response_processing_time == 0.0 && \
+        .parts.elb_status_code == "200" && \
+        .parts.target_status_code == "200" && \
+        .parts.received_bytes == 34 && \
+        .parts.sent_bytes == 366 && \
+        .parts.request_method == "GET" && \
+        .parts.request_url == "http://www.example.com:80/" && \
+        .parts.request_protocol == "HTTP/1.1" && \
+        .parts.user_agent == "curl/7.46.0" && \
+        .parts.ssl_cipher == null && \
+        .parts.ssl_protocol == null && \
+        .parts.target_group_arn == "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067" && \
+        .parts.trace_id == "Root=1-58337364-23a8c76965a2ef7629b185e3" && \
+        .parts.domain_name == null && \
+        .parts.chosen_cert_arn == null && \
+        .parts.matched_rule_priority == "0" && \
+        .parts.request_creation_time == "2018-11-30T22:22:48.364000Z" && \
+        .parts.actions_executed == "forward" && \
+        .parts.redirect_url == null && \
+        .parts.error_reason == null && \
+        .parts.classification == null && \
+        .parts.classification_reason == null
+      '''
 
 [transforms.remap_function_parse_aws_vpc_flow_log]
   inputs = []
@@ -1466,39 +1464,39 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_aws_vpc_flow_log"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a.version == 2 && \
-            .a.account_id == 123456789010 && \
-            .a.interface_id == "eni-1235b8ca123456789" && \
-            .a.srcaddr == null && \
-            .a.dstaddr == null && \
-            .a.srcport == null && \
-            .a.dstport == null && \
-            .a.protocol == null && \
-            .a.packets == null && \
-            .a.bytes == null && \
-            .a.start == 1431280876 && \
-            .a.end == 1431280934 && \
-            .a.action == null && \
-            .a.log_status == "NODATA" && \
-            .b.instance_id == null && \
-            .b.interface_id == "eni-1235b8ca123456789" && \
-            .b.srcaddr == "10.0.1.5" && \
-            .b.dstaddr == "10.0.0.220" && \
-            .b.pkt_srcaddr == "10.0.1.5" && \
-            .b.pkt_dstaddr == "203.0.113.5"
-        '''
+      type = "remap"
+      source = '''
+        .a.version == 2 && \
+        .a.account_id == 123456789010 && \
+        .a.interface_id == "eni-1235b8ca123456789" && \
+        .a.srcaddr == null && \
+        .a.dstaddr == null && \
+        .a.srcport == null && \
+        .a.dstport == null && \
+        .a.protocol == null && \
+        .a.packets == null && \
+        .a.bytes == null && \
+        .a.start == 1431280876 && \
+        .a.end == 1431280934 && \
+        .a.action == null && \
+        .a.log_status == "NODATA" && \
+        .b.instance_id == null && \
+        .b.interface_id == "eni-1235b8ca123456789" && \
+        .b.srcaddr == "10.0.1.5" && \
+        .b.dstaddr == "10.0.0.220" && \
+        .b.pkt_srcaddr == "10.0.1.5" && \
+        .b.pkt_dstaddr == "203.0.113.5"
+      '''
 
 [transforms.remap_metrics]
   inputs = []
   type = "remap"
   source = """
-      .tags.host = "ook"
-      .tags.name = .name
-      .tags.namespace = .namespace
-      .tags.type = .type
-   """
+    .tags.host = "ook"
+    .tags.name = .name
+    .tags.namespace = .namespace
+    .tags.type = .type
+  """
 [[tests]]
   name = "remap_metrics"
   [tests.input]
@@ -1512,13 +1510,13 @@
   [[tests.outputs]]
     extract_from = "remap_metrics"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .tags.name == "example counter" && \
-            .tags.namespace == "zork" && \
-            .tags.host == "ook" && \
-            .tags.type == "counter"
-        '''
+      type = "remap"
+      source = '''
+        .tags.name == "example counter" && \
+        .tags.namespace == "zork" && \
+        .tags.host == "ook" && \
+        .tags.type == "counter"
+      '''
 
 [transforms.remap_function_encode_json]
   inputs = []
@@ -1538,11 +1536,11 @@
   [[tests.outputs]]
     extract_from = "remap_function_encode_json"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "[1,2,3]" && \
-            .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
-        '''
+      type = "remap"
+      source = '''
+        .a == "[1,2,3]" && \
+        .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
+      '''
 
 [transforms.remap_function_parse_regex]
   inputs = []
@@ -1563,18 +1561,18 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_regex"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .bytes_in == 5667 && \
-            .host == "5.86.210.12" && \
-            .user == "zieme4647" && \
-            .timestamp == "19/06/2019:17:20:49 -0400" && \
-            .method == "GET" && \
-            .path == "/embrace/supply-chains/dynamic/vertical" && \
-            .status == 201 && \
-            .bytes_out == 20574 && \
-            .0 == "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
-        '''
+      type = "remap"
+      source = '''
+        .bytes_in == 5667 && \
+        .host == "5.86.210.12" && \
+        .user == "zieme4647" && \
+        .timestamp == "19/06/2019:17:20:49 -0400" && \
+        .method == "GET" && \
+        .path == "/embrace/supply-chains/dynamic/vertical" && \
+        .status == 201 && \
+        .bytes_out == 20574 && \
+        .0 == "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+      '''
 
 [transforms.remap_function_parse_regex_all]
   inputs = []
@@ -1592,15 +1590,15 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_regex_all"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result[0].fruit == "apples" && \
-            .result[0].veg == "carrots" && \
-            .result[0].0 == "apples and carrots" && \
-            .result[1].fruit == "peaches" && \
-            .result[1].veg == "peas" && \
-            .result[1].0 == "peaches and peas"
-        '''
+      type = "remap"
+      source = '''
+        .result[0].fruit == "apples" && \
+        .result[0].veg == "carrots" && \
+        .result[0].0 == "apples and carrots" && \
+        .result[1].fruit == "peaches" && \
+        .result[1].veg == "peas" && \
+        .result[1].0 == "peaches and peas"
+      '''
 
 [transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
   inputs = []
@@ -1618,17 +1616,17 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_aws_cloudwatch_log_subscription_message"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result.owner == "CloudwatchLogs" && \
-            .result.message_type == "CONTROL_MESSAGE" && \
-            .result.subscription_filters == [] && \
-            .result.log_group == "" && \
-            .result.log_stream == "" && \
-            .result.log_events == [{ "id": "", 
-                                     "timestamp": to_timestamp("2020-09-14T19:00:03.794Z"), 
-                                     "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
-        '''
+      type = "remap"
+      source = '''
+        .result.owner == "CloudwatchLogs" && \
+        .result.message_type == "CONTROL_MESSAGE" && \
+        .result.subscription_filters == [] && \
+        .result.log_group == "" && \
+        .result.log_stream == "" && \
+        .result.log_events == [{ "id": "", 
+                                 "timestamp": to_timestamp("2020-09-14T19:00:03.794Z"), 
+                                 "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
+      '''
 
 [transforms.remap_function_parse_key_value]
   inputs = []
@@ -1648,19 +1646,19 @@
   [[tests.outputs]]
     extract_from = "remap_function_parse_key_value"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .path == "/cart_link" && \
-            .host == "lumberjack-store.herokuapp.com" && \
-            .request_id == "6ad70ccd-40db-477c-afce-f7e3719a886b" && \
-            .fwd == "108.30.189.26" && \
-            .dyno == "web.1" && \
-            .connect == "0ms" && \
-            .service == "73ms" && \
-            .status == "304" && \
-            .bytes == "656" && \
-            .protocol == "https"
-        '''
+      type = "remap"
+      source = '''
+        .path == "/cart_link" && \
+        .host == "lumberjack-store.herokuapp.com" && \
+        .request_id == "6ad70ccd-40db-477c-afce-f7e3719a886b" && \
+        .fwd == "108.30.189.26" && \
+        .dyno == "web.1" && \
+        .connect == "0ms" && \
+        .service == "73ms" && \
+        .status == "304" && \
+        .bytes == "656" && \
+        .protocol == "https"
+      '''
 
 [transforms.remap_function_is_nullish]
   inputs = []
@@ -1690,16 +1688,16 @@
   [[tests.outputs]]
     extract_from = "remap_function_is_nullish"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == true && \
-            .b == true && \
-            .c == true && \
-            .d == true && \
-            .e == true && \
-            .f == true && \
-            .g == false
-        '''
+      type = "remap"
+      source = '''
+        .a == true && \
+        .b == true && \
+        .c == true && \
+        .d == true && \
+        .e == true && \
+        .f == true && \
+        .g == false
+      '''
 
 [transforms.remap_function_to_syslog_facility]
   inputs = []
@@ -1721,12 +1719,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_to_syslog_facility"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == "daemon" && \
-            .b == "ftp" && \
-            .c == "local7"
-        '''
+      type = "remap"
+      source = '''
+        .a == "daemon" && \
+        .b == "ftp" && \
+        .c == "local7"
+      '''
 
 [transforms.remap_function_to_unix_timestamp]
   inputs = []
@@ -1746,12 +1744,12 @@
   [[tests.outputs]]
     extract_from = "remap_function_to_unix_timestamp"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .secs == 1600077224 && \
-            .millis == 1600077224000 && \
-            .nanos == 1600077224000000000
-        '''
+      type = "remap"
+      source = '''
+        .secs == 1600077224 && \
+        .millis == 1600077224000 && \
+        .nanos == 1600077224000000000
+      '''
 
 [transforms.remap_function_push_to_array]
   inputs = []
@@ -1770,13 +1768,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_push_to_array"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result[0] == "apple" && \
-            .result[1] == "orange" && \
-            .result[2] == "banana" && \
-            .result[3] == "mango"
-        '''
+      type = "remap"
+      source = '''
+        .result[0] == "apple" && \
+        .result[1] == "orange" && \
+        .result[2] == "banana" && \
+        .result[3] == "mango"
+      '''
 
 [transforms.remap_function_append_to_array]
   inputs = []
@@ -1795,13 +1793,13 @@
   [[tests.outputs]]
     extract_from = "remap_function_append_to_array"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result[0] == "apple" && \
-            .result[1] == "orange" && \
-            .result[2] == "banana" && \
-            .result[3] == "mango"
-        '''
+      type = "remap"
+      source = '''
+        .result[0] == "apple" && \
+        .result[1] == "orange" && \
+        .result[2] == "banana" && \
+        .result[3] == "mango"
+      '''
 
 [transforms.remap_function_encode_base64]
   inputs = []
@@ -1818,10 +1816,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_encode_base64"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result == "QnJvbi1ZLUF1ciBTdG9tcA=="
-        '''
+      type = "remap"
+      source = '''
+        .result == "QnJvbi1ZLUF1ciBTdG9tcA=="
+      '''
 
 [transforms.remap_function_decode_base64]
   inputs = []
@@ -1838,10 +1836,10 @@
   [[tests.outputs]]
     extract_from = "remap_function_decode_base64"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .result == "Bron-Y-Aur Stomp"
-        '''
+      type = "remap"
+      source = '''
+        .result == "Bron-Y-Aur Stomp"
+      '''
 
 [transforms.remap_comments]
   inputs = []
@@ -1866,11 +1864,11 @@
   [[tests.outputs]]
     extract_from = "remap_comments"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .a == 1
-	    .b == true
-        '''
+      type = "remap"
+      source = '''
+        .a == 1
+        .b == true
+      '''
 
 [transforms.remap_multiline]
   inputs = []

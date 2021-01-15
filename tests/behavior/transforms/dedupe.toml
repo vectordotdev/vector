@@ -67,14 +67,14 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .a == 1 && .b == 2 && .c == 3
+        .a == 1 && .b == 2 && .c == 3
       '''
   [[tests.outputs]]
     extract_from = "dedupe_field_order"
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .a == 1 && .b == 3 && .c == 3
+        .a == 1 && .b == 3 && .c == 3
       '''
 
 [transforms.dedupe_nested_fields]

@@ -21,8 +21,8 @@
       [[tests.outputs.conditions]]
         type = "remap"
         source = '''
-            .data.action == "Accept"
-            .data.ifdir == "inbound"
+          .data.action == "Accept"
+          .data.ifdir == "inbound"
         '''
 
 [transforms.key_value_parser_defaults]
@@ -41,6 +41,6 @@
       [[tests.outputs.conditions]]
         type = "remap"
         source = '''
-                .action == "\"Accept\""
-                .ifdir == "\"inbound\""
+          .action == "\"Accept\""
+          .ifdir == "\"inbound\""
         '''

@@ -4,12 +4,12 @@
   [transforms.foo.lanes.first]
     type = "remap"
     source = '''
-           .message == "test swimlane 1"
+      .message == "test swimlane 1"
     '''
   [transforms.foo.lanes.second]
     type = "remap"
     source = '''
-        .message == "test swimlane 2"
+      .message == "test swimlane 2"
     '''
   [transforms.foo.lanes.third]
     type = "is_log"
@@ -33,7 +33,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-             .message == "test swimlane 1"
+        .message == "test swimlane 1"
       '''
 
   [[tests.outputs]]
@@ -41,8 +41,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-            .message == "test swimlane 1"
-            .new_field == "new field added"
+        .message == "test swimlane 1"
+        .new_field == "new field added"
       '''
 
   [[tests.outputs]]
@@ -50,7 +50,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-             .message == "test swimlane 1"
+        .message == "test swimlane 1"
       '''
 
 [[tests]]
@@ -66,7 +66,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-             .message == "test swimlane 2"
+        .message == "test swimlane 2"
       '''
 
   [[tests.outputs]]
@@ -74,5 +74,5 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-             .message == "test swimlane 2"
+        .message == "test swimlane 2"
       '''

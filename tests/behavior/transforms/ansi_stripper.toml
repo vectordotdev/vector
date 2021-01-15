@@ -11,8 +11,8 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_simple"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '.message == "hello123"'
+      type = "remap"
+      source = '.message == "hello123"'
 
 [transforms.ansi_stripper_nested]
   inputs = []
@@ -28,5 +28,5 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_nested"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '.a.b == "hello123"'
+      type = "remap"
+      source = '.a.b == "hello123"'

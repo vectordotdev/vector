@@ -15,13 +15,13 @@
   [[tests.outputs]]
     extract_from = "logfmt_parser_simple"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .code == 1234 && \
-            .flag == true && \
-            .number == 42.3 && \
-            .rest == "word"
-        '''
+      type = "remap"
+      source = '''
+        .code == 1234 && \
+        .flag == true && \
+        .number == 42.3 && \
+        .rest == "word"
+      '''
 
 [transforms.logfmt_parser_nested]
   inputs = []
@@ -40,10 +40,10 @@
   [[tests.outputs]]
     extract_from = "logfmt_parser_nested"
     [[tests.outputs.conditions]]
-        type = "remap"
-        source = '''
-            .nested.code == 1234 && \
-            .nested.flag == true && \
-            .nested.number == 42.3 && \
-            .nested.rest == "word"
-        '''
+      type = "remap"
+      source = '''
+        .nested.code == 1234 && \
+        .nested.flag == true && \
+        .nested.number == 42.3 && \
+        .nested.rest == "word"
+      '''
