@@ -43,12 +43,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a[0] == 0 && \
-        .a[1] == "1" && \
-        .a[2] == 2.0 && \
-        .b[0] == 0 && \
-        .b[1] == null && \
-        .b[2] == "two"
+        .a == [0, "1", 2.0] && \
+        .b == [0, null, "two"]
       '''
 
 [transforms.remap_arithmetic]
@@ -208,10 +204,13 @@
   [[tests.outputs]]
     extract_from = "remap_infallible_assignment"
     [[tests.outputs.conditions]]
-      "nope.equals" = "<null>"
-      "err1.equals" = "function call error: unable to parse json: key must be a string at line 1 column 3"
-      "ok.foo.equals" = true
-      "err2.equals" = "<null>"
+      type = "remap"
+      source = '''
+        .nope == null
+        .err1 == "function call error: unable to parse json: key must be a string at line 1 column 3"
+        .ok.foo == true
+        .err2 == null
+      '''
 
 [transforms.remap_error_coalesce_operator]
   inputs = []
@@ -229,8 +228,11 @@
   [[tests.outputs]]
     extract_from = "remap_error_coalesce_operator"
     [[tests.outputs.conditions]]
-      "val1.equals" = "nope"
-      "val2.equals" = true
+      type = "remap"
+      source = '''
+        .val1 == "nope"
+        .val2 == true
+      '''
 
 [transforms.remap_bang_function]
   inputs = []
@@ -247,7 +249,8 @@
   [[tests.outputs]]
     extract_from = "remap_bang_function"
     [[tests.outputs.conditions]]
-      "val.exists" = false
+      type = "remap"
+      source = "!exists(.val)"
 
 [transforms.remap_function_arguments]
   inputs = []
@@ -310,7 +313,7 @@
       source = '''
         .a == "A" && \
         .b == "BBB BB" && \
-        .c.c == "C.C" && \
+        .c == {"c": "C.C"} && \
         .f == "ff"
       '''
 
@@ -362,7 +365,7 @@
       source = '''
         .a == "a" && \
         .b == "bbb bb" && \
-        .c.c == "c.c" && \
+        .c == {"c": "c.c"} && \
         .f == "FF"
       '''
 
@@ -810,14 +813,15 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .parts.scheme == "https" && \
-        .parts.username == "" && \
-        .parts.password == "" && \
-        .parts.host == "master.vector.dev" && \
-        .parts.port == null && \
-        .parts.path == "/docs/reference/transforms/merge/" && \
-        .parts.query.hello == "world" && \
-        .parts.fragment == "configuration"
+        .parts == { "scheme": "https",
+                    "username": "",
+                    "password": "",
+                    "host": "master.vector.dev",
+                    "port": null,
+                    "path": "/docs/reference/transforms/merge/",
+                    "query": {"hello": "world"},
+                    "fragment": "configuration"
+	         }
       '''
 
 [transforms.remap_function_ceil]
