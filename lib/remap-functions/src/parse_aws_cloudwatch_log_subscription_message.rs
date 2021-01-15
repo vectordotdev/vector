@@ -57,7 +57,6 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
             .into_fallible(true) // Message parsing error
             .with_constraint(value::Kind::Map)
     }
