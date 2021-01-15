@@ -73,13 +73,13 @@ pub trait CustomFilter<T> {
 }
 
 /// Returns true if a provided `Item` passes all 'AND' or 'OR' filter rules, recursively.
-fn filter_one<Item, Filter>(item: &Item, f: &Filter) -> bool
+fn filter_item<Item, Filter>(item: &Item, f: &Filter) -> bool
 where
     Filter: CustomFilter<Item>,
 {
     f.matches(item)
         || f.or()
-            .map_or_else(|| false, |f| f.iter().any(|f| filter_one(item, f)))
+            .map_or_else(|| false, |f| f.iter().any(|f| filter_item(item, f)))
 }
 
 /// Filters items based on an implementation of `CustomFilter<T>`.
@@ -88,7 +88,7 @@ where
     Iter: Iterator<Item = Item>,
     Filter: CustomFilter<Item>,
 {
-    items.filter(|c| filter_one(c, f)).collect()
+    items.filter(|c| filter_item(c, f)).collect()
 }
 
 #[cfg(test)]
