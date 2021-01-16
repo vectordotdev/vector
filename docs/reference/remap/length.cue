@@ -6,14 +6,18 @@ remap: functions: length: {
 			name:        "value"
 			description: "The array or map"
 			required:    true
-			type: ["array", "map"]
+			type: ["array", "map", "string"]
 		},
 	]
 	internal_failure_reason: null
 	return: ["integer"]
 	category: "Enumerate"
 	description: """
-		Return the length of the array or the number of keys in the map (nested keys are ignored).
+		Returns the length of the input:
+
+		* If an array, the size of the array
+		* If a string, the length of the string
+		* If a map, the number of keys in the map (nested keys are ignored)
 		"""
 	examples: [
 		{
@@ -46,5 +50,11 @@ remap: functions: length: {
 			source: ".num_attrs = length(.team)"
 			output: input & {log: num_attrs: 3}
 		},
+		{
+			title: "String"
+			input: log: message: "The Planet of the Apes Musical"
+			source: ".str_len = length(.message)"
+			output: input & {log: str_len: 30}
+		}
 	]
 }
