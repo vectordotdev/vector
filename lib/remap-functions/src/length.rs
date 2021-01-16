@@ -55,7 +55,7 @@ impl Expression for LengthFn {
 fn safe_i64(n: usize) -> Result<Value> {
     match i64::try_from(n) {
         Ok(n) => Ok(Value::from(n)),
-        Err(_) => Err("64-bit integer overflow".into())
+        Err(_) => Err("64-bit integer overflow".into()),
     }
 }
 
