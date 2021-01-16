@@ -28,19 +28,12 @@ struct GetEnvVarFn {
     name: Box<dyn Expression>,
 }
 
-impl GetEnvVarFn {
-    #[cfg(test)]
-    fn new(name: Box<dyn Expression>) -> Self {
-        Self { name }
-    }
-}
-
 impl Expression for GetEnvVarFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = self.name.execute(state, object)?.try_bytes()?;
         let name = String::from_utf8_lossy(&bytes);
 
-        let value = std::env::var(name.as_ref()).map_err(ToString::to_string)?;
+        let value = std::env::var(name.as_ref()).map_err(|e| e.to_string())?;
         Ok(value.into())
     }
 
