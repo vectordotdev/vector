@@ -56,8 +56,6 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
-#[cfg(feature = "only_fields")]
-mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -191,8 +189,6 @@ pub use log::Log;
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
-#[cfg(feature = "only_fields")]
-pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -328,8 +324,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
-        #[cfg(feature = "only_fields")]
-        Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]

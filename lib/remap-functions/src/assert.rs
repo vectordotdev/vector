@@ -67,12 +67,7 @@ impl Expression for AssertFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.condition
             .type_def(state)
-            .fallible_unless(value::Kind::Boolean)
-            .merge_with_default_optional(
-                self.message
-                    .as_ref()
-                    .map(|message| message.type_def(state).fallible_unless(value::Kind::Bytes)),
-            )
+            .into_fallible(true)
             .with_constraint(value::Kind::Null)
     }
 }
