@@ -67,6 +67,7 @@ urls: {
 	aws_s3_regions:                                           "https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region"
 	aws_s3_service_limits:                                    "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html"
 	aws_s3_sse:                                               "https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html"
+	aws_s3_server_access_logs:                                "https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html"
 	aws_s3_storage_classes:                                   "https://aws.amazon.com/s3/storage-classes/"
 	aws_s3_tags:                                              "https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html"
 	aws_sqs:                                                  "https://aws.amazon.com/sqs/"
