@@ -65,7 +65,9 @@ mod tests {
     #[test]
     fn get_env_var() {
         let mut state = state::Program::default();
-        let func = GetEnvVarFn::new(Box::new(Path::from("foo")));
+        let func = GetEnvVarFn {
+            name: Box::new(Path::from("foo")),
+        };
         std::env::set_var("VAR2", "var");
 
         let cases = vec![
