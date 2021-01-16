@@ -13,6 +13,18 @@ remap: functions: parse_duration: {
 			description: "The string of the duration unit the number should be output as."
 			required:    true
 			type: ["string"]
+			enum: {
+				ns: "Nanoseconds (1 billion nanoseconds in a second)"
+				us: "Microseconds (1 million microseconds in a second)"
+				µs: "Microseconds (1 million microseconds in a second)"
+				ms: "Milliseconds (1 thousand microseconds in a second)"
+				cs: "Centiseconds (100 centiseconds in a second)"
+				ds: "Deciseconds (10 deciseconds in a second)"
+				s:  "Seconds"
+				m:  "Minutes (60 seconds in a minute)"
+				h:  "Hours (60 minutes in an hour)"
+				d:  "Days (24 hours in a day)"
+			}
 		},
 	]
 	internal_failure_reasons: [
@@ -22,25 +34,13 @@ remap: functions: parse_duration: {
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` representing a duration in the specified `unit`.
-
-		Available units:
-		- **ns** - nanoseconds (1 billion nanoseconds in a second)
-		- **us** - microseconds (1 million microseconds in a second)
-		- **µs** - microseconds (1 million microseconds in a second)
-		- **ms** - milliseconds (1 thousand microseconds in a second)
-		- **cs** - centisecond (100 centiseconds in a second)
-		- **ds** - decisecond (10 deciseconds in a second)
-		- **s** - second
-		- **m** - minute (60 seconds in a minute)
-		- **h** - hour (60 minutes in an hour)
-		- **d** - day (24 hours in a day)
 		"""#
 	examples: [
 		{
 			title: "Parse duration (milliseconds)"
 			input: log: duration: "1005ms"
 			source: #"""
-				.seconds = parse_duration(.duration, "s")
+				.seconds = parse_duration(.duration, unit: "s")
 				"""#
 			output: input & {log: seconds: 1.005}
 		},
@@ -48,7 +48,7 @@ remap: functions: parse_duration: {
 			title: "Parse duration (error)"
 			input: log: duration: "1005years"
 			source: #"""
-				.seconds = parse_duration(.duration, "s")
+				.seconds = parse_duration(.duration, unit: "s")
 				"""#
 			raise: "Failed to parse"
 		},
