@@ -40,7 +40,7 @@ impl Expression for GetEnvVarFn {
         let bytes = self.name.execute(state, object)?.try_bytes()?;
         let name = String::from_utf8_lossy(&bytes);
 
-        let value = std::env::var(name.as_ref()).map_err(|e| Error::Call(e.to_string()))?;
+        let value = std::env::var(name.as_ref()).map_err(ToString::to_string)?;
         Ok(value.into())
     }
 
