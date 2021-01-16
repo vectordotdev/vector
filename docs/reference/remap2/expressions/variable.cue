@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: variable: {
 	title: "Variable"
 	description: """
-		An path expression is a sequence of period-delimited segments that represent the location of a value
+		An "variable" expression is a sequence of period-delimited segments that represent the location of a value
 		within a map.
 		"""
 	return: """
@@ -12,8 +12,20 @@ remap2: expressions: variable: {
 
 	grammar: {
 		source: """
-			!(reserved_keyword ~ !(ASCII_ALPHANUMERIC | "_")) ~ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")*
+			leading ~ (trailing)*
 			"""
-		definitions: {}
+		definitions: {
+			leading: {
+				description:	"""
+					The `leading` character can only be an alpha-numeric character (`a-zA-Z0-9`).
+					"""
+			}
+			trailing: {
+				description:	"""
+					The `trailing` characters must only contain ASCII alpha-numeric and underscore characters
+					(`a-zA-Z0-9_`).
+					"""
+			}
+		}
 	}
 }

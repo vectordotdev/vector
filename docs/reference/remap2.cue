@@ -13,7 +13,7 @@ package metadata
 		raises?: string
 
 		if raises == _|_ {
-			return:  _
+			return?:  _
 			output?: #Event
 		}
 	}
