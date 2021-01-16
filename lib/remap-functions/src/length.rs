@@ -1,4 +1,5 @@
 use remap::prelude::*;
+use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Length;
@@ -35,8 +36,8 @@ impl Expression for LengthFn {
         let value = self.value.execute(state, object)?;
 
         match value {
-            Array(v) => Ok((v.len() as i32).into()),
-            Map(v) => Ok((v.len() as i32).into()),
+            Array(v) => safe_i64(v.len()),
+            Map(v) => safe_i64(v.len()),
             _ => Err("unsupported type".into()),
         }
     }
@@ -48,6 +49,13 @@ impl Expression for LengthFn {
             .type_def(state)
             .fallible_unless(Kind::Array | Kind::Map)
             .with_constraint(Kind::Integer)
+    }
+}
+
+fn safe_i64(n: usize) -> Result<Value> {
+    match i64::try_from(n) {
+        Ok(n) => Ok(Value::from(n)),
+        Err(_) => Err("64-bit integer overflow".into())
     }
 }
 
