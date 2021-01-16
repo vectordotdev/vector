@@ -1,5 +1,4 @@
 use remap::prelude::*;
-use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Length;
@@ -36,8 +35,9 @@ impl Expression for LengthFn {
         let value = self.value.execute(state, object)?;
 
         match value {
-            Array(v) => safe_i64(v.len()),
-            Map(v) => safe_i64(v.len()),
+            Array(v) => Ok(Value::from(v.len() as i64)),
+            Map(v) => Ok(Value::from(v.len() as i64)),
+            Bytes(v) => Ok(Value::from(v.len() as i64)),
             _ => Err("unsupported type".into()),
         }
     }
@@ -47,15 +47,8 @@ impl Expression for LengthFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Array | Kind::Map)
+            .fallible_unless(Kind::Bytes | Kind::Array | Kind::Map)
             .with_constraint(Kind::Integer)
-    }
-}
-
-fn safe_i64(n: usize) -> Result<Value> {
-    match i64::try_from(n) {
-        Ok(n) => Ok(Value::from(n)),
-        Err(_) => Err("64-bit integer overflow".into()),
     }
 }
 
@@ -101,14 +94,14 @@ mod tests {
             },
         }
 
-        value_string_fallible {
+        value_string_infallible {
             expr: |_| LengthFn {
-                value: lit!("this is fallible").boxed()
+                value: lit!("this is infallible").boxed()
             },
             def: TypeDef {
-                fallible: true,
                 kind: Kind::Integer,
-                inner_type_def: None
+                inner_type_def: None,
+                ..Default::default()
             },
         }
     ];
@@ -139,6 +132,11 @@ mod tests {
         empty_array_value {
             args: func_args![value: array![]],
             want: Ok(value!(0)),
+        }
+
+        string_value {
+            args: func_args![value: value!("hello world")],
+            want: Ok(value!(11))
         }
     ];
 }
