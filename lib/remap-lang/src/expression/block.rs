@@ -1,4 +1,6 @@
-use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    state, value, Expr, Expression, Object, Result, TypeDef, Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
@@ -47,6 +49,7 @@ mod tests {
     use crate::{
         expression::{Arithmetic, Array, Literal},
         test_type_def,
+        type_def::InnerTypeDef,
         value::Kind,
         Operator,
     };
@@ -103,7 +106,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: InnerTypeDef::Array(TypeDef {
                     fallible: false,
                     kind: Kind::Integer,
                     ..Default::default()

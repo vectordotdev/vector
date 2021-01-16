@@ -89,6 +89,7 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Boolean,
+                inner_type_def: InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Bytes).boxed()),
                 ..Default::default()
             },
         }

@@ -1,4 +1,6 @@
-use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    state, type_def::InnerTypeDef, value, Expr, Expression, Object, Result, TypeDef, Value,
+};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -66,17 +68,14 @@ impl Expression for Map {
             .any(|d| d.is_fallible());
 
         let inner_type_def = if self.expressions.is_empty() {
-            None
+            InnerTypeDef::None
         } else {
-            let type_def = self.expressions.iter().fold(
-                TypeDef {
-                    kind: value::Kind::empty(),
-                    ..Default::default()
-                },
-                |type_def, (_, expression)| type_def.merge(expression.type_def(state)),
-            );
-
-            Some(type_def.boxed())
+            InnerTypeDef::Map(
+                self.expressions
+                    .iter()
+                    .map(|(name, expression)| (name.clone(), expression.type_def(state)))
+                    .collect(),
+            )
         };
 
         TypeDef {
@@ -90,7 +89,10 @@ impl Expression for Map {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{array, expression::Arithmetic, map, test_type_def, value::Kind, Operator};
+    use crate::{
+        array, expression::Arithmetic, map, test_type_def, type_def_map, value::Kind, InnerTypeDef,
+        Operator,
+    };
 
     test_type_def![
         no_expression {
@@ -106,10 +108,10 @@ mod tests {
             expr: |_| map!{"a": true},
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Boolean,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: InnerTypeDef::Map(
+                    type_def_map! [
+                        "a": TypeDef::new_with_kind(Kind::Boolean),
+                    ]),
                 ..Default::default()
             },
         }
@@ -122,10 +124,12 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: InnerTypeDef::Map(
+                    type_def_map! [
+                        "a": TypeDef::new_with_kind(Kind::Bytes),
+                        "b": TypeDef::new_with_kind(Kind::Boolean),
+                        "c": TypeDef::new_with_kind(Kind::Integer)
+                    ]),
                 ..Default::default()
             },
         }
@@ -142,11 +146,12 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean,
-                    fallible: true,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: InnerTypeDef::Map(
+                    type_def_map! [
+                        "a": TypeDef::new_with_kind(Kind::Boolean),
+                        "b": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true)
+                    ]
+                )
             },
         }
 
@@ -163,15 +168,12 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean | Kind::Array,
-                    fallible: true,
-                    inner_type_def: Some(TypeDef {
-                        kind: Kind::Integer,
-                        fallible: false,
-                        ..Default::default()
-                    }.boxed()),
-                }.boxed()),
+                inner_type_def: InnerTypeDef::Map(
+                    type_def_map! [
+                        "a": TypeDef::new_with_kind(Kind::Boolean),
+                        "b": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true),
+                        "c": TypeDef::new_with_kind(Kind::Array).with_inner_type(InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Integer).boxed()))
+                    ])
             },
         }
     ];

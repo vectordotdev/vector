@@ -1,6 +1,4 @@
-use crate::{
-    expression::Literal, state, value, Error, Expr, Expression, Object, Result, TypeDef, Value,
-};
+use crate::{Error, Expr, Expression, Object, Result, TypeDef, Value, expression::Literal, state, type_def::InnerTypeDef, value};
 use std::convert::TryFrom;
 use std::fmt;
 use std::iter::IntoIterator;
@@ -109,7 +107,7 @@ impl Expression for Array {
             .any(|d| d.is_fallible());
 
         let inner_type_def = if self.expressions.is_empty() {
-            None
+            InnerTypeDef::None
         } else {
             let type_def = self.expressions.iter().fold(
                 TypeDef {
@@ -119,12 +117,12 @@ impl Expression for Array {
                 |type_def, expression| type_def.merge(expression.type_def(state)),
             );
 
-            Some(type_def.boxed())
+            InnerTypeDef::Array(type_def.boxed())
         };
 
         TypeDef {
             fallible,
-            kind: value::Kind::Array,
+            kind:  value::Kind::Array,
             inner_type_def,
         }
     }
@@ -154,7 +152,7 @@ mod tests {
             expr: |_| Array::new(vec![Literal::from(true).into()]),
             def: TypeDef {
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: InnerTypeDef::Array(TypeDef {
                     kind: Kind::Boolean,
                     ..Default::default()
                 }.boxed()),
@@ -170,7 +168,7 @@ mod tests {
             ]),
             def: TypeDef {
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: InnerTypeDef::Array(TypeDef {
                     kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
                     ..Default::default()
                 }.boxed()),
@@ -190,7 +188,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: InnerTypeDef::Array(TypeDef {
                     fallible: true,
                     kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes,
                     ..Default::default()
@@ -211,10 +209,10 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: InnerTypeDef::Array(TypeDef {
                     fallible: true,
                     kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes | Kind::Boolean | Kind::Array,
-                    inner_type_def: Some(TypeDef {
+                    inner_type_def: InnerTypeDef::Array(TypeDef {
                         kind: Kind::Integer,
                         ..Default::default()
                     }.boxed()),

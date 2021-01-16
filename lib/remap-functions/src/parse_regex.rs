@@ -55,9 +55,26 @@ impl Expression for ParseRegexFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let mut inner_type = BTreeMap::new();
+
+        // Add typedefs for each capture by numerical index.
+        for num in 0..self.pattern.captures_len() {
+            inner_type.insert(num.to_string(), TypeDef::new_with_kind(value::Kind::Bytes));
+        }
+
+        // Add a typedef for each capture name.
+        for name in self
+            .pattern
+            .capture_names()
+            .filter_map(std::convert::identity)
+        {
+            inner_type.insert(name.to_owned(), TypeDef::new_with_kind(value::Kind::Bytes));
+        }
+
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
+            .with_inner_type(InnerTypeDef::Map(inner_type))
             .with_constraint(value::Kind::Map)
     }
 }
@@ -72,25 +89,48 @@ mod tests {
         value_string {
             expr: |_| ParseRegexFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
+            def: TypeDef { kind: Kind::Map,
+                           inner_type_def: InnerTypeDef::Map(
+                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
+                               ]
+                           ),
+                           ..Default::default() },
         }
 
         value_non_string {
             expr: |_| ParseRegexFn {
                 value: Literal::from(1).boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: InnerTypeDef::Map(
+                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
+                               ]
+                           ),
+            },
         }
 
         value_optional {
             expr: |_| ParseRegexFn {
                 value: Box::new(Noop),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: InnerTypeDef::Map(
+                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
+                               ]
+                           ),
+            },
         }
     ];
 
