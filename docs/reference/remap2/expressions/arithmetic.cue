@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: arithmetic: {
 	title: "Arithmetic"
 	description: """
-		An "arithmetic" expression performs an operation on two expressions as defined by the operator.
+		An "arithmetic" expression performs an operation on two expressions (operands) as defined by the operator.
 
 		Although arithmetic is commonly performed with numbers, it can apply to other types as well, such as strings.
 		"""
@@ -17,21 +17,21 @@ remap2: expressions: arithmetic: {
 			"""
 		definitions: {
 			expression: {
-				description:	"""
+				description: """
 					The `expression` can be any expression that returns a valid type as defined by the `operator`.
 					"""
 			}
 			operator: {
-				description:	"""
+				description: """
 					The `operator` defines the operation performed on the left-hand and right-hand side operands.
 					"""
 				enum: {
-					"+": "Sum. Operates on `int`, `float`, and `string` types."
-					"-": "Difference. Operates on `int` and `float` types."
-					"*": "Multiplication. Operates on `int` and `float` types."
-					"/": "Float division. Operates on `int` and `float` types. _Always_ produces a `float`."
+					"+":  "Sum. Operates on `int`, `float`, and `string` types."
+					"-":  "Difference. Operates on `int` and `float` types."
+					"*":  "Multiplication. Operates on `int` and `float` types."
+					"/":  "Float division. Operates on `int` and `float` types. _Always_ produces a `float`."
 					"//": "Integer division. Operates on `int` and `float` types. _Always_ produces a `int`."
-					"%": "Remainder. Operates on `int` and `float` types. _Always_ produces an `int`."
+					"%":  "Remainder. Operates on `int` and `float` types. _Always_ produces an `int`."
 				}
 			}
 		}

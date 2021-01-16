@@ -36,7 +36,7 @@ remap2: features: progressive_type_safety: {
 			title: "Progressivenes"
 			description: """
 				VRL's type safety is _progressive_, meaning it will implement type safety for any value for which it
-				knows the type. Because obervability data can be quite unpredictable, it's not always known which
+				knows the type. Because observability data can be quite unpredictable, it's not always known which
 				type a field might be, hence the _progressive_ nature of VRL's type safety. As VRL scripts are
 				evaluated, type information is built up and used at compile-time to enforce type safety. Let's look
 				at an example:
@@ -47,7 +47,7 @@ remap2: features: progressive_type_safety: {
 				.foo = upcase(.foo) # string
 				```
 
-				Let's break down the above example:
+				Breaking down the above:
 
 				1. The `.foo` field starts off as an `any` type (AKA unknown).
 				2. The call to the `downcase` function requires error handling since VRL cannot guarantee that `.foo`
@@ -55,7 +55,7 @@ remap2: features: progressive_type_safety: {
 				3. Afterwards, assuming the `downcase` invocation is successful, VRL knows that `.foo` is a string,
 				   since `downcase` can only return strings.
 				4. Finally, the call to `upcase` does not require error handling since VRL knows that `.foo` is a
-				   string, makign the `upcase` invocation infallible.
+				   string, making the `upcase` invocation infallible.
 
 				To avoid error handling for argument errors, you can specify the types of your fields at the top
 				of your VRL script:

@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: index: {
 	title: "Index"
 	description: """
-		An index expression denotes the element of an array.
+		An "index" expression denotes the element of an array.
 		"""
 	return: """
 		Returns the element in the position of the supplied index.
@@ -16,7 +16,7 @@ remap2: expressions: index: {
 		definitions: {
 			index: {
 				description: """
-					The `index` represents the zero-based position of the elemennt.
+					The `index` represents the zero-based position of the element.
 					"""
 
 				characteristics: {

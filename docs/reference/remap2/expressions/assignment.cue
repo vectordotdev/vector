@@ -7,7 +7,7 @@ remap2: expressions: assignment: {
 		target (path or variable).
 		"""
 	return: """
-		Returns the value of the right-hand side expression only if the expression succeeeds. If the expression errors,
+		Returns the value of the right-hand side expression only if the expression succeeds. If the expression errors,
 		then the error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
 		"""
 

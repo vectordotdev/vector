@@ -16,22 +16,22 @@ remap2: expressions: comparison: {
 			"""
 		definitions: {
 			expression: {
-				description:	"""
+				description: """
 					The `expression` (operand) can be any expression that returns a valid type as defined by the
 					`operator`.
 					"""
 			}
 			operator: {
-				description:	"""
+				description: """
 					The `operator` defines the operation performed on the left-hand and right-hand side operations.
 					"""
 				enum: {
 					"==": "Equal. Operates on all types."
 					"!=": "Not equal. Operates on all types."
 					">=": "Greater than or equal. Operates on `int` and `float` types."
-					">": "Greater than. Operates on `int` and `float` types."
+					">":  "Greater than. Operates on `int` and `float` types."
 					"<=": "Less than or equal. Operates on `int` and `float` types."
-					"<": "Less than. Operates on `int` and `float` types."
+					"<":  "Less than. Operates on `int` and `float` types."
 				}
 			}
 		}

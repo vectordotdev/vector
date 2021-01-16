@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: path: {
 	title: "Path"
 	description: """
-		An path expression is a sequence of period-delimited segments that represent the location of a value
+		A "path" expression is a sequence of period-delimited segments that represent the location of a value
 		within a map.
 		"""
 	return: """
@@ -18,7 +18,7 @@ remap2: expressions: path: {
 			".": {
 				description: """
 					The `.` character represents the root of the event. Therefore, _all_ paths must begin with the `.`
-					character, and `.` alone is valid path.
+					character, and `.` alone is a valid path.
 					"""
 			}
 			path_segments: {
@@ -50,7 +50,7 @@ remap2: expressions: path: {
 							"""
 					}
 					dynamic: {
-						title:       "Dynamic paths"
+						title: "Dynamic paths"
 						description: """
 							Dynamic paths are currently not supported.
 							"""

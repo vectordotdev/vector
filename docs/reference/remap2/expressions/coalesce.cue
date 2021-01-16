@@ -4,7 +4,7 @@ remap2: expressions: coalesce: {
 	title: "Coalesce"
 	description: """
 		A "coalesce" expression is composed of multiple expressions (operands) delimited by a coalesce operator,
-		short-circuiting on the the first expression that does not violate the operator condition.
+		short-circuiting on the first expression that does not violate the operator condition.
 		"""
 	return: """
 		Returns the value of the first expression (operand) that does not violate the operator condition.

@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: function_call: {
 	title: "Function call"
 	description: """
-		A function call expression invokes built-in VRL functions.
+		A "function call" expression invokes built-in VRL functions.
 		"""
 	return: """
 		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, then the
@@ -44,8 +44,8 @@ remap2: expressions: function_call: {
 			}
 			arguments: {
 				description: """
-					The `arguments` are comma-delimited expressions that can optionally	be specified with the
-					documented name. The examples are functionally equivalent.
+					The `arguments` are comma-delimited expressions that can optionally	be prefixed with the
+					documented name.
 					"""
 
 				characteristics: {

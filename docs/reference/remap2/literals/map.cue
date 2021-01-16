@@ -3,16 +3,16 @@ package metadata
 remap2: literals: map: {
 	title: "Map"
 	description: """
-		A "map" literal is a growable key/value structure whole values are a set of expressions.
+		A "map" literal is a growable key/value structure.
 
-		Maps are based on the [`BTreeMap` Rust type][b_tree_map] and syntactically equivalet to a JSON object.
+		Maps are based on the [`BTreeMap` Rust type][b_tree_map] and syntactically equivalent to a JSON object.
 		"""
 
 	characteristics: {
 		ordering: {
 			title: "Ordering"
 			description: """
-				Maps are ordered alphabetically by the key in asending order. Therefore, operations, such as encoding
+				Maps are ordered alphabetically by the key in ascending order. Therefore, operations, such as encoding
 				into JSON, will produce a string with keys that are alphabetically ordered in ascending fashion.
 				"""
 		}
