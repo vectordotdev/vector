@@ -493,12 +493,12 @@ impl DockerLogsSource {
                                                 attributes.get("name").map(|s| s.as_str()),
                                             );
 
-                                        let self_check = self.exclude_vector(
+                                        let exclude_vector = self.exclude_vector(
                                             id.as_str(),
                                             attributes.get("image").map(|s| s.as_str()),
                                         );
 
-                                        if include_name && self_check {
+                                        if include_name && !exclude_vector {
                                             self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
                                     }
