@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	affine_type_system: "https://en.wikipedia.org/wiki/Substructural_type_system#Affine_type_systems"
 	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
 	ansi_escape_codes:                                        "https://en.wikipedia.org/wiki/ANSI_escape_code"
@@ -79,6 +80,7 @@ urls: {
 	base64_padding:                                           "https://en.wikipedia.org/wiki/Base64#Output_padding"
 	basic_auth:                                               "https://en.wikipedia.org/wiki/Basic_access_authentication"
 	big_query_streaming:                                      "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
+	b_tree_map: "https://doc.rust-lang.org/std/collections/struct.BTreeMap.html"
 	cargo_audit:                                              "https://github.com/RustSec/cargo-audit"
 	centos:                                                   "https://www.centos.org/"
 	chrono_time_formats:                                      "https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers"
@@ -137,6 +139,7 @@ urls: {
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "https://github.com/timberio/vector/blob/master/proto/event.proto"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"
+	expression_oriented_language: "https://en.wikipedia.org/wiki/Expression-oriented_programming_language"
 	externally_tagged_representation:                         "https://serde.rs/enum-representations.html#externally-tagged"
 	file:                                                     "https://en.wikipedia.org/wiki/Computer_file"
 	file_system:                                              "https://en.wikipedia.org/wiki/File_system"
@@ -372,7 +375,9 @@ urls: {
 	toml_array:                                               "https://github.com/toml-lang/toml#array"
 	toml_table:                                               "https://github.com/toml-lang/toml#table"
 	toml_types:                                               "https://github.com/toml-lang/toml#table-of-contents"
-	vrl_reference:                                            "https://vector.dev/docs/reference/remap/"
+	vrl_errors_reference: "https://vector.dev/docs/reference/vrl/errors/"
+	vrl_functions_reference: "https://vector.dev/docs/reference/vrl/functions/"
+	vrl_reference:                                            "https://vector.dev/docs/reference/vrl/"
 	twelve_factor_app:                                        "https://12factor.net/"
 	ubuntu:                                                   "https://ubuntu.com/"
 	udp:                                                      "https://en.wikipedia.org/wiki/User_Datagram_Protocol"

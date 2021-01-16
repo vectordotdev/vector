@@ -1,58 +1,39 @@
 package metadata
 
 remap2: {
-	#Argument: {
-		name:        string
-		description: string
-		required:    bool
-		multiple:    bool | *false
-		default?:    bool | string | int
-		type: [#Type, ...#Type]
-		enum?: #Enum
-	}
-
-	#Construct: {
-		title: string
-		description: string
-		types: [...#ConstructType]
-	}
-
-	#ConstructType: {
+	#Characteristic: {
+		name: string
 		title: string
 		description :string
-	}
 
-	#Example: {
-		title: string
-		configuration?: [string]: string
-		input:   #Event
-		source:  string
-		raises?: string
-
-		if raises == _|_ {
-			output: #Event
+		characteristics: [Name=string]: #Characteristic & {
+			name: Name
 		}
 	}
 
-	#Function: {
-		arguments: [...#Argument]
-		internal_failure_reasons: [...string]
-		return: [#Type, ...#Type]
-		category:    #FunctionCategory
-		description: string
-		examples?: [#Example, ...#Example]
-		name: string
-	}
-
-	#FunctionCategory: "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
-
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "path" | "string" | "regex" | "timestamp"
 
-	functions: [Name=string]: #Function & {
-		name: Name
-	}
+	description: #"""
+		**Vector Remap Language** (VRL) is an [expression-oriented](\(urls.expression_oriented_language)) language
+		specifically designed for transforming observability data (logs and metrics). It features a simple
+		[syntax](#syntax) and a rich set of built-in [functions](#functions) tailored specifically to observability
+		use cases. VRL is built on the following two principles:
 
-	syntax: [Name=string]: #Construct & {
-		name: Name
-	}
+		1. **Performance** — VRL is implemented in the very fast and efficient [Rust](\(urls.rust)) language and
+		   VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to
+		   transform observability with a minimal per-event performance penalty vis-à-vis pure Rust. In addition,
+		   ergonomic features such as compile-time correctness checks and the lack of language constructs like
+		   loops make it difficult to write scripts that are slow or buggy or require optimization.
+		2. **Safety** - VRL is a safe language in several senses: VRL scripts have access only to the event data
+		   that they handle and not, for example, to the Internet or the host; VRL provides the same strong memory
+		   safety guarantees as Rust; and, as mentioned above, compile-time correctness checks prevent VRL
+		   scripts from behaving in unexpected or sub-optimal ways. These factors distinguish VRL from other
+		   available event data transformation languages and runtimes.
+
+		For a more in-depth picture, see the [announcement blog post](\(urls.vrl_announcement)) for more details.
+		"""#
+
+	features: _
+	functions: _
+	constructs: _
 }

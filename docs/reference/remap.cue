@@ -55,6 +55,7 @@ remap: {
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
+			notices: [...string]
 		}
 	}
 
