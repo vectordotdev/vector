@@ -81,7 +81,7 @@ impl InternalEvent for KafkaStatisticsReceived {
         };
 
         let labels = [("statistics", statistics)];
-        counter!("kafka_statistics", 1, &labels);
+        counter!("kafka_statistics_received_total", 1, &labels);
     }
 }
 

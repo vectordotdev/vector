@@ -283,6 +283,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		kafka_statistics_received_total: {
+			description:       "The total number of statistics that have been received from Kafka."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"

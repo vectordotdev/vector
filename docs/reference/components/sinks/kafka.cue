@@ -145,4 +145,8 @@ components: sinks: kafka: {
 	}
 
 	how_it_works: components._kafka.how_it_works
+
+	telemetry: metrics: {
+		kafka_statistics_received_total: components.sources.internal_metrics.output.metrics.kafka_statistics_received_total
+	}
 }
