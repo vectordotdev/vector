@@ -301,7 +301,8 @@ test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
+test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+test-integration: test-integration-splunk
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -437,6 +438,17 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
+endif
+
+.PHONY: test-integration-postgresql_metrics
+test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh postgresql_metrics stop
+	@scripts/setup_integration_env.sh postgresql_metrics start
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh postgresql_metrics stop
 endif
 
 .PHONY: test-integration-prometheus

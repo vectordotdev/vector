@@ -199,6 +199,10 @@ impl Application {
         #[cfg(feature = "api")]
         let api_config = self.config.api;
 
+        // Any internal_logs sources will have grabbed a copy of the
+        // early buffer by this point and set up a subscriber.
+        crate::trace::stop_buffering();
+
         rt.block_on(async move {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());

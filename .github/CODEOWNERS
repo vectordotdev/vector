@@ -7,9 +7,9 @@
 /NOTICE @binarylogic @jamtur01
 /SECURITY.md @binarylogic @jamtur01
 
-/skaffold/ @vector-kubernetes
-/skaffold.yaml @vector-kubernetes
-/kustomization.yaml @vector-kubernetes
+/skaffold/ @timberio/vector-kubernetes
+/skaffold.yaml @timberio/vector-kubernetes
+/kustomization.yaml @timberio/vector-kubernetes
 
 /docs/reference/components/sinks/*_metrics.cue @lukesteensen
 /docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
@@ -34,7 +34,7 @@
 /docs/reference/components/sources/host_metrics.cue @bruceg
 /docs/reference/components/sources/internal_logs.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
-/docs/reference/components/sources/kubernetes_logs.cue @vector-kubernetes
+/docs/reference/components/sources/kubernetes_logs.cue @timberio/vector-kubernetes
 /docs/reference/components/sources/mongodb_metrics.cue @fanatid
 /docs/reference/components/sources/nginx_metrics.cue @fanatid
 /docs/reference/components/sources/prometheus_scrape.cue @bruceg
@@ -44,7 +44,6 @@
 /docs/reference/components/sources/tcp.cue @bruceg
 /docs/reference/components/sources/udp.cue @bruceg
 /docs/reference/components/sources/vector.cue @lukesteensen
-/docs/reference/components/sources/kubernetes_* @vector-kubernetes
 /docs/reference/components/sources/splunk_hec.cue @ktff
 
 /docs/reference/components/transforms/add_tags.cue @lukesteensen
@@ -79,15 +78,19 @@
 /docs/reference/remap/parse_aws_cloudwatch_log_subscription_message.cue @fanatid
 /docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
 
+/docs/reference/**/*kubectl* @timberio/vector-kubernetes
+/docs/reference/**/*helm* @timberio/vector-kubernetes
+/docs/reference/**/*kubernetes* @timberio/vector-kubernetes
+
 /distribution/ @hoverbear @jamtur01
-/distribution/docker/ @vector-kubernetes
-/distribution/helm/ @vector-kubernetes
-/distribution/kubernetes/ @vector-kubernetes
+/distribution/docker/ @timberio/vector-kubernetes
+/distribution/helm/ @timberio/vector-kubernetes
+/distribution/kubernetes/ @timberio/vector-kubernetes
 
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
-/lib/k8s-test-framework/ @vector-kubernetes
-/lib/k8s-e2e-tests/ @vector-kubernetes
+/lib/k8s-test-framework/ @timberio/vector-kubernetes
+/lib/k8s-e2e-tests/ @timberio/vector-kubernetes
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
@@ -122,14 +125,16 @@
 /scripts/package-* @jamtur01
 /scripts/release-* @hoverbear
 /scripts/upgrade-* @hoverbear
-/scripts/*docker* @vector-kubernetes
-/scripts/ci-setup-minikube.sh @vector-kubernetes
-/scripts/environment/setup-helm.sh @vector-kubernetes
-/scripts/release-helm.sh @vector-kubernetes
-/scripts/deploy-kubernetes-test.sh @vector-kubernetes
-/scripts/test-e2e-kubernetes.sh @vector-kubernetes
-/scripts/kubernetes-yaml.sh @vector-kubernetes
-/scripts/kubernetes-yaml/ @vector-kubernetes
+/scripts/*docker* @timberio/vector-kubernetes
+/scripts/ci-setup-minikube.sh @timberio/vector-kubernetes
+/scripts/environment/setup-helm.sh @timberio/vector-kubernetes
+/scripts/release-helm.sh @timberio/vector-kubernetes
+/scripts/deploy-kubernetes-test.sh @timberio/vector-kubernetes
+/scripts/test-e2e-kubernetes.sh @timberio/vector-kubernetes
+/scripts/helm-dependencies.sh @timberio/vector-kubernetes
+/scripts/kubernetes-yaml.sh @timberio/vector-kubernetes
+/scripts/kubernetes-yaml/ @timberio/vector-kubernetes
+/scripts/helm-template-snapshot.sh @timberio/vector-kubernetes
 
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
@@ -150,7 +155,7 @@
 
 /src/internal_events/ @JeanMertz
 
-/src/kubernetes/ @vector-kubernetes
+/src/kubernetes/ @timberio/vector-kubernetes
 
 /src/mapping/ @JeanMertz @FungusHumungus
 
@@ -189,7 +194,7 @@
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
 /src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
-/src/sources/kubernetes_logs/ @vector-kubernetes
+/src/sources/kubernetes_logs/ @timberio/vector-kubernetes
 /src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
@@ -218,10 +223,11 @@
 /tests/data/wasm/ @hoverbear @JeanMertz
 /tests/shutdown.rs @ktff
 /tests/cli.rs @ktff
+/tests/helm-snapshots/ @timberio/vector-kubernetes
 
 /.github/semantic* @binarylogic @jamtur01
 /.github/SUPPORT.md @binarylogic @jamtur01
 /.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
 /.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
-/.github/workflows/k8s_e2e.yml @vector-kubernetes
+/.github/workflows/k8s_e2e.yml @timberio/vector-kubernetes
 /.github/workflows/ @jamtur01

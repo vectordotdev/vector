@@ -53,6 +53,7 @@ default = [
     "floor",
     "format_number",
     "format_timestamp",
+    "get_env_var",
     "includes",
     "ip_cidr_contains",
     "ip_subnet",
@@ -64,7 +65,6 @@ default = [
     "md5",
     "merge",
     "now",
-    "only_fields",
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
@@ -120,6 +120,7 @@ flatten = []
 floor = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+get_env_var = []
 includes = []
 ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
@@ -131,7 +132,6 @@ match = ["regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = []
-only_fields = []
 parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription"]
 parse_aws_vpc_flow_log = []

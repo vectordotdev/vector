@@ -20,8 +20,9 @@ structopt = { version = "0.3", default-features = false }
 thiserror = "1"
 rustyline = { version = "7.0.0", default-features = false, optional = true }
 exitcode = "1.1.2"
+prettytable-rs = { version = "0.8.0", default-features = false, optional = true }
 webbrowser = { version = "0.5.5", default-features = false, optional = true }
 
 [features]
 default = ["repl"]
-repl = ["regex", "rustyline", "webbrowser"]
+repl = ["prettytable-rs", "regex", "rustyline", "webbrowser"]
