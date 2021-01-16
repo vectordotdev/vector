@@ -86,6 +86,12 @@ components: sources: docker_logs: {
 				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
 				drivers.
 				""",
+			"""
+				To avoid collecting logs from itself, the Docker source does not
+				collect logs from Vector containers. Please consider using the
+				[`vector` source](\(urls.vector_source)) if you want to collect logs
+				from other Vector containers.
+				""",
 		]
 		notices: []
 	}
