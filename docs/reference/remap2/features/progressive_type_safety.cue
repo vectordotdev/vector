@@ -20,9 +20,9 @@ remap2: features: progressive_type_safety: {
 
 				```
 				error: unneeded error assignment
-				  ┌─ :2:1
+				  ┌─ :1:1
 				  │
-				2 │ foo, err = 5;
+				1 │ foo, err = 5;
 				  │ ^^^^^^^^   - because this expression cannot fail
 				  │ │
 				  │ this error assignment is unneeded
@@ -43,7 +43,7 @@ remap2: features: progressive_type_safety: {
 
 				```vrl
 				.foo # any
-				.foo, err = downcase(.foo) # string
+				.foo, err = downcase(.foo) # string or null
 				.foo = upcase(.foo) # string
 				```
 

@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: index: {
 	title: "Index"
 	description: """
-		An index expression denotes the element of an array or a character in a string.
+		An index expression denotes the element of an array.
 		"""
 	return: """
 		Returns the element in the position of the supplied index.
@@ -38,14 +38,6 @@ remap2: expressions: index: {
 	}
 
 	examples: [
-		{
-			title: "String index expression"
-			input: log: message: "Hello, World!"
-			source: #"""
-				.message[0]
-				"""#
-			return: "H"
-		},
 		{
 			title: "Array index expression"
 			input: log: array: ["first", "second"]

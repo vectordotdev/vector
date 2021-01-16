@@ -8,7 +8,7 @@ remap2: expressions: if: {
 		the "else" branch is executed.
 		"""
 	return: """
-		The result of the last expression evaluated in the executed branch.
+		The result of the last expression evaluated in the executed branch or null if no expression is evaluated.
 		"""
 
 	grammar: {
@@ -29,7 +29,7 @@ remap2: expressions: if: {
 		{
 			title: "True if expression"
 			source: #"""
-				if (true) {
+				if true {
 					"Hello, World!"
 				}
 				"""#
@@ -38,7 +38,7 @@ remap2: expressions: if: {
 		{
 			title: "False if expression"
 			source: #"""
-				if (false) {
+				if false {
 					# not evaluated
 				}
 				"""#
@@ -47,7 +47,7 @@ remap2: expressions: if: {
 		{
 			title: "If/else expression"
 			source: #"""
-				if (false) {
+				if false {
 					# not evaluated
 				} else {
 					"Hello, World!"
@@ -58,9 +58,9 @@ remap2: expressions: if: {
 		{
 			title: "If/else if/else expression"
 			source: #"""
-				if (false) {
+				if false {
 					# not evaluated
-				} else if (false) {
+				} else if false {
 					# not evaluated
 				} else {
 					"Hello, World!"

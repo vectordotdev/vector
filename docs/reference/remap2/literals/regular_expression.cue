@@ -6,13 +6,11 @@ remap2: literals: regular_expression: {
 		A "regular expression" literal represents a [Regular Expression](\(urls.regex)) used for string matching and
 		parsing.
 
-		Regular expressions are delimited by `/` and use [Rust regex syntax](\(urls.rust_regex_syntax)). There are a
-		few limitations with Regular Expressions in VRL:
+		Regular expressions are delimited by `/` and use [Rust regex syntax](\(urls.rust_regex_syntax)). There is one
+		limitation with Regular Expressions in VRL:
 
-		1. You can't assign a regex to an event path. Thus, `.pattern = /foo|bar/i` is not
-		   allowed.
-		2. Expressions can't return regexes. Thus you can't, for example, dynamically create
-		   regular expressions.
+		You can't assign a regex to a map path. Thus, `.pattern = /foo|bar/i` is not allowed. This is because regex's
+		cannot be serialized to JSON.
 		"""
 
 	examples: [

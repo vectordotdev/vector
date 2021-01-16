@@ -7,7 +7,7 @@ remap2: expressions: function_call: {
 		"""
 	return: """
 		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, then the
-		error must be [handled](\(urls.vrl_errors_reference)) and nothing is returned.
+		error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
 
 		Functions can _only_ return a single value. If multiple values are relevant, they will be wrapped in a data
 		structure fit to hold them, such as an array or map.
@@ -15,7 +15,7 @@ remap2: expressions: function_call: {
 
 	grammar: {
 		source: """
-			function ~ bang? ~ "(" ~ arguments? ~ ")"
+			function ~ abort? ~ "(" ~ arguments? ~ ")"
 			"""
 		definitions: {
 			function: {
@@ -23,9 +23,9 @@ remap2: expressions: function_call: {
 					`function` represents the name of the built-in function.
 					"""
 			}
-			bang: {
+			abort: {
 				description: """
-					`bang` represents a literal `!` that can optionally be used with fallible functions to abort
+					`abort` represents a literal `!` that can optionally be used with fallible functions to abort
 					the program when the function fails:
 
 					```vrl
@@ -35,7 +35,7 @@ remap2: expressions: function_call: {
 					Otherwise, errors must be handled:
 
 					```vrl
-					result, err = f!()
+					result, err = f()
 					```
 
 					Failure to handle errors from fallible function will result in compile-time errors. Please see the

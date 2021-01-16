@@ -12,7 +12,7 @@ remap2: expressions: path: {
 
 	grammar: {
 		source: """
-			"." ~ path_segments? ~ !(WHITESPACE* ~ ("." | "\""))
+			"." ~ path_segments
 			"""
 		definitions: {
 			".": {
@@ -49,6 +49,12 @@ remap2: expressions: path: {
 							```
 							"""
 					}
+					dynamic: {
+						title:       "Dynamic paths"
+						description: """
+							Dynamic paths are currently not supported.
+							"""
+					}
 					nested_maps: {
 						title: "Nested map paths"
 						description: """
@@ -59,6 +65,12 @@ remap2: expressions: path: {
 							```
 							"""
 					}
+					nonexistent: {
+						title: "Non-existent paths"
+						description: """
+							Non-existent paths resolve to null.
+							"""
+					}
 					quoting: {
 						title: "Path quoting"
 						description: """
@@ -66,7 +78,7 @@ remap2: expressions: path: {
 							others:
 
 							```vrl
-							.\"parent.key.with.special characters\".child
+							."parent.key.with.special \"characters\"".child
 							```
 							"""
 					}

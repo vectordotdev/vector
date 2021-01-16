@@ -8,7 +8,7 @@ remap2: expressions: assignment: {
 		"""
 	return: """
 		Returns the value of the right-hand side expression only if the expression succeeeds. If the expression errors,
-		then the error must be [handled](\(urls.vrl_errors_reference)) and nothing is returned.
+		then the error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
 		"""
 
 	grammar: {
@@ -34,7 +34,7 @@ remap2: expressions: assignment: {
 						.field = "value"
 						```
 						"""
-					"=??": """
+					"??=": """
 						Assigns _only_ if the right hand side does not error. Useful when invoking fallible functions
 						on the right-hand side:
 
@@ -48,8 +48,8 @@ remap2: expressions: assignment: {
 				description: """
 					If the `target` is a variable, then the `expression` can be any	expression.
 
-					If the `target` is a path, then the `expression` can be any expression that returns a valid path
-					type (ex: not a regular expression).
+					If the `target` is a path, then the `expression` can be any expression that returns a supported map
+					value type (ex: not a regular expression).
 					"""
 			}
 		}
@@ -108,9 +108,9 @@ remap2: expressions: assignment: {
 		{
 			title: "Fallible assignment (error)"
 			source: #"""
-				structured, err = parse_json("malformed")
+				parsed, err = parse_json("malformed")
 				"""#
-			raises: "unable to parse JSON"
+			return: null
 		},
 	]
 }

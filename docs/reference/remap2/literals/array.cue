@@ -10,6 +10,13 @@ remap2: literals: array: {
 		#"["first", "second", "third"]"#,
 		#"["mixed", 1, 1.0, true, false, {"foo": "bar"}]"#,
 		#"["first-level", ["second-level", ["third-level"]]"#,
-		#"["expressions", 1 + 2, 2 == 5, true || false]"#,
+		#"""
+		[
+			"expressions",
+			1 + 2,
+			2 == 5,
+			true || false
+		]
+		"""#,
 	]
 }

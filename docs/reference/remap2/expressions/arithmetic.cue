@@ -1,7 +1,7 @@
 package metadata
 
 remap2: expressions: arithmetic: {
-	title: "Assignment"
+	title: "Arithmetic"
 	description: """
 		An "arithmetic" expression performs an operation on two expressions as defined by the operator.
 

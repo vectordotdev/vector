@@ -1,7 +1,7 @@
 package metadata
 
 remap2: expressions: comparison: {
-	title: "Assignment"
+	title: "Comparison"
 	description: """
 		An "comparison" expression compares two expressions (operands) and produces a boolean as defined by the
 		operator.
@@ -26,8 +26,8 @@ remap2: expressions: comparison: {
 					The `operator` defines the operation performed on the left-hand and right-hand side operations.
 					"""
 				enum: {
-					"!=": "Equal. Operates on all types."
-					"==": "Not equal. Operates on all types."
+					"==": "Equal. Operates on all types."
+					"!=": "Not equal. Operates on all types."
 					">=": "Greater than or equal. Operates on `int` and `float` types."
 					">": "Greater than. Operates on `int` and `float` types."
 					"<=": "Less than or equal. Operates on `int` and `float` types."

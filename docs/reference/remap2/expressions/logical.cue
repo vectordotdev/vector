@@ -37,16 +37,23 @@ remap2: expressions: logical: {
 		{
 			title: "AND"
 			source: #"""
-				true && true
+				true && "foo"
 				"""#
-			return: true
+			return: "foo"
 		},
 		{
-			title: "OR"
+			title: "OR (boolean)"
 			source: #"""
-				false || true
+				false || "foo"
 				"""#
-			return: true
+			return: "foo"
+		},
+		{
+			title: "OR (null)"
+			source: #"""
+				null || "foo"
+				"""#
+			return: "foo"
 		},
 		{
 			title: "NOT"

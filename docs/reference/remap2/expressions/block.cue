@@ -3,7 +3,9 @@ package metadata
 remap2: expressions: block: {
 	title: "Assignment"
 	description: """
-		An "block" expression is a possibly empty sequence of expressions within matching brace brackets.
+		A "block" expression is a sequence of one or more expressions within matching brace brackets.
+
+		Blocks cannot be empty, instead, empty blocks are treated as blank maps.
 		"""
 	return: """
 		Returns the result of the last evaluated expression within the block.
