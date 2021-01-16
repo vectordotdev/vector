@@ -57,12 +57,10 @@ impl Glob {
         // `std::clone::Clone` trait.
         include_patterns
             .iter()
-            .map(|include_pattern| -> Result<_, _> {
-                let glob = glob(include_pattern).with_context(|| InvalidIncludePattern {
+            .map(|include_pattern| {
+                glob(include_pattern).with_context(|| InvalidIncludePattern {
                     glob: include_pattern.to_owned(),
-                })?;
-
-                Ok(glob)
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
