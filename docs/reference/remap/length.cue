@@ -22,26 +22,29 @@ remap: functions: length: {
 				portland: "Trail Blazers"
 				seattle:  "Supersonics"
 			}
-			source: ".num_teams = length(del(.teams))"
-			output: log: num_teams: 2
+			source: ".num_teams = length(.teams)"
+			output: input & {log: num_teams: 2}
 		},
 		{
 			title: "Array"
 			input: log: teams: ["Trail Blazers", "Supersonics", "Grizzlies"]
-			source: ".num_teams = length(del(.teams))"
-			output: log: num_teams: 3
+			source: ".num_teams = length(.teams)"
+			output: input & {log: num_teams: 3}
 		},
 		{
 			title: "Nested map"
 			input: log: team: {
-				city: "Portland"
+				home: {
+					city:  "Portland"
+					state: "Oregon"
+				}
 				name: "Trail Blazers"
 				mascot: {
 					name: "Blaze the Trail Cat"
 				}
 			}
-			source: ".num_attrs = length(del(.team))"
-			output: log: num_attrs: 3
+			source: ".num_attrs = length(.team)"
+			output: input & {log: num_attrs: 3}
 		},
 	]
 }
