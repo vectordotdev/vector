@@ -3,8 +3,8 @@ package metadata
 remap2: expressions: variable: {
 	title: "Variable"
 	description: """
-		An "variable" expression is a sequence of period-delimited segments that represent the location of a value
-		within a map.
+		A "variable" expression names variables. A variable is a sequence of one or more letters and digits. The first
+		character in an identifier must be a letter.
 		"""
 	return: """
 		Returns the value of the variable.

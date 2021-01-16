@@ -3,7 +3,7 @@ package metadata
 remap2: literals: string: {
 	title:       "String"
 	description: """
-		A `string` literal is a [UTF-8–encoded](\(urls.utf8)), growable string.
+		A "string" literal is a [UTF-8–encoded](\(urls.utf8)), growable string.
 		"""
 
 	examples: [

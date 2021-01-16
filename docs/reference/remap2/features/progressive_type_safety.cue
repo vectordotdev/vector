@@ -1,7 +1,7 @@
-remap2: features: type_safety: {
-	title: "Type safety"
+remap2: features: progressive_type_safety: {
+	title: "Progressive type safety"
 	description: """
-		VRL implements progressive type safety, erroring at compilation-time if a type mismatch is detected. This
+		VRL implements _progressive_ type safety, erroring at compilation-time if a type mismatch is detected. This
 		largely contributes to VRL's safety principle, ensuring scripts work as expected post-compilation.
 		"""
 

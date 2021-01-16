@@ -22,7 +22,6 @@ package metadata
 
 	concepts:    _
 	description: string
-	examples:    _
 	expressions: _
 	features:    _
 	functions:   _
@@ -33,8 +32,8 @@ remap2: #Remap & {
 	description: #"""
 		**Vector Remap Language** (VRL) is an [expression-oriented](\(urls.expression_oriented_language)) language
 		specifically designed for transforming observability data (logs and metrics). It features a simple
-		[syntax]((\urls.vrl_constructs_reference)) and a rich set of built-in [functions](\(urls.vrl_functions_reference))
-		tailored specifically to observability use cases.
+		[syntax]((\urls.vrl_spec)) and a rich set of built-in [functions](\(urls.vrl_functions)) tailored specifically
+		to observability use cases.
 
 		### Principles
 

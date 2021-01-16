@@ -3,11 +3,11 @@ package metadata
 remap2: expressions: coalesce: {
 	title: "Coalesce"
 	description: """
-		A "coalesce" expression is composed of multiple expressions delimited by a coalesce operator, short-circuiting
-		on the the first expression that does not violate the operator condition.
+		A "coalesce" expression is composed of multiple expressions (operands) delimited by a coalesce operator,
+		short-circuiting on the the first expression that does not violate the operator condition.
 		"""
 	return: """
-		Returns the value of the first expression that does not violate the operator condition.
+		Returns the value of the first expression (operand) that does not violate the operator condition.
 		"""
 
 	grammar: {
@@ -17,7 +17,7 @@ remap2: expressions: coalesce: {
 		definitions: {
 			expression: {
 				description: """
-					The `expression` can be any expression.
+					The `expression` (operand) can be any expression.
 					"""
 			}
 			operator: {

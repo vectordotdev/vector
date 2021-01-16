@@ -4,22 +4,22 @@ remap2: expressions: if: {
 	title: "If"
 	description: """
 		"If" expressions specify the conditional execution of two branches according to the value of a boolean
-		expression. If the expression evaluates to `true`, the "if" branch is executed, otherwise, if present, the
-		"else" branch is executed.
+		expression. If the boolean expression evaluates to `true`, the "if" branch is executed, otherwise, if present,
+		the "else" branch is executed.
 		"""
 	return: """
-		The return of the "if" expression is the result of the last expression evaluated.
+		The result of the last expression evaluated in the executed branch.
 		"""
 
 	grammar: {
 		source: """
-			"if" ~ if_condition ~ block ~ ("else if" ~ if_condition ~ block)* ~ ("else" ~ block)?
+			"if" ~ boolean_expression ~ block ~ ("else if" ~ boolean_expression ~ block)* ~ ("else" ~ block)?
 			"""
 		definitions: {
-			if_condition: {
+			boolean_expression: {
 				description: """
-					The `if_condition` must be a boolean expression. If a boolean is not returned a compile-time
-					error will be raised.
+					The `boolean_expression` must be an expression that resolves to a boolean. If a boolean is not
+					returned a compile-time error will be raised.
 					"""
 			}
 		}

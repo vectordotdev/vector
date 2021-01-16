@@ -3,20 +3,21 @@ package metadata
 remap2: expressions: logical: {
 	title: "Assignment"
 	description: """
-		An "logical" expression compares two boolean expressions and produces a boolean.
+		A "logical" expression compares two boolean expressions and produces a boolean.
 		"""
 	return: """
-		Returns the same boolean type as the expressions operands.
+		Returns the same boolean type as the expressions (operands).
 		"""
 
 	grammar: {
 		source: """
-			expression ~ operator ~ expression
+			boolean_expression ~ operator ~ boolean_expression
 			"""
 		definitions: {
-			expression: {
+			boolean_expression: {
 				description:	"""
-					The `expression` can be any expression that returns a valid type as defined by the `operator`.
+					The `expression` (operand) can be any expression that returns a valid type as defined by the
+					`operator`.
 					"""
 			}
 			operator: {

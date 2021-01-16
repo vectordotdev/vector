@@ -35,7 +35,8 @@ remap2: expressions: assignment: {
 						```
 						"""
 					"=??": """
-						Assigns _only_ if the right hand side does not error. Useful when invoking fallible functions on the right-hand side:
+						Assigns _only_ if the right hand side does not error. Useful when invoking fallible functions
+						on the right-hand side:
 
 						```vrl
 						.structured ??= parse_json(.message)
@@ -45,11 +46,10 @@ remap2: expressions: assignment: {
 			}
 			expression: {
 				description: """
-					If the `target` is a variable, then the `expression` can be any
-					expression.
+					If the `target` is a variable, then the `expression` can be any	expression.
 
-					If the `target` is a path, then the `expression` can be any expression
-					that returns a valid path type (ex: not a regular expression).
+					If the `target` is a path, then the `expression` can be any expression that returns a valid path
+					type (ex: not a regular expression).
 					"""
 			}
 		}

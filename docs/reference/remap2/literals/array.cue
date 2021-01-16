@@ -3,7 +3,7 @@ package metadata
 remap2: literals: array: {
 	title: "Array"
 	description: """
-		An array literal is a comma-delimited set of expressions that represent a contiguous growable array type,
+		An "array" literal is a comma-delimited set of expressions that represent a contiguous growable array type,
 		also known as a 'vector' in Rust.
 		"""
 	examples: [

@@ -6,7 +6,7 @@ remap2: expressions: index: {
 		An index expression denotes the element of an array or a character in a string.
 		"""
 	return: """
-		Returns the elements in the position of the supplied index.
+		Returns the element in the position of the supplied index.
 		"""
 
 	grammar: {

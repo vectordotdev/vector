@@ -8,8 +8,7 @@ remap2: expressions: arithmetic: {
 		Although arithmetic is commonly performed with numbers, it can apply to other types as well, such as strings.
 		"""
 	return: """
-		Returns the value of the right-hand side expression only if the expression succeeeds. If the expression errors,
-		then the error must be [handled](\(urls.vrl_errors_reference)) and nothing is returned.
+		Returns the result of the expression as defined by the operator.
 		"""
 
 	grammar: {
@@ -24,7 +23,7 @@ remap2: expressions: arithmetic: {
 			}
 			operator: {
 				description:	"""
-					The `operator` defines the operation performed on the left-hand and right-hand side operations.
+					The `operator` defines the operation performed on the left-hand and right-hand side operands.
 					"""
 				enum: {
 					"+": "Sum. Operates on `int`, `float`, and `string` types."
