@@ -351,7 +351,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::metric::MetricValue,
         sinks::influxdb::test_util::{cleanup_v1, onboarding_v1, query_v1},
-        tls::TlsOptions,
+        tls::{self, TlsOptions},
         Event,
     };
     use futures::stream;
@@ -381,7 +381,7 @@ mod integration_tests {
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
             tls: Some(TlsOptions {
-                ca_file: Some("tests/data/Vector_CA.crt".into()),
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
             ..Default::default()

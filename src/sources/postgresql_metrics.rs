@@ -794,7 +794,7 @@ mod tests {
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, tls, Pipeline};
 
     async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
         trace_init();
@@ -859,7 +859,7 @@ mod integration_tests {
         test_postgresql_metrics(
             "postgresql://vector:vector@localhost/postgres?sslmode=require".to_owned(),
             Some(PostgresqlMetricsTlsConfig {
-                ca_file: "tests/data/Vector_CA.crt".into(),
+                ca_file: tls::TEST_PEM_CA_PATH.into(),
             }),
         )
         .await

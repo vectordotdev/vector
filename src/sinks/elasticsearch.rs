@@ -633,7 +633,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
-        tls::TlsOptions,
+        tls::{self, TlsOptions},
         Event,
     };
     use futures::{stream, StreamExt};
@@ -749,7 +749,7 @@ mod integration_tests {
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
-                    ca_file: Some("tests/data/Vector_CA.crt".into()),
+                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                     ..Default::default()
                 }),
                 ..config()
@@ -841,7 +841,7 @@ mod integration_tests {
         flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
-        File::open("tests/data/Vector_CA.crt")
+        File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();
