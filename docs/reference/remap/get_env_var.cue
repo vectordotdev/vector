@@ -9,6 +9,10 @@ remap: functions: get_env_var: {
 			type: ["string"]
 		},
 	]
+	internal_failure_reasons: [
+		"Environment variable `name` does not exist",
+		"Value of environment variable `name` is not valid unicode",
+	]
 	return: ["string"]
 	category: "System"
 	description: #"""
