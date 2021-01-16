@@ -1,6 +1,6 @@
 package metadata
 
-remap2: {
+remap2: functions: {
 	#Argument: {
 		name:        string
 		description: string
@@ -17,25 +17,13 @@ remap2: {
 		return: [#Type, ...#Type]
 		category:    #FunctionCategory
 		description: string
-		examples?: [#FunctionExample, ...#FunctionExample]
+		examples?: [remap2.#Example, ...remap2.#Example]
 		name: string
 	}
 
 	#FunctionCategory: "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "Test" | "Timestamp"
 
-	#FunctionExample: {
-		title: string
-		configuration?: [string]: string
-		input:   #Event
-		source:  string
-		raises?: string
-
-		if raises == _|_ {
-			output: #Event
-		}
-	}
-
-	functions: [Name=string]: #Function & {
+	{[Name=string]: #Function & {
 		name: Name
-	}
+	}}
 }

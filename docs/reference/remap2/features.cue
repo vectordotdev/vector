@@ -1,17 +1,17 @@
 package metadata
 
-remap2: {
+remap2: features: {
 	#Feature: {
-		name: string
-		title: string
+		name:        string
+		title:       string
 		description: string
 
-		characteristics: [Name=string]: remap2.#Characteristic & {
+		features: [Name=string]: #Feature & {
 			name: Name
 		}
 	}
 
-	features: [Name=string]: #Feature & {
+	{[Name=string]: #Feature & {
 		name: Name
-	}
+	}}
 }

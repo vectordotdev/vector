@@ -32,7 +32,7 @@ remap: functions: parse_regex: {
 		VRL aims to provide purpose-specific parsing functions for common log formats. Before reaching,
 		for the `parse_regex` function see if a Remap `parse_*` function already exists for your format.
 		If not, please consider [opening an issue](\(urls.new_feature_request)) to request support.
-		"""
+		""",
 	]
 	examples: [
 		{

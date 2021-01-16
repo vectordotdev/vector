@@ -1,6 +1,6 @@
 remap2: features: type_safety: {
 	title: "Type safety"
-	description:	"""
+	description: """
 		VRL implements progressive type safety, erroring at compilation-time if a type mismatch is detected. This
 		largely contributes to VRL's safety principle, ensuring scripts work as expected post-compilation.
 		"""
@@ -8,7 +8,7 @@ remap2: features: type_safety: {
 	characteristics: {
 		errors: {
 			title: "Errors"
-			description:	"""
+			description: """
 				If VRL detects a type mismatch, it will produce a user-friendly compile-time error. For example, given
 				this VRL script:
 
@@ -34,7 +34,7 @@ remap2: features: type_safety: {
 		}
 		progressive: {
 			title: "Progressivenes"
-			description:	"""
+			description: """
 				VRL's type safety is _progressive_, meaning it will implement type safety for any value for which it
 				knows the type. Because obervability data can be quite unpredictable, it's not always known which
 				type a field might be, hence the _progressive_ nature of VRL's type safety. As VRL scripts are
