@@ -7,14 +7,14 @@ remap2: functions: {
 		required:    bool
 		multiple:    bool | *false
 		default?:    bool | string | int
-		type: [#Type, ...#Type]
+		type: [remap2.#Type, ...remap2.#Type]
 		enum?: #Enum
 	}
 
 	#Function: {
 		arguments: [...#Argument]
 		internal_failure_reasons: [...string]
-		return: [#Type, ...#Type]
+		return: [remap2.#Type, ...remap2.#Type]
 		category:    #FunctionCategory
 		description: string
 		examples?: [remap2.#Example, ...remap2.#Example]
