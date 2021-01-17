@@ -25,6 +25,8 @@ components: transforms: coercer: {
 			"x86_64-pc-windows-msv":      true
 			"x86_64-unknown-linux-gnu":   true
 			"x86_64-unknown-linux-musl":  true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
 		}
 
 		requirements: []
