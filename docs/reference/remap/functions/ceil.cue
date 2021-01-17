@@ -24,7 +24,7 @@ remap: functions: ceil: {
 		"""#
 	examples: [
 		{
-			title: "Ceil a number (without precision)"
+			title: "Round a number up (without precision)"
 			input: log: number: 4.345
 			source: #"""
 				.number = ceil(.number)
@@ -32,7 +32,7 @@ remap: functions: ceil: {
 			output: log: number: 4
 		},
 		{
-			title: "Ceil a number (with precision)"
+			title: "Round a number up (with precision)"
 			input: log: number: 4.345
 			source: #"""
 				.number = ceil(.number, precision: 2)

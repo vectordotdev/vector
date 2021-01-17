@@ -24,7 +24,7 @@ remap: functions: floor: {
 		"""#
 	examples: [
 		{
-			title: "Floor a number (without precision)"
+			title: "Round a number down (without precision)"
 			input: log: number: 4.345
 			source: #"""
 				.floor = floor(.number, precision: 2)
@@ -32,7 +32,7 @@ remap: functions: floor: {
 			output: log: number: 4
 		},
 		{
-			title: "Floor a number (with precision)"
+			title: "Round a number down (with precision)"
 			input: log: number: 4.345
 			source: #"""
 				.floor = floor(.number, precision: 2)
