@@ -783,7 +783,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default)),
+                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default{})),
                 endpoint: "http://localhost:4571".into(),
                 ..config()
             },
@@ -798,7 +798,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default)),
+                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default{})),
                 endpoint: "http://localhost:4571".into(),
                 compression: Compression::gzip_default(),
                 ..config()
