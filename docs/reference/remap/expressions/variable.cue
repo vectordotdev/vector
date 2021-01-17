@@ -28,4 +28,15 @@ remap: expressions: variable: {
 			}
 		}
 	}
+
+	examples: [
+		{
+			title: "Simple variable"
+			source: #"""
+				my_variable = 1
+				"""#
+			return: 1
+		},
+
+	]
 }

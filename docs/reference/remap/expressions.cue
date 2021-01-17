@@ -10,7 +10,7 @@ remap: {
 
 		grammar?: #Grammar
 
-		examples?: [remap.#Example, ...remap.#Example]
+		examples: [remap.#Example, ...remap.#Example]
 	}
 
 	#Grammar: {
