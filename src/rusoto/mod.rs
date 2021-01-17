@@ -28,7 +28,9 @@ use std::{
 };
 use tower::{Service, ServiceExt};
 
+pub mod auth;
 pub mod region;
+pub use auth::AWSAuthentication;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
