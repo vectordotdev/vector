@@ -30,16 +30,16 @@ package metadata
 
 remap: #Remap & {
 	description: #"""
-		**Vector Remap Language** (VRL) is an [expression-oriented](\(urls.expression_oriented_language)) language
+		**Vector Remap Language** (VRL) is an [expression-oriented](\#(urls.expression_oriented_language)) language
 		specifically designed for transforming observability data (logs and metrics). It features a simple
-		[syntax]((\urls.vrl_spec)) and a rich set of built-in [functions](\(urls.vrl_functions)) tailored specifically
-		to observability use cases.
+		[syntax](\#(urls.vrl_spec)) and a rich set of built-in [functions](\#(urls.vrl_functions)) tailored
+		specifically to observability use cases.
 
 		### Principles
 
 		VRL is built on the following two principles:
 
-		1. **Performance** — VRL is implemented in the very fast and efficient [Rust](\(urls.rust)) language and
+		1. **Performance** — VRL is implemented in the very fast and efficient [Rust](\#(urls.rust)) language and
 		   VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to
 		   transform observability data with a minimal per-event performance penalty vis-à-vis pure Rust. In addition,
 		   ergonomic features such as compile-time correctness checks and the lack of language constructs like
@@ -50,6 +50,6 @@ remap: #Remap & {
 		   scripts from behaving in unexpected or sub-optimal ways. These factors distinguish VRL from other
 		   available event data transformation languages and runtimes.
 
-		For a more in-depth picture, see the [announcement blog post](\(urls.vrl_announcement)) for more details.
+		For a more in-depth picture, see the [announcement blog post](\#(urls.vrl_announcement)) for more details.
 		"""#
 }
