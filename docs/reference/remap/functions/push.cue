@@ -26,29 +26,19 @@ remap: functions: push: {
 	examples: [
 		{
 			title: "Push an item onto an array (new array)"
-			input: log: {
-				kitchen_sink: [72.5, false, [1, 2, 3]]
-				item: "booper"
-			}
+			input: log: kitchen_sink: [72.5, false, [1, 2, 3]]
 			source: """
-				.added = push(.kitchen_sink, .item)
+				.kitchen_sink = push(.kitchen_sink, "booper")
 				"""
-			output: input & {log: {
-				added: [72.5, false, [1, 2, 3], "booper"]
-			}}
+			output: log: kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
 		},
 		{
 			title: "Push an item onto an array (same array)"
-			input: log: {
-				kitchen_sink: [72.5, false, [1, 2, 3]]
-				item: "booper"
-			}
+			input: log: kitchen_sink: [72.5, false, [1, 2, 3]]
 			source: """
-				.new_kitchen_sink = push(.kitchen_sink, .item)
+				.kitchen_sink = push(.kitchen_sink, "booper")
 				"""
-			output: input & {log: {
-				new_kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
-			}}
+			output: log: kitchen_sink: [72.5, false, [1, 2, 3], "booper"]
 		},
 	]
 }

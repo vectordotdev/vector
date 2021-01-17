@@ -24,14 +24,13 @@ remap: functions: append: {
 	examples: [
 		{
 			title: "Mixed array"
-			input: {
+			input: log: {
 				kitchen_sink: [72.5, false, [1, 2, 3]]
-				items: ["booper", "bopper"]
 			}
 			source: """
-				.kitchen_sink = append(.kitchen_sink, .items)
+				.kitchen_sink = append(.kitchen_sink, ["booper", "bopper"])
 				"""
-			output: {
+			output: log: {
 				kitchen_sink: [72.5, false, [1, 2, 3], "booper", "bopper"]
 			}
 		},
