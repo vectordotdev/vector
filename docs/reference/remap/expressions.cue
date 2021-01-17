@@ -16,6 +16,7 @@ remap: {
 	#Grammar: {
 		source: string
 		definitions: [Name=string]: {
+			name: Name
 			description: string
 			characteristics: [Name=string]: remap.#Characteristic
 			enum?: #Enum
