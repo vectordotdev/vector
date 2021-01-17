@@ -23,19 +23,19 @@ remap: functions: is_nullish: {
 		"""#
 	examples: [
 		{
-			title: "Empty string is nullish"
+			title: "Null detection (blank string)"
 			input: log: string: ""
 			source: ".is_nullish = is_nullish(.string)"
 			output: input & {log: is_nullish: true}
 		},
 		{
-			title: "Dash is nullish"
+			title: "Null detection (dash string)"
 			input: log: string: "-"
 			source: ".is_nullish = is_nullish(.string)"
 			output: input & {log: is_nullish: true}
 		},
 		{
-			title: "Whitespace is nullish"
+			title: "Null detection (whitespace)"
 			input: log: string: "\n   \n"
 			source: ".is_nullish = is_nullish(.string)"
 			output: input & {log: is_nullish: true}

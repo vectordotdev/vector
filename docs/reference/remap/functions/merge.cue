@@ -34,7 +34,7 @@ remap: functions: merge: {
 		"""#
 	examples: [
 		{
-			title: "Shallow object merge"
+			title: "Object merge (shallow)"
 			input: log: {
 				map1: {
 					parent1: {
@@ -66,7 +66,7 @@ remap: functions: merge: {
 			}
 		},
 		{
-			title: "Deep"
+			title: "Object merge (deep)"
 			input: log: {
 				map1: {
 					parent1: {
