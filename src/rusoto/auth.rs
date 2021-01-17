@@ -2,11 +2,20 @@ use super::AwsCredentialsProvider;
 use rusoto_core::Region;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// Configuration for configuring authentication strategy for AWS.
+#[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
 #[serde(untagged)]
+#[derivative(Default)]
 pub enum AWSAuthentication {
-    Role { assume_role: String },
-    Default,
+    Role {
+        assume_role: String,
+    },
+    // Default variant is used instead of Option<AWSAuthentication> since even for
+    // None we need to build `AwsCredentialsProvider`.
+    //
+    // {} is required to work around a bug in serde. https://github.com/serde-rs/serde/issues/1374
+    #[derivative(Default)]
+    Default {},
 }
 
 impl AWSAuthentication {
@@ -25,13 +34,59 @@ impl AWSAuthentication {
                 }
                 AwsCredentialsProvider::new(region, Some(assume_role.clone()))
             }
-            Self::Default => AwsCredentialsProvider::new(region, old_assume_role),
+            Self::Default {} => AwsCredentialsProvider::new(region, old_assume_role),
         }
     }
 }
 
-impl Default for AWSAuthentication {
-    fn default() -> Self {
-        Self::Default
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Serialize, Deserialize, Clone, Debug)]
+    struct ComponentConfig {
+        assume_role: Option<String>,
+        #[serde(default)]
+        auth: AWSAuthentication,
+    }
+
+    #[test]
+    fn parsing_default() {
+        toml::from_str::<ComponentConfig>(
+            r#"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn parsing_old_assume_role() {
+        toml::from_str::<ComponentConfig>(
+            r#"
+            assume_role = "root"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn parsing_assume_role() {
+        toml::from_str::<ComponentConfig>(
+            r#"
+            auth.assume_role = "root"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn parsing_both_assume_role() {
+        toml::from_str::<ComponentConfig>(
+            r#"
+            assume_role = "root"
+            auth.assume_role = "root"
+        "#,
+        )
+        .unwrap();
     }
 }

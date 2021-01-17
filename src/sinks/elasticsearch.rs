@@ -392,7 +392,7 @@ impl ElasticSearchCommon {
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws(auth)) => Some(auth.build(&region, None)?),
+            Some(ElasticSearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
         };
 
         let compression = config.compression;
@@ -520,6 +520,26 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
+
+    #[test]
+    fn parse_aws_auth() {
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+            auth.assume_role = "role"
+        "#,
+        )
+        .unwrap();
+
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+        "#,
+        )
+        .unwrap();
     }
 
     #[test]
