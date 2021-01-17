@@ -55,6 +55,6 @@ remap: functions: length: {
 			input: log: message: "The Planet of the Apes Musical"
 			source: ".str_len = length(.message)"
 			output: input & {log: str_len: 30}
-		}
+		},
 	]
 }

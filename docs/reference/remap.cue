@@ -53,7 +53,7 @@ remap: {
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
 			category: "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" |
 				"Hash" | "IP" | "Log" | "Map" | "Number" | "Parse" | "Random" | "String" |
-				"System" | "Test" | "Timestamp"
+					"System" | "Test" | "Timestamp"
 			description: string
 			examples?: [#RemapExample, ...#RemapExample]
 			name: Name
