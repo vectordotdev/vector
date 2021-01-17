@@ -37,7 +37,7 @@ remap: #Remap & {
 		specifically to observability use cases. For example, the following script parses, shapes, generates an ID,
 		and converces a timestamp in 4 lines:
 
-		```vrl
+		```vrl title="example VRL program"
 		# Parse into named fields, and abort if parsing fails
 		. = parse_syslog!(.message)
 		# Overwrite the severity
