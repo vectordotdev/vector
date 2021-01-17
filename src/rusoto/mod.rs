@@ -224,7 +224,7 @@ where
                     Ok(name) => name,
                     Err(err) => {
                         return Err(HttpDispatchError::new(format!(
-                            "error parsing header name: {}",
+                            "Error parsing header name: {}",
                             err
                         )))
                     }
@@ -234,8 +234,8 @@ where
                         Ok(value) => value,
                         Err(err) => {
                             return Err(HttpDispatchError::new(format!(
-                                "error parsing header value: {}",
-                                err
+                                "Value of header {:?} contains invalid header byte. Error: {}",
+                                h.0, err
                             )))
                         }
                     };
@@ -258,7 +258,7 @@ where
                 .method(method)
                 .uri(uri)
                 .body(RusotoBody::from(request.payload))
-                .map_err(|error| format!("error building request: {}", error))
+                .map_err(|error| format!("Error building request: {}", error))
                 .map_err(HttpDispatchError::new)?;
 
             *request.headers_mut() = headers;
