@@ -45,7 +45,8 @@ impl Expression for LengthFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let value_def = self.value
+        let value_def = self
+            .value
             .type_def(state)
             .fallible_unless(Kind::Bytes | Kind::Array | Kind::Map)
             .with_constraint(Kind::Integer);
