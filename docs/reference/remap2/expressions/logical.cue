@@ -28,7 +28,7 @@ remap2: expressions: logical: {
 				enum: {
 					"&&": "Conditional AND. Supports boolean expressions only."
 					"||": "Conditional OR. Supports any expression."
-					"!":  "NOT. Support boolean expressions only."
+					"!":  "NOT. Supports boolean expressions only."
 				}
 			}
 		}
