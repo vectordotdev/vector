@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: assignment: {
 	title: "Assignment"
 	description: """
-		An "assignment" expression assigns the result of the right-hand side expression to the left-hand side
+		An _assignment_ expression assigns the result of the right-hand side expression to the left-hand side
 		target (path or variable).
 		"""
 	return: """

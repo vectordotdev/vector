@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: if: {
 	title: "If"
 	description: """
-		An "if" expression specifies the conditional execution of two branches according to the value of a boolean
+		An _if_ expression specifies the conditional execution of two branches according to the value of a boolean
 		expression. If the boolean expression evaluates to `true`, the "if" branch is executed, otherwise, if present,
 		the "else" branch is executed.
 		"""

@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: index: {
 	title: "Index"
 	description: """
-		An "index" expression denotes the element of an array.
+		An _index_ expression denotes the element of an array.
 		"""
 	return: """
 		Returns the element in the position of the supplied index.

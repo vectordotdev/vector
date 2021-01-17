@@ -3,9 +3,9 @@ package metadata
 remap2: literals: map: {
 	title: "Map"
 	description: """
-		A "map" literal is a growable key/value structure.
+		A _map_ literal is a growable key/value structure that is syntactically equivalent to a JSON object.
 
-		Maps are based on the [`BTreeMap` Rust type][b_tree_map] and syntactically equivalent to a JSON object.
+		A well-formed JSON document is a valid VRL map.
 		"""
 
 	characteristics: {

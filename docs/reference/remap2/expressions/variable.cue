@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: variable: {
 	title: "Variable"
 	description: """
-		A "variable" expression names variables. A variable is a sequence of one or more letters and digits. The first
+		A _variable_ expression names variables. A variable is a sequence of one or more letters and digits. The first
 		character in a variable must be a letter.
 		"""
 	return: """

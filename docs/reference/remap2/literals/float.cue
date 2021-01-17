@@ -3,7 +3,7 @@ package metadata
 remap2: literals: float: {
 	title: "Float"
 	description: """
-		A "float" literal is a decimal representation of a 64-bit floating-point type (specifically, the "binary64" type
+		A _float_ literal is a decimal representation of a 64-bit floating-point type (specifically, the "binary64" type
 		defined in IEEE 754-2008).
 
 		A decimal floating-point literal consists of an integer part (decimal digits), a decimal point, a fractional

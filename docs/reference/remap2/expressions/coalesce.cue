@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: coalesce: {
 	title: "Coalesce"
 	description: """
-		A "coalesce" expression is composed of multiple expressions (operands) delimited by a coalesce operator,
+		A _coalesce_ expression is composed of multiple expressions (operands) delimited by a coalesce operator,
 		short-circuiting on the first expression that does not violate the operator condition.
 		"""
 	return: """
@@ -12,7 +12,7 @@ remap2: expressions: coalesce: {
 
 	grammar: {
 		source: """
-				expression ~ (operator ~ expression)+
+			expression ~ (operator ~ expression)+
 			"""
 		definitions: {
 			expression: {

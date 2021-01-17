@@ -3,7 +3,7 @@ package metadata
 remap2: literals: regular_expression: {
 	title:       "Regular Expression"
 	description: """
-		A "regular expression" literal represents a [Regular Expression](\(urls.regex)) used for string matching and
+		A _regular expression_ literal represents a [Regular Expression](\(urls.regex)) used for string matching and
 		parsing.
 
 		Regular expressions are delimited by `/` and use [Rust regex syntax](\(urls.rust_regex_syntax)). There is one

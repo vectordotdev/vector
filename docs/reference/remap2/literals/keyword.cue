@@ -3,7 +3,7 @@ package metadata
 remap2: literals: keyword: {
 	title: "Comment"
 	description: """
-		A "keyword" literal is a reserved word that cannot be used by variables.
+		A _keyword_ literal is a reserved word that cannot be used by variables.
 		"""
 
 	examples: [

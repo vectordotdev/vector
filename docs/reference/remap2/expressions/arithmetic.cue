@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: arithmetic: {
 	title: "Arithmetic"
 	description: """
-		An "arithmetic" expression performs an operation on two expressions (operands) as defined by the operator.
+		An _arithmetic_ expression performs an operation on two expressions (operands) as defined by the operator.
 
 		Although arithmetic is commonly performed with numbers, it can apply to other types as well, such as strings.
 		"""

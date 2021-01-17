@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: comparison: {
 	title: "Comparison"
 	description: """
-		An "comparison" expression compares two expressions (operands) and produces a boolean as defined by the
+		An _comparison_ expression compares two expressions (operands) and produces a boolean as defined by the
 		operator.
 		"""
 	return: """

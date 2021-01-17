@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: block: {
 	title: "Assignment"
 	description: """
-		A "block" expression is a sequence of one or more expressions within matching brace brackets.
+		A _block_ expression is a sequence of one or more expressions within matching brace brackets.
 
 		Blocks cannot be empty, instead, empty blocks are treated as blank maps.
 		"""

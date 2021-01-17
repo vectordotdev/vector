@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: path: {
 	title: "Path"
 	description: """
-		A "path" expression is a sequence of period-delimited segments that represent the location of a value
+		A _path_ expression is a sequence of period-delimited segments that represent the location of a value
 		within a map.
 		"""
 	return: """
@@ -23,7 +23,9 @@ remap2: expressions: path: {
 			}
 			path_segments: {
 				description: """
-					`path_segments` denote a step, or segment, of a nested path.
+					`path_segments` denote a segment of a nested path. Each segment must be delimited by a `.` character
+					and only contain alpha-numeric, `_`, and `@` characters (`a-zA-Z0-9_@`). Segments that contain
+					characters outside of this range must be quoted.
 					"""
 				characteristics: {
 					array_elements: {

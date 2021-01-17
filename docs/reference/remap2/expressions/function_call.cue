@@ -3,7 +3,7 @@ package metadata
 remap2: expressions: function_call: {
 	title: "Function call"
 	description: """
-		A "function call" expression invokes built-in VRL functions.
+		A _function call_ expression invokes built-in VRL functions.
 		"""
 	return: """
 		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, then the
@@ -90,7 +90,7 @@ remap2: expressions: function_call: {
 							number, err = round(.message)
 							```
 
-							See the [errors reference](\(urls.vrl_errors_reference)). for more info.
+							See the [errors reference](\(urls.vrl_errors_reference)) for more info.
 							"""
 					}
 				}

@@ -51,9 +51,5 @@ remap2: #Remap & {
 		   available event data transformation languages and runtimes.
 
 		For a more in-depth picture, see the [announcement blog post](\(urls.vrl_announcement)) for more details.
-
-		### Concepts
-
-		...
 		"""#
 }

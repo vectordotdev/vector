@@ -2,8 +2,8 @@ remap2: features: affine_type_system: {
 	title:       "Affine type system"
 	description: """
 		VRL is built with [Rust](\(urls.rust)) and therefore inherits its
-		[affine type system](\(urls.affine_type_system)). This makes VRL exceptionally memory-efficient and
-		high-performance, avoiding the need for a garbage collector.
+		[affine type system](\(urls.affine_type_system)). This makes VRL exceptionally fast, memory-efficient, and
+		memory-safe.
 		"""
 
 	characteristics: {
