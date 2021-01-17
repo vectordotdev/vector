@@ -1,0 +1,12 @@
+# SKIP
+#
+# This test should result in an error, because .foo is either "string" or
+# "null", because we don't know at compile-time if the downcase call succeeds
+# or not.
+#
+# object: { "foo": "bar" }
+# result: TODO
+
+.foo # any
+.foo, err = downcase(.foo) # string
+.foo = upcase(.foo) # string
