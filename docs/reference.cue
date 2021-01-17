@@ -330,12 +330,14 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
+	"aarch64-unknown-linux-gnu":      bool
+	"aarch64-unknown-linux-musl":     bool
+	"armv7-unknown-linux-gnueabihf":  bool
+	"armv7-unknown-linux-musleabihf": bool
+	"x86_64-apple-darwin":            bool
+	"x86_64-pc-windows-msv":          bool
+	"x86_64-unknown-linux-gnu":       bool
+	"x86_64-unknown-linux-musl":      bool
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
