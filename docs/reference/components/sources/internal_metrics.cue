@@ -283,12 +283,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		kafka_statistics_received_total: {
-			description:       "The total number of statistics that have been received from Kafka."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
@@ -296,6 +290,66 @@ components: sources: internal_metrics: {
 			tags:              _component_tags & {
 				file: _file
 			}
+		}
+		kafka_queue_messages: {
+			description:       "Current number of messages in producer queues."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_queue_messages_bytes: {
+			description:       "Current total size of messages in producer queues."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_requests_total: {
+			description:       "Total number of requests sent to Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_requests_bytes_total: {
+			description:       "Total number of bytes transmitted to Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_responses_total: {
+			description:       "Total number of responses received from Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_responses_bytes_total: {
+			description:       "Total number of bytes received from Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_produced_messages_total: {
+			description:       "Total number of messages transmitted (produced) to Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_produced_messages_bytes_total: {
+			description:       "Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_consumed_messages_total: {
+			description:       "Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		kafka_consumed_messages_bytes_total: {
+			description:       "Total number of message bytes (including framing) received from Kafka brokers."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		file_delete_errors_total: {
 			description:       "The total number of failures to delete a file."
