@@ -10,7 +10,7 @@ remap: functions: uuid_v4: {
 		"""#
 	examples: [
 		{
-			title: "Create UUIDv4"
+			title: "Create a UUIDv4"
 			input: log: {}
 			source: #"""
 				.id = uuid_v4()

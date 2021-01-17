@@ -17,7 +17,7 @@ remap: functions: encode_json: {
 		"""
 	examples: [
 		{
-			title: "Encode data into JSON"
+			title: "Encode to JSON"
 			input: log: payload: age: 42
 			source: #"""
 				.payload = encode_json(.payload)

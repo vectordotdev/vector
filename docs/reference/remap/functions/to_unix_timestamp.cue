@@ -32,7 +32,7 @@ remap: functions: to_unix_timestamp: {
 		"""
 	examples: [
 		{
-			title: "Happy new year!"
+			title: "Convert to a Unix timestamp"
 			input: log: date: "2021-01-01T00:00:00+00:00"
 			source: #"""
 				.no_default = to_unix_timestamp(to_timestamp(.date))

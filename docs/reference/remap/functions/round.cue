@@ -24,7 +24,7 @@ remap: functions: round: {
 		"""#
 	examples: [
 		{
-			title: "Round (without precision)"
+			title: "Round a number (without precision)"
 			input: log: number: 4.345
 			source: #"""
 				.number = floor(.number)
@@ -32,7 +32,7 @@ remap: functions: round: {
 			output: log: number: 4
 		},
 		{
-			title: "Round (with precision)"
+			title: "Round a number (with precision)"
 			input: log: number: 4.345
 			source: #"""
 				.number = floor(.number, precision: 2)

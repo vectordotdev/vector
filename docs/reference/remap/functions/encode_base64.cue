@@ -36,7 +36,7 @@ remap: functions: encode_base64: {
 		"""#
 	examples: [
 		{
-			title: "Encode string"
+			title: "Encode to Base64 (default)"
 			input: log: message: "please encode me"
 			source: ".encoded = encode_base64(.message)"
 			output: input & {log: {
@@ -44,7 +44,7 @@ remap: functions: encode_base64: {
 			}}
 		},
 		{
-			title: "Encode string without padding"
+			title: "Encode to Base64 (without padding)"
 			input: log: message: "please encode me, no padding though"
 			source: ".encoded = encode_base64(.message, padding: false)"
 			output: input & {log: {
@@ -52,7 +52,7 @@ remap: functions: encode_base64: {
 			}}
 		},
 		{
-			title: "Encode URL string"
+			title: "Encode to Base64 (URL safe)"
 			input: log: message: "please encode me, but safe for URLs"
 			source: #".encoded = encode_base64(.message, charset: "url_safe")"#
 			output: input & {log: {

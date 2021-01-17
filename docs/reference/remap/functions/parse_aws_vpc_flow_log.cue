@@ -62,13 +62,5 @@ remap: functions: parse_aws_vpc_flow_log: {
 				"pkt_dstaddr":  "203.0.113.5"
 			}
 		},
-		{
-			title: "Parse AWS VPC Flow log (error)"
-			input: log: message: "I am not am AWS VPC Flow log"
-			source: #"""
-				.parsed = parse_aws_vpc_flow_log(.log)
-				"""#
-			raises: "Failed to parse"
-		},
 	]
 }

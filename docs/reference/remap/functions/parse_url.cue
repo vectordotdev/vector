@@ -35,13 +35,5 @@ remap: functions: parse_url: {
 				fragment: "123"
 			}
 		},
-		{
-			title: "Parse a URL (error)"
-			input: log: url: "I am not a url"
-			source: #"""
-				.url = parse_url(.url)
-				"""#
-			raises: "Failed to parse"
-		},
 	]
 }

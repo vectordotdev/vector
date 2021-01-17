@@ -27,7 +27,7 @@ remap: functions: to_bool: {
 		"""#
 	examples: [
 		{
-			title: "Cast a value to a boolean"
+			title: "Coerce to a boolean"
 			input: log: {
 				string:  "yes"
 				float:   0.0

@@ -17,10 +17,10 @@ remap: functions: to_float: {
 		"""#
 	examples: [
 		{
-			title: "Convert string to float"
-			input: log: float: "3.14"
-			source: ".float = to_float(.float)"
-			output: log: float: 3.14
+			title: "Coerce to a float"
+			input: log: string: "3.14"
+			source: ".string = to_float(.string)"
+			output: log: string: 3.14
 		},
 	]
 }

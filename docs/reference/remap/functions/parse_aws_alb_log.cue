@@ -58,13 +58,5 @@ remap: functions: parse_aws_alb_log: {
 				classification_reason: null
 			}
 		},
-		{
-			title: "Parse AWS ALB log (error)"
-			input: log: message: "I am not an AWS ALB log"
-			source: #"""
-				. = parse_aws_alb_log(.message)
-				"""#
-			raises: "Failed to parse"
-		},
 	]
 }

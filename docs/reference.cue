@@ -146,12 +146,7 @@ _values: {
 	sub_sections?: [#Subsection, ...#Subsection]
 })
 
-#LogEvent: {
-	host?:      string | null
-	message?:   string | null
-	timestamp?: string | null
-	#Any
-} | {}
+#LogEvent: #Any | {}
 
 #Map: [string]: string
 

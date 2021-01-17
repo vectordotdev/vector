@@ -20,16 +20,10 @@ remap: functions: to_syslog_level: {
 		"""
 	examples: [
 		{
-			title: "Convert Syslog severity to level"
+			title: "Coerce to a Syslog level"
 			input: log: severity: "5"
 			source: ".log_level = to_syslog_level(.severity)"
 			output: input & {log: level: "notice"}
-		},
-		{
-			title: "Error"
-			input: log: severity: "1337"
-			source: ".log_level = to_syslog_level(.severity)"
-			raises: "Failed to parse"
 		},
 	]
 }

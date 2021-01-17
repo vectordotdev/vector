@@ -37,20 +37,12 @@ remap: functions: parse_duration: {
 		"""#
 	examples: [
 		{
-			title: "Parse duration (milliseconds)"
+			title: "Parse a duration (milliseconds)"
 			input: log: duration: "1005ms"
 			source: #"""
 				.seconds = parse_duration(.duration, unit: "s")
 				"""#
 			output: input & {log: seconds: 1.005}
-		},
-		{
-			title: "Parse duration (error)"
-			input: log: duration: "1005years"
-			source: #"""
-				.seconds = parse_duration(.duration, unit: "s")
-				"""#
-			raises: "Failed to parse"
 		},
 	]
 }

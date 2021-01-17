@@ -41,11 +41,5 @@ remap: functions: parse_syslog: {
 				message:     "Try to override the THX port, maybe it will reboot the neural interface!"
 			}
 		},
-		{
-			title: "Parse Syslog meessage (error)"
-			input: log: message: "I am not a Syslog message"
-			source: ". = parse_syslog(.message)"
-			raises: "Failed to parse"
-		},
 	]
 }

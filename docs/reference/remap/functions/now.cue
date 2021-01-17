@@ -10,7 +10,7 @@ remap: functions: now: {
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "Generate a current timestamp"
 			input: log: {}
 			source: #"""
 				.timestamp = now()

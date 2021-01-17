@@ -18,7 +18,7 @@ remap: functions: only_fields: {
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "White-list event fields"
 			input: log: {
 				field1: 1
 				field2: 2

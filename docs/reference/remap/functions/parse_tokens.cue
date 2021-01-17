@@ -25,7 +25,7 @@ remap: functions: parse_tokens: {
 		"""#
 	examples: [
 		{
-			title: "Success"
+			title: "Parse tokens"
 			input: log: text: #"""
 				A sentence "with \"a\" sentence inside" and [some brackets]
 				"""#

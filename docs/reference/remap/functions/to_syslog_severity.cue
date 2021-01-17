@@ -23,7 +23,7 @@ remap: functions: to_syslog_severity: {
 
 	examples: [
 		{
-			title: "Concert Syslog level to serverity"
+			title: "Coerce to Syslog serverity"
 			input: log: level: "alert"
 			source: ".severity = to_syslog_severity(.level)"
 			output: input & {log: severity: 1}

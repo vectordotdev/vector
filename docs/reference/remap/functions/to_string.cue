@@ -17,12 +17,22 @@ remap: functions: to_string: {
 		"""#
 	examples: [
 		{
-			title: "Convert number to string"
-			input: log: number: 52
+			title: "Coerce to a string"
+			input: log: {
+				boolean: true
+				int:     52
+				float:   12.2
+			}
 			source: #"""
-				.number = to_string(.number)
+				.boolean = to_string(.boolean)
+				.int = to_string(.int)
+				.float = to_string(.float)
 				"""#
-			output: log: number: "52"
+			output: log: {
+				boolean: "true"
+				int:     "52"
+				float:   "12.2"
+			}
 		},
 	]
 }
