@@ -28,6 +28,8 @@ components: transforms: wasm: {
 		targets: {
 			"aarch64-unknown-linux-gnu":  false
 			"aarch64-unknown-linux-musl": false
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
 			"x86_64-apple-darwin":        false
 			"x86_64-pc-windows-msv":      false
 			"x86_64-unknown-linux-gnu":   true
