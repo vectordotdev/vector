@@ -352,7 +352,7 @@ mod integration_tests {
         delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default{})),
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
