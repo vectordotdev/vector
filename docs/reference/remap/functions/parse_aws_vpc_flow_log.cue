@@ -68,7 +68,7 @@ remap: functions: parse_aws_vpc_flow_log: {
 			source: #"""
 				.parsed = parse_aws_vpc_flow_log(.log)
 				"""#
-			raise: "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

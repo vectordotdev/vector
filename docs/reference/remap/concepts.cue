@@ -1,6 +1,6 @@
 package metadata
 
-remap: concepts: {
+remap: {
 	#Concept: {
 		anchor:      "#\(name)"
 		name:        string
@@ -10,7 +10,7 @@ remap: concepts: {
 		characteristics: [Name=string]: remap.#Characteristic
 	}
 
-	{[Name=string]: #Concept & {
+	concepts: [Name=string]: #Concept & {
 		name: Name
-	}}
+	}
 }

@@ -51,7 +51,7 @@ remap: functions: compact: {
 			type: ["boolean"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["array", "map"]
 	category: "Enumerate"
 	description: #"""
@@ -70,7 +70,7 @@ remap: functions: compact: {
 		},
 		{
 			title: "Compact a map"
-			input: map: {
+			input: log: map: {
 				field1: 1
 				field2: ""
 				field3: []
@@ -79,7 +79,7 @@ remap: functions: compact: {
 			source: #"""
 				.map = compact(.map, string: true, array: true, null: true)
 				"""#
-			output: map: field1: 1
+			output: log: map: field1: 1
 		},
 	]
 }

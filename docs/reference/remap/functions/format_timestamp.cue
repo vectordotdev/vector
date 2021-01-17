@@ -15,7 +15,7 @@ remap: functions: format_timestamp: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Timestamp"
 	description: #"""

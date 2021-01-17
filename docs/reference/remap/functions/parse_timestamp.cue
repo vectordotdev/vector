@@ -39,7 +39,7 @@ remap: functions: parse_timestamp: {
 			source: #"""
 				.timestamp = parse_timestamp(.timestamp, format: "%v %R")
 				"""#
-			raise: "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

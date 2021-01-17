@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: {
+remap: {
 	#Argument: {
 		name:        string
 		description: string
@@ -12,18 +12,20 @@ remap: functions: {
 	}
 
 	#Function: {
-		arguments: [...#Argument]
-		internal_failure_reasons: [...string]
-		return: [remap.#Type, ...remap.#Type]
+		name:        string
 		category:    #FunctionCategory
 		description: string
+		notices?: [string, ...string]
+
+		arguments: [...#Argument]
+		return: [remap.#Type, ...remap.#Type]
+		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
-		name: string
 	}
 
 	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Debug" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
 
-	{[Name=string]: #Function & {
+	functions: [Name=string]: #Function & {
 		name: Name
-	}}
+	}
 }

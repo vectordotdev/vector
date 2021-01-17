@@ -32,8 +32,8 @@ remap: functions: to_int: {
 		{
 			title: "Convert timestamp to int"
 			input: log: timestamp: "2020-12-30 22:20:53.824727 UTC"
-			source: ".timestamp = to_int(.timestamp)"
-			output: log: timestamp: 1609366853
+			source: ".unix = to_int(.timestamp)"
+			output: input & {log: unix: 1609366853}
 		},
 	]
 }

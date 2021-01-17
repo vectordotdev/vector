@@ -29,7 +29,7 @@ remap: functions: format_number: {
 			default: ","
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Number"
 	description: #"""

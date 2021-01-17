@@ -20,14 +20,11 @@ remap: functions: decode_base64: {
 	examples: [
 		{
 			title: "Decode Base64 data"
-			input: {
-				message: "eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU="
-			}
+			input: log: message: "eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU="
 			source: ".decoded = decode_base64(.message)"
-			output: {
-				message: "eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU="
+			output: input & {log: {
 				decoded: "you have successfully decoded me"
-			}
+			}}
 		},
 	]
 }

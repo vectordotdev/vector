@@ -16,7 +16,7 @@ remap: functions: floor: {
 			type: ["integer"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["timestamp"]
 	category: "Number"
 	description: #"""

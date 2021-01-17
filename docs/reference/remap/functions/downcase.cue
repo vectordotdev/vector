@@ -9,7 +9,7 @@ remap: functions: downcase: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "String"
 	description: #"""

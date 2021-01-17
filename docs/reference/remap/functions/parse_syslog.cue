@@ -45,7 +45,7 @@ remap: functions: parse_syslog: {
 			title: "Parse Syslog meessage (error)"
 			input: log: message: "I am not a Syslog message"
 			source: ". = parse_syslog(.message)"
-			raise:  "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

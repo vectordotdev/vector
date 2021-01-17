@@ -15,7 +15,7 @@ remap: functions: includes: {
 			type: ["any"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "Enumerate"
 	description: """

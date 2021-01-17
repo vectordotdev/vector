@@ -7,7 +7,7 @@ remap: concepts: function: {
 		helps to keep the language simple.
 		"""
 
-	charactertistics: {
+	characteristics: {
 		fallibility: {
 			title:       "Fallibility"
 			description: """

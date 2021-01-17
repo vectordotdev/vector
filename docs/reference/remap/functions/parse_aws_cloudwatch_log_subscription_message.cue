@@ -59,7 +59,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 			title: "Parse AWS Cloudwatch Log subscription message (error)"
 			input: log: message: "I am not an AWS Cloudwatch Logs subscription message"
 			source: ". = parse_aws_cloudwatch_log_subscription_message(.message)"
-			raise:  "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

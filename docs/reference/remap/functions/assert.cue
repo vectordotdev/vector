@@ -15,7 +15,7 @@ remap: functions: assert: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reason: [
+	internal_failure_reasons: [
 		"`condition` evaluates to `false`",
 	]
 	return: ["null"]

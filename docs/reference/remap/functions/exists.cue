@@ -10,7 +10,7 @@ remap: functions: exists: {
 			type: ["path"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "Event"
 	description: #"""

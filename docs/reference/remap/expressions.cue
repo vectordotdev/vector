@@ -1,6 +1,6 @@
 package metadata
 
-remap: expressions: {
+remap: {
 	#Expression: {
 		anchor:      "#\(name)"
 		name:        string
@@ -23,7 +23,7 @@ remap: expressions: {
 		}
 	}
 
-	{[Name=string]: #Expression & {
+	expressions: [Name=string]: #Expression & {
 		name: Name
-	}}
+	}
 }

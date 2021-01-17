@@ -22,13 +22,9 @@ remap: functions: to_timestamp: {
 	examples: [
 		{
 			title: "Success"
-			input: {
-				date: "2020-10-21T16:00:00Z"
-			}
+			input: log: date: "2020-10-21T16:00:00Z"
 			source: ".date = to_timestamp(.date)"
-			output: {
-				date: "2020-10-21T16:00:00Z"
-			}
+			output: log: date: "2020-10-21T16:00:00Z"
 		},
 	]
 }

@@ -50,7 +50,7 @@ remap: functions: parse_duration: {
 			source: #"""
 				.seconds = parse_duration(.duration, unit: "s")
 				"""#
-			raise: "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

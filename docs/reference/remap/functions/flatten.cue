@@ -9,7 +9,7 @@ remap: functions: flatten: {
 			type: ["array", "map"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["array", "map"]
 	category: "Enumerate"
 	description: #"""

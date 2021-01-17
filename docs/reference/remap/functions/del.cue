@@ -9,7 +9,7 @@ remap: functions: del: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["any"]
 	category: "Event"
 	description: #"""

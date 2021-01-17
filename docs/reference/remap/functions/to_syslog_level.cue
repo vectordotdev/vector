@@ -29,7 +29,7 @@ remap: functions: to_syslog_level: {
 			title: "Error"
 			input: log: severity: "1337"
 			source: ".log_level = to_syslog_level(.severity)"
-			raise:  "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

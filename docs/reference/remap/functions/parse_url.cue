@@ -41,7 +41,7 @@ remap: functions: parse_url: {
 			source: #"""
 				.url = parse_url(.url)
 				"""#
-			raise: "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

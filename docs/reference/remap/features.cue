@@ -1,18 +1,16 @@
 package metadata
 
-remap: features: {
+remap: {
 	#Feature: {
 		anchor:      "#\(name)"
 		name:        string
 		title:       string
 		description: string
 
-		features: [Name=string]: #Feature & {
-			name: Name
-		}
+		characteristics: [Name=string]: remap.#Characteristic
 	}
 
-	{[Name=string]: #Feature & {
+	features: [Name=string]: #Feature & {
 		name: Name
-	}}
+	}
 }

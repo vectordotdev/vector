@@ -64,7 +64,7 @@ remap: functions: parse_aws_alb_log: {
 			source: #"""
 				. = parse_aws_alb_log(.message)
 				"""#
-			raise: "Failed to parse"
+			raises: "Failed to parse"
 		},
 	]
 }

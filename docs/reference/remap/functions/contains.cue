@@ -22,7 +22,7 @@ remap: functions: contains: {
 			default: true
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["boolean"]
 	category: "String"
 	description: #"""

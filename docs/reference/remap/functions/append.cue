@@ -15,7 +15,7 @@ remap: functions: append: {
 			type: ["array"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["array"]
 	category: "Array"
 	description: """

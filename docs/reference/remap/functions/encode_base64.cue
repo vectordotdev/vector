@@ -27,7 +27,7 @@ remap: functions: encode_base64: {
 			}
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["string"]
 	category: "Codec"
 	description: #"""
@@ -37,36 +37,27 @@ remap: functions: encode_base64: {
 	examples: [
 		{
 			title: "Encode string"
-			input: {
-				message: "please encode me"
-			}
+			input: log: message: "please encode me"
 			source: ".encoded = encode_base64(.message)"
-			output: {
-				message: "please encode me"
+			output: input & {log: {
 				encoded: "cGxlYXNlIGVuY29kZSBtZQ=="
-			}
+			}}
 		},
 		{
 			title: "Encode string without padding"
-			input: {
-				message: "please encode me, no padding though"
-			}
+			input: log: message: "please encode me, no padding though"
 			source: ".encoded = encode_base64(.message, padding: false)"
-			output: {
-				message: "please encode me, no padding though"
+			output: input & {log: {
 				encoded: "cGxlYXNlIGVuY29kZSBtZSwgbm8gcGFkZGluZyB0aG91Z2g"
-			}
+			}}
 		},
 		{
 			title: "Encode URL string"
-			input: {
-				message: "please encode me, but safe for URLs"
-			}
+			input: log: message: "please encode me, but safe for URLs"
 			source: #".encoded = encode_base64(.message, charset: "url_safe")"#
-			output: {
-				message: "please encode me, but safe for URLs"
+			output: input & {log: {
 				encoded: "cGxlYXNlIGVuY29kZSBtZSwgYnV0IHNhZmUgZm9yIFVSTHM="
-			}
+			}}
 		},
 	]
 }

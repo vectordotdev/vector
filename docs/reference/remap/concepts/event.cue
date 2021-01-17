@@ -12,7 +12,7 @@ remap: concepts: event: {
 		The current event is the context of the VRL program.
 		"""
 
-	charactertistics: {
+	characteristics: {
 		path: {
 			title:       "Paths"
 			description: """

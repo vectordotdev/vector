@@ -1,6 +1,6 @@
 package metadata
 
-remap: literals: {
+remap: {
 	#Literal: {
 		anchor:      "#\(name)"
 		name:        string
@@ -10,7 +10,7 @@ remap: literals: {
 		examples: [string, ...string]
 	}
 
-	{[Name=string]: #Literal & {
+	literals: [Name=string]: #Literal & {
 		name: Name
-	}}
+	}
 }
