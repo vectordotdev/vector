@@ -532,6 +532,7 @@ impl CheckFieldsConfig {
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
+        warn!(message = "The `check_fields` condition is deprecated, use `remap` instead.",);
         build_predicates(&self.predicates)
             .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
             .map_err(|errs| {

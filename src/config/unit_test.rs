@@ -127,19 +127,11 @@ fn walk(
             }
             Transform::Task(t) => {
                 error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
-                use futures::compat::Stream01CompatExt;
-                let in_stream = futures01::stream::iter_ok(inputs.clone());
-                let out_stream = t.transform(Box::new(in_stream)).compat();
+                let in_stream = futures::stream::iter(inputs.clone());
+                let out_stream = t.transform(Box::pin(in_stream));
                 // TODO(new-transform-enum): Handle Many
                 let out_iter = futures::executor::block_on_stream(out_stream);
-                let out_iter_mapped = out_iter.flat_map(|v| match v {
-                    Err(e) => {
-                        error!("Stream transform experienced error: {:?}", e);
-                        None
-                    }
-                    Ok(v) => Some(v),
-                });
-                results.extend(out_iter_mapped);
+                results.extend(out_iter);
                 targets = target.next.clone();
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
