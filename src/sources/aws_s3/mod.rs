@@ -48,7 +48,8 @@ struct AwsS3Config {
 
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
-    pub auth: AWSAuthentication,
+    #[serde(default)]
+    auth: AWSAuthentication,
 
     multiline: Option<MultilineConfig>,
 }

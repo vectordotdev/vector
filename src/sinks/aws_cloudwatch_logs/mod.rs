@@ -74,6 +74,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub request: TowerRequestConfig<Option<usize>>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
+    #[serde(default)]
     pub auth: AWSAuthentication,
 }
 

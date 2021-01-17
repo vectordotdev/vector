@@ -51,6 +51,7 @@ pub struct KinesisSinkConfig {
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
+    #[serde(default)]
     pub auth: AWSAuthentication,
 }
 
