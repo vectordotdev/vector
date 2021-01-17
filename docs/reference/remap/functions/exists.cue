@@ -18,7 +18,7 @@ remap: functions: exists: {
 		"""#
 	examples: [
 		{
-			title: "Field exists"
+			title: "Exists (field)"
 			input: log: field: 1
 			source: #"""
 				.exists = exists(.field)
@@ -30,7 +30,7 @@ remap: functions: exists: {
 			}}
 		},
 		{
-			title: "Array element exists"
+			title: "Exits (array element)"
 			input: log: array: [1, 2, 3]
 			source: #"""
 				.exists = exists(.array[2])
