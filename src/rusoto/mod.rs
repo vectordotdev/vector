@@ -226,7 +226,7 @@ where
                         return Err(HttpDispatchError::new(format!(
                             "Error parsing header name: {}",
                             err
-                        )))
+                        )));
                     }
                 };
                 for v in h.1.iter() {
@@ -236,7 +236,7 @@ where
                             return Err(HttpDispatchError::new(format!(
                                 "Value of header {:?} contains invalid header byte. Error: {}",
                                 h.0, err
-                            )))
+                            )));
                         }
                     };
                     headers.append(&header_name, header_value);
