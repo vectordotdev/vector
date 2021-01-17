@@ -26,7 +26,7 @@ remap: functions: parse_timestamp: {
 		"""#
 	examples: [
 		{
-			title: "Parse a timestamp (success)"
+			title: "Parse a timestamp"
 			input: log: timestamp: "10-Oct-2020 16:00"
 			source: #"""
 				.timestamp = parse_timestamp(.timestamp, format: "%v %R")

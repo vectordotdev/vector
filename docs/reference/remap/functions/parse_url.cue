@@ -19,7 +19,7 @@ remap: functions: parse_url: {
 		"""#
 	examples: [
 		{
-			title: "Parse a URL (success)"
+			title: "Parse a URL"
 			input: log: url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
 			source: #"""
 				.url = parse_url(.url)

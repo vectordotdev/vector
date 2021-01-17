@@ -20,7 +20,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 		"""#
 	examples: [
 		{
-			title: "Parse AWS Cloudwatch Log subscription message (success)"
+			title: "Parse AWS Cloudwatch Log subscription message"
 			input: log: message: """
 				{
 				  "messageType": "DATA_MESSAGE",

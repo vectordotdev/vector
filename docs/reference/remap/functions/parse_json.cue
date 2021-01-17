@@ -22,7 +22,7 @@ remap: functions: parse_json: {
 		"""#
 	examples: [
 		{
-			title: "Parse JSON (success)"
+			title: "Parse JSON"
 			input: log: message: #"{"key": "val"}"#
 			source: #"""
 				. = parse_json(.message)
