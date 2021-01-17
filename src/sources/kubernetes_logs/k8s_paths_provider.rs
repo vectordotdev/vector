@@ -44,6 +44,14 @@ impl PathsProvider for K8sPathsProvider {
                 // is always better if possible, but it's not clear if it's
                 // a sane strategy here.
                 warn!(message = "Unable to read the state of the pods.");
+                // Reaching this branch is only possible during the shutdown procedure, where the
+                // reflector has been already dropped, while the file server is still terminating -
+                // this is the only case when the pods_state_reader's internal storage would've been
+                // gone.
+                //
+                // The file server isn't supposed to invoke the paths provider at shutdown, but if
+                // it does, we do not want to fail during the shutdown sequence - and therefore
+                // return an empty result instead of panicing or returning an error.
                 return Ok(Vec::new());
             }
         };
