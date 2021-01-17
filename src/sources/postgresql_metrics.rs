@@ -830,6 +830,14 @@ mod integration_tests {
     async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
         trace_init();
 
+        let config: Config = endpoint.parse().unwrap();
+        let tags_endpoint = config_to_endpoint(&config);
+        let tags_host = match config.get_hosts().get(0).unwrap() {
+            Host::Tcp(host) => host.clone(),
+            #[cfg(unix)]
+            Host::Unix(path) => path.to_string_lossy().to_string(),
+        };
+
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
@@ -863,6 +871,42 @@ mod integration_tests {
             }
         }
         assert!(events.len() > 1);
+
+        // test up metric
+        assert_eq!(
+            events
+                .iter()
+                .map(|e| e.as_metric())
+                .find(|e| e.name == "up")
+                .unwrap()
+                .value,
+            gauge!(1)
+        );
+
+        // test namespace and tags
+        for event in &events {
+            let metric = event.as_metric();
+
+            assert_eq!(metric.namespace, Some("postgresql".to_owned()));
+            assert_eq!(
+                metric.tags.as_ref().unwrap().get("endpoint").unwrap(),
+                &tags_endpoint
+            );
+            assert_eq!(
+                metric.tags.as_ref().unwrap().get("host").unwrap(),
+                &tags_host
+            );
+        }
+
+        // test metrics from different queries
+        let names = vec![
+            "pg_stat_database_datid",
+            "pg_stat_database_conflicts_confl_tablespace_total",
+            "pg_stat_bgwriter_checkpoints_timed_total",
+        ];
+        for name in names {
+            assert!(events.iter().any(|e| e.as_metric().name == name));
+        }
     }
 
     #[tokio::test]
