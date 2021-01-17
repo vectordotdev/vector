@@ -1,7 +1,7 @@
 package metadata
 
 remap: expressions: block: {
-	title: "Assignment"
+	title: "Block"
 	description: """
 		A _block_ expression is a sequence of one or more expressions within matching brace brackets.
 

@@ -18,7 +18,7 @@ remap: {
 		definitions: [Name=string]: {
 			name:        Name
 			description: string
-			characteristics: [Name=string]: remap.#Characteristic
+			characteristics?: [Name=string]: remap.#Characteristic
 			enum?: #Enum
 			examples?: [string, ...string]
 		}

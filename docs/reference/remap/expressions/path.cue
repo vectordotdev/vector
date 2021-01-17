@@ -15,9 +15,9 @@ remap: expressions: path: {
 			"." ~ path_segments
 			"""
 		definitions: {
-			".": {
+			"\".\"": {
 				description: """
-					The `.` character represents the root of the event. Therefore, _all_ paths must begin with the `.`
+					The `"."` character represents the root of the event. Therefore, _all_ paths must begin with the `.`
 					character, and `.` alone is a valid path.
 					"""
 			}
