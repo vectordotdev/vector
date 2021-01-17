@@ -39,7 +39,7 @@ remap2: functions: parse_grok: {
 			title: "Parse via Grok"
 			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
 			source: #"""
-				. = parse_grok(del(.message), "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
 				"""#
 			output: log: {
 				timestamp: "2020-10-02T23:22:12.223222Z"

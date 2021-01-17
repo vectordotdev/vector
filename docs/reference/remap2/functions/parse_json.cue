@@ -25,7 +25,7 @@ remap2: functions: parse_json: {
 			title: "Parse JSON (success)"
 			input: log: message: #"{"key": "val"}"#
 			source: #"""
-				. = parse_json(del(.message))
+				. = parse_json(.message)
 				"""#
 			output: log: key: "val"
 		},

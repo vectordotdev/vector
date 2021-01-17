@@ -39,7 +39,7 @@ remap2: functions: parse_regex: {
 		{
 			title: "Parse via Regex (with capture groups)"
 			input: log: message: "first group and second group."
-			source: ". = parse_regex(del(.message), /(?P<number>.*?) group/)"
+			source: ". = parse_regex(.message, /(?P<number>.*?) group/)"
 			output: log: {
 				number: "first"
 				"0":    "first group"
@@ -49,7 +49,7 @@ remap2: functions: parse_regex: {
 		{
 			title: "Parse via Regex (without capture groups)"
 			input: log: message: "first group and second group."
-			source: ". = parse_regex(del(.message), /(?.*?) group/)"
+			source: ". = parse_regex(.message, /(?.*?) group/)"
 			output: log: {
 				"1": "first"
 			}

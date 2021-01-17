@@ -22,7 +22,7 @@ remap2: functions: parse_url: {
 			title: "Parse a URL (success)"
 			input: log: url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
 			source: #"""
-				.url = parse_url(del(.url))
+				.url = parse_url(.url)
 				"""#
 			output: log: url: {
 				scheme:   "ftp"
@@ -39,7 +39,7 @@ remap2: functions: parse_url: {
 			title: "Parse a URL (error)"
 			input: log: url: "I am not a url"
 			source: #"""
-				.url = parse_url(del(.url))
+				.url = parse_url(.url)
 				"""#
 			raise: "Failed to parse"
 		},

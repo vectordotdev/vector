@@ -26,7 +26,7 @@ remap2: functions: parse_syslog: {
 			input: log: message: """
 				<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
 				"""
-			source: ". = parse_syslog(del(.message))"
+			source: ". = parse_syslog(.message)"
 			output: log: {
 				severity:    "notice"
 				facility:    "user"
@@ -44,7 +44,7 @@ remap2: functions: parse_syslog: {
 		{
 			title: "Parse Syslog meessage (error)"
 			input: log: message: "I am not a Syslog message"
-			source: ". = parse_syslog(del(.message))"
+			source: ". = parse_syslog(.message)"
 			raise:  "Failed to parse"
 		},
 	]
