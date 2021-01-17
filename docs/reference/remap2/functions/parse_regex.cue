@@ -29,9 +29,10 @@ remap2: functions: parse_regex: {
 		"""
 	notices: [
 		"""
-		VRL aims to provide purpose-specific parsing functions for common log formats. Before reaching,
-		for the `parse_regex` function see if a Remap `parse_*` function already exists for your format.
-		If not, please consider [opening an issue](\(urls.new_feature_request)) to request support.
+		VRL aims to provide purpose-specific [parsing functions](\(urls.vrl_parsing_functions)) for common log formats.
+		Before reaching for the `parse_regex` function, see if a Remap [`parse_*` function](\(urls.vrl_parsing_functions))
+		already exists for your format. If not, please consider [opening an issue](\(urls.new_feature_request)) to
+		request support.
 		""",
 	]
 	examples: [
