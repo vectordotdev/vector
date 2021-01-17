@@ -162,7 +162,7 @@ pub struct Reader {
     uncompacted_size: usize,
     unacked_sizes: VecDeque<usize>,
     buffer: Vec<Vec<u8>>,
-    max_size: usize,
+    max_uncompacted_size: usize,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -251,9 +251,7 @@ impl Reader {
             self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
 
             self.uncompacted_size += size_deleted;
-            if self.uncompacted_size as f64
-                > self.max_size as f64 * MAX_UNCOMPACTED / (1.0 - MAX_UNCOMPACTED)
-            {
+            if self.uncompacted_size > self.max_uncompacted_size {
                 self.compact();
             }
         }
@@ -282,7 +280,8 @@ impl super::DiskBuffer for Buffer {
     fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
-        let max_size = (max_size as f64 * (1.0 - MAX_UNCOMPACTED)) as usize;
+        let max_uncompacted_size = (max_size as f64 * MAX_UNCOMPACTED) as usize;
+        let max_size = max_size - max_uncompacted_size;
 
         let mut options = Options::new();
         options.create_if_missing = true;
@@ -331,7 +330,7 @@ impl super::DiskBuffer for Buffer {
             delete_offset: head,
             current_size,
             ack_counter,
-            max_size,
+            max_uncompacted_size,
             uncompacted_size: 1,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
