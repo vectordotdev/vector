@@ -13,7 +13,7 @@ remap: functions: decode_base64: {
 		"`value` is not a valid encoded base64 string.",
 	]
 	return: ["string"]
-	category:    "Decode"
+	category:    "Codec"
 	description: """
 		Decodes the provided `value` (a [Base64](\(urls.base64)) string) into it's original string.
 		"""

@@ -21,7 +21,7 @@ remap: functions: {
 		name: string
 	}
 
-	#FunctionCategory: "Array" | "Check" | "Coerce" | "Decode" | "Encode" | "Enumerate" | "Event" | "Hash" | "IP" | "Log" | "Map" | "Number" | "Parse" | "Random" | "String" | "System" | "Test" | "Timestamp"
+	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Debug" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
 
 	{[Name=string]: #Function & {
 		name: Name

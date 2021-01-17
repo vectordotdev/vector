@@ -11,7 +11,7 @@ remap: functions: encode_json: {
 	]
 	internal_failure_reason: null
 	return: ["string"]
-	category: "Encode"
+	category: "Codec"
 	description: """
 		Encodes the provided `value` into JSON.
 		"""

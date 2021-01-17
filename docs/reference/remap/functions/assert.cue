@@ -19,7 +19,7 @@ remap: functions: assert: {
 		"`condition` evaluates to `false`",
 	]
 	return: ["null"]
-	category: "Test"
+	category: "Debug"
 	description: #"""
 		Checks a given condition.
 

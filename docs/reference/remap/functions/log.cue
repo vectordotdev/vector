@@ -25,7 +25,7 @@ remap: functions: log: {
 	]
 	internal_failure_reasons: []
 	return: ["null"]
-	category:    "Log"
+	category:    "Debug"
 	description: """
 		Logs the supplied error message to Vector's [stdout](\(urls.stdout)) at the specified log
 		level.

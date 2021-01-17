@@ -11,7 +11,7 @@ remap: functions: is_nullish: {
 	]
 	internal_failure_reasons: []
 	return: ["boolean"]
-	category: "Check"
+	category: "Type"
 	description: #"""
 		Determines whether the provided `value` is "nullish,"
 
