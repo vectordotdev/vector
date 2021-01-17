@@ -45,10 +45,16 @@ impl Expression for LengthFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        self.value
+        let mut value_def = self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes | Kind::Array | Kind::Map)
-            .with_constraint(Kind::Integer)
+            .with_constraint(Kind::Integer);
+
+        if value_def.kind.is_scalar() {
+            value_def.with_inner_type(None)
+        } else {
+            value_def
+        }
     }
 }
 

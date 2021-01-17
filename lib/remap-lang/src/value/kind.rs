@@ -29,6 +29,12 @@ impl Kind {
     pub fn scalar(self) -> Self {
         self & !(Kind::Array | Kind::Map)
     }
+
+    /// Returns `true` if the [`value::Kind`] is a scalar and `false` if it's
+    /// map or array.
+    pub fn is_scalar(self) -> bool {
+        !matches!(self, Kind::Array | Kind::Map)
+    }
 }
 
 macro_rules! impl_kind {
