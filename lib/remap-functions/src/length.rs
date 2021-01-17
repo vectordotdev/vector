@@ -45,7 +45,7 @@ impl Expression for LengthFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let mut value_def = self.value
+        let value_def = self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes | Kind::Array | Kind::Map)
             .with_constraint(Kind::Integer);
@@ -69,16 +69,8 @@ mod tests {
                 value: map! {"foo": "bar", "baz": 27, "baq": false}.boxed()
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Integer,
-                inner_type_def: Some(
-                    TypeDef {
-                        fallible: false,
-                        kind: Kind::Bytes | Kind::Integer | Kind::Boolean,
-                        inner_type_def: None
-                    }
-                    .boxed()
-                )
+                ..Default::default()
             },
         }
 
@@ -87,16 +79,8 @@ mod tests {
                 value: array!["foo", 127, false].boxed()
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Integer,
-                inner_type_def: Some(
-                    TypeDef {
-                        fallible: false,
-                        kind: Kind::Bytes | Kind::Integer | Kind::Boolean,
-                        inner_type_def: None
-                    }
-                    .boxed()
-                )
+                ..Default::default()
             },
         }
 
