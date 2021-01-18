@@ -60,16 +60,6 @@ impl<'a> fmt::Display for Formatter<'a> {
     }
 }
 
-impl<'a> From<(&'a str, DiagnosticList)> for Formatter<'a> {
-    fn from((source, diagnostics): (&'a str, DiagnosticList)) -> Self {
-        Self {
-            source,
-            diagnostics,
-            color: false,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
     severity: Severity,
@@ -189,6 +179,17 @@ impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
 pub struct DiagnosticList(Vec<Diagnostic>);
 
 impl DiagnosticList {
+    /// Turns the diagnostic list into a result type, the `Ok` variant is
+    /// returned if none of the diagnostics are errors or bugs. Otherwise the
+    /// `Err` variant is returned.
+    pub fn into_result(self) -> std::result::Result<DiagnosticList, DiagnosticList> {
+        if self.is_err() {
+            return Err(self)
+        }
+
+        Ok(self)
+    }
+
     /// Returns `true` if there are any errors or bugs in the parsed source.
     pub fn is_err(&self) -> bool {
         self.0.iter().any(|d| d.is_problem())
@@ -276,6 +277,8 @@ impl From<Diagnostic> for DiagnosticList {
 ///
 /// This exists because `Range` doesn't implement `Copy` and to make it easy to
 /// convert other types into spans.
+///
+/// Similar to `Range`, the range is half-open, meaning `end` is exclusive.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Span {
     pub start: usize,
@@ -450,7 +453,30 @@ impl Into<diagnostic::Label<()>> for Label {
             style,
             file_id: (),
             range: self.span.into(),
-            message: self.message.to_string(),
+            message: self.message,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_span_from_range() {
+        let range = 10..20;
+        let span = Span::from(range);
+
+        assert_eq!(span.start, 10);
+        assert_eq!(span.end, 20);
+    }
+ 
+    #[test]
+    fn test_span_from_range_inclusive() {
+        let range = 10..=20;
+        let span = Span::from(range);
+
+        assert_eq!(span.start, 10);
+        assert_eq!(span.end, 21);
     }
 }

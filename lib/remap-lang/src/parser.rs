@@ -6,7 +6,7 @@ use crate::{
         self, function, if_statement::IfCondition, Arithmetic, Array, Assignment, Block, Function,
         IfStatement, Literal, Map, Noop, Not, Path, Target, Variable,
     },
-    path, state, value, Expr, Expression, Function as Fn, Operator, Value,
+    path, state, Expr, Expression, Function as Fn, Operator, Value,
 };
 use pest::error::InputLocation;
 use pest::iterators::{Pair, Pairs};
@@ -174,7 +174,7 @@ impl<T: Into<Expr>> From<ParsedNode<T>> for ParsedExpression {
 /// Similar to [`ParsedExpression`] except that it is private, generic over `T`
 /// and has an expanded API used within the parser.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct ParsedNode<T> {
+struct ParsedNode<T> {
     span: Span,
     inner: T,
 }
@@ -381,7 +381,7 @@ impl<'a> Parser<'a> {
     fn pairs_from_str<'b>(&mut self, rule: R, source: &'b str) -> IResult<Pairs<'b, R>> {
         use pest::Parser;
 
-        let span = 0..source.bytes().len() - 1;
+        let span = Span::from(source);
         let pairs = match Self::parse(rule, source) {
             Ok(pairs) => pairs,
             Err(err) => {
@@ -691,17 +691,7 @@ impl<'a> Parser<'a> {
                 .into()),
             R::array => self.array_from_pair(pair).map(ParsedNode::to_expr),
             R::map => self.map_from_pair(pair).map(ParsedNode::to_expr),
-            R::regex => Ok((
-                span,
-                // If regex parsing fails, a diagnostic message is recorded, and
-                // we turn the regex into a no-op expression to allow parsing to
-                // continue.
-                match self.regex_from_pair(pair)?.into_inner() {
-                    Ok(regex) => regex.into(),
-                    Err(_) => value!(null),
-                },
-            )
-                .into()),
+            R::regex => self.regex_from_pair(pair).map(ParsedNode::to_expr),
             _ => Err(e(R::value, &pair)),
         }
     }
@@ -711,19 +701,10 @@ impl<'a> Parser<'a> {
 
         let expressions = pair
             .into_inner()
-            .map(|pair| self.expression_from_pair(pair))
+            .map(|pair| self.expression_from_pair(pair).map(ParsedNode::into_inner))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok((
-            span,
-            Array::new(
-                expressions
-                    .into_iter()
-                    .map(ParsedNode::into_inner)
-                    .collect(),
-            ),
-        )
-            .into())
+        Ok((span, Array::new(expressions)).into())
     }
 
     fn map_from_pair(&mut self, pair: Pair<R>) -> IResult<Map> {
@@ -747,7 +728,7 @@ impl<'a> Parser<'a> {
         let pair = inner.next().ok_or(e(R::kv_pair, span))?;
         let (expr_span, expr) = self.expression_from_pair(pair)?.take();
 
-        Ok((Span::new(key_span.start, expr_span.end), (key, expr)).into())
+        Ok((key_span.start..expr_span.end, (key, expr)).into())
     }
 
     /// Parse function call expressions.
@@ -767,8 +748,6 @@ impl<'a> Parser<'a> {
             }
             _ => false,
         };
-
-        // FIXME: add required diagnostics.
 
         let (arguments_span, arguments) = inner
             .next()
@@ -864,7 +843,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a [`Regex`] value
-    fn regex_from_pair(&mut self, pair: Pair<R>) -> IResult<Result<Regex, ()>> {
+    fn regex_from_pair(&mut self, pair: Pair<R>) -> IResult<Regex> {
         let span = Span::from(&pair);
         let mut inner = pair.into_inner();
 
@@ -889,7 +868,7 @@ impl<'a> Parser<'a> {
             })
             .unwrap_or_default();
 
-        let result = RegexBuilder::new(&pattern)
+        let regex = RegexBuilder::new(&pattern)
             .case_insensitive(i)
             .multi_line(m)
             .ignore_whitespace(x)
@@ -902,14 +881,16 @@ impl<'a> Parser<'a> {
                     .unwrap_or_else(|| "unknown error")
                     .to_owned();
 
+                // Record error diagnostic for invalid regex.
                 self.diagnostics.push(
                     Diagnostic::error("regex parsing unsuccessful")
                         .with_primary("invalid regex", span)
                         .with_primary(format!("error: {}", error), span),
                 )
-            });
+            })
+            .unwrap_or_else(|_| Regex::new("").unwrap());
 
-        Ok((span, result).into())
+        Ok((span, regex).into())
     }
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"
@@ -1089,7 +1070,7 @@ impl<'a> Parser<'a> {
             }
             Err(_) => {
                 self.compiler_state.revert_changes();
-                Err(span_with_noop(span))
+                Err(Ok((span, Noop).into()))
             }
         }
     }
@@ -1127,10 +1108,6 @@ impl<'a> Parser<'a> {
 }
 
 // -----------------------------------------------------------------------------
-
-fn span_with_noop<S: Into<Span>>(span: S) -> IResult<Expr> {
-    Ok((span, Noop).into())
-}
 
 #[inline]
 fn e(rule: R, span: impl Into<Span>) -> ParserBug {

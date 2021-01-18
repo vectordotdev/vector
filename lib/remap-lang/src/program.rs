@@ -77,8 +77,6 @@ impl Program {
             }
         }
 
-        // TODO: this should point to the exact expression that is fallible,
-        // not the entire root expression.
         expressions
             .iter()
             .filter(|e| e.type_def(&state).is_fallible())
@@ -91,16 +89,14 @@ impl Program {
                 )
             });
 
-        if diagnostics.is_err() {
-            return Err(diagnostics);
-        }
-
         let program = Self {
             source,
             expressions,
         };
 
-        Ok((program, diagnostics))
+        diagnostics
+            .into_result()
+            .map(|diagnostics| (program, diagnostics))
     }
 
     pub fn expressions(&self) -> &[ParsedExpression] {
@@ -210,11 +206,10 @@ mod tests {
         ];
 
         for (source, constraint, expect) in cases {
-            let program = Program::new(source, &[], constraint, false)
+            let program = Program::new(source.to_owned(), &[], constraint, false)
                 .map(|_| ())
                 .map_err(|err| diagnostic::Formatter::new(source, err).to_string());
 
-            // assert_eq!(program, expect.map_err(ToOwned::to_owned));
             assert_eq!(program, expect);
         }
     }

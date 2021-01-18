@@ -12,7 +12,7 @@ pub enum Error {
 }
 
 /// Provide easy access to individual [`Segment`]s of a path.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Path {
     segments: Vec<Segment>,
 }

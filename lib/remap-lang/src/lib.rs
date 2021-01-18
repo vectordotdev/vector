@@ -350,7 +350,7 @@ mod tests {
 
         for (script, compile_expected, runtime_expected) in cases {
             let program = Program::new(
-                script,
+                script.to_owned(),
                 &[
                     Box::new(test_functions::RegexPrinter),
                     Box::new(test_functions::EnumValidator),

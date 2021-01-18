@@ -23,7 +23,7 @@ fn main() {
 
         let state = state::Program::default();
         let mut runtime = Runtime::new(state);
-        let program = Program::new(&test.source, &remap_functions::all(), None, true);
+        let program = Program::new(test.source.clone(), &remap_functions::all(), None, true);
         let want = test.result.to_string();
 
         match program {
