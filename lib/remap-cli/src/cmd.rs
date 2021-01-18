@@ -41,7 +41,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
 fn run(opts: &Opts) -> Result<(), Error> {
     // Run the REPL if no script or script file is specified
-    if opts.script.is_none() && opts.script_file.is_none() {
+    if should_open_repl(opts) {
         // If an input file is provided, use that for the REPL objects, otherwise provide a
         // generic default object.
         let repl_objects = match &opts.input_file {
@@ -139,6 +139,10 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     reader.read_to_string(&mut buffer)?;
 
     Ok(buffer)
+}
+
+fn should_open_repl(opts: &Opts) -> bool {
+    opts.script.is_none() && opts.script_file.is_none()
 }
 
 fn default_objects() -> Vec<Value> {
