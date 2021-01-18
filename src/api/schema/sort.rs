@@ -17,7 +17,7 @@ pub struct SortField<T: InputType> {
 
 /// Defines a type as sortable by a given field
 pub trait SortableByField<T: InputType> {
-    fn sort(&self, rhs: &Self, field: &T) -> std::cmp::Ordering;
+    fn sort(&self, rhs: &Self, field: &T) -> Ordering;
 }
 
 /// Performs an in-place sort against a slice of Sortable<T>, with the provided SortField<T>s
