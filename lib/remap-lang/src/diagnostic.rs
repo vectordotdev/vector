@@ -184,7 +184,7 @@ impl DiagnosticList {
     /// `Err` variant is returned.
     pub fn into_result(self) -> std::result::Result<DiagnosticList, DiagnosticList> {
         if self.is_err() {
-            return Err(self)
+            return Err(self);
         }
 
         Ok(self)
@@ -405,12 +405,18 @@ impl fmt::Display for Note {
                     ok, err
                 )
             }
-            SeeFuncDocs(func) => write!(f, 
+            SeeFuncDocs(func) => {
+                write!(f,
                 "see function documentation at: https://master.vector.dev/docs/reference/remap/#{}",
                 func
+            )
+            }
+            SeeErrDocs => f.write_str(
+                "see error handling documentation at: https://vector.dev/docs/reference/vrl/",
             ),
-            SeeErrDocs => f.write_str("see error handling documentation at: https://vector.dev/docs/reference/vrl/"),
-            SeeLangDocs => f.write_str("see language documentation at: https://vector.dev/docs/reference/vrl/"),
+            SeeLangDocs => {
+                f.write_str("see language documentation at: https://vector.dev/docs/reference/vrl/")
+            }
         }
     }
 }
@@ -470,7 +476,7 @@ mod tests {
         assert_eq!(span.start, 10);
         assert_eq!(span.end, 20);
     }
- 
+
     #[test]
     fn test_span_from_range_inclusive() {
         let range = 10..=20;
