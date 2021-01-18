@@ -272,6 +272,12 @@ impl DatnameFilter {
             Self::None => client.query(conditions.as_str(), &[]).await,
         }
     }
+
+    async fn pg_stat_bgwriter(&self, client: &Client) -> Result<Row, PgError> {
+        client
+            .query_one("SELECT * FROM pg_stat_bgwriter", &[])
+            .await
+    }
 }
 
 #[derive(Debug)]
@@ -599,8 +605,9 @@ impl PostgresqlMetrics {
     }
 
     async fn collect_pg_stat_bgwriter(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
-        let row = client
-            .query_one("SELECT * FROM pg_stat_bgwriter", &[])
+        let row = self
+            .datname_filter
+            .pg_stat_bgwriter(client)
             .await
             .context(QueryError)?;
 
