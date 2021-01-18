@@ -47,7 +47,7 @@ components: sources: host_metrics: {
 
     env_vars: {
 		PROCFS_ROOT: {
-			description: "Sets an arbitrary path to the system's Procfs root. Can be used to expose host metrics from within a container."
+			description: "Sets an arbitrary path to the system's Procfs root. Can be used to expose host metrics from within a container. Unset and uses system `/proc` by default."
 			type: string: {
 				default: null
 				examples: ["/mnt/host/proc"]
@@ -55,7 +55,7 @@ components: sources: host_metrics: {
 		}
 
 		SYSFS_ROOT: {
-			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container."
+			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default."
 			type: string: {
                 default: null
 				examples: ["/mnt/host/sys"]
