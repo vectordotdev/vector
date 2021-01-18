@@ -9,7 +9,7 @@ remap: functions: length: {
 			type: ["array", "map", "string"]
 		},
 	]
-	internal_failure_reason: null
+	internal_failure_reasons: []
 	return: ["integer"]
 	category: "Enumerate"
 	description: """
