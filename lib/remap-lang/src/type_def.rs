@@ -167,13 +167,12 @@ impl TypeDef {
     }
 
     pub fn with_constraint(mut self, kind: impl Into<value::Kind>) -> Self {
-        let kind = kind.into();
+        self.kind = kind.into();
 
-        if kind.is_scalar() {
+        if self.kind.is_scalar() {
             self.inner_type_def = None;
         }
 
-        self.kind = kind;
         self
     }
 
