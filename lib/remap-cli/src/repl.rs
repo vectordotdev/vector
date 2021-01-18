@@ -237,8 +237,8 @@ fn print_function_list() {
         .chunks(num_columns)
         .map(|funcs| {
             // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
-            // values when num_columns is 3. And so this logic below is necessary to avoid panics
-            // caused by inappropriately calling funcs.get(_) on a None.
+            // values when num_columns is 3, this logic below is necessary to avoid panics caused
+            // by inappropriately calling funcs.get(_) on a None.
             let mut ids: Vec<Cell> = Vec::new();
 
             for n in 0..num_columns {
@@ -267,6 +267,7 @@ fn open_url(url: &str) {
         );
     }
 }
+
 
 fn show_func_docs(line: &str, pattern: &Regex) {
     // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
