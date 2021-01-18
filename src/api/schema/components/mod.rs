@@ -430,17 +430,10 @@ mod tests {
         }];
         sort::by_fields(&mut components, &fields);
 
-        struct Expect(&'static str);
-        let expectations = [
-            Expect("devnull"),
-            Expect("gen1"),
-            Expect("gen2"),
-            Expect("gen3"),
-            Expect("parse_json"),
-        ];
+        let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
-        for (i, exp) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_name(), exp.0);
+        for (i, name) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_name(), *name);
         }
     }
 
