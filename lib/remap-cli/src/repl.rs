@@ -268,7 +268,6 @@ fn open_url(url: &str) {
     }
 }
 
-
 fn show_func_docs(line: &str, pattern: &Regex) {
     // Unwrap is okay in both cases here, as there's guaranteed to be two matches ("help docs" and
     // "help docs <func_name>")
