@@ -14,8 +14,10 @@ use crate::{
 };
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
-use std::cmp;
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+};
 use tokio::stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
