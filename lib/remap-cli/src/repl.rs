@@ -27,6 +27,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
+    let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
@@ -113,7 +114,12 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                     _ => line,
                 };
 
-                let value = resolve(objects.get_mut(index), &mut rt, command);
+                let value = resolve(
+                    objects.get_mut(index),
+                    &mut rt,
+                    command,
+                    &mut compiler_state,
+                );
                 println!("{}\n", value);
             }
             Err(ReadlineError::Interrupted) => break,
@@ -128,13 +134,24 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     Ok(())
 }
 
-fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &str) -> String {
+fn resolve(
+    object: Option<&mut impl Object>,
+    runtime: &mut Runtime,
+    program: &str,
+    state: &mut state::Compiler,
+) -> String {
     let object = match object {
         None => return Value::Null.to_string(),
         Some(object) => object,
     };
 
-    let program = match Program::new(program.to_owned(), &remap_functions::all(), None, true) {
+    let program = match Program::new_with_state(
+        program.to_owned(),
+        &remap_functions::all(),
+        None,
+        true,
+        state,
+    ) {
         Ok((program, _)) => program,
         Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };

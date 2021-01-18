@@ -37,14 +37,14 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new(
+    pub fn new_with_state(
         source: String,
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
         allow_regex_return: bool, // TODO: move this into a builder pattern
+        state: &mut state::Compiler,
     ) -> diagnostic::Result<Self> {
-        let mut state = state::Compiler::default();
-        let parser = Parser::new(function_definitions, &mut state, allow_regex_return);
+        let parser = Parser::new(function_definitions, state, allow_regex_return);
 
         let (expressions, mut diagnostics) = parser.program_from_str(&source)?;
 
@@ -97,6 +97,22 @@ impl Program {
         diagnostics
             .into_result()
             .map(|diagnostics| (program, diagnostics))
+    }
+
+    pub fn new(
+        source: String,
+        function_definitions: &[Box<dyn Function>],
+        constraint: Option<TypeConstraint>,
+        allow_regex_return: bool, // TODO: move this into a builder pattern
+    ) -> diagnostic::Result<Self> {
+        let mut state = state::Compiler::default();
+        Self::new_with_state(
+            source,
+            function_definitions,
+            constraint,
+            allow_regex_return,
+            &mut state,
+        )
     }
 
     pub fn expressions(&self) -> &[ParsedExpression] {
