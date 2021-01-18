@@ -18,9 +18,6 @@ remap: functions: length: {
 		* If an array, the size of the array
 		* If a string, the number of bytes in the string
 		* If a map, the number of keys in the map (nested keys are ignored)
-
-		Please note that if the array size, string length, or number of keys in the map exceeds the
-		maximum 64-bit signed integer value of 9223372036854775807, the return value is wrapped.
 		"""
 	examples: [
 		{
