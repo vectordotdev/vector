@@ -4,7 +4,7 @@ use crate::{
     internal_events::RemapConditionExecutionError,
     Event,
 };
-use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
+use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -40,8 +40,12 @@ impl ConditionConfig for RemapConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let program = Program::new(&self.source, &functions, Some(constraint), false)
-            .map_err(|e| e.to_string())?;
+        let (program, _) = Program::new(self.source.clone(), &functions, Some(constraint), false)
+            .map_err(|diagnostics| {
+            remap::Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -55,7 +59,7 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<remap::Value, RemapError> {
+    fn run(&self, event: &Event) -> remap::RuntimeResult {
         // TODO(jean): This clone exists until remap-lang has an "immutable"
         // mode.
         //
@@ -69,15 +73,15 @@ impl Remap {
         //
         // see: https://github.com/timberio/vector/issues/4744
         match event {
-            Event::Log(event) => Runtime::default().execute(&mut event.clone(), &self.program),
-            Event::Metric(event) => Runtime::default().execute(&mut event.clone(), &self.program),
+            Event::Log(event) => Runtime::default().run(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().run(&mut event.clone(), &self.program),
         }
     }
 }
 
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
-        self.execute(&event)
+        self.run(&event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => unreachable!("boolean type constraint set"),
@@ -90,7 +94,7 @@ impl Condition for Remap {
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         let value = self
-            .execute(event)
+            .run(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?;
 
         match value {
@@ -124,7 +128,7 @@ mod test {
             ),
             (
                 log_event!["foo" => true, "bar" => false],
-                "to_bool(.bar || .foo)",
+                "to_bool(.bar || .foo) ?? false",
                 Ok(()),
                 Ok(()),
             ),
@@ -137,19 +141,19 @@ mod test {
             (
                 log_event![],
                 "null",
-                Err("remap error: program error: expected to resolve to an error, or boolean value, but instead resolves to null value"),
+                Err("error: unexpected return value\n  ┌─ :1:1\n  │\n1 │ null\n  │ ^^^^\n  │ │\n  │ got: null\n  │ expected: boolean\n  │\n  = see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
                 Ok(()),
             ),
             (
                 log_event!["foo" => "string"],
                 ".foo",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
+                Err("error: unexpected return value\n  ┌─ :1:1\n  │\n1 │ .foo\n  │ ^^^^\n  │ │\n  │ got: any\n  │ expected: boolean\n  │\n  = see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
                 Ok(()),
             ),
             (
                 log_event![],
                 ".",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
+                Err("error: unexpected return value\n  ┌─ :1:1\n  │\n1 │ .\n  │ ^\n  │ │\n  │ got: any\n  │ expected: boolean\n  │\n  = see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
                 Ok(()),
             ),
             (

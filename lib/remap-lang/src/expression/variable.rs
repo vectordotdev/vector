@@ -1,17 +1,5 @@
-use crate::{
-    expression::{path, Error as ExprErr, Path},
-    state, Error as E, Expression, Object, Result, TypeDef, Value,
-};
+use crate::{expression::Path, state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error(transparent)]
-    Query(#[from] path::Error),
-
-    #[error("unknown error: {0}")]
-    Unknown(String),
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
@@ -54,14 +42,7 @@ impl Expression for Variable {
         let mut value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
 
         if let Some(path) = &self.path {
-            return path.execute(state, &mut value).map_err(|err| {
-                let err = match err {
-                    E::Expression(ExprErr::Path(err)) => Error::Query(err),
-                    _ => Error::Unknown(err.to_string()),
-                };
-
-                ExprErr::Variable(self.ident.clone(), err).into()
-            });
+            return path.execute(state, &mut value);
         }
 
         Ok(value)

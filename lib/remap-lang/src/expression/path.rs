@@ -1,15 +1,6 @@
 use crate::{path, state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("missing path: {0}")]
-    Missing(String),
-
-    #[error("unable to resolve path: {0}")]
-    Resolve(String),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
     path: path::Path,
@@ -95,7 +86,6 @@ mod tests {
         exact_match {
             expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef {
-                    fallible: true,
                     kind: Kind::Bytes,
                     ..Default::default()
                 });
@@ -103,7 +93,6 @@ mod tests {
                 Path::from("foo")
             },
             def: TypeDef {
-                fallible: true,
                 kind: Kind::Bytes,
                 ..Default::default()
             },
@@ -111,25 +100,16 @@ mod tests {
 
         ident_mismatch {
             expr: |state: &mut state::Compiler| {
-                state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef {
-                    fallible: true,
-                    ..Default::default()
-                });
+                state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef::default());
 
                 Path::from("bar")
             },
-            def: TypeDef {
-                fallible: true,
-                ..Default::default()
-            },
+            def: TypeDef::default(),
         }
 
         empty_state {
             expr: |_| Path::from("foo"),
-            def: TypeDef {
-                fallible: true,
-                ..Default::default()
-            },
+            def: TypeDef::default(),
         }
     ];
 }

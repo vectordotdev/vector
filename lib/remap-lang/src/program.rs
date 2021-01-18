@@ -1,20 +1,8 @@
 use crate::{
     diagnostic::{self, Note},
-    parser::{self, ParsedExpression, Parser},
+    parser::{ParsedExpression, Parser},
     state, value, Diagnostic, Expression, Function, TypeDef,
 };
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("unable to parse program")]
-    Parse(#[from] parser::Error),
-
-    #[error("unexpected return value")]
-    ReturnValue { want: value::Kind, got: value::Kind },
-
-    #[error("expected to be infallible, but is not")]
-    Fallible,
-}
 
 /// The constraint applied to the result of a program.
 pub struct TypeConstraint {
@@ -43,14 +31,14 @@ pub struct TypeConstraint {
 /// You can create a program using [`Program::from_str`]. The provided string
 /// will be parsed. If parsing fails, an [`Error`] is returned.
 #[derive(Debug, Clone)]
-pub struct Program<'a> {
-    pub(crate) source: &'a str,
+pub struct Program {
+    pub(crate) source: String,
     pub(crate) expressions: Vec<ParsedExpression>,
 }
 
-impl<'a> Program<'a> {
+impl Program {
     pub fn new(
-        source: &'a str,
+        source: String,
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
         allow_regex_return: bool, // TODO: move this into a builder pattern
@@ -58,7 +46,7 @@ impl<'a> Program<'a> {
         let mut state = state::Compiler::default();
         let parser = Parser::new(function_definitions, &mut state, allow_regex_return);
 
-        let (expressions, mut diagnostics) = parser.program_from_str(source)?;
+        let (expressions, mut diagnostics) = parser.program_from_str(&source)?;
 
         // optional type constraint checking
         if let Some(constraint) = constraint {
@@ -107,13 +95,12 @@ impl<'a> Program<'a> {
             return Err(diagnostics);
         }
 
-        Ok((
-            Self {
-                source,
-                expressions,
-            },
-            diagnostics,
-        ))
+        let program = Self {
+            source,
+            expressions,
+        };
+
+        Ok((program, diagnostics))
     }
 
     pub fn expressions(&self) -> &[ParsedExpression] {
@@ -125,18 +112,13 @@ impl<'a> Program<'a> {
 mod tests {
     use super::*;
     use crate::value;
-    use std::error::Error;
 
     #[test]
     fn program_test() {
         use value::Kind;
 
         let cases = vec![
-            (
-                ".foo",
-                None,
-                Ok(()),
-            ),
+            (".foo", None, Ok(())),
             // "any" value is allowed
             (
                 ".foo",
@@ -150,92 +132,90 @@ mod tests {
                 }),
                 Ok(()),
             ),
-            // "any" value is allowed, but resolves to non-allowed kind
-            (
-                "42",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: false,
-                        kind: Kind::Boolean,
-                        ..Default::default()
-                    },
-                    allow_any: true,
-                }),
-                Err("expected to resolve to boolean value, but instead resolves to integer value"),
-            ),
-            // "any" value is disallowed, and resolves to any
-            (
-                ".foo",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: true,
-                        kind: Kind::Boolean,
-                        ..Default::default()
-                    },
-                    allow_any: false,
-                }),
-                Err("expected to resolve to boolean value, but instead resolves to any value"),
-            ),
-            // The final expression is infallible, but the first one isn't, so
-            // this isn't allowed.
-            (
-                ".foo\ntrue",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: false,
-                        ..Default::default()
-                    },
-                    allow_any: false,
-                }),
-                Err("expected to be infallible, but is not"),
-            ),
-            (
-                ".foo",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: false,
-                        ..Default::default()
-                    },
-                    allow_any: false,
-                }),
-                Err("expected to resolve to any value, but instead resolves to an error, or any value"),
-            ),
-            (
-                ".foo",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: false,
-                        kind: Kind::Bytes,
-                        ..Default::default()
-                    },
-                    allow_any: false,
-                }),
-                Err("expected to resolve to string value, but instead resolves to an error, or any value"),
-            ),
-            (
-                "false || 2",
-                Some(TypeConstraint {
-                    type_def: TypeDef {
-                        fallible: false,
-                        kind: Kind::Bytes | Kind::Float,
-                        ..Default::default()
-                    },
-                    allow_any: false,
-                }),
-                Err("expected to resolve to string or float values, but instead resolves to integer or boolean values"),
-            ),
+            // TODO: move to `remap-tests`
+            // // "any" value is allowed, but resolves to non-allowed kind
+            // (
+            //     "42",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: false,
+            //             kind: Kind::Boolean,
+            //             ..Default::default()
+            //         },
+            //         allow_any: true,
+            //     }),
+            //     Err("expected to resolve to boolean value, but instead resolves to integer value"),
+            // ),
+            // // "any" value is disallowed, and resolves to any
+            // (
+            //     ".foo",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: true,
+            //             kind: Kind::Boolean,
+            //             ..Default::default()
+            //         },
+            //         allow_any: false,
+            //     }),
+            //     Err("expected to resolve to boolean value, but instead resolves to any value"),
+            // ),
+            // // The final expression is infallible, but the first one isn't, so
+            // // this isn't allowed.
+            // (
+            //     ".foo\ntrue",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: false,
+            //             ..Default::default()
+            //         },
+            //         allow_any: false,
+            //     }),
+            //     Err("expected to be infallible, but is not"),
+            // ),
+            // (
+            //     ".foo",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: false,
+            //             ..Default::default()
+            //         },
+            //         allow_any: false,
+            //     }),
+            //     Err("expected to resolve to any value, but instead resolves to an error, or any value"),
+            // ),
+            // (
+            //     ".foo",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: false,
+            //             kind: Kind::Bytes,
+            //             ..Default::default()
+            //         },
+            //         allow_any: false,
+            //     }),
+            //     Err("expected to resolve to string value, but instead resolves to an error, or any value"),
+            // ),
+            // (
+            //     "false || 2",
+            //     Some(TypeConstraint {
+            //         type_def: TypeDef {
+            //             fallible: false,
+            //             kind: Kind::Bytes | Kind::Float,
+            //             ..Default::default()
+            //         },
+            //         allow_any: false,
+            //     }),
+            //     Err("expected to resolve to string or float values, but instead resolves to integer or boolean values"),
+            // ),
         ];
 
         for (source, constraint, expect) in cases {
             let program = Program::new(source, &[], constraint, false)
                 .map(|_| ())
-                .map_err(|e| {
-                    e.source()
-                        .and_then(|e| e.source().map(|e| e.to_string()))
-                        .unwrap()
-                });
+                .map_err(|err| diagnostic::Formatter::new(source, err).to_string());
 
-            assert_eq!(program, expect.map_err(ToOwned::to_owned));
+            // assert_eq!(program, expect.map_err(ToOwned::to_owned));
+            assert_eq!(program, expect);
         }
     }
 }

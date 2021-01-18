@@ -11,11 +11,6 @@ use std::fmt;
 pub enum Error {
     #[error("unable to insert value in path: {0}")]
     PathInsertion(String),
-
-    #[error(
-        r#"the {0} "{1}" does not need to handle the error-case, because its result is infallible"#
-    )]
-    UnneededInfallibleAssignment(&'static str, String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

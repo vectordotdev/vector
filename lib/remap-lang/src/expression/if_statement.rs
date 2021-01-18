@@ -85,18 +85,14 @@ impl Expression for IfStatement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        expression::{Literal, Noop},
-        lit, test_type_def,
-        value::Kind,
-    };
+    use crate::{expression::Noop, lit, test_type_def, value::Kind};
 
     test_type_def![
         concrete_type_def {
-            expr: |state: &mut state::Compiler| {
-                let conditional = IfCondition(lit!(true).boxed());
-                let true_expression = Exor::from(lit!(true)).boxed();
-                let false_expression = Expr::from(lit!(true)).boxed();
+            expr: |_| {
+                let conditional = IfCondition(Box::new(lit!(true).into()));
+                let true_expression = Box::new(lit!(true).into());
+                let false_expression = Box::new(lit!(true).into());
 
                 IfStatement::new(conditional, true_expression, false_expression)
             },
@@ -107,9 +103,9 @@ mod tests {
         }
 
         optional_null {
-            expr: |state: &mut state::Compiler| {
-                let conditional = IfCondition(lit!(true).boxed());
-                let true_expression = Exor::from(lit!(true)).boxed();
+            expr: |_| {
+                let conditional = IfCondition(Box::new(lit!(true).into()));
+                let true_expression = Box::new(lit!(true).into());
                 let false_expression = Box::new(Noop.into());
 
                 IfStatement::new(conditional, true_expression, false_expression)

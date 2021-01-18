@@ -24,6 +24,11 @@ impl<'a> Formatter<'a> {
         }
     }
 
+    pub fn colored(mut self) -> Self {
+        self.color = true;
+        self
+    }
+
     pub fn enable_colors(&mut self, color: bool) {
         self.color = color
     }
@@ -43,6 +48,8 @@ impl<'a> fmt::Display for Formatter<'a> {
         } else {
             Buffer::no_color()
         };
+
+        f.write_str("\n")?;
 
         for diagnostic in self.diagnostics.iter() {
             term::emit(&mut buffer, &config, &file, &diagnostic.to_owned().into())
@@ -94,18 +101,16 @@ impl Diagnostic {
         }
     }
 
+    pub fn with_primary(self, message: impl ToString, span: impl Into<Span>) -> Self {
+        self.with_label(Label::primary(message, span.into()))
+    }
+
+    pub fn with_context(self, message: impl ToString, span: impl Into<Span>) -> Self {
+        self.with_label(Label::context(message, span.into()))
+    }
+
     pub fn with_label(mut self, label: Label) -> Self {
         self.labels.push(label);
-        self
-    }
-
-    pub fn with_primary(mut self, message: impl ToString, span: impl Into<Span>) -> Self {
-        self.labels.push(Label::primary(message, span.into()));
-        self
-    }
-
-    pub fn with_context(mut self, message: impl ToString, span: impl Into<Span>) -> Self {
-        self.labels.push(Label::context(message, span.into()));
         self
     }
 
