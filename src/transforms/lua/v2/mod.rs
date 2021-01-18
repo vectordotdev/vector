@@ -784,27 +784,27 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        });
+        let event = Event::Metric(Metric::new(
+            "example counter".into(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
 
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        let expected = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 2.0 },
-        });
+        let expected = Event::Metric(Metric::new(
+            "example counter".into(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 2.0 },
+        ));
 
         assert_eq!(output, expected);
         Ok(())

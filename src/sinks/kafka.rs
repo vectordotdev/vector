@@ -285,7 +285,7 @@ impl Sink<Event> for KafkaSink {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
                 .and_then(|v| v.as_timestamp()),
-            Event::Metric(metric) => metric.timestamp.as_ref(),
+            Event::Metric(metric) => metric.data.timestamp.as_ref(),
         }
         .map(|ts| ts.timestamp_millis());
         let (key, body) = encode_event(item, &self.key_field, &self.encoding);
@@ -403,8 +403,7 @@ fn encode_event(
         .and_then(|f| match &event {
             Event::Log(log) => log.get(f).map(|value| value.as_bytes().to_vec()),
             Event::Metric(metric) => metric
-                .tags
-                .as_ref()
+                .tags()
                 .and_then(|tags| tags.get(f))
                 .map(|value| value.clone().into_bytes()),
         })
@@ -479,14 +478,14 @@ mod tests {
 
     #[test]
     fn kafka_encode_event_metric_text() {
-        let metric = Metric {
-            name: "kafka-metric".to_owned(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.0 },
-        };
+        let metric = Metric::new(
+            "kafka-metric".to_owned(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.0 },
+        );
         let (key_bytes, bytes) = encode_event(
             metric.clone().into(),
             &None,
@@ -499,14 +498,14 @@ mod tests {
 
     #[test]
     fn kafka_encode_event_metric_json() {
-        let metric = Metric {
-            name: "kafka-metric".to_owned(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.0 },
-        };
+        let metric = Metric::new(
+            "kafka-metric".to_owned(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.0 },
+        );
         let (key_bytes, bytes) = encode_event(
             metric.clone().into(),
             &None,

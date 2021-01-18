@@ -237,14 +237,7 @@ impl From<proto::EventWrapper> for Event {
                     },
                 };
 
-                Event::Metric(Metric {
-                    name,
-                    namespace,
-                    timestamp,
-                    tags,
-                    kind,
-                    value,
-                })
+                Event::Metric(Metric::new(name, namespace, timestamp, tags, kind, value))
             }
         }
     }
@@ -296,30 +289,24 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric {
-                name,
-                namespace,
-                timestamp,
-                tags,
-                kind,
-                value,
-            }) => {
-                let namespace = namespace.unwrap_or_default();
+            Event::Metric(Metric { series, data }) => {
+                let name = series.name.name;
+                let namespace = series.name.namespace.unwrap_or_default();
 
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let tags = tags.unwrap_or_default();
+                let tags = series.tags.unwrap_or_default();
 
-                let kind = match kind {
+                let kind = match data.kind {
                     MetricKind::Incremental => proto::metric::Kind::Incremental,
                     MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let metric = match value {
+                let metric = match data.value {
                     MetricValue::Counter { value } => {
                         MetricProto::Counter(proto::Counter { value })
                     }

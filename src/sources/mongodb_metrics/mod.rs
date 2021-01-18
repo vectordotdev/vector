@@ -288,14 +288,14 @@ impl MongoDBMetrics {
         value: MetricValue,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(tags),
-            kind: MetricKind::Absolute,
+        Metric::new(
+            name.into(),
+            self.namespace.clone(),
+            Some(Utc::now()),
+            Some(tags),
+            MetricKind::Absolute,
             value,
-        }
+        )
     }
 
     async fn collect(&self) -> stream::BoxStream<'static, Metric> {
@@ -1084,12 +1084,12 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
             // validate namespace
-            assert!(metric.namespace == Some(namespace.to_string()));
+            assert!(metric.namespace() == Some(namespace));
             // validate timestamp
-            let timestamp = metric.timestamp.expect("existed timestamp");
+            let timestamp = metric.data.timestamp.expect("existed timestamp");
             assert!((timestamp - Utc::now()).num_seconds() < 1);
             // validate basic tags
-            let tags = metric.tags.expect("existed tags");
+            let tags = metric.tags().expect("existed tags");
             assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
             assert_eq!(tags.get("host"), Some(&host));
         }

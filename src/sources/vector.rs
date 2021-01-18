@@ -172,14 +172,14 @@ mod test {
             Event::from("sink"),
             Event::from("and"),
             Event::from("source"),
-            Event::Metric(Metric {
-                name: String::from("also test a metric"),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 1.0 },
-            }),
+            Event::Metric(Metric::new(
+                String::from("also test a metric"),
+                None,
+                None,
+                None,
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )),
         ];
 
         sink.run(stream::iter(events.clone())).await.unwrap();

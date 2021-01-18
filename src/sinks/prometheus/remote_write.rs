@@ -325,11 +325,11 @@ mod tests {
     }
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
-        Event::Metric(Metric {
+        Event::Metric(Metric::new(
             name,
-            namespace: None,
-            timestamp: Some(chrono::Utc::now()),
-            tags: Some(
+            None,
+            Some(chrono::Utc::now()),
+            Some(
                 vec![
                     ("region".to_owned(), "us-west-1".to_owned()),
                     ("production".to_owned(), "true".to_owned()),
@@ -337,9 +337,9 @@ mod tests {
                 .into_iter()
                 .collect(),
             ),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value },
-        })
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        ))
     }
 }
 
@@ -400,7 +400,7 @@ mod integration_tests {
             let metric = event.into_metric();
             let result = query(
                 url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, &metric.name),
+                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
             )
             .await;
 
@@ -408,17 +408,18 @@ mod integration_tests {
             assert_eq!(metrics.len(), 1);
             let output = &metrics[0];
 
-            match metric.value {
+            match metric.data.value {
                 MetricValue::Gauge { value } => {
                     assert_eq!(output["value"], Value::Number((value as u32).into()))
                 }
                 _ => panic!("Unhandled metric value, fix the test"),
             }
-            for (tag, value) in metric.tags.unwrap() {
-                assert_eq!(output[&tag], Value::String(value));
+            for (tag, value) in metric.tags().unwrap() {
+                assert_eq!(output[&tag[..]], Value::String(value.to_string()));
             }
             let timestamp = strip_timestamp(
                 metric
+                    .data
                     .timestamp
                     .unwrap()
                     .format("%Y-%m-%dT%H:%M:%S%.3fZ")

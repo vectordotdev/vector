@@ -189,14 +189,14 @@ fn apache_metrics(
                                     Utc::now(),
                                     Some(&tags),
                                 )
-                                .chain(vec![Ok(Metric {
-                                    name: "up".into(),
-                                    namespace: namespace.clone(),
-                                    timestamp: Some(Utc::now()),
-                                    tags: Some(tags.clone()),
-                                    kind: MetricKind::Absolute,
-                                    value: MetricValue::Gauge { value: 1.0 },
-                                })]);
+                                .chain(vec![Ok(Metric::new(
+                                    "up".into(),
+                                    namespace.clone(),
+                                    Some(Utc::now()),
+                                    Some(tags.clone()),
+                                    MetricKind::Absolute,
+                                    MetricValue::Gauge { value: 1.0 },
+                                ))]);
 
                                 let metrics = results
                                     .filter_map(|res| match res {
@@ -223,14 +223,14 @@ fn apache_metrics(
                                     url: &sanitized_url,
                                 });
                                 Some(
-                                    stream::iter(vec![Metric {
-                                        name: "up".into(),
-                                        namespace: namespace.clone(),
-                                        timestamp: Some(Utc::now()),
-                                        tags: Some(tags.clone()),
-                                        kind: MetricKind::Absolute,
-                                        value: MetricValue::Gauge { value: 1.0 },
-                                    }])
+                                    stream::iter(vec![Metric::new(
+                                        "up".into(),
+                                        namespace.clone(),
+                                        Some(Utc::now()),
+                                        Some(tags.clone()),
+                                        MetricKind::Absolute,
+                                        MetricValue::Gauge { value: 1.0 },
+                                    )])
                                     .map(Event::Metric)
                                     .map(Ok),
                                 )
@@ -241,14 +241,14 @@ fn apache_metrics(
                                     url: &sanitized_url
                                 });
                                 Some(
-                                    stream::iter(vec![Metric {
-                                        name: "up".into(),
-                                        namespace: namespace.clone(),
-                                        timestamp: Some(Utc::now()),
-                                        tags: Some(tags.clone()),
-                                        kind: MetricKind::Absolute,
-                                        value: MetricValue::Gauge { value: 0.0 },
-                                    }])
+                                    stream::iter(vec![Metric::new(
+                                        "up".into(),
+                                        namespace.clone(),
+                                        Some(Utc::now()),
+                                        Some(tags.clone()),
+                                        MetricKind::Absolute,
+                                        MetricValue::Gauge { value: 0.0 },
+                                    )])
                                     .map(Event::Metric)
                                     .map(Ok),
                                 )
@@ -365,11 +365,11 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "up") {
+        match metrics.iter().find(|m| m.name() == "up") {
             Some(m) => {
-                assert_eq!(m.value, MetricValue::Gauge { value: 1.0 });
+                assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 });
 
-                match &m.tags {
+                match m.tags() {
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
@@ -434,8 +434,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // we still publish `up=1` for bad status codes following the pattern of the Prometheus exporter:
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
-        match metrics.iter().find(|m| m.name == "up") {
-            Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
+        match metrics.iter().find(|m| m.name() == "up") {
+            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 1.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
@@ -470,8 +470,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "up") {
-            Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
+        match metrics.iter().find(|m| m.name() == "up") {
+            Some(m) => assert_eq!(m.data.value, MetricValue::Gauge { value: 0.0 }),
             None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }

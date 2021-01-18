@@ -152,192 +152,192 @@ fn line_to_metrics<'a>(
 ) -> Option<Result<Box<dyn Iterator<Item = Metric> + 'a>, ParseError>> {
     StatusFieldStatistic::from_key_value(key, value).map(move |result| {
         result.map(move |statistic| match statistic {
-            StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric {
-                name: "uptime_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: tags.cloned(),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
+            StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric::new(
+                "uptime_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                tags.cloned(),
+                MetricKind::Absolute,
+                MetricValue::Counter {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric {
-                name: "access_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: tags.cloned(),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
+            ))),
+            StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric::new(
+                "access_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                tags.cloned(),
+                MetricKind::Absolute,
+                MetricValue::Counter {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric {
-                name: "sent_bytes_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: tags.cloned(),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
+            ))),
+            StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric::new(
+                "sent_bytes_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                tags.cloned(),
+                MetricKind::Absolute,
+                MetricValue::Counter {
                     value: (value * 1024) as f64,
                 },
-            })),
-            StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric {
-                name: "duration_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: tags.cloned(),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
+            ))),
+            StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric::new(
+                "duration_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                tags.cloned(),
+                MetricKind::Absolute,
+                MetricValue::Counter {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(Metric {
-                name: "cpu_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            ))),
+            StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(Metric::new(
+                "cpu_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "user".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }))
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(Metric {
-                name: "cpu_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(Metric::new(
+                "cpu_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "system".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }))
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(Metric {
-                name: "cpu_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(Metric::new(
+                "cpu_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "children_user".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }))
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(Metric {
-                name: "cpu_seconds_total".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(Metric::new(
+                "cpu_seconds_total".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "children_system".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }))
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric {
-                name: "cpu_load".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: tags.cloned(),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            }))
+            StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric::new(
+                "cpu_load".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                tags.cloned(),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::IdleWorkers(value) => Box::new(iter::once(Metric {
-                name: "workers".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            StatusFieldStatistic::IdleWorkers(value) => Box::new(iter::once(Metric::new(
+                "workers".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "idle".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            }))
+            )))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::BusyWorkers(value) => Box::new(iter::once(Metric {
-                name: "workers".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            StatusFieldStatistic::BusyWorkers(value) => Box::new(iter::once(Metric::new(
+                "workers".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "busy".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::ConnsTotal(value) => Box::new(iter::once(Metric {
-                name: "connections".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            ))),
+            StatusFieldStatistic::ConnsTotal(value) => Box::new(iter::once(Metric::new(
+                "connections".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "total".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::ConnsAsyncWriting(value) => Box::new(iter::once(Metric {
-                name: "connections".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            ))),
+            StatusFieldStatistic::ConnsAsyncWriting(value) => Box::new(iter::once(Metric::new(
+                "connections".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "writing".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::ConnsAsyncClosing(value) => Box::new(iter::once(Metric {
-                name: "connections".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            ))),
+            StatusFieldStatistic::ConnsAsyncClosing(value) => Box::new(iter::once(Metric::new(
+                "connections".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "closing".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            })),
-            StatusFieldStatistic::ConnsAsyncKeepAlive(value) => Box::new(iter::once(Metric {
-                name: "connections".into(),
-                namespace: namespace.map(str::to_string),
-                timestamp: Some(now),
-                tags: {
+            ))),
+            StatusFieldStatistic::ConnsAsyncKeepAlive(value) => Box::new(iter::once(Metric::new(
+                "connections".into(),
+                namespace.map(str::to_string),
+                Some(now),
+                {
                     let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "keepalive".to_string());
                     Some(tags)
                 },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: value as f64,
                 },
-            })),
+            ))),
             StatusFieldStatistic::Scoreboard(value) => {
                 let scores = value.chars().fold(HashMap::new(), |mut m, c| {
                     *m.entry(c).or_insert(0u32) += 1;
@@ -375,20 +375,20 @@ fn score_to_metric(
     state: &str,
     count: u32,
 ) -> Metric {
-    Metric {
-        name: "scoreboard".into(),
-        namespace: namespace.map(str::to_string),
-        timestamp: Some(now),
-        tags: {
+    Metric::new(
+        "scoreboard".into(),
+        namespace.map(str::to_string),
+        Some(now),
+        {
             let mut tags = tags.cloned().unwrap_or_default();
             tags.insert("state".to_string(), state.to_string());
             Some(tags)
         },
-        kind: MetricKind::Absolute,
-        value: MetricValue::Gauge {
+        MetricKind::Absolute,
+        MetricValue::Gauge {
             value: count.into(),
         },
-    }
+    )
 }
 
 #[derive(Debug)]
@@ -508,155 +508,155 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
+        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
         assert_eq!(
             metrics,
             vec![
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "closing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "keepalive"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "total"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "writing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "closing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "dnslookup"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "finishing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "idle_cleanup"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "keepalive"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "logging"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "open"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 325.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "reading"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "sending"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "starting"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "waiting"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 64.0 },
-                },
-                Metric {
-                    name: "uptime_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 12.0 },
-                },
-                Metric {
-                    name: "workers".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "busy"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "workers".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "idle"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 74.0 },
-                },
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "closing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "keepalive"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "total"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "writing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "closing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "dnslookup"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "finishing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "idle_cleanup"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 2.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "keepalive"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 2.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "logging"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "open"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 325.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "reading"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "sending"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "starting"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "waiting"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 64.0 },
+                ),
+                Metric::new(
+                    "uptime_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 12.0 },
+                ),
+                Metric::new(
+                    "workers".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "busy"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "workers".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "idle"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 74.0 },
+                ),
             ]
         );
         assert_eq!(errors.len(), 0);
@@ -718,219 +718,219 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
+        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
         assert_eq!(
             metrics,
             vec![
-                Metric {
-                    name: "access_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 30.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "closing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "keepalive"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "total"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "connections".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "writing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "cpu_load".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.846154 },
-                },
-                Metric {
-                    name: "cpu_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"type" => "children_system"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "cpu_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"type" => "children_user"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.0 },
-                },
-                Metric {
-                    name: "cpu_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"type" => "system"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.02 },
-                },
-                Metric {
-                    name: "cpu_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"type" => "user"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.2 },
-                },
-                Metric {
-                    name: "duration_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 11.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "closing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "dnslookup"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "finishing"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "idle_cleanup"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "keepalive"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "logging"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "open"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 325.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "reading"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "sending"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "starting"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "scoreboard".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "waiting"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 64.0 },
-                },
-                Metric {
-                    name: "sent_bytes_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 222208.0 },
-                },
-                Metric {
-                    name: "uptime_seconds_total".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 26.0 },
-                },
-                Metric {
-                    name: "workers".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "busy"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "workers".into(),
-                    namespace: Some("apache".into()),
-                    timestamp: Some(now),
-                    tags: Some(map! {"state" => "idle"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 74.0 },
-                },
+                Metric::new(
+                    "access_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 30.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "closing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "keepalive"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "total"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "connections".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "writing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "cpu_load".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.846154 },
+                ),
+                Metric::new(
+                    "cpu_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"type" => "children_system"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "cpu_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"type" => "children_user"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.0 },
+                ),
+                Metric::new(
+                    "cpu_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"type" => "system"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.02 },
+                ),
+                Metric::new(
+                    "cpu_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"type" => "user"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.2 },
+                ),
+                Metric::new(
+                    "duration_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 11.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "closing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "dnslookup"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "finishing"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "idle_cleanup"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 2.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "keepalive"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 2.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "logging"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "open"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 325.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "reading"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "sending"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "starting"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "scoreboard".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "waiting"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 64.0 },
+                ),
+                Metric::new(
+                    "sent_bytes_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 222208.0 },
+                ),
+                Metric::new(
+                    "uptime_seconds_total".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 26.0 },
+                ),
+                Metric::new(
+                    "workers".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "busy"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                ),
+                Metric::new(
+                    "workers".into(),
+                    Some("apache".into()),
+                    Some(now),
+                    Some(map! {"state" => "idle"}),
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 74.0 },
+                ),
             ]
         );
         assert_eq!(errors.len(), 0);
@@ -955,18 +955,18 @@ ConnsTotal: 1
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
+        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
         assert_eq!(
             metrics,
-            vec![Metric {
-                name: "connections".into(),
-                namespace: Some("apache".into()),
-                timestamp: Some(now),
-                tags: Some(map! {"state" => "total"}),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 1.0 },
-            },]
+            vec![Metric::new(
+                "connections".into(),
+                Some("apache".into()),
+                Some(now),
+                Some(map! {"state" => "total"}),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            ),]
         );
         assert_eq!(errors.len(), 1);
     }

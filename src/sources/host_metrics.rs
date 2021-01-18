@@ -193,7 +193,7 @@ impl HostMetricsConfig {
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
-                (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
+                (metric.series.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
             }
         }
         emit!(HostMetricsEventReceived {
@@ -650,14 +650,14 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.0.clone(),
-            timestamp: Some(timestamp),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value },
-            tags: Some(tags),
-        }
+        Metric::new(
+            name.into(),
+            self.namespace.0.clone(),
+            Some(timestamp),
+            Some(tags),
+            MetricKind::Absolute,
+            MetricValue::Counter { value },
+        )
     }
 
     fn gauge(
@@ -667,14 +667,14 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.0.clone(),
-            timestamp: Some(timestamp),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value },
-            tags: Some(tags),
-        }
+        Metric::new(
+            name.into(),
+            self.namespace.0.clone(),
+            Some(timestamp),
+            Some(tags),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value },
+        )
     }
 }
 
@@ -686,7 +686,7 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
-        (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
+        (metric.series.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
     }
     metrics
 }
@@ -904,7 +904,7 @@ mod tests {
         let hostname = crate::get_hostname().expect("Broken hostname");
         assert!(!metrics.any(|event| event
             .into_metric()
-            .tags
+            .tags()
             .expect("Missing tags")
             .get("host")
             .expect("Missing \"host\" tag")
@@ -920,14 +920,14 @@ mod tests {
         .capture_metrics()
         .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("other")));
+        assert!(metrics.all(|event| event.into_metric().namespace() == Some("other")));
     }
 
     #[tokio::test]
     async fn uses_default_namespace() {
         let mut metrics = HostMetricsConfig::default().capture_metrics().await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("host")));
+        assert!(metrics.all(|event| event.into_metric().namespace() == Some("host")));
     }
 
     #[tokio::test]
@@ -1070,7 +1070,7 @@ mod tests {
         // All metrics are named network_*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("network_")));
+            .any(|metric| !metric.name().starts_with("network_")));
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
@@ -1103,26 +1103,25 @@ mod tests {
         // All metrics are named load*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("load")));
+            .any(|metric| !metric.name().starts_with("load")));
     }
 
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.value, MetricValue::Counter { .. }))
+            .any(|metric| !matches!(metric.data.value, MetricValue::Counter { .. }))
     }
 
     fn all_gauges(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.value, MetricValue::Gauge { .. }))
+            .any(|metric| !matches!(metric.data.value, MetricValue::Gauge { .. }))
     }
 
     fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {
         !metrics.iter().any(|metric| {
             metric
-                .tags
-                .as_ref()
+                .tags()
                 .unwrap()
                 .get(tag)
                 .map(|value| !matches(value))
@@ -1131,7 +1130,10 @@ mod tests {
     }
 
     fn count_name(metrics: &[Metric], name: &str) -> usize {
-        metrics.iter().filter(|metric| metric.name == name).count()
+        metrics
+            .iter()
+            .filter(|metric| metric.name() == name)
+            .count()
     }
 
     fn count_tag(metrics: &[Metric], tag: &str) -> usize {
@@ -1139,8 +1141,7 @@ mod tests {
             .iter()
             .filter(|metric| {
                 metric
-                    .tags
-                    .as_ref()
+                    .tags()
                     .expect("Metric is missing tags")
                     .contains_key(tag)
             })
@@ -1150,7 +1151,7 @@ mod tests {
     fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
         metrics
             .iter()
-            .filter_map(|metric| metric.tags.as_ref().unwrap().get(tag).cloned())
+            .filter_map(|metric| metric.tags().unwrap().get(tag).cloned())
             .collect::<HashSet<_>>()
     }
 

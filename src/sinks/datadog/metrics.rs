@@ -141,7 +141,7 @@ impl DatadogEndpoint {
     }
 
     fn from_metric(event: &Event) -> Self {
-        match event.as_metric().value {
+        match event.as_metric().data.value {
             MetricValue::Distribution {
                 statistic: StatisticKind::Summary,
                 ..
@@ -272,7 +272,7 @@ async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result
     }
 }
 
-fn encode_tags(tags: BTreeMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter()
         .map(|(name, value)| format!("{}:{}", name, value))
@@ -346,15 +346,12 @@ fn encode_events(
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(
-                event.namespace.as_deref().or(default_namespace),
-                '.',
-                &event.name,
-            );
-            let ts = encode_timestamp(event.timestamp);
-            let tags = event.tags.clone().map(encode_tags);
-            match event.kind {
-                MetricKind::Incremental => match event.value {
+            let fullname =
+                encode_namespace(event.namespace().or(default_namespace), '.', event.name());
+            let ts = encode_timestamp(event.data.timestamp);
+            let tags = event.tags().map(encode_tags);
+            match event.data.kind {
+                MetricKind::Incremental => match event.data.value {
                     MetricValue::Counter { value } => Some(vec![DatadogMetric {
                         metric: fullname,
                         r#type: DatadogMetricType::Count,
@@ -432,7 +429,7 @@ fn encode_events(
                     }]),
                     _ => None,
                 },
-                MetricKind::Absolute => match event.value {
+                MetricKind::Absolute => match event.data.value {
                     MetricValue::Gauge { value } => Some(vec![DatadogMetric {
                         metric: fullname,
                         r#type: DatadogMetricType::Gauge,
@@ -459,15 +456,12 @@ fn encode_distribution_events(
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(
-                event.namespace.as_deref().or(default_namespace),
-                '.',
-                &event.name,
-            );
-            let ts = encode_timestamp(event.timestamp);
-            let tags = event.tags.clone().map(encode_tags);
-            match event.kind {
-                MetricKind::Incremental => match event.value {
+            let fullname =
+                encode_namespace(event.namespace().or(default_namespace), '.', event.name());
+            let ts = encode_timestamp(event.data.timestamp);
+            let tags = event.tags().map(encode_tags);
+            match event.data.kind {
+                MetricKind::Incremental => match event.data.value {
                     MetricValue::Distribution {
                         samples,
                         statistic: StatisticKind::Summary,
@@ -547,30 +541,30 @@ mod tests {
         };
 
         let events = vec![
-            Metric {
-                name: "total".into(),
-                namespace: Some("test".into()),
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.5 },
-            },
-            Metric {
-                name: "check".into(),
-                namespace: Some("test".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            },
-            Metric {
-                name: "unsupported".into(),
-                namespace: Some("test".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 1.0 },
-            },
+            Metric::new(
+                "total".into(),
+                Some("test".into()),
+                None,
+                None,
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.5 },
+            ),
+            Metric::new(
+                "check".into(),
+                Some("test".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ),
+            Metric::new(
+                "unsupported".into(),
+                Some("test".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            ),
         ];
         let req = sink
             .build_request(PartitionInnerBuffer::new(events, DatadogEndpoint::Series))
@@ -586,7 +580,7 @@ mod tests {
     #[test]
     fn test_encode_tags() {
         assert_eq!(
-            encode_tags(tags()),
+            encode_tags(&tags()),
             vec!["empty_tag:", "normal_tag:value", "true_tag:true"]
         );
     }
@@ -601,30 +595,30 @@ mod tests {
     fn encode_counter() {
         let interval = 60;
         let events = vec![
-            Metric {
-                name: "total".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.5 },
-            },
-            Metric {
-                name: "check".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            },
-            Metric {
-                name: "unsupported".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 1.0 },
-            },
+            Metric::new(
+                "total".into(),
+                Some("ns".into()),
+                Some(ts()),
+                None,
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.5 },
+            ),
+            Metric::new(
+                "check".into(),
+                Some("ns".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ),
+            Metric::new(
+                "unsupported".into(),
+                Some("ns".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            ),
         ];
         let input = encode_events(events, None, interval);
         let json = serde_json::to_string(&input).unwrap();
@@ -638,22 +632,22 @@ mod tests {
     #[test]
     fn encode_gauge() {
         let events = vec![
-            Metric {
-                name: "unsupported".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: 0.1 },
-            },
-            Metric {
-                name: "volume".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: -1.1 },
-            },
+            Metric::new(
+                "unsupported".into(),
+                None,
+                Some(ts()),
+                None,
+                MetricKind::Incremental,
+                MetricValue::Gauge { value: 0.1 },
+            ),
+            Metric::new(
+                "volume".into(),
+                None,
+                Some(ts()),
+                None,
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: -1.1 },
+            ),
         ];
         let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
@@ -666,16 +660,16 @@ mod tests {
 
     #[test]
     fn encode_set() {
-        let events = vec![Metric {
-            name: "users".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+        let events = vec![Metric::new(
+            "users".into(),
+            None,
+            Some(ts()),
+            None,
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
-        }];
+        )];
         let input = encode_events(events, Some("ns"), 60);
         let json = serde_json::to_string(&input).unwrap();
 
@@ -770,17 +764,17 @@ mod tests {
     #[test]
     fn encode_distribution() {
         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+        let events = vec![Metric::new(
+            "requests".into(),
+            None,
+            Some(ts()),
+            None,
+            MetricKind::Incremental,
+            MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
-        }];
+        )];
         let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
@@ -793,17 +787,17 @@ mod tests {
     #[test]
     fn encode_datadog_distribution() {
         // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+        let events = vec![Metric::new(
+            "requests".into(),
+            None,
+            Some(ts()),
+            None,
+            MetricKind::Incremental,
+            MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
-        }];
+        )];
         let input = encode_distribution_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 

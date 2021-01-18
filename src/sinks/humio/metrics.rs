@@ -169,33 +169,33 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            Event::from(Metric {
-                name: "metric1".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
-                tags: Some(
+            Event::from(Metric::new(
+                "metric1".to_string(),
+                None,
+                Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
+                Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
                 ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 42.0 },
-            }),
-            Event::from(Metric {
-                name: "metric2".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
-                tags: Some(
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )),
+            Event::from(Metric::new(
+                "metric2".to_string(),
+                None,
+                Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
+                Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
                 ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Distribution {
+                MetricKind::Absolute,
+                MetricValue::Distribution {
                     samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                     statistic: StatisticKind::Histogram,
                 },
-            }),
+            )),
         ];
 
         let len = metrics.len();

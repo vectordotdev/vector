@@ -217,8 +217,8 @@ impl TagCardinalityLimit {
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
-        match event.as_mut_metric().tags {
-            Some(ref mut tags_map) => {
+        match event.as_mut_metric().tags_mut() {
+            Some(tags_map) => {
                 match self.config.limit_exceeded_action {
                     LimitExceededAction::DropEvent => {
                         for (key, value) in tags_map {
@@ -280,14 +280,14 @@ mod tests {
     }
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
-        Event::Metric(Metric {
-            name: "event".into(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tags),
-            kind: metric::MetricKind::Incremental,
-            value: metric::MetricValue::Counter { value: 1.0 },
-        })
+        Event::Metric(Metric::new(
+            "event".into(),
+            None,
+            None,
+            Some(tags),
+            metric::MetricKind::Incremental,
+            metric::MetricValue::Counter { value: 1.0 },
+        ))
     }
 
     fn make_transform_hashset(
@@ -390,21 +390,10 @@ mod tests {
         assert_eq!(new_event2, event2);
         // The third event should have been modified to remove "tag1"
         assert_ne!(new_event3, event3);
-        assert!(!new_event3
-            .as_metric()
-            .tags
-            .as_ref()
-            .unwrap()
-            .contains_key("tag1"));
+        assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
         assert_eq!(
             "val1",
-            new_event3
-                .as_metric()
-                .tags
-                .as_ref()
-                .unwrap()
-                .get("tag2")
-                .unwrap()
+            new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
         );
     }
 

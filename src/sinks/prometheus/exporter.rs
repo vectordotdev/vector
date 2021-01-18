@@ -303,21 +303,21 @@ impl StreamSink for PrometheusExporter {
                     .drain(..)
                     .map(|(MetricEntry(mut metric), is_incremental_set)| {
                         if is_incremental_set {
-                            metric.reset();
+                            metric.data.reset();
                         }
                         (MetricEntry(metric), is_incremental_set)
                     })
                     .collect();
             }
 
-            match item.kind {
+            match item.data.kind {
                 MetricKind::Incremental => {
                     let mut new = MetricEntry(item.to_absolute());
                     if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&new) {
-                        existing.add(&item);
+                        existing.data.add(&item.data);
                         new = MetricEntry(existing);
                     }
-                    metrics.map.insert(new, item.value.is_set());
+                    metrics.map.insert(new, item.data.value.is_set());
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
@@ -401,18 +401,18 @@ mod tests {
 
     pub fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
-        let event = Metric {
-            name: name.clone(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(
+        let event = Metric::new(
+            name.clone(),
+            None,
+            None,
+            Some(
                 vec![("some_tag".to_owned(), "some_value".to_owned())]
                     .into_iter()
                     .collect(),
             ),
-            kind: MetricKind::Incremental,
+            MetricKind::Incremental,
             value,
-        }
+        )
         .into();
         (name, event)
     }

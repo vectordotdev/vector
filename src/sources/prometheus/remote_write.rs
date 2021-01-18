@@ -130,14 +130,14 @@ fn decode_timeseries(timeseries: proto::TimeSeries) -> Option<impl Iterator<Item
             } else {
                 MetricValue::Gauge { value }
             };
-            Metric {
-                name: name.clone(),
-                namespace: None,
-                timestamp: parse_timestamp(sample.timestamp),
-                tags: tags.clone(),
-                kind: MetricKind::Absolute,
+            Metric::new(
+                name.clone(),
+                None,
+                parse_timestamp(sample.timestamp),
+                tags.clone(),
+                MetricKind::Absolute,
                 value,
-            }
+            )
             .into()
         })),
         None => {
@@ -228,7 +228,7 @@ mod test {
         let mut output = test_util::collect_ready(rx).await;
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
-        output.sort_unstable_by_key(|event| event.as_metric().name.clone());
+        output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
         assert_eq!(events, output);
     }
@@ -237,14 +237,14 @@ mod test {
         (0..10)
             .map(|num| {
                 let timestamp = Utc::now().trunc_subsecs(3);
-                Event::Metric(Metric {
-                    name: format!("gauge_{}", num),
-                    namespace: None,
-                    timestamp: Some(timestamp),
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: num as f64 },
-                })
+                Event::Metric(Metric::new(
+                    format!("gauge_{}", num),
+                    None,
+                    Some(timestamp),
+                    None,
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: num as f64 },
+                ))
             })
             .collect()
     }

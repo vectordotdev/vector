@@ -404,25 +404,25 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = capture_metrics(&controller)
         .map(Event::into_metric)
-        .map(|event| (event.name.clone(), event))
+        .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
     assert!(
-        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().data.value,
                  MetricValue::Distribution { .. })
     );
     assert!(
-        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().data.value,
                  MetricValue::Distribution { .. })
     );
     if params.concurrency == Concurrency::Adaptive {
         assert!(
-            matches!(metrics.get("adaptive_concurrency_limit").unwrap().value,
+            matches!(metrics.get("adaptive_concurrency_limit").unwrap().data.value,
                      MetricValue::Distribution { .. })
         );
     }
     assert!(
-        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().data.value,
                  MetricValue::Distribution { .. })
     );
 

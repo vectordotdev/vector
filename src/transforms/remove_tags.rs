@@ -54,7 +54,7 @@ impl RemoveTags {
 
 impl FunctionTransform for RemoveTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let tags = &mut event.as_mut_metric().tags;
+        let tags = &mut event.as_mut_metric().series.tags;
 
         if let Some(map) = tags {
             for tag in &self.tags {
@@ -86,11 +86,11 @@ mod tests {
 
     #[test]
     fn remove_tags() {
-        let event = Event::Metric(Metric {
-            name: "foo".into(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(
+        let event = Event::Metric(Metric::new(
+            "foo".into(),
+            None,
+            None,
+            Some(
                 vec![
                     ("env".to_owned(), "production".to_owned()),
                     ("region".to_owned(), "us-east-1".to_owned()),
@@ -99,13 +99,13 @@ mod tests {
                 .into_iter()
                 .collect(),
             ),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 10.0 },
-        });
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        ));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags.unwrap();
+        let tags = metric.tags().unwrap();
 
         assert_eq!(tags.len(), 1);
         assert!(tags.contains_key("env"));
@@ -115,41 +115,41 @@ mod tests {
 
     #[test]
     fn remove_all_tags() {
-        let event = Event::Metric(Metric {
-            name: "foo".into(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(
+        let event = Event::Metric(Metric::new(
+            "foo".into(),
+            None,
+            None,
+            Some(
                 vec![("env".to_owned(), "production".to_owned())]
                     .into_iter()
                     .collect(),
             ),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 10.0 },
-        });
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        ));
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
 
-        assert!(metric.tags.is_none());
+        assert!(metric.tags().is_none());
     }
 
     #[test]
     fn remove_tags_from_none() {
-        let event = Event::Metric(Metric {
-            name: "foo".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+        let event = Event::Metric(Metric::new(
+            "foo".into(),
+            None,
+            None,
+            None,
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: vec!["bar".into()].into_iter().collect(),
             },
-        });
+        ));
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
 
-        assert!(metric.tags.is_none());
+        assert!(metric.tags().is_none());
     }
 }

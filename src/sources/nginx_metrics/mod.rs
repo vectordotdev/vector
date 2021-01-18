@@ -221,14 +221,14 @@ impl NginxMetrics {
     }
 
     fn create_metric(&self, name: &str, value: MetricValue) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(self.tags.clone()),
-            kind: MetricKind::Absolute,
+        Metric::new(
+            name.into(),
+            self.namespace.clone(),
+            Some(Utc::now()),
+            Some(self.tags.clone()),
+            MetricKind::Absolute,
             value,
-        }
+        )
     }
 }
 

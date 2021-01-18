@@ -81,14 +81,14 @@ mod test {
 
     #[test]
     fn to_lua_metric() {
-        let event = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        });
+        let event = Event::Metric(Metric::new(
+            "example counter".into(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        ));
 
         let assertions = vec![
             "type(event) == 'table'",
@@ -132,14 +132,14 @@ mod test {
                 }
             }
         }"#;
-        let expected = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        });
+        let expected = Event::Metric(Metric::new(
+            "example counter".into(),
+            None,
+            None,
+            None,
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        ));
 
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();

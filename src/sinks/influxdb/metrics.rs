@@ -193,7 +193,7 @@ fn merge_tags(
     event: &Metric,
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (&event.tags, tags) {
+    match (&event.series.tags, tags) {
         (Some(ref event_tags), Some(ref config_tags)) => {
             let mut event_tags = event_tags.clone();
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -219,14 +219,10 @@ fn encode_events(
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = encode_namespace(
-            event.namespace.as_deref().or(default_namespace),
-            '.',
-            &event.name,
-        );
-        let ts = encode_timestamp(event.timestamp);
+        let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
+        let ts = encode_timestamp(event.data.timestamp);
         let tags = merge_tags(&event, tags);
-        let (metric_type, fields) = get_type_and_fields(event.value, &quantiles);
+        let (metric_type, fields) = get_type_and_fields(event.data.value, &quantiles);
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
@@ -348,22 +344,22 @@ mod tests {
     #[test]
     fn test_encode_counter() {
         let events = vec![
-            Metric {
-                name: "total".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.5 },
-            },
-            Metric {
-                name: "check".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            },
+            Metric::new(
+                "total".into(),
+                Some("ns".into()),
+                Some(ts()),
+                None,
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.5 },
+            ),
+            Metric::new(
+                "check".into(),
+                Some("ns".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ),
         ];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, Some("vector"), None, &[]);
@@ -376,14 +372,14 @@ mod tests {
 
     #[test]
     fn test_encode_gauge() {
-        let events = vec![Metric {
-            name: "meter".to_owned(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Gauge { value: -1.5 },
-        }];
+        let events = vec![Metric::new(
+            "meter".to_owned(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: -1.5 },
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
@@ -394,16 +390,16 @@ mod tests {
 
     #[test]
     fn test_encode_set() {
-        let events = vec![Metric {
-            name: "users".into(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+        let events = vec![Metric::new(
+            "users".into(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
@@ -414,18 +410,18 @@ mod tests {
 
     #[test]
     fn test_encode_histogram_v1() {
-        let events = vec![Metric {
-            name: "requests".to_owned(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
+        let events = vec![Metric::new(
+            "requests".to_owned(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -453,18 +449,18 @@ mod tests {
 
     #[test]
     fn test_encode_histogram() {
-        let events = vec![Metric {
-            name: "requests".to_owned(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
+        let events = vec![Metric::new(
+            "requests".to_owned(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -492,18 +488,18 @@ mod tests {
 
     #[test]
     fn test_encode_summary_v1() {
-        let events = vec![Metric {
-            name: "requests_sum".to_owned(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
+        let events = vec![Metric::new(
+            "requests_sum".to_owned(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -531,18 +527,18 @@ mod tests {
 
     #[test]
     fn test_encode_summary() {
-        let events = vec![Metric {
-            name: "requests_sum".to_owned(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
+        let events = vec![Metric::new(
+            "requests_sum".to_owned(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -571,24 +567,24 @@ mod tests {
     #[test]
     fn test_encode_distribution() {
         let events = vec![
-            Metric {
-                name: "requests".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+            Metric::new(
+                "requests".into(),
+                Some("ns".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Incremental,
+                MetricValue::Distribution {
                     samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
-            },
-            Metric {
-                name: "dense_stats".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+            ),
+            Metric::new(
+                "dense_stats".into(),
+                Some("ns".into()),
+                Some(ts()),
+                None,
+                MetricKind::Incremental,
+                MetricValue::Distribution {
                     samples: (0..20)
                         .map(|v| Sample {
                             value: f64::from(v),
@@ -597,14 +593,14 @@ mod tests {
                         .collect(),
                     statistic: StatisticKind::Histogram,
                 },
-            },
-            Metric {
-                name: "sparse_stats".into(),
-                namespace: Some("ns".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
+            ),
+            Metric::new(
+                "sparse_stats".into(),
+                Some("ns".into()),
+                Some(ts()),
+                None,
+                MetricKind::Incremental,
+                MetricValue::Distribution {
                     samples: (1..5)
                         .map(|v| Sample {
                             value: f64::from(v),
@@ -613,7 +609,7 @@ mod tests {
                         .collect(),
                     statistic: StatisticKind::Histogram,
                 },
-            },
+            ),
         ];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
@@ -680,17 +676,17 @@ mod tests {
 
     #[test]
     fn test_encode_distribution_empty_stats() {
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+        let events = vec![Metric::new(
+            "requests".into(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
                 samples: vec![],
                 statistic: StatisticKind::Histogram,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
@@ -698,17 +694,17 @@ mod tests {
 
     #[test]
     fn test_encode_distribution_zero_counts_stats() {
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+        let events = vec![Metric::new(
+            "requests".into(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
                 samples: crate::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
@@ -716,17 +712,17 @@ mod tests {
 
     #[test]
     fn test_encode_distribution_summary() {
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
+        let events = vec![Metric::new(
+            "requests".into(),
+            Some("ns".into()),
+            Some(ts()),
+            Some(tags()),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
-        }];
+        )];
 
         let line_protocols = encode_events(
             ProtocolVersion::V2,
@@ -769,22 +765,22 @@ mod tests {
         crate::test_util::trace_init();
 
         let events = vec![
-            Metric {
-                name: "cpu".into(),
-                namespace: Some("vector".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 2.5 },
-            },
-            Metric {
-                name: "mem".into(),
-                namespace: Some("vector".into()),
-                timestamp: Some(ts()),
-                tags: Some(tags()),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 1000.0 },
-            },
+            Metric::new(
+                "cpu".into(),
+                Some("vector".into()),
+                Some(ts()),
+                None,
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 2.5 },
+            ),
+            Metric::new(
+                "mem".into(),
+                Some("vector".into()),
+                Some(ts()),
+                Some(tags()),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1000.0 },
+            ),
         ];
 
         let mut tags = HashMap::new();
@@ -923,11 +919,11 @@ mod integration_tests {
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
         let mut events = Vec::new();
         for i in 0..10 {
-            let event = Event::Metric(Metric {
-                name: metric.to_string(),
-                namespace: Some("ns".to_string()),
-                timestamp: None,
-                tags: Some(
+            let event = Event::Metric(Metric::new(
+                metric.to_string(),
+                Some("ns".to_string()),
+                None,
+                Some(
                     vec![
                         ("region".to_owned(), "us-west-1".to_owned()),
                         ("production".to_owned(), "true".to_owned()),
@@ -935,9 +931,9 @@ mod integration_tests {
                     .into_iter()
                     .collect(),
                 ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
+                MetricKind::Incremental,
+                MetricValue::Counter { value: i as f64 },
+            ));
             events.push(event);
         }
 
@@ -1007,11 +1003,11 @@ mod integration_tests {
     }
 
     fn create_event(i: i32) -> Event {
-        Event::Metric(Metric {
-            name: format!("counter-{}", i),
-            namespace: Some("ns".to_string()),
-            timestamp: None,
-            tags: Some(
+        Event::Metric(Metric::new(
+            format!("counter-{}", i),
+            Some("ns".to_string()),
+            None,
+            Some(
                 vec![
                     ("region".to_owned(), "us-west-1".to_owned()),
                     ("production".to_owned(), "true".to_owned()),
@@ -1019,8 +1015,8 @@ mod integration_tests {
                 .into_iter()
                 .collect(),
             ),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: i as f64 },
-        })
+            MetricKind::Incremental,
+            MetricValue::Counter { value: i as f64 },
+        ))
     }
 }
