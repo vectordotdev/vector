@@ -221,6 +221,32 @@ impl DatnameFilter {
         (null, names.into_iter().collect())
     }
 
+    fn build_match_params(sql: &mut String, len: usize, include: bool) {
+        let op = if include {
+            (" OR", "~")
+        } else {
+            (" AND", "!~")
+        };
+
+        sql.push_str(" WHERE (");
+        for i in 1..=len {
+            if i > 1 {
+                sql.push_str(op.0);
+            }
+            sql.push_str(&format!(" datname {} ${}", op.1, i));
+        }
+        sql.push_str(")");
+    }
+
+    fn to_params(list: &Vec<String>) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
+        let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
+            Vec::with_capacity(list.len());
+        for item in list {
+            params.push(item);
+        }
+        params
+    }
+
     async fn pg_stat_database(&self, client: &Client) -> Result<Vec<Row>, PgError> {
         let mut conditions = "SELECT * FROM pg_stat_database".to_owned();
         match self {
@@ -228,26 +254,26 @@ impl DatnameFilter {
                 need_null,
                 databases,
             } => {
-                conditions += " WHERE datname = ANY($1)";
+                Self::build_match_params(&mut conditions, databases.len(), true);
                 if *need_null {
                     conditions += " OR datname IS NULL";
                 }
                 client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
                     .await
             }
             Self::Exclude {
                 need_null,
                 databases,
             } => {
-                conditions += " WHERE datname != ANY($1)";
+                Self::build_match_params(&mut conditions, databases.len(), false);
                 if *need_null {
                     conditions += " AND datname IS NOT NULL";
                 } else {
                     conditions += " OR datname IS NULL";
                 }
                 client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
                     .await
             }
             Self::None => client.query(conditions.as_str(), &[]).await,
@@ -258,15 +284,15 @@ impl DatnameFilter {
         let mut conditions = "SELECT * FROM pg_stat_database_conflicts".to_owned();
         match self {
             Self::Include { databases, .. } => {
-                conditions += " WHERE datname = ANY($1)";
+                Self::build_match_params(&mut conditions, databases.len(), true);
                 client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
                     .await
             }
             Self::Exclude { databases, .. } => {
-                conditions += " WHERE datname != ANY($1)";
+                Self::build_match_params(&mut conditions, databases.len(), false);
                 client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
+                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
                     .await
             }
             Self::None => client.query(conditions.as_str(), &[]).await,
@@ -803,7 +829,12 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
 
-    async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
+    async fn test_postgresql_metrics(
+        endpoint: String,
+        tls: Option<PostgresqlMetricsTlsConfig>,
+        include_databases: Option<Vec<String>>,
+        exclude_databases: Option<Vec<String>>,
+    ) -> Vec<Event> {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
@@ -812,6 +843,8 @@ mod integration_tests {
             PostgresqlMetricsConfig {
                 endpoints: vec![endpoint],
                 tls,
+                include_databases,
+                exclude_databases,
                 ..Default::default()
             }
             .build(
@@ -839,6 +872,8 @@ mod integration_tests {
             }
         }
         assert!(events.len() > 1);
+
+        events
     }
 
     #[tokio::test]
@@ -846,8 +881,10 @@ mod integration_tests {
         test_postgresql_metrics(
             "postgresql://vector:vector@localhost/postgres".to_owned(),
             None,
+            None,
+            None,
         )
-        .await
+        .await;
     }
 
     #[tokio::test]
@@ -858,7 +895,7 @@ mod integration_tests {
             "postgresql:///postgres?host={}&user=vector&password=vector",
             socket.to_str().unwrap()
         );
-        test_postgresql_metrics(endpoint, None).await
+        test_postgresql_metrics(endpoint, None, None, None).await;
     }
 
     #[tokio::test]
@@ -868,7 +905,47 @@ mod integration_tests {
             Some(PostgresqlMetricsTlsConfig {
                 ca_file: "tests/data/Vector_CA.crt".into(),
             }),
+            None,
+            None,
         )
-        .await
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_host_include_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
+            None,
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags.unwrap().get("db") {
+                assert!(db == "vector" || db == "postgres");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_host_exclude_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            None,
+            Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags.unwrap().get("db") {
+                assert!(db != "vector" && db != "postgres");
+            }
+        }
     }
 }
