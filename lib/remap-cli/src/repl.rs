@@ -1,7 +1,7 @@
 use crate::Error;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use remap::{state, Object, Program, Runtime, Value};
+use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::all as funcs;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -134,12 +134,12 @@ fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &st
         Some(object) => object,
     };
 
-    let program = match Program::new(program, &remap_functions::all(), None, true) {
-        Ok(program) => program,
-        Err(err) => return err.to_string(),
+    let program = match Program::new(program.to_owned(), &remap_functions::all(), None, true) {
+        Ok((program, _)) => program,
+        Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };
 
-    match runtime.execute(object, &program) {
+    match runtime.run(object, &program) {
         Ok(value) => value.to_string(),
         Err(err) => err.to_string(),
     }

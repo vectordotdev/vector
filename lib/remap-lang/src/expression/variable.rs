@@ -1,4 +1,4 @@
-use crate::{expression::Path, state, Expression, Object, Result, TypeDef, Value};
+use crate::{expression::Path, state, value::Kind, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,7 +55,7 @@ impl Expression for Variable {
             // TODO: we can make it so this can never happen, by making it a
             // compile-time error to reference a variable before it is assigned.
             .unwrap_or(TypeDef {
-                fallible: true,
+                kind: Kind::Null,
                 ..Default::default()
             })
     }
@@ -64,7 +64,7 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Kind};
+    use crate::test_type_def;
 
     test_type_def![
         ident_match {
@@ -102,7 +102,7 @@ mod tests {
                 Variable::new("bar".to_owned(), None)
             },
             def: TypeDef {
-                fallible: true,
+                kind: Kind::Null,
                 ..Default::default()
             },
         }
@@ -110,7 +110,7 @@ mod tests {
         empty_state {
             expr: |_| Variable::new("foo".to_owned(), None),
             def: TypeDef {
-                fallible: true,
+                kind: Kind::Null,
                 ..Default::default()
             },
         }

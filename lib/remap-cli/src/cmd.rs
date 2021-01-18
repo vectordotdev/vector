@@ -1,5 +1,5 @@
 use super::{repl, Error};
-use remap::{state, Object, Program, Runtime, Value};
+use remap::{state, Formatter, Object, Program, Runtime, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -51,7 +51,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         repl(objects)
     } else {
         for mut object in objects {
-            let result = execute(&mut object, &program).map(|v| {
+            let result = execute(&mut object, program.clone()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -79,12 +79,16 @@ fn repl(object: Vec<Value>) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
-fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
+fn execute(object: &mut impl Object, source: String) -> Result<Value, Error> {
     let state = state::Program::default();
     let mut runtime = Runtime::new(state);
-    let program = Program::new(program, &remap_functions::all(), None, true)?;
+    let (program, _) = Program::new(source.clone(), &remap_functions::all(), None, true).map_err(
+        |diagnostics| Error::Parse(Formatter::new(&source, diagnostics).colored().to_string()),
+    )?;
 
-    runtime.execute(object, &program).map_err(Into::into)
+    runtime
+        .run(object, &program)
+        .map_err(|err| Error::Runtime(err.to_string()))
 }
 
 fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
