@@ -180,10 +180,7 @@ mod test {
             let source = source.to_owned();
             let config = RemapConfig { source };
 
-            assert_eq!(
-                config.build().map(|_| ()).map_err(|e| e.to_string()),
-                build.map_err(|e| e.to_string())
-            );
+            assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
 
             if let Ok(cond) = config.build() {
                 assert_eq!(
