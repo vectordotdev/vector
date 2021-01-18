@@ -74,6 +74,7 @@ macro_rules! expression_dispatch {
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
         #[derive(Clone, PartialEq)]
+        #[allow(clippy::large_enum_variant)] // TODO: investigate
         pub enum Expr {
             $($expr($expr)),+
         }

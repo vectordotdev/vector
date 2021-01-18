@@ -105,7 +105,7 @@ impl From<PestError> for Diagnostic {
                     _ if !negatives.is_empty() => Diagnostic::error(msg)
                         .with_label(label)
                         .with_label(unexpected),
-                    _ => Diagnostic::error(msg).with_primary("unexpected token", span.clone()),
+                    _ => Diagnostic::error(msg).with_primary("unexpected token", span),
                 }
             }
             pest::error::ErrorVariant::CustomError { message } => {
@@ -202,6 +202,7 @@ impl<T> ParsedNode<T> {
         (self.span, self.inner)
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_expr(self) -> ParsedNode<Expr>
     where
         T: Into<Expr>,
@@ -386,7 +387,7 @@ impl<'a> Parser<'a> {
             Ok(pairs) => pairs,
             Err(err) => {
                 self.diagnostics.push(err.into());
-                pest::state("", |s| Ok(s)).unwrap()
+                pest::state("", Ok).unwrap()
             }
         };
 
@@ -444,7 +445,7 @@ impl<'a> Parser<'a> {
     /// on the parser rule being processed.
     fn target_from_pair(&mut self, pair: Pair<R>) -> IResult<Target> {
         match pair.as_rule() {
-            R::variable => self.variable_from_pair(pair).and_then(|node| {
+            R::variable => self.variable_from_pair(pair).map(|node| {
                 let (span, mut variable) = node.take();
 
                 // track an error diagnostic and re-assign variable to a
@@ -469,7 +470,7 @@ impl<'a> Parser<'a> {
                     variable = Variable::new("_".to_owned(), None);
                 }
 
-                Ok((span, Target::Variable(variable)).into())
+                (span, Target::Variable(variable)).into()
             }),
             R::path => {
                 let (span, path) = self.path_from_pair(pair)?.take();
@@ -868,6 +869,7 @@ impl<'a> Parser<'a> {
             })
             .unwrap_or_default();
 
+        #[allow(clippy::trivial_regex)]
         let regex = RegexBuilder::new(&pattern)
             .case_insensitive(i)
             .multi_line(m)
@@ -878,7 +880,7 @@ impl<'a> Parser<'a> {
                     .to_string()
                     .split("error: ")
                     .last()
-                    .unwrap_or_else(|| "unknown error")
+                    .unwrap_or("unknown error")
                     .to_owned();
 
                 // Record error diagnostic for invalid regex.
