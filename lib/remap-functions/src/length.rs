@@ -63,12 +63,8 @@ mod tests {
                 value: map! {"foo": "bar", "baz": 27, "baq": false}.boxed()
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Integer,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Boolean,
-                    ..Default::default()
-                }.boxed())
+                ..Default::default()
             },
         }
 
@@ -77,12 +73,8 @@ mod tests {
                 value: array!["foo", 127, false].boxed()
             },
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Integer,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Boolean,
-                    ..Default::default()
-                }.boxed())
+                ..Default::default()
             },
         }
 
@@ -92,7 +84,17 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Integer,
-                inner_type_def: None,
+                ..Default::default()
+            },
+        }
+
+        value_integer_fallible {
+            expr: |_| LengthFn {
+                value: lit!(127).boxed()
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Integer,
                 ..Default::default()
             },
         }
