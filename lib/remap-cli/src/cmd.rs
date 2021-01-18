@@ -146,7 +146,5 @@ fn should_open_repl(opts: &Opts) -> bool {
 }
 
 fn default_objects() -> Vec<Value> {
-    let mut map = BTreeMap::new();
-    map.insert("foo".into(), "bar".into());
-    vec![Value::Map(map)]
+    vec![Value::Map(BTreeMap::new())]
 }
