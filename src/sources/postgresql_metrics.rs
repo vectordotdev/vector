@@ -540,7 +540,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if self.version.unwrap() >= 120000 {
+            if self.version.expect("version is set above") >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
