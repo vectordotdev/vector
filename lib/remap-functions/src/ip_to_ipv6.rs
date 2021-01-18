@@ -55,7 +55,7 @@ impl Expression for IpToIpv6Fn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Bytes)
     }
 }
@@ -71,6 +71,7 @@ mod tests {
         },
         def: TypeDef {
             kind: value::Kind::Bytes,
+            fallible: true,
             ..Default::default()
         },
     }];

@@ -186,7 +186,10 @@ vectorSource:
   listenAddress: "0.0.0.0"
   # The port to listen at.
   listenPort: "9000"
-  # Raw TOML config to embed at the vector source.
+  # Additional config to embed at the vector source.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the vector source (deprecated).
   rawConfig: null
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
@@ -196,7 +199,10 @@ internalMetricsSource:
   enabled: true
   # The name to use for the "built-in" internal metrics source.
   sourceId: internal_metrics
-  # Raw TOML config to embed at the internal metrics source.
+  # Additional config to embed at the internal metrics source.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the internal metrics source (deprecated).
   rawConfig: null
 
 # The "built-in" prometheus sink exposing metrics in the Prometheus scraping
@@ -222,7 +228,10 @@ prometheusSink:
   listenAddress: "0.0.0.0"
   # The port to listen at.
   listenPort: "9090"
-  # Raw TOML config to embed at the vector source.
+  # Additional config to embed at the prometheus sink.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the prometheus sink (deprecated).
   rawConfig: null
   # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.
   # To be used in clusters that rely on Pod annotations in the form of
