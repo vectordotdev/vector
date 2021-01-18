@@ -445,6 +445,7 @@ test-integration-postgresql_metrics: ## Runs postgresql_metrics integration test
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics stop
 	@scripts/setup_integration_env.sh postgresql_metrics start
+	sleep 5 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
