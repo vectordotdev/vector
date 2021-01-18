@@ -11,7 +11,7 @@ impl Function for Length {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Array(_) | Value::Map(_)),
+            accepts: |v| matches!(v, Value::Array(_) | Value::Map(_) | Value::Bytes(_)),
             required: true,
         }]
     }
@@ -52,7 +52,8 @@ impl Expression for LengthFn {
             .with_constraint(Kind::Integer);
 
         if value_def.kind.is_scalar() {
-            value_def.with_inner_type(None)
+            value_def
+                .with_inner_type(None)
         } else {
             value_def
         }
