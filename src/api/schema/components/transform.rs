@@ -1,12 +1,27 @@
 use super::{sink, source, state, Component};
-use crate::api::schema::metrics::{self, IntoTransformMetrics};
-use async_graphql::Object;
+use crate::{
+    api::schema::{
+        filter,
+        metrics::{self, IntoTransformMetrics},
+    },
+    filter_check,
+};
+use async_graphql::{InputObject, Object};
 
 #[derive(Debug, Clone)]
 pub struct Data {
     pub name: String,
     pub component_type: String,
     pub inputs: Vec<String>,
+}
+
+impl Data {
+    pub fn get_name(&self) -> &str {
+        self.name.as_str()
+    }
+    pub fn get_component_type(&self) -> &str {
+        self.component_type.as_str()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -55,5 +70,30 @@ impl Transform {
     /// Transform metrics
     pub async fn metrics(&self) -> metrics::TransformMetrics {
         metrics::by_component_name(&self.0.name).to_transform_metrics(&self.0.component_type)
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct TransformsFilter {
+    name: Option<Vec<filter::StringFilter>>,
+    component_type: Option<Vec<filter::StringFilter>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<Transform> for TransformsFilter {
+    fn matches(&self, transform: &Transform) -> bool {
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(transform.0.get_name()))),
+            self.component_type.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(transform.0.get_component_type())))
+        );
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
     }
 }

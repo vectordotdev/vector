@@ -26,15 +26,13 @@
   [[tests.outputs]]
     extract_from = "dedupe_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.equals" = 1
-      "b.equals" = 2
+      type = "remap"
+      source = ".a == 1 && .b == 2"
   [[tests.outputs]]
     extract_from = "dedupe_simple"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.equals" = 2
-      "b.equals" = 4
+      type = "remap"
+      source = ".a == 2 && .b == 4"
 
 [transforms.dedupe_field_order]
   inputs = []
@@ -67,17 +65,17 @@
   [[tests.outputs]]
     extract_from = "dedupe_field_order"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.equals" = 1
-      "b.equals" = 2
-      "c.equals" = 3
+      type = "remap"
+      source = '''
+        .a == 1 && .b == 2 && .c == 3
+      '''
   [[tests.outputs]]
     extract_from = "dedupe_field_order"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.equals" = 1
-      "b.equals" = 3
-      "c.equals" = 3
+      type = "remap"
+      source = '''
+        .a == 1 && .b == 3 && .c == 3
+      '''
 
 [transforms.dedupe_nested_fields]
   inputs = []
@@ -107,12 +105,10 @@
   [[tests.outputs]]
     extract_from = "dedupe_nested_fields"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.b.c.equals" = "d"
-      "b.equals" = 2
+      type = "remap"
+      source = '.a.b.c == "d" && .b == 2'
   [[tests.outputs]]
     extract_from = "dedupe_nested_fields"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "a.b.equals" = "c.d"
-      "b.equals" = 4
+      type = "remap"
+      source = '.a.b == "c.d" && .b == 4'
