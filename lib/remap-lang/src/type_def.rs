@@ -173,7 +173,7 @@ impl TypeDef {
             self.inner_type_def = None;
         }
 
-        self.kind = kind.into();
+        self.kind = kind;
         self
     }
 
