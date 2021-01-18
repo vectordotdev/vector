@@ -1,0 +1,12 @@
+# object: { "bar": "bar" }
+# result: 
+#
+# error: call to undefined function
+#   ┌─ :2:1
+#   │
+# 2 │ unknown_function(.foo, .bar)
+#   │ ^^^^^^^^^^^^^^^^ undefined function
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+unknown_function(.foo, .bar)

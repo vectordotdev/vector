@@ -9,8 +9,11 @@ pub enum Error {
     #[error("io error")]
     Io(#[from] std::io::Error),
 
-    #[error("remap error: {0}")]
-    Remap(#[from] remap::RemapError),
+    #[error("parse error")]
+    Parse(String),
+
+    #[error("runtime error")]
+    Runtime(String),
 
     #[error("json error")]
     Json(#[from] serde_json::Error),
