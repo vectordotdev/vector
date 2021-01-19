@@ -54,22 +54,22 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Download baseline benchmarks
-        uses: dawidd6/action-download-artifact@891cccee4b25d3306cf5edafa174ddc1d969871f
-        continue-on-error: true
-        with:
-          github_token: ${{secrets.GITHUB_TOKEN}}
-          workflow: benches.yml
-          branch: master
-          name: criterion
-          path: target
-          workflow_conclusion: success
-      - name: Check if there were master artifacts
-        run: |
-          test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
-      - run: unzip target/criterion.zip
-        continue-on-error: true
       - run: make slim-builds
+
+      - name: Checkout master to build first
+        run: |
+          git fetch --depth 1 origin master
+          git checkout --force origin/master
+        # build benchmarks on all CPUs, including isolated benchmarking CPU
+      - name: Prebuild master benchmarks
+        run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
+        # run benchmarks on isolated CPU and with address randomization
+        # disabled
+      - name: Run master benchmarks
+        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all
+
+      - name: Checkout current SHA
+        run: git clean --force && git checkout --force $GITHUB_SHA
         # build benchmarks on all CPUs, including isolated benchmarking CPU
       - name: Prebuild benchmarks
         run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
@@ -79,6 +79,7 @@ jobs:
         run: |
           mkdir -p target/criterion
           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
+
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
@@ -90,7 +91,10 @@ jobs:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
       # note: should run last to flag regressions
-      - run: cat target/criterion/out | scripts/check-criterion-output.sh
+      - name: Compare benchmarks
+        run: |
+          echo "Comparing $(git rev-parse HEAD) with $(git rev-parse origin/master)"
+          cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:
     name: master-failure
