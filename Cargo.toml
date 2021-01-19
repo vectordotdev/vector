@@ -149,7 +149,7 @@ http = "0.2"
 typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
-syslog_loose = "0.7.0"
+syslog_loose = "0.8.0"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
