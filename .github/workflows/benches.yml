@@ -59,17 +59,17 @@ jobs:
       - name: Checkout master to build first
         run: |
           git fetch --depth 1 origin master
-          git checkout origin/master
+          git checkout --force origin/master
         # build benchmarks on all CPUs, including isolated benchmarking CPU
       - name: Prebuild master benchmarks
-        run: taskset -c "0-$(nproc)" make bench CARGO_BENCH_FLAGS="--no-run"
+        run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
         # run benchmarks on isolated CPU and with address randomization
         # disabled
       - name: Run master benchmarks
-        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench
+        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all
 
       - name: Checkout current SHA
-        run: git checkout $GITHUB_SHA
+        run: git clean --force && git checkout --force $GITHUB_SHA
         # build benchmarks on all CPUs, including isolated benchmarking CPU
       - name: Prebuild benchmarks
         run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
@@ -93,7 +93,7 @@ jobs:
       # note: should run last to flag regressions
       - name: Compare benchmarks
         run: |
-          echo "Comparing with $(git rev-parse origin/master)"
+          echo "Comparing $(git rev-parse HEAD) with $(git rev-parse origin/master)"
           cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:
