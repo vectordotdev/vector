@@ -61,6 +61,10 @@ macro_rules! gauge {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
+    #[snafu(display(
+        "null database can not be specified in both `include_databases` and `exclude_databases`"
+    ))]
+    IncludeExcludeEmpty,
     #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: PgError },
     #[snafu(display("host missing"))]
@@ -134,7 +138,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
         let datname_filter = DatnameFilter::new(
             self.include_databases.clone().unwrap_or_default(),
             self.exclude_databases.clone().unwrap_or_default(),
-        );
+        )?;
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let mut sources = try_join_all(self.endpoints.iter().map(|endpoint| {
@@ -179,143 +183,125 @@ impl SourceConfig for PostgresqlMetricsConfig {
 }
 
 #[derive(Debug, Clone)]
-enum DatnameFilter {
-    Include {
-        need_null: bool,
-        databases: Vec<String>,
-    },
-    Exclude {
-        need_null: bool,
-        databases: Vec<String>,
-    },
-    None,
+struct DatnameFilter {
+    pg_stat_database_sql: String,
+    pg_stat_database_conflicts_sql: String,
+    match_params: Vec<String>,
 }
 
 impl DatnameFilter {
-    fn new(include: Vec<String>, exclude: Vec<String>) -> Self {
-        let exclude = exclude.into_iter().collect::<HashSet<_>>();
-        let include = include
-            .into_iter()
-            .filter(|name| !exclude.contains(name))
-            .collect::<HashSet<_>>();
+    fn new(include: Vec<String>, exclude: Vec<String>) -> Result<Self, BuildError> {
+        let (include_databases, include_null) = Self::clean_databases(include.clone());
+        let (exclude_databases, exclude_null) = Self::clean_databases(exclude.clone());
+        let (match_sql, match_params) =
+            Self::build_match_params(include_databases, exclude_databases);
+
+        let mut pg_stat_database_sql = "SELECT * FROM pg_stat_database".to_owned();
+        if !match_sql.is_empty() {
+            pg_stat_database_sql += " WHERE";
+            pg_stat_database_sql += &match_sql;
+        }
+        match (include_null, exclude_null) {
+            (false, false) => {} // nothing
+            (false, true) => {
+                pg_stat_database_sql += if match_sql.is_empty() {
+                    " WHERE"
+                } else {
+                    " AND"
+                };
+                pg_stat_database_sql += " datname IS NOT NULL";
+            }
+            (true, false) => {
+                pg_stat_database_sql += if match_sql.is_empty() {
+                    " WHERE"
+                } else {
+                    " OR"
+                };
+                pg_stat_database_sql += " datname IS NULL";
+            }
+            (true, true) => return Err(BuildError::IncludeExcludeEmpty),
+        }
+
+        let mut pg_stat_database_conflicts_sql =
+            "SELECT * FROM pg_stat_database_conflicts".to_owned();
+        if !match_sql.is_empty() {
+            pg_stat_database_conflicts_sql += " WHERE";
+            pg_stat_database_conflicts_sql += &match_sql;
+        }
+
+        Ok(Self {
+            pg_stat_database_sql,
+            pg_stat_database_conflicts_sql,
+            match_params,
+        })
+    }
+
+    fn clean_databases(names: Vec<String>) -> (Vec<String>, bool) {
+        let mut set = names.into_iter().collect::<HashSet<_>>();
+        let null = set.remove(&"".to_owned());
+        (set.into_iter().collect(), null)
+    }
+
+    fn build_match_params(include: Vec<String>, exclude: Vec<String>) -> (String, Vec<String>) {
+        let mut query = String::new();
+        let mut params = vec![];
 
         if !include.is_empty() {
-            let (need_null, databases) = Self::remove_empty(include);
-            return Self::Include {
-                need_null,
-                databases,
-            };
+            query.push_str(" (");
+            for (i, name) in include.into_iter().enumerate() {
+                params.push(name);
+                if i > 0 {
+                    query.push_str(" OR");
+                }
+                query.push_str(&format!(" datname ~ ${}", params.len()));
+            }
+            query.push(')');
         }
 
         if !exclude.is_empty() {
-            let (need_null, databases) = Self::remove_empty(exclude);
-            return Self::Exclude {
-                need_null,
-                databases,
-            };
-        }
-
-        Self::None
-    }
-
-    fn remove_empty(mut names: HashSet<String>) -> (bool, Vec<String>) {
-        let null = names.remove(&"".to_owned());
-        (null, names.into_iter().collect())
-    }
-
-    fn build_match_params(sql: &mut String, len: usize, include: bool) {
-        if len > 0 {
-            let op = if include {
-                (" OR", "~")
-            } else {
-                (" AND", "!~")
-            };
-
-            sql.push_str(" WHERE (");
-            for i in 1..=len {
-                if i > 1 {
-                    sql.push_str(op.0);
-                }
-                sql.push_str(&format!(" datname {} ${}", op.1, i));
+            if !query.is_empty() {
+                query.push_str(" AND");
             }
-            sql.push_str(")");
+
+            query.push_str(" (");
+            for (i, name) in exclude.into_iter().enumerate() {
+                params.push(name);
+                if i > 0 {
+                    query.push_str(" AND");
+                }
+                query.push_str(&format!(" datname !~ ${}", params.len()));
+            }
+            query.push(')');
         }
+
+        (query, params)
     }
 
-    fn to_params(list: &Vec<String>) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
+    fn get_match_params(&self) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
         let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
-            Vec::with_capacity(list.len());
-        for item in list {
+            Vec::with_capacity(self.match_params.len());
+        for item in self.match_params.iter() {
             params.push(item);
         }
         params
     }
 
     async fn pg_stat_database(&self, client: &Client) -> Result<Vec<Row>, PgError> {
-        let mut conditions = "SELECT * FROM pg_stat_database".to_owned();
-        match self {
-            Self::Include {
-                need_null,
-                databases,
-            } => {
-                Self::build_match_params(&mut conditions, databases.len(), true);
-                if *need_null {
-                    if !databases.is_empty() {
-                        conditions += " WHERE";
-                    } else {
-                        conditions += " OR";
-                    }
-                    conditions += " datname IS NULL";
-                }
-                client
-                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
-                    .await
-            }
-            Self::Exclude {
-                need_null,
-                databases,
-            } => {
-                Self::build_match_params(&mut conditions, databases.len(), false);
-                if *need_null {
-                    if databases.is_empty() {
-                        conditions += " WHERE";
-                    } else {
-                        conditions += " AND";
-                    }
-                    conditions += " datname IS NOT NULL";
-                } else {
-                    if databases.is_empty() {
-                        conditions += " WHERE";
-                    } else {
-                        conditions += " OR";
-                    }
-                    conditions += " datname IS NULL";
-                }
-                client
-                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
-                    .await
-            }
-            Self::None => client.query(conditions.as_str(), &[]).await,
-        }
+        client
+            .query(
+                self.pg_stat_database_sql.as_str(),
+                self.get_match_params().as_slice(),
+            )
+            .await
     }
 
     async fn pg_stat_database_conflicts(&self, client: &Client) -> Result<Vec<Row>, PgError> {
-        let mut conditions = "SELECT * FROM pg_stat_database_conflicts".to_owned();
-        match self {
-            Self::Include { databases, .. } => {
-                Self::build_match_params(&mut conditions, databases.len(), true);
-                client
-                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
-                    .await
-            }
-            Self::Exclude { databases, .. } => {
-                Self::build_match_params(&mut conditions, databases.len(), false);
-                client
-                    .query(conditions.as_str(), Self::to_params(databases).as_slice())
-                    .await
-            }
-            Self::None => client.query(conditions.as_str(), &[]).await,
-        }
+        client
+            .query(
+                self.pg_stat_database_conflicts_sql.as_str(),
+                self.get_match_params().as_slice(),
+            )
+            .await
     }
 
     async fn pg_stat_bgwriter(&self, client: &Client) -> Result<Row, PgError> {
@@ -1050,5 +1036,24 @@ mod integration_tests {
             Some(vec!["".to_owned()]),
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_host_include_databases_and_exclude_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            Some(vec!["template\\d+".to_owned()]),
+            Some(vec!["template0".to_owned()]),
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags.unwrap().get("db") {
+                assert!(db == "template1");
+            }
+        }
     }
 }
