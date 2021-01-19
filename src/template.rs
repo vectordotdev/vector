@@ -10,9 +10,9 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -27,19 +27,12 @@ pub struct Template {
     has_fields: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Snafu, Eq, PartialEq)]
 pub enum TemplateError {
+    #[snafu(display("Missing fields on event: {:?}", fields))]
+    MissingFields { fields: Vec<String> },
+    #[snafu(display("Invalid strftime item"))]
     StrftimeError,
-}
-
-impl Error for TemplateError {}
-
-impl fmt::Display for TemplateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StrftimeError => write!(f, "Invalid strftime item"),
-        }
-    }
 }
 
 impl TryFrom<&str> for Template {
@@ -101,11 +94,11 @@ fn is_dynamic(item: &Item) -> bool {
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateError> {
         self.render_string(event).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
+    pub fn render_string(&self, event: &Event) -> Result<String, TemplateError> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -141,7 +134,7 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
+fn render_fields(src: &str, event: &Event) -> Result<String, TemplateError> {
     let mut missing_fields = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
@@ -163,7 +156,9 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
     if missing_fields.is_empty() {
         Ok(out)
     } else {
-        Err(missing_fields)
+        Err(TemplateError::MissingFields {
+            fields: missing_fields,
+        })
     }
 }
 
@@ -307,7 +302,9 @@ mod tests {
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(vec!["log_stream".to_string(), "foo".to_string()]),
+            Err(TemplateError::MissingFields {
+                fields: vec!["log_stream".to_string(), "foo".to_string()]
+            }),
             template.render(&event)
         );
     }

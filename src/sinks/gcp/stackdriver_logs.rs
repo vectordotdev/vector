@@ -6,11 +6,13 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{HttpSink, PartitionHttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
+            PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
+    template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
 };
 use futures::{FutureExt, SinkExt};
@@ -21,6 +23,45 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+struct VecMap<V> {
+    keys: Vec<String>,
+    values: Vec<V>,
+}
+
+impl<V> From<HashMap<String, V>> for VecMap<V> {
+    fn from(map: HashMap<String, V>) -> Self {
+        let mut entries = map.into_iter().collect::<Vec<_>>();
+        // keys are unique because they come from HashMap,
+        // therefore no need to compare values.
+        entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        let (keys, values) = entries.into_iter().unzip();
+        Self { keys, values }
+    }
+}
+
+impl<V> VecMap<V> {
+    fn keys<'a>(&'a self) -> &[String] {
+        &self.keys
+    }
+}
+
+impl VecMap<Template> {
+    fn render_string(&self, event: &Event) -> Result<Vec<String>, TemplateError> {
+        let mut result = Vec::with_capacity(self.values.len());
+        for v in &self.values {
+            result.push(v.render_string(event)?);
+        }
+        Ok(result)
+    }
+}
+
+#[derive(Hash, Clone, PartialEq, Eq)]
+struct PartitionKey {
+    r#type: String,
+    resource_values: Vec<String>,
+}
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -59,6 +100,7 @@ struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
     severity_key: Option<String>,
+    resource: VecMap<Template>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -86,9 +128,9 @@ pub enum StackdriverLogName {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct StackdriverResource {
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: Template,
     #[serde(flatten)]
-    pub labels: HashMap<String, String>,
+    pub labels: HashMap<String, Template>,
 }
 
 inventory::submit! {
@@ -123,6 +165,7 @@ impl SinkConfig for StackdriverConfig {
         let client = HttpClient::new(tls_settings)?;
 
         let sink = StackdriverSink {
+            resource: self.resource.labels.clone().into(),
             config: self.clone(),
             creds,
             severity_key: self.severity_key.clone(),
@@ -130,9 +173,9 @@ impl SinkConfig for StackdriverConfig {
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
 
-        let sink = BatchedHttpSink::new(
+        let sink = PartitionHttpSink::new(
             sink,
-            JsonArrayBuffer::new(batch.size),
+            PartitionBuffer::new(JsonArrayBuffer::new(batch.size)),
             request,
             batch.timeout,
             client,
@@ -152,12 +195,29 @@ impl SinkConfig for StackdriverConfig {
     }
 }
 
+impl StackdriverSink {
+    fn render_partition_key(&self, event: &Event) -> Result<PartitionKey, TemplateError> {
+        Ok(PartitionKey {
+            r#type: self.config.resource.type_.render_string(&event)?,
+            resource_values: self.resource.render_string(&event)?,
+        })
+    }
+}
+
 #[async_trait::async_trait]
 impl HttpSink for StackdriverSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+    type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
+    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
+        let key = match self.render_partition_key(&event) {
+            Err(error) => {
+                error!(msg = "Error rendering template.", error = %error, rate_limit = 30);
+                return None;
+            }
+            Ok(key) => key,
+        };
+
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -180,16 +240,21 @@ impl HttpSink for StackdriverSink {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
-        Some(json!(entry))
+        Some(PartitionInnerBuffer::new(json!(entry), key))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, output: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+        let (events, partition) = output.into_parts();
+        let labels = IterMap {
+            keys: self.resource.keys(),
+            values: &partition.resource_values,
+        };
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
             "resource": {
-                "type": self.config.resource.type_,
-                "labels": self.config.resource.labels,
+                "type": partition.r#type,
+                "labels": labels,
             }
         });
 
@@ -205,6 +270,26 @@ impl HttpSink for StackdriverSink {
         }
 
         Ok(request)
+    }
+}
+
+struct IterMap<'a, K, V> {
+    keys: &'a [K],
+    values: &'a [V],
+}
+
+impl<'a, K, V> Serialize for IterMap<'a, K, V>
+where
+    K: Serialize,
+    V: Serialize,
+{
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(None)?;
+        for (k, v) in self.keys.iter().zip(self.values.iter()) {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
     }
 }
 
@@ -249,10 +334,13 @@ fn remap_severity(severity: Value) -> Value {
 }
 
 async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+    /*
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    */
+    Ok(())
 }
 
 impl StackdriverConfig {
@@ -294,6 +382,7 @@ mod tests {
         .unwrap();
 
         let sink = StackdriverSink {
+            resource: config.resource.labels.clone().into(),
             config,
             creds: None,
             severity_key: Some("anumber".into()),
@@ -304,7 +393,7 @@ mod tests {
                 .iter()
                 .copied(),
         );
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().1;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
@@ -325,6 +414,7 @@ mod tests {
         .unwrap();
 
         let sink = StackdriverSink {
+            resource: config.resource.labels.clone().into(),
             config,
             creds: None,
             severity_key: Some("anumber".into()),
@@ -338,7 +428,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().1;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
@@ -387,6 +477,7 @@ mod tests {
         .unwrap();
 
         let sink = StackdriverSink {
+            resource: config.resource.labels.clone().into(),
             config,
             creds: None,
             severity_key: None,
