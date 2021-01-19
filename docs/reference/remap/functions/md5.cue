@@ -18,11 +18,10 @@ remap: functions: md5: {
 	examples: [
 		{
 			title: "Create md5 hash"
-			input: log: text: #"foo"#
 			source: #"""
-				.hash = md5(.text)
+				md5("foo")
 				"""#
-			output: input & {log: hash: "acbd18db4cc2f85cedef654fccc4a4d8"}
+			return: "acbd18db4cc2f85cedef654fccc4a4d8"
 		},
 	]
 }

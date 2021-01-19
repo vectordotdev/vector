@@ -24,11 +24,10 @@ remap: functions: ipv6_to_ipv4: {
 	examples: [
 		{
 			title: "IPv6 to IPv4"
-			input: log: v6: "::ffff:192.168.0.1"
 			source: #"""
-				.v4 = ipv6_to_ipv4(.address)
+				ipv6_to_ipv4("::ffff:192.168.0.1")
 				"""#
-			output: input & {log: v4: "192.168.0.1"}
+			return: "192.168.0.1"
 		},
 	]
 }

@@ -20,11 +20,10 @@ remap: functions: parse_url: {
 	examples: [
 		{
 			title: "Parse URL"
-			input: log: url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
 			source: #"""
-				.url = parse_url(.url)
+				parse_url("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
 				"""#
-			output: log: url: {
+			return: {
 				scheme:   "ftp"
 				username: "foo"
 				password: "bar"

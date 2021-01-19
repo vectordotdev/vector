@@ -47,20 +47,18 @@ remap: functions: redact: {
 		"""
 	examples: [
 		{
-			title: "Redact credit card number"
-			input: log: credit_card: "9876123454320123"
+			title: "Redact (credit card number)"
 			source: """
-				.credit_card = redact(.credit_card, filters: ["pattern"], redactor: "full", patterns: [/[0-9]{16}/])
+				redact("9876123454320123", filters: ["pattern"], redactor: "full", patterns: [/[0-9]{16}/])
 				"""
-			output: log: credit_card: "****"
+			return: "****"
 		},
 		{
-			title: "Redact email address"
-			input: log: email: "ana@booper.com"
+			title: "Redact (email address)"
 			source: #"""
-				.email = redact(.email, filters: ["pattern"], redactor: "full", patterns: [/^\S+@\S+$/])
+				redact("vic@vector.dev", filters: ["pattern"], redactor: "full", patterns: [/^\S+@\S+$/])
 				"""#
-			output: log: email: "****"
+			return: "****"
 		},
 	]
 }

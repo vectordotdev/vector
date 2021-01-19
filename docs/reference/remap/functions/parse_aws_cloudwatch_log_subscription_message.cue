@@ -40,7 +40,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 				}
 				"""
 			source: #"""
-				. = parse_aws_cloudwatch_log_subscription_message(.message)
+				parse_aws_cloudwatch_log_subscription_message(.message)
 				"""#
 			output: log: {
 				owner:        "111111111111"

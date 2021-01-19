@@ -21,40 +21,44 @@ remap: functions: length: {
 		"""
 	examples: [
 		{
-			title: "Standard map"
-			input: log: teams: {
-				portland: "Trail Blazers"
-				seattle:  "Supersonics"
-			}
-			source: ".num_teams = length(.teams)"
-			output: input & {log: num_teams: 2}
+			title: "Length (map)"
+			source: """
+				length({
+					"portland": "Trail Blazers"
+					"seattle":  "Supersonics"
+				})
+				"""
+			return: 2
 		},
 		{
-			title: "Array"
-			input: log: teams: ["Trail Blazers", "Supersonics", "Grizzlies"]
-			source: ".num_teams = length(.teams)"
-			output: input & {log: num_teams: 3}
+			title: "Length (nested map)"
+			source: """
+				length({
+					"home": {
+						"city":  "Portland"
+						"state": "Oregon"
+					}
+					"name": "Trail Blazers"
+					"mascot": {
+						"name": "Blaze the Trail Cat"
+					}
+				})
+				"""
+			return: 3
 		},
 		{
-			title: "Nested map"
-			input: log: team: {
-				home: {
-					city:  "Portland"
-					state: "Oregon"
-				}
-				name: "Trail Blazers"
-				mascot: {
-					name: "Blaze the Trail Cat"
-				}
-			}
-			source: ".num_attrs = length(.team)"
-			output: input & {log: num_attrs: 3}
+			title: "Length (array)"
+			source: """
+				length(["Trail Blazers", "Supersonics", "Grizzlies"])
+				"""
+			return: 3
 		},
 		{
-			title: "String"
-			input: log: message: "The Planet of the Apes Musical"
-			source: ".str_len = length(.message)"
-			output: input & {log: str_len: 30}
+			title: "Length (string)"
+			source: """
+				length("The Planet of the Apes Musical")
+				"""
+			return: 30
 		},
 	]
 }

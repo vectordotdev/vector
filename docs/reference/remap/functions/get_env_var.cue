@@ -21,15 +21,10 @@ remap: functions: get_env_var: {
 	examples: [
 		{
 			title: "Get environment variable"
-			input: log: {}
 			source: #"""
-				.home = get_env_var!("HOME")
-				.not_found = get_env_var("SOME_VAR") ?? "default"
+				get_env_var("HOME")
 				"""#
-			output: log: {
-				home:      "/root"
-				not_found: "default"
-			}
+			return: "/root"
 		},
 	]
 }

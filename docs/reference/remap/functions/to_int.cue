@@ -24,19 +24,18 @@ remap: functions: to_int: {
 		"""#
 	examples: [
 		{
-			title: "Coerce to an int"
-			input: log: {
-				string:    "2"
-				timestamp: "2020-12-30 22:20:53.824727 UTC"
-			}
+			title: "Coerce to an int (string)"
 			source: """
-				.string = to_int(.string)
-				.timestamp = to_int(.timestamp)
+				to_int("2")
 				"""
-			output: log: {
-				string:    2
-				timestamp: 1609366853
-			}
+			return: 2
+		},
+		{
+			title: "Coerce to an int (timestamp)"
+			source: """
+				to_int(to_timestamp("2020-12-30 22:20:53.824727 UTC"))
+				"""
+			return: 1609366853
 		},
 	]
 }
