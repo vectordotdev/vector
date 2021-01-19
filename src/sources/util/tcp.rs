@@ -70,8 +70,6 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
-
         let listenfd = ListenFd::from_env();
 
         Ok(Box::pin(async move {
@@ -161,7 +159,7 @@ async fn handle_stream(
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    out: impl Sink<Event> + Send + 'static,
+    mut out: Pipeline,
 ) {
     tokio::select! {
         result = socket.handshake() => {
@@ -184,7 +182,7 @@ async fn handle_stream(
     let mut _token = None;
     let mut shutdown = Some(shutdown);
     let mut reader = FramedRead::new(socket, source.decoder());
-    stream::poll_fn(move |cx| {
+    let mut stream = stream::poll_fn(move |cx| {
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(token) => {
@@ -212,20 +210,23 @@ async fn handle_stream(
         reader.poll_next_unpin(cx)
     })
     .take_until(tripwire)
-    .filter_map(move |frame| ready(match frame {
-        Ok(frame) => {
-            let host = host.clone();
-            source.build_event(frame, host).map(Ok)
-        }
-        Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", %error);
-            None
-        }
-    }))
-    .forward(out)
-    .map_err(|_| warn!(message = "Error received while processing TCP source."))
-    .map(|_| debug!("Connection closed."))
-    .await
+    .filter_map(move |frame| {
+        ready(match frame {
+            Ok(frame) => {
+                let host = host.clone();
+                source.build_event(frame, host)
+            }
+            Err(error) => {
+                warn!(message = "Failed to read data from TCP source.", %error);
+                None
+            }
+        })
+    });
+
+    out.send_stream(&mut stream)
+        .map_err(|_| warn!(message = "Error received while processing TCP source."))
+        .map(|_| debug!("Connection closed."))
+        .await
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
