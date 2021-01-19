@@ -191,8 +191,8 @@ struct DatnameFilter {
 
 impl DatnameFilter {
     fn new(include: Vec<String>, exclude: Vec<String>) -> Result<Self, BuildError> {
-        let (include_databases, include_null) = Self::clean_databases(include.clone());
-        let (exclude_databases, exclude_null) = Self::clean_databases(exclude.clone());
+        let (include_databases, include_null) = Self::clean_databases(include);
+        let (exclude_databases, exclude_null) = Self::clean_databases(exclude);
         let (match_sql, match_params) =
             Self::build_match_params(include_databases, exclude_databases);
 
