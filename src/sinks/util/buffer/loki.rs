@@ -153,6 +153,7 @@ impl Batch for LokiBuffer {
                 .cloned()
                 .unwrap_or(item.event.timestamp);
             if item.event.timestamp < latest_timestamp {
+                warn!(msg = "Received out-of-order event.", rate_limit = 30);
                 match self.out_of_order_action {
                     OutOfOrderAction::Drop => return PushResult::Ok(false),
                     OutOfOrderAction::RewriteTimestamp => {
