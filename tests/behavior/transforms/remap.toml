@@ -1900,9 +1900,9 @@
   inputs = []
   type = "remap"
   source = '''
-    .a = length(parse_json(.a))
-    .b = length(parse_json(.b))
-    .c = length(parse_json(.c))
+    .a = length!(parse_json!(.a))
+    .b = length!(parse_json!(.b))
+    .c = length!(parse_json!(.c))
   '''
 [[tests]]
   name = "remap_function_length"
