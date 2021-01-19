@@ -76,11 +76,13 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: openssl::error::Error },
+    Handshake { source: openssl::ssl::Error },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
     CreateAcceptor { source: ErrorStack },
+    #[snafu(display("Error building SSL context: {}", source))]
+    SslBuildError { source: openssl::error::ErrorStack },
     #[snafu(display("Error setting up the TLS certificate: {}", source))]
     SetCertificate { source: ErrorStack },
     #[snafu(display("Error setting up the TLS private key: {}", source))]

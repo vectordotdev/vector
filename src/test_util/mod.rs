@@ -147,10 +147,15 @@ pub async fn send_lines_tls(
         connector.set_verify(SslVerifyMode::NONE);
     }
 
-    let config = connector.build().configure().unwrap();
+    let ssl = connector
+        .build()
+        .configure()
+        .unwrap()
+        .into_ssl(&host)
+        .unwrap();
 
-    let stream = tokio_openssl::SslStream::new(config, stream).unwrap();
-    stream.connect().await.unwrap();
+    let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
+    Pin::new(&mut stream).connect().await.unwrap();
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);

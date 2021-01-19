@@ -1,13 +1,12 @@
 #[cfg(feature = "listenfd")]
-use super::Handshake;
 use super::{
-    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError,
-    TlsSettings,
+    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError, TcpBind,
+    TlsError, TlsSettings,
 };
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{SslAcceptor, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::{
     future::Future,
@@ -108,7 +107,7 @@ pub struct MaybeTlsIncomingStream<S> {
 
 enum StreamState<S> {
     Accepted(MaybeTlsStream<S>),
-    Accepting(BoxFuture<'static, Result<SslStream<S>, openssl::error::Error>>),
+    Accepting(BoxFuture<'static, Result<SslStream<S>, TlsError>>),
     AcceptError(String),
 }
 
@@ -142,7 +141,13 @@ impl MaybeTlsIncomingStream<TcpStream> {
     ) -> Self {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
-                async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
+                async move {
+                    let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
+                    let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
+                    Pin::new(&mut stream).accept().await;
+                    Ok(stream)
+                }
+                .boxed(),
             ),
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
@@ -153,7 +158,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     #[cfg(feature = "listenfd")]
     pub(crate) async fn handshake(&mut self) -> crate::tls::Result<()> {
         if let StreamState::Accepting(fut) = &mut self.state {
-            let stream = fut.await.context(Handshake)?;
+            let stream = fut.await?;
             self.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
         }
 
