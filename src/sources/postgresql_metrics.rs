@@ -230,6 +230,7 @@ impl DatnameFilter {
             (" AND", "!~")
         };
 
+        // It's not possible to get `WHERE ()` because minimum value of `len` is 1.
         sql.push_str(" WHERE (");
         for i in 1..=len {
             if i > 1 {
