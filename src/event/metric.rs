@@ -18,7 +18,7 @@ pub struct Metric {
     pub data: MetricData,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
@@ -28,7 +28,7 @@ pub struct MetricSeries {
 
 pub type MetricTags = BTreeMap<String, String>;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricName {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -44,7 +44,7 @@ pub struct MetricData {
     pub value: MetricValue,
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 /// A metric may be an incremental value, updating the previous value of
 /// the metric, or absolute, which sets the reference for future

@@ -19,11 +19,9 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        discriminant(&metric.data.value).hash(state);
-        metric.name().hash(state);
-        metric.namespace().hash(state);
-        metric.tags().hash(state);
+        metric.series.hash(state);
         metric.data.kind.hash(state);
+        discriminant(&metric.data.value).hash(state);
 
         match &metric.data.value {
             MetricValue::AggregatedHistogram { buckets, .. } => {
@@ -46,10 +44,8 @@ impl PartialEq for MetricEntry {
         // This differs from a straightforward implementation of `eq` by
         // comparing only the "shape" bits (name, tags, and type) while
         // allowing the contained values to be different.
-        self.name() == other.name()
-            && self.namespace() == other.namespace()
+        self.series == other.series
             && self.data.kind == other.data.kind
-            && self.tags() == other.tags()
             && discriminant(&self.data.value) == discriminant(&other.data.value)
             && match (&self.data.value, &other.data.value) {
                 (
