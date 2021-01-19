@@ -1,0 +1,11 @@
+# SKIP
+#
+# Division is a fallible operation, because division by 0 fails.
+#
+# It currently is marked as infallible, which in turn prevents us from using
+# the fallible assignment operation.
+#
+# object: {}
+# result: TODO
+
+ok, err = 1 / 0

@@ -1,4 +1,5 @@
 use ansi_term::Colour;
+use glob::glob;
 use remap::{diagnostic::Formatter, prelude::*, Program, Runtime};
 use std::fs;
 use std::path::PathBuf;
@@ -10,12 +11,15 @@ fn main() {
         .unwrap_or_default();
 
     let mut failed_count = 0;
-    let tests = fs::read_dir("tests").expect("dir exists");
+    for entry in glob("tests/**/*.vrl").expect("valid pattern") {
+        let path = match entry {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
 
-    for file in tests {
-        let mut test = Test::new(file.expect("file").path());
+        let mut test = Test::new(path);
 
-        print!("{:.<60}", test.name);
+        print!("{:.<70}", test.name);
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
@@ -36,15 +40,18 @@ fn main() {
                         let got = value.to_string();
 
                         if got == want {
-                            println!("{}", Colour::Green.bold().paint("OK"));
+                            if !test.skip {
+                                println!("{}", Colour::Green.bold().paint("OK"));
+                            }
                         } else {
-                            println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                            if !test.skip {
+                                println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                                failed_count += 1;
+                            }
 
                             let diff =
                                 prettydiff::diff_chars(&want, &got).set_highlight_whitespace(true);
                             println!("  {}", diff);
-
-                            failed_count += 1;
                         }
 
                         if verbose {
@@ -58,9 +65,14 @@ fn main() {
                         let want = want.trim().to_owned();
 
                         if got == want {
-                            println!("{}", Colour::Green.bold().paint("OK"));
+                            if !test.skip {
+                                println!("{}", Colour::Green.bold().paint("OK"));
+                            }
                         } else {
-                            println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
+                            if !test.skip {
+                                println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
+                                failed_count += 1;
+                            }
 
                             let diff = prettydiff::diff_lines(&want, &got);
                             println!("{}", diff);
@@ -80,7 +92,10 @@ fn main() {
                 if got == want {
                     println!("{}", Colour::Green.bold().paint("OK"));
                 } else {
-                    println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
+                    if !test.skip {
+                        println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
+                        failed_count += 1;
+                    }
 
                     let diff = prettydiff::diff_lines(&want, &got);
                     println!("{}", diff);
