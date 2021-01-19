@@ -8,10 +8,10 @@ modify your observability data as it passes through your Vector
 [topology][docs.topology].
 
 The transform that you will likely use most often is the [`remap`][docs.remap]
-transform, which enables you to use a single-purpose data transformation
-language called [Vector Remap Language][docs.vrl] (VRL for short) to define your
+transform, which uses a single-purpose data transformation language called
+[Vector Remap Language][docs.vrl] (VRL for short) to define event
 transformation logic. VRL has several features that should make it your first
-choice for Vector transforms:
+choice for transforming data in Vector:
 
 * It offers a wide range of observability-data-specific
   [functions][docs.vrl_funcs] that map directly to observability use cases.
@@ -27,6 +27,11 @@ In cases where VRL doesn't fit your use case, Vector also offers two [runtime
 transforms](#runtime-transforms) that offer a bit more flexibility than VRL but
 also come with downsides (listed below) that should always be borne in mind.
 
+> If your observability use case isn't covered by VRL, please feel *very*
+> welcome to [open an issue][urls.issue] describing your use case. The Vector
+> team will follow up with potential solutions and workarounds or, in some
+> cases, updates to VRL that directly address your needs.
+
 ## Transforming data using VRL
 
 Let's jump straight into an example of using VRL to modify some data. We'll
@@ -35,7 +40,7 @@ create a simple topology consisting of three components:
 1. A [`generator`][docs.generator] source produces random [Syslog][urls.syslog]
    messages at a rate of 10 per second.
 2. A [`remap`][docs.remap] transform uses VRL to parse incoming Syslog lines
-   into named fields (`severity`, `timestamp`, etc.)
+   into named fields (`severity`, `timestamp`, etc.).
 3. A [`console`][docs.console] sink pipes the output of the topology to stdout,
    so that we can see the results on the command line.
 
@@ -119,15 +124,16 @@ transform to make some ad hoc transformations:
 
 A few things to notice about this script:
 
-* Any errors thrown by VRL functions must be handled. If we neglected to handle
-  a potential error thrown by the `parse_syslog` function here, for example, the
-  VRL compiler would provide a very specific warning and Vector wouldn't start
-  up.
-* VRL supports variables, like `is_critical` above.
+* Any errors thrown by VRL functions must be handled. Were we to neglect to
+  handle the potential error thrown by the `parse_syslog` function, for example,
+  the VRL compiler would provide a very specific warning and Vector wouldn't
+  start up.
+* VRL has language constructs like variables, `if` statements, comments, and
+  logging.
 * The `.` acts as a sort of "container" for the event data. `.` by itself refers
-  to the root event, while you can use paths like `.foo`, `.foo[0]`,
-  `.foo.bar`, `.foo.bar[0]`, and so on to reference subfields, array indices,
-  and more.
+  to the root event, while you can use [paths][docs.vrl_paths] like `.foo`,
+  `.foo[0]`, `.foo.bar`, `.foo.bar[0]`, and so on to reference subfields, array
+  indices, and more.
 
 If you stop and restart Vector, you should see log lines like this (again
 reformatted for readability):
@@ -152,11 +158,6 @@ recommend checking out the following documentation:
 * [VRL examples][docs.vrl_examples]
 * The [VRL specification][docs.vrl_spec], which describes things VRL's syntax
   and type system in great detail
-
-> If your observability use case isn't covered by VRL, please feel *very*
-> welcome to [open an issue][urls.issue] describing your use case. The Vector
-> will follow up with potential solutions and workarounds or, in some cases,
-> updates to VRL that directly address your needs.
 
 ## Runtime transforms
 
@@ -190,6 +191,7 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.vrl]: /docs/reference/vrl
 [docs.vrl_examples]: /docs/reference/vrl/examples
 [docs.vrl_funcs]: /docs/reference/vrl/functions
+[docs.vrl_paths]: /docs/reference/vrl/spec/#path
 [docs.vrl_spec]: /docs/reference/vrl/spec
 [docs.wasm]: /docs/reference/transforms/wasm
 [urls.issue]: https://github.com/timberio/vector/issues/new?assignees=&labels=type%3A+enhancement&template=enhancement.md&title=
