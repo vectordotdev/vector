@@ -88,6 +88,18 @@ pub fn init() -> crate::Result<()> {
 }
 
 /// [`VectorRegistry`] is a vendored version of [`metrics_util::Registry`].
+///
+/// We are removing the generational wrappers that upstream added, as they
+/// might've been the cause of the performance issues on the multi-core systems
+/// under high paralellism.
+///
+/// The suspicion is that the atomics usage in the generational somehow causes
+/// permanent cache invalidation starvation at some scenarios - however, it's
+/// based on the empiric observations, and we currently don't have
+/// a comprehensive mental model to back up this behaviour.
+/// It was decided to just eliminate the generationals - for now.
+/// Maybe in the long term too - we don't need them, so why pay the price?
+/// They're not zero-cost.
 #[derive(Debug)]
 struct VectorRegistry<K, H>
 where
