@@ -134,7 +134,7 @@ impl MaybeTlsStream<TcpStream> {
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+        // stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
 
         Ok(())
     }

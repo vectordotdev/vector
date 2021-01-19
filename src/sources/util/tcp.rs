@@ -191,9 +191,9 @@ async fn handle_stream(
                     // that it should stop writing and close the channel.
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
                     if let Some(socket) = socket {
-                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-                        }
+                        // if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+                        // warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+                        // }
                     } else {
                         // Connection hasn't yet been established so we are done here.
                         debug!("Closing connection that hasn't yet been fully established.");

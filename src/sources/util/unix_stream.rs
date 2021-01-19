@@ -98,7 +98,7 @@ where
                     info!("Finished sending.");
 
                     let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
-                    let _ = socket.shutdown(std::net::Shutdown::Both);
+                    // let _ = socket.shutdown(std::net::Shutdown::Both);
                 }
                 .instrument(span),
             );

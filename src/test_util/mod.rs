@@ -127,7 +127,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    // stream.shutdown(Shutdown::Both).unwrap();
 
     Ok(())
 }
@@ -162,7 +162,7 @@ pub async fn send_lines_tls(
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut().get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    // stream.shutdown(Shutdown::Both).unwrap();
 
     Ok(())
 }

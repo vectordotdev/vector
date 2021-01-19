@@ -174,7 +174,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
+        // stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
 
         Ok(())
     }
