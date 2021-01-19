@@ -12,10 +12,17 @@ pub enum Direction {
     Desc,
 }
 
+impl Default for Direction {
+    fn default() -> Self {
+        Direction::Asc
+    }
+}
+
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentsSortField", params(ComponentsSortFieldName)))]
 pub struct SortField<T: InputType> {
     pub field: T,
+    #[graphql(default_with = "Direction::default()")]
     pub direction: Direction,
 }
 
@@ -28,7 +35,7 @@ pub trait SortableByField<T: InputType> {
 pub fn by_fields<T: InputType>(f: &mut [impl SortableByField<T>], sort_fields: &[SortField<T>]) {
     f.sort_by(|a, b| {
         sort_fields
-            .into_iter()
+            .iter()
             .fold_while(Ordering::Equal, |cmp, f| match cmp {
                 Ordering::Equal => {
                     let cmp = a.sort(b, &f.field);
