@@ -66,7 +66,7 @@ pub enum OutOfOrderAction {
 
 impl Default for OutOfOrderAction {
     fn default() -> OutOfOrderAction {
-        OutOfOrderAction::RewriteTimestamp
+        OutOfOrderAction::Drop
     }
 }
 
