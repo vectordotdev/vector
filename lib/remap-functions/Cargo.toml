@@ -60,6 +60,7 @@ default = [
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_nullish",
+    "length",
     "log",
     "match",
     "md5",
@@ -127,6 +128,7 @@ ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 is_nullish = []
+length = []
 log = ["tracing"]
 match = ["regex"]
 md5 = ["md-5", "hex"]

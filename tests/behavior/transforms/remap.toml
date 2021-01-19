@@ -1895,3 +1895,26 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '.a == "A long multiline string"'
+
+[transforms.remap_function_length]
+  inputs = []
+  type = "remap"
+  source = '''
+    .a = length(parse_json(.a))
+    .b = length(parse_json(.b))
+    .c = length(parse_json(.c))
+  '''
+[[tests]]
+  name = "remap_function_length"
+  [tests.input]
+    insert_at = "remap_function_length"
+    type = "log"
+    [tests.input.log_fields]
+    a = '[1, 2, 3]'
+    b = '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
+    c = '[[1, 2, 3], [4, 5, 6], []]'
+  [[tests.outputs]]
+    extract_from = "remap_function_length"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '[.a, .b, .c] == [3, 2, 3]'
