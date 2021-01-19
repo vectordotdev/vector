@@ -63,12 +63,6 @@ pub struct ComponentsFilter {
     or: Option<Vec<Self>>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum ComponentsSortFieldName {
-    Name,
-    ComponentKind,
-}
-
 impl filter::CustomFilter<Component> for ComponentsFilter {
     fn matches(&self, component: &Component) -> bool {
         filter_check!(
