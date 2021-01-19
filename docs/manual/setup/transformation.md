@@ -14,7 +14,7 @@ transformation logic. VRL has several features that should make it your first
 choice for transforming data in Vector:
 
 * It offers a wide range of observability-data-specific
-  [functions][docs.vrl_funcs] that map directly to observability use cases.
+  [functions][docs.vrl.funcs] that map directly to observability use cases.
 * It's built for the very specific use case of working with Vector logs and
   metrics, which means that it has no extraneous functionality, its data model
   maps directly to Vector's internal data model, and its performance comes quite
@@ -131,7 +131,7 @@ A few things to notice about this script:
 * VRL has language constructs like variables, `if` statements, comments, and
   logging.
 * The `.` acts as a sort of "container" for the event data. `.` by itself refers
-  to the root event, while you can use [paths][docs.vrl_paths] like `.foo`,
+  to the root event, while you can use [paths][docs.vrl.paths] like `.foo`,
   `.foo[0]`, `.foo.bar`, `.foo.bar[0]`, and so on to reference subfields, array
   indices, and more.
 
@@ -154,9 +154,9 @@ And that's it! We've successfully created a Vector topology that transforms
 every event that passes through it. If you'd like to know more about VRL, we
 recommend checking out the following documentation:
 
-* A full list listing of [VRL functions][docs.vrl_funcs]
-* [VRL examples][docs.vrl_examples]
-* The [VRL specification][docs.vrl_spec], which describes things VRL's syntax
+* A full list listing of [VRL functions][docs.vrl.funcs]
+* [VRL examples][docs.vrl.examples]
+* The [VRL specification][docs.vrl.spec], which describes things VRL's syntax
   and type system in great detail
 
 ## Runtime transforms
@@ -189,10 +189,10 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.topology]: /docs/about/under-the-hood/architecture/topology-model
 [docs.transforms]: /docs/reference/transforms
 [docs.vrl]: /docs/reference/vrl
-[docs.vrl_examples]: /docs/reference/vrl/examples
-[docs.vrl_funcs]: /docs/reference/vrl/functions
-[docs.vrl_paths]: /docs/reference/vrl/spec/#path
-[docs.vrl_spec]: /docs/reference/vrl/spec
+[docs.vrl.examples]: /docs/reference/vrl/examples
+[docs.vrl.funcs]: /docs/reference/vrl/functions
+[docs.vrl.paths]: /docs/reference/vrl/spec/#path
+[docs.vrl.spec]: /docs/reference/vrl/spec
 [docs.wasm]: /docs/reference/transforms/wasm
 [urls.issue]: https://github.com/timberio/vector/issues/new?assignees=&labels=type%3A+enhancement&template=enhancement.md&title=
 [urls.lua]: https://www.lua.org
