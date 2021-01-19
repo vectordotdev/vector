@@ -14,6 +14,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct MetricEntry(pub Metric);
 
+type MetricSet = HashSet<MetricEntry>;
+
 impl Eq for MetricEntry {}
 
 impl Hash for MetricEntry {
@@ -96,52 +98,34 @@ impl DerefMut for MetricEntry {
     }
 }
 
-pub struct MetricBuffer {
-    state: HashSet<MetricEntry>,
-    metrics: HashSet<MetricEntry>,
+pub type MetricBuffer = MetricsBuffer<StdMetricsState>;
+
+/// The metrics buffer is a data structure for collecting a flow of data
+/// points into a batch.
+///
+/// Batching mostly means that we will aggregate away timestamp
+/// information, and apply metric-specific compression to improve the
+/// performance of the pipeline.  In particular, only the latest in a
+/// series of absolute metrics are output, and incremental metrics are
+/// summed together. Further, distribution metrics have their their
+/// samples compressed with `compress_distribution` below.
+///
+/// Some sinks have requirements on the types of the metrics in the
+/// batch. For instance, Datadog requires gauges to be absolute values,
+/// but the Statsd source produces relative gauges. Normalization of
+/// metrics is handled by the `State` type parameter before batching.
+pub struct MetricsBuffer<State> {
+    state: State,
+    metrics: MetricSet,
     max_events: usize,
 }
 
-impl MetricBuffer {
-    // Metric buffer is a data structure for creating normalised
-    // batched metrics data from the flow of data points.
-    //
-    // Batching mostly means that we will aggregate away timestamp information, and
-    // apply metric-specific compression to improve the performance of the pipeline.
-    // For example, multiple counter observations will be summed up into single observation.
-    //
-    // Normalisation is required to make sure Sources and Sinks are exchanging compatible data
-    // structures. For instance, delta gauges produced by Statsd source cannot be directly
-    // sent to Datadog API. In this case the buffer will keep the state of a gauge value, and
-    // produce absolute values gauges that are well supported by Datadog.
-    //
-    // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
-    // them delta counters (e.g. how many events occurred during the flush period). And most sources are
-    // producing exactly these kind of counters, with Prometheus being a notable exception. If the counter
-    // comes already aggregated inside the source, the buffer will compare it's values with the previous
-    // known and calculate the delta.
-    //
-    // This table will summarise how metrics are transforming inside the buffer:
-    //
-    // Normalised and accumulated metrics
-    //   Counter                      => Counter
-    //   Absolute Counter             => Counter
-    //   Gauge                        => Absolute Gauge
-    //   Distribution                 => Distribution
-    //   Set                          => Set
-    //
-    // Deduplicated metrics
-    //   Absolute Gauge               => Absolute Gauge
-    //   AggregatedHistogram          => AggregatedHistogram
-    //   AggregatedSummary            => AggregatedSummary
-    //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
-    //   Absolute AggregatedSummary   => Absolute AggregatedSummary
-    //
+impl<State: MetricsState> MetricsBuffer<State> {
     pub fn new(settings: BatchSize<Self>) -> Self {
-        Self::new_with_state(settings.events, HashSet::new())
+        Self::new_with_state(settings.events, State::default())
     }
 
-    fn new_with_state(max_events: usize, state: HashSet<MetricEntry>) -> Self {
+    fn new_with_state(max_events: usize, state: State) -> Self {
         Self {
             state,
             metrics: HashSet::with_capacity(max_events),
@@ -150,7 +134,7 @@ impl MetricBuffer {
     }
 }
 
-impl Batch for MetricBuffer {
+impl<State: MetricsState> Batch for MetricsBuffer<State> {
     type Input = Event;
     type Output = Vec<Metric>;
 
@@ -169,87 +153,28 @@ impl Batch for MetricBuffer {
             PushResult::Overflow(item)
         } else {
             let item = item.into_metric();
+            let item = match self.state.apply_state(item) {
+                Some(item) => item,
+                None => return PushResult::Ok(self.num_items() >= self.max_events),
+            };
 
-            match (item.data.kind, &item.data.value) {
-                (MetricKind::Absolute, MetricValue::Counter { value }) => {
-                    let value = *value;
-                    let item = MetricEntry(item);
-                    if let Some(MetricEntry(Metric {
-                        data:
-                            MetricData {
-                                value: MetricValue::Counter { value: value0, .. },
-                                ..
-                            },
-                        ..
-                    })) = self.state.get(&item)
-                    {
-                        // Counters are disaggregated. We take the previous value from the state
-                        // and emit the difference between previous and current as a Counter
-                        let delta = MetricEntry(Metric {
-                            series: item.series.clone(),
-                            data: MetricData {
-                                timestamp: item.data.timestamp,
-                                kind: MetricKind::Incremental,
-                                value: MetricValue::Counter {
-                                    value: value - value0,
-                                },
-                            },
-                        });
-
-                        // The resulting Counters could be added up normally
-                        let new_entry = match self.metrics.take(&delta) {
-                            Some(mut existing) => {
-                                existing.data.add(&item.data);
-                                existing
-                            }
-                            None => delta,
-                        };
-                        self.metrics.insert(new_entry);
-                    }
-                    self.state.replace(item);
-                }
-                (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
-                    let entry = MetricEntry(item.into_absolute());
-                    if let Some(mut existing) = self.metrics.take(&entry) {
-                        existing.data.update(&entry.data);
-                        self.metrics.insert(existing);
-                    } else {
-                        // If the metric is not present in active batch,
-                        // then we look it up in permanent state, where we keep track
-                        // of its values throughout the entire application uptime
-                        let mut initial = if let Some(default) = self.state.get(&entry) {
-                            default.0.clone()
-                        } else {
-                            // Otherwise we start from zero value
-                            Metric {
-                                series: entry.series.clone(),
-                                data: MetricData {
-                                    timestamp: entry.data.timestamp,
-                                    kind: MetricKind::Absolute,
-                                    value: MetricValue::Gauge { value: 0.0 },
-                                },
-                            }
-                        };
-                        initial.data.update(&entry.data);
-                        self.metrics.insert(MetricEntry(initial));
-                    }
-                }
-                (MetricKind::Absolute, _) => {
-                    self.metrics.replace(MetricEntry(item));
-                }
-                (MetricKind::Incremental, _) => {
+            let new_entry = match item.data.kind {
+                // Absolute metrics simply overwrite older metrics in the buffer.
+                MetricKind::Absolute => MetricEntry(item),
+                MetricKind::Incremental => {
+                    // Incremental metrics update existing entries, if present.
                     let entry = MetricEntry(item);
                     match self.metrics.take(&entry) {
                         Some(mut existing) => {
-                            existing.data.add(&entry.data);
-                            self.metrics.insert(existing);
+                            existing.data.update(&entry.data);
+                            existing
                         }
-                        None => {
-                            self.metrics.insert(entry);
-                        }
+                        None => entry,
                     }
                 }
-            }
+            };
+            self.metrics.replace(new_entry);
+
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -259,15 +184,7 @@ impl Batch for MetricBuffer {
     }
 
     fn fresh(&self) -> Self {
-        let mut state = self.state.clone();
-        for entry in self.metrics.iter() {
-            let data = &entry.data;
-            if (data.value.is_gauge() || data.value.is_counter()) && data.kind.is_absolute() {
-                state.replace(entry.clone());
-            }
-        }
-
-        Self::new_with_state(self.max_events, state)
+        Self::new_with_state(self.max_events, self.state.fresh(&self.metrics))
     }
 
     fn finish(self) -> Self::Output {
@@ -286,6 +203,110 @@ impl Batch for MetricBuffer {
 
     fn num_items(&self) -> usize {
         self.metrics.len()
+    }
+}
+
+/// The metrics state trait abstracts how data point normalization is
+/// done.  Normalisation is required to make sure Sources and Sinks are
+/// exchanging compatible data structures. For instance, delta gauges
+/// produced by Statsd source cannot be directly sent to Datadog API. In
+/// this case the buffer will keep the state of a gauge value, and
+/// produce absolute values gauges that are well supported by Datadog.
+///
+/// Another example of normalisation is disaggregation of counters. Most
+/// sinks would expect we send them delta counters (e.g. how many events
+/// occurred during the flush period). And most sources are producing
+/// exactly these kind of counters, with Prometheus being a notable
+/// exception. If the counter comes already aggregated inside the
+/// source, the buffer will compare it's values with the previous known
+/// and calculate the delta.
+pub trait MetricsState: Default {
+    fn apply_state(&mut self, metric: Metric) -> Option<Metric>;
+    fn fresh(&self, metrics: &MetricSet) -> Self;
+}
+
+/// This is the "standard" metrics normalization handler. It handles two cases:
+///
+/// 1. Absolute counters are disaggregated into incremental counters,
+/// indicating how many events happened during the flush period.
+///
+/// 2. Incremental gauges are converted into absolute values by keeping
+/// track of the accumulated value and re-emitting the resulting value
+/// as an absolute gauge.
+///
+/// All other metrics are left unchanged.
+#[derive(Default)]
+pub struct StdMetricsState {
+    state: MetricSet,
+}
+
+impl MetricsState for StdMetricsState {
+    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+        match (metric.data.kind, &metric.data.value) {
+            (MetricKind::Absolute, MetricValue::Counter { value }) => {
+                let new_value = *value;
+                let entry = MetricEntry(metric);
+                let result = match self.state.get(&entry) {
+                    Some(MetricEntry(Metric {
+                        data:
+                            MetricData {
+                                value: MetricValue::Counter { value: old_value },
+                                ..
+                            },
+                        ..
+                    })) => {
+                        // Counters are disaggregated. We take the previous value from the state
+                        // and emit the difference between previous and current as a Counter
+                        Some(Metric {
+                            series: entry.series.clone(),
+                            data: MetricData {
+                                timestamp: entry.data.timestamp,
+                                kind: MetricKind::Incremental,
+                                value: MetricValue::Counter {
+                                    value: new_value - old_value,
+                                },
+                            },
+                        })
+                    }
+                    _ => None,
+                };
+                self.state.replace(entry);
+                result
+            }
+            (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
+                // Convert incremental gauges into absolute ones, using
+                // the state buffer to keep track of its value
+                // throughout the entire application uptime.
+                let mut entry = MetricEntry(metric.into_absolute());
+                let mut existing = self.state.take(&entry).unwrap_or_else(|| {
+                    // Start from zero value if the entry is not found.
+                    MetricEntry(Metric {
+                        series: entry.series.clone(),
+                        data: MetricData {
+                            timestamp: entry.data.timestamp,
+                            kind: MetricKind::Absolute,
+                            value: MetricValue::Gauge { value: 0.0 },
+                        },
+                    })
+                });
+                existing.data.update(&entry.data);
+                entry.data.value = existing.data.value.clone();
+                self.state.insert(existing);
+                Some(entry.0)
+            }
+            _ => Some(metric),
+        }
+    }
+
+    fn fresh(&self, metrics: &MetricSet) -> Self {
+        let mut state = self.state.clone();
+        for entry in metrics {
+            let data = &entry.data;
+            if (data.value.is_gauge() || data.value.is_counter()) && data.kind.is_absolute() {
+                state.replace(entry.clone());
+            }
+        }
+        Self { state }
     }
 }
 
