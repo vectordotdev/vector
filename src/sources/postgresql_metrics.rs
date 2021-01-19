@@ -263,13 +263,13 @@ impl DatnameFilter {
                 query.push_str(" AND");
             }
 
-            query.push_str(" (");
+            query.push_str(" NOT (");
             for (i, name) in exclude.into_iter().enumerate() {
                 params.push(name);
                 if i > 0 {
-                    query.push_str(" AND");
+                    query.push_str(" OR");
                 }
-                query.push_str(&format!(" datname !~ ${}", params.len()));
+                query.push_str(&format!(" datname ~ ${}", params.len()));
             }
             query.push(')');
         }
