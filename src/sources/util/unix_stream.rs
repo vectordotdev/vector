@@ -7,6 +7,7 @@ use crate::{
     sources::Source,
     Pipeline,
 };
+use async_stream::stream;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
 use std::{future::ready, path::PathBuf};
@@ -39,7 +40,13 @@ where
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         let connection_open = OpenGauge::new();
-        let mut stream = listener.incoming().take_until(shutdown.clone());
+        let mut stream = stream! {
+            loop {
+                yield listener.accept().await.map(|(stream, _addr)| stream)
+            }
+        }
+        .take_until(shutdown.clone());
+        tokio::pin!(stream);
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
