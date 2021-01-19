@@ -378,7 +378,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^\\w.*/)"
+    starts_when.source = "match!(.message, /^\\w.*/)"
 
 [[tests]]
   name = "reduce_ruby_exception"
@@ -437,7 +437,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     ends_when.type = "remap"
-    ends_when.source = """!ends_with(strip_whitespace(.message), "\\\\")"""
+    ends_when.source = """!ends_with(strip_whitespace!(.message), "\\\\")"""
 
 [[tests]]
   name = "reduce_line_continuation"
@@ -491,7 +491,7 @@
   type = "reduce"
   merge_strategies.message = "concat"
   ends_when.type = "remap"
-  ends_when.source = """ends_with(strip_whitespace(.message), ";")"""
+  ends_when.source = """ends_with(strip_whitespace!(.message), ";")"""
 
 [[tests]]
   name = "reduce_line_termination"
@@ -545,7 +545,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^<\\d\\d> /)"
+    starts_when.source = "match!(.message, /^<\\d\\d> /)"
 
 [[tests]]
   name = "reduce_log_stream"
@@ -599,7 +599,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^\\d{4}-\\d{2}-\\d{2} .+/)"
+    starts_when.source = "match!(.message, /^\\d{4}-\\d{2}-\\d{2} .+/)"
 
 [[tests]]
   name = "reduce_java_exception"
@@ -669,6 +669,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        starts_with(.message, "2020-10-19 04:34:15,389") && \
-        ends_with(.message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
+        starts_with!(.message, "2020-10-19 04:34:15,389") && \
+        ends_with!(.message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
       '''

@@ -1,0 +1,16 @@
+# object: { "bar": "bar" }
+# result:
+#
+# error: program aborted
+#   ┌─ :2:1
+#   │
+# 2 │ parse_json!("{ INVALID }")
+#   │ ^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   │ │
+#   │ function call error
+#   │ unable to parse json: key must be a string at line 1 column 3
+#   │
+#   = see function documentation at: https://master.vector.dev/docs/reference/remap/#parse_json
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+parse_json!("{ INVALID }")

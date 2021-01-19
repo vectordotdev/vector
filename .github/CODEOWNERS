@@ -37,6 +37,7 @@
 /docs/reference/components/sources/kubernetes_logs.cue @timberio/vector-kubernetes
 /docs/reference/components/sources/mongodb_metrics.cue @fanatid
 /docs/reference/components/sources/nginx_metrics.cue @fanatid
+/docs/reference/components/sources/postgresql_metrics.cue @fanatid @jszwedko
 /docs/reference/components/sources/prometheus_scrape.cue @bruceg
 /docs/reference/components/sources/prometheus_remote_write.cue @bruceg
 /docs/reference/components/sources/stdin.cue @bruceg
@@ -187,6 +188,7 @@
 /src/sources/journald.rs @bruceg
 /src/sources/mongodb_metrics/ @fanatid
 /src/sources/nginx/ @fanatid
+/src/sources/postgresql_metrics.rs @fanatid @jszwedko
 /src/sources/prometheus @bruceg
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen

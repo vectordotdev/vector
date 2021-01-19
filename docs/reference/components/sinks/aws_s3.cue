@@ -91,12 +91,14 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				enum: {
-					"private":            "Owner gets FULL_CONTROL. No one else has access rights (default)."
-					"public-read":        "Owner gets FULL_CONTROL. The AllUsers group gets READ access."
-					"public-read-write":  "Owner gets FULL_CONTROL. The AllUsers group gets READ and WRITE access. Granting this on a bucket is generally not recommended."
-					"aws-exec-read":      "Owner gets FULL_CONTROL. Amazon EC2 gets READ access to GET an Amazon Machine Image (AMI) bundle from Amazon S3."
-					"authenticated-read": "Owner gets FULL_CONTROL. The AuthenticatedUsers group gets READ access."
-					"log-delivery-write": "The LogDelivery group gets WRITE and READ_ACP permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](https://docs.aws.amazon.com/AmazonS3/latest/dev/ServerLogs.html)."
+					"private":                   "Owner gets `FULL_CONTROL`. No one else has access rights (default)."
+					"public-read":               "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` access."
+					"public-read-write":         "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` and `WRITE` access. Granting this on a bucket is generally not recommended."
+					"aws-exec-read":             "Owner gets `FULL_CONTROL`. Amazon EC2 gets `READ` access to `GET` an Amazon Machine Image (AMI) bundle from Amazon S3."
+					"authenticated-read":        "Owner gets `FULL_CONTROL`. The AuthenticatedUsers group gets `READ` access."
+					"bucket-owner-read":         "Object owner gets `FULL_CONTROL`. Bucket owner gets `READ. access."
+					"bucket-owner-full-control": "Both the object owner and the bucket owner get `FULL_CONTROL` over the object."
+					"log-delivery-write":        "The LogDelivery group gets `WRITE` and `READ_ACP` permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](\(urls.aws_s3_server_access_logs))."
 				}
 			}
 		}

@@ -27,6 +27,7 @@ pub mod hash_value;
 pub mod instrumenting_watcher;
 pub mod mock_watcher;
 pub mod multi_response_decoder;
+pub mod pod_manager_logic;
 pub mod reflector;
 pub mod resource_version;
 pub mod state;
