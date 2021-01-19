@@ -14,8 +14,8 @@
     type = "remap"
     source = '''
       message = if exists(.tags) { .tags.message } else { .message }
-      contains(message, "test filter") && \
-      contains(message, "2")
+      contains!(message, "test filter") && \
+      contains!(message, "2")
     '''
 [transforms.filter_c]
   inputs = ["ignored"]

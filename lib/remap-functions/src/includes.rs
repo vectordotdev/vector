@@ -55,7 +55,6 @@ impl Expression for IncludesFn {
             .fallible_unless(Kind::Array)
             .merge(self.item.type_def(state))
             .with_constraint(Kind::Boolean)
-            .with_inner_type(None)
     }
 }
 

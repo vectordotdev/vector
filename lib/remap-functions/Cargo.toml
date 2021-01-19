@@ -26,7 +26,7 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.7", optional = true }
+syslog_loose = { version = "0.8", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
@@ -60,6 +60,7 @@ default = [
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_nullish",
+    "length",
     "log",
     "match",
     "md5",
@@ -127,6 +128,7 @@ ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 is_nullish = []
+length = []
 log = ["tracing"]
 match = ["regex"]
 md5 = ["md-5", "hex"]

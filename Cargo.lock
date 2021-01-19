@@ -944,6 +944,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codespan-reporting"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6ce42b8998a383572e0a802d859b1f00c79b7b7474e62fff88ee5c2845d9c13"
+dependencies = [
+ "termcolor",
+ "unicode-width",
+]
+
+[[package]]
 name = "colored"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1823,9 +1833,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.7.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
+checksum = "f26ecb66b4bdca6c1409b40fb255eefc2bd4f6d135dab3c3124f80ffa2a9661e"
 dependencies = [
  "log",
  "regex",
@@ -1955,7 +1965,6 @@ dependencies = [
  "indexmap",
  "libc",
  "quickcheck",
- "rand 0.7.3",
  "scan_fmt",
  "serde",
  "serde_json",
@@ -4895,14 +4904,13 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quickcheck"
-version = "0.9.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44883e74aa97ad63db83c4bf8ca490f02b2fc02f92575e720c8551e843c945f"
+checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
 dependencies = [
- "env_logger 0.7.1",
+ "env_logger 0.8.2",
  "log",
- "rand 0.7.3",
- "rand_core 0.5.1",
+ "rand 0.8.2",
 ]
 
 [[package]]
@@ -5353,6 +5361,7 @@ dependencies = [
  "bitflags",
  "bytes 0.5.6",
  "chrono",
+ "codespan-reporting",
  "criterion",
  "dyn-clone",
  "paste",
@@ -5360,6 +5369,7 @@ dependencies = [
  "pest_derive",
  "regex",
  "serde",
+ "termcolor",
  "thiserror",
 ]
 
@@ -5368,6 +5378,7 @@ name = "remap-tests"
 version = "0.1.0"
 dependencies = [
  "ansi_term 0.12.1",
+ "glob 0.3.0",
  "prettydiff",
  "remap-functions",
  "remap-lang",
@@ -6595,12 +6606,12 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59105a46f64e6e0c60a07061ffd07ef42d137735b5d9796572fe969b21342772"
+checksum = "7981176aaf014836371693ebc7e254e865bb2dafa9f7d71943fbde7c87640e35"
 dependencies = [
  "chrono",
- "nom 5.1.2",
+ "nom 6.0.1",
 ]
 
 [[package]]

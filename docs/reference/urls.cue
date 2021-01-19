@@ -67,6 +67,7 @@ urls: {
 	aws_s3_grantee:                                           "\(aws_docs)/AmazonS3/latest/dev/acl-overview.html#specifying-grantee"
 	aws_s3_metadata:                                          "\(aws_docs)/AmazonS3/latest/dev/UsingMetadata.html#object-metadata"
 	aws_s3_regions:                                           "\(aws_docs)/general/latest/gr/rande.html#s3_region"
+	aws_s3_server_access_logs:                                "\(aws_docs)/AmazonS3/latest/dev/ServerLogs.html"
 	aws_s3_service_limits:                                    "\(aws_docs)/streams/latest/dev/service-sizes-and-limits.html"
 	aws_s3_sse:                                               "\(aws_docs)/AmazonS3/latest/dev/UsingServerSideEncryption.html"
 	aws_s3_storage_classes:                                   "https://aws.amazon.com/s3/storage-classes/"
