@@ -79,6 +79,8 @@ Drawbacks to adopting HTTP/2 are that (like literally any other transport we cou
 
 One alternative to consider is that we just commit to providing multiple transports and stick with protobufs for encoding decoding. I think this approach should be considered thoroughly. Assuming we're using protobufs as the only encoding type, maintaining a few different transports might not be a huge maintenance overhead and it could give users some runtime flexibility that might add value.
 
+Another alternative as was pointed out by @MOZGIII the schema that we have currently is simple compared to the use cases that protobuf was designed for - so we could consider writing the whole of the serialization logic with some optimal, specially tailored process. This is likely not worth doing but, it's probably worth discussing. The downside of a hard-written solution is that we'll then maintain our own serialization library - which has a maintenance cost, potentially higher than any tooling overhead.
+
 ## Outstanding Questions
 
 Are there features in GRPC that we'd actually want to use?
