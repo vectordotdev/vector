@@ -213,7 +213,9 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
     group.bench_function("span_enter_without_counter", |b| {
         b.iter_batched_ref(
             || span!(Level::ERROR, "my span"),
-            |span| span.enter(),
+            |span| {
+                let _enter = span.enter();
+            },
             BatchSize::SmallInput,
         );
     });
@@ -221,9 +223,8 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
         b.iter_batched_ref(
             || span!(Level::ERROR, "my span"),
             |span| {
-                let enter = span.enter();
+                let _enter = span.enter();
                 counter!("test", 1);
-                enter
             },
             BatchSize::SmallInput,
         );
@@ -232,9 +233,8 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
         b.iter_batched_ref(
             || span!(Level::ERROR, "my span", "my key" = "my value"),
             |span| {
-                let enter = span.enter();
+                let _enter = span.enter();
                 counter!("test", 1);
-                enter
             },
             BatchSize::SmallInput,
         );
@@ -250,9 +250,8 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
                 )
             },
             |span| {
-                let enter = span.enter();
+                let _enter = span.enter();
                 counter!("test", 1);
-                enter
             },
             BatchSize::SmallInput,
         );
@@ -264,9 +263,8 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
                 span!(Level::ERROR, "my span", "my key" = %my_value)
             },
             |span| {
-                let enter = span.enter();
+                let _enter = span.enter();
                 counter!("test", 1);
-                enter
             },
             BatchSize::SmallInput,
         );
@@ -284,9 +282,8 @@ fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
                 )
             },
             |span| {
-                let enter = span.enter();
+                let _enter = span.enter();
                 counter!("test", 1);
-                enter
             },
             BatchSize::SmallInput,
         );
