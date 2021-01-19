@@ -33,6 +33,9 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     controller
 }
 
+/// This call has negligible (and cosistent) performance compared to the rest
+/// of the benches, however it performs the assertion over the data, effectively
+/// acting as an implicit blackbox.
 fn assert_cardinality_matches(iter: &impl Iterator, cardinality: usize) {
     assert_eq!(iter.size_hint().0, cardinality);
     assert_eq!(iter.size_hint().1.unwrap(), cardinality);
