@@ -138,7 +138,7 @@ impl Batch for LokiBuffer {
         } else {
             // We must sort the stream labels here to ensure they hash to
             // the same stream if the label set matches.
-            item.labels.sort();
+            item.labels.sort_unstable();
 
             let partition = &item.partition;
             if self.latest_timestamps.is_none() {
