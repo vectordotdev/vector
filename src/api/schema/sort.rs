@@ -1,5 +1,9 @@
 use crate::api::schema::components::ComponentsSortFieldName;
 use async_graphql::{Enum, InputObject, InputType};
+use itertools::{
+    FoldWhile::{Continue, Done},
+    Itertools,
+};
 use std::cmp::Ordering;
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
@@ -23,16 +27,18 @@ pub trait SortableByField<T: InputType> {
 /// Performs an in-place sort against a slice of Sortable<T>, with the provided SortField<T>s
 pub fn by_fields<T: InputType>(f: &mut [impl SortableByField<T>], sort_fields: &[SortField<T>]) {
     f.sort_by(|a, b| {
-        let mut cmp = Ordering::Equal;
-        for sf in sort_fields {
-            if cmp != Ordering::Equal {
-                break;
-            }
-            cmp = a.sort(b, &sf.field);
-            if sf.direction == Direction::Desc {
-                cmp = cmp.reverse();
-            }
-        }
-        cmp
-    })
+        sort_fields
+            .into_iter()
+            .fold_while(Ordering::Equal, |cmp, f| match cmp {
+                Ordering::Equal => {
+                    let cmp = a.sort(b, &f.field);
+                    Continue(match f.direction {
+                        Direction::Desc => cmp.reverse(),
+                        _ => cmp,
+                    })
+                }
+                _ => Done(cmp),
+            })
+            .into_inner()
+    });
 }
