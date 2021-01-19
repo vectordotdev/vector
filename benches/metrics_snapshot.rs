@@ -1,4 +1,4 @@
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
@@ -37,6 +37,7 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
 /// of the benches, however it performs the assertion over the data, effectively
 /// acting as an implicit blackbox.
 fn assert_cardinality_matches(iter: &impl Iterator, cardinality: usize) {
+    let iter = black_box(iter);
     assert_eq!(iter.size_hint().0, cardinality);
     assert_eq!(iter.size_hint().1.unwrap(), cardinality);
 }
