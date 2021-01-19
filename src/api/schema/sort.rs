@@ -1,4 +1,4 @@
-use crate::api::schema::components::ComponentsSortFieldName;
+use crate::api::schema::components::{source::SourcesSortFieldName, ComponentsSortFieldName};
 use async_graphql::{Enum, InputObject, InputType};
 use itertools::{
     FoldWhile::{Continue, Done},
@@ -20,6 +20,7 @@ impl Default for Direction {
 
 #[derive(InputObject)]
 #[graphql(concrete(name = "ComponentsSortField", params(ComponentsSortFieldName)))]
+#[graphql(concrete(name = "SourcesSortField", params(SourcesSortFieldName)))]
 pub struct SortField<T: InputType> {
     pub field: T,
     #[graphql(default_with = "Direction::default()")]

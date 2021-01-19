@@ -63,12 +63,6 @@ pub struct ComponentsFilter {
     or: Option<Vec<Self>>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum ComponentsSortFieldName {
-    Name,
-    ComponentKind,
-}
-
 impl filter::CustomFilter<Component> for ComponentsFilter {
     fn matches(&self, component: &Component) -> bool {
         filter_check!(
@@ -85,6 +79,12 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
     fn or(&self) -> Option<&Vec<Self>> {
         self.or.as_ref()
     }
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum ComponentsSortFieldName {
+    Name,
+    ComponentKind,
 }
 
 impl sort::SortableByField<ComponentsSortFieldName> for Component {
@@ -136,9 +136,14 @@ impl ComponentsQuery {
         first: Option<i32>,
         last: Option<i32>,
         filter: Option<source::SourcesFilter>,
+        sort: Option<Vec<sort::SortField<source::SourcesSortFieldName>>>,
     ) -> relay::ConnectionResult<source::Source> {
         let filter = filter.unwrap_or_else(source::SourcesFilter::default);
-        let sources = filter_items(state::get_sources().into_iter(), &filter);
+        let mut sources = filter_items(state::get_sources().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut sources, &sort_fields);
+        }
 
         relay::query(
             sources.into_iter(),
@@ -156,9 +161,14 @@ impl ComponentsQuery {
         first: Option<i32>,
         last: Option<i32>,
         filter: Option<transform::TransformsFilter>,
+        sort: Option<Vec<sort::SortField<transform::TransformsSortFieldName>>>,
     ) -> relay::ConnectionResult<transform::Transform> {
         let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
-        let transforms = filter_items(state::get_transforms().into_iter(), &filter);
+        let mut transforms = filter_items(state::get_transforms().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut transforms, &sort_fields);
+        }
 
         relay::query(
             transforms.into_iter(),
@@ -176,9 +186,14 @@ impl ComponentsQuery {
         first: Option<i32>,
         last: Option<i32>,
         filter: Option<sink::SinksFilter>,
+        sort: Option<Vec<sort::SortField<sink::SinksSortFieldName>>>,
     ) -> relay::ConnectionResult<sink::Sink> {
         let filter = filter.unwrap_or_else(sink::SinksFilter::default);
-        let sinks = filter_items(state::get_sinks().into_iter(), &filter);
+        let mut sinks = filter_items(state::get_sinks().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut sinks, &sort_fields);
+        }
 
         relay::query(
             sinks.into_iter(),
