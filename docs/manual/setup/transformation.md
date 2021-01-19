@@ -144,6 +144,20 @@ reformatted for readability):
 }
 ```
 
+And that's it! We've successfully created a Vector topology that transforms
+every event that passes through it. If you'd like to know more about VRL, we
+recommend checking out the following documentation:
+
+* A full list listing of [VRL functions][docs.vrl_funcs]
+* [VRL examples][docs.vrl_examples]
+* The [VRL specification][docs.vrl_spec], which describes things VRL's syntax
+  and type system in great detail
+
+> If your observability use case isn't covered by VRL, please feel *very*
+> welcome to [open an issue][urls.issue] describing your use case. The Vector
+> will follow up with potential solutions and workarounds or, in some cases,
+> updates to VRL that directly address your needs.
+
 ## Runtime transforms
 
 If VRL doesn't cover your use case—and that should happen rarely—Vector also
@@ -161,7 +175,8 @@ recommend using these transforms only when truly necessary, for several reasons:
 1. The runtime transforms make it all too easy to write scripts that are slow,
    error prone, and hard to read.
 2. Both require you to add a coding/testing/debugging workflow to using Vector,
-   which is worth the effort when truly necessary but best avoided if possible.
+   which is worth the effort if there's no other way to satisfy your use case
+   but best avoided if possible.
 3. Both impose a performance penalty vis-à-vis VRL. Wasm does tend to be faster
    than Lua, but Wasm is more difficult to use given the need to add a
    Wasm compilation step to your Vector workflow.
@@ -173,8 +188,11 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.topology]: /docs/about/under-the-hood/architecture/topology-model
 [docs.transforms]: /docs/reference/transforms
 [docs.vrl]: /docs/reference/vrl
+[docs.vrl_examples]: /docs/reference/vrl/examples
 [docs.vrl_funcs]: /docs/reference/vrl/functions
+[docs.vrl_spec]: /docs/reference/vrl/spec
 [docs.wasm]: /docs/reference/transforms/wasm
+[urls.issue]: https://github.com/timberio/vector/issues/new?assignees=&labels=type%3A+enhancement&template=enhancement.md&title=
 [urls.lua]: https://www.lua.org
 [urls.rust]: https://rust-lang.org
 [urls.syslog]: https://en.wikipedia.org/wiki/Syslog
