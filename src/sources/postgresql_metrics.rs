@@ -224,21 +224,22 @@ impl DatnameFilter {
     }
 
     fn build_match_params(sql: &mut String, len: usize, include: bool) {
-        let op = if include {
-            (" OR", "~")
-        } else {
-            (" AND", "!~")
-        };
+        if len > 0 {
+            let op = if include {
+                (" OR", "~")
+            } else {
+                (" AND", "!~")
+            };
 
-        // It's not possible to get `WHERE ()` because minimum value of `len` is 1.
-        sql.push_str(" WHERE (");
-        for i in 1..=len {
-            if i > 1 {
-                sql.push_str(op.0);
+            sql.push_str(" WHERE (");
+            for i in 1..=len {
+                if i > 1 {
+                    sql.push_str(op.0);
+                }
+                sql.push_str(&format!(" datname {} ${}", op.1, i));
             }
-            sql.push_str(&format!(" datname {} ${}", op.1, i));
+            sql.push_str(")");
         }
-        sql.push_str(")");
     }
 
     fn to_params(list: &Vec<String>) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
@@ -259,7 +260,12 @@ impl DatnameFilter {
             } => {
                 Self::build_match_params(&mut conditions, databases.len(), true);
                 if *need_null {
-                    conditions += " OR datname IS NULL";
+                    if !databases.is_empty() {
+                        conditions += " WHERE";
+                    } else {
+                        conditions += " OR";
+                    }
+                    conditions += " datname IS NULL";
                 }
                 client
                     .query(conditions.as_str(), Self::to_params(databases).as_slice())
@@ -271,9 +277,19 @@ impl DatnameFilter {
             } => {
                 Self::build_match_params(&mut conditions, databases.len(), false);
                 if *need_null {
-                    conditions += " AND datname IS NOT NULL";
+                    if databases.is_empty() {
+                        conditions += " WHERE";
+                    } else {
+                        conditions += " AND";
+                    }
+                    conditions += " datname IS NOT NULL";
                 } else {
-                    conditions += " OR datname IS NULL";
+                    if databases.is_empty() {
+                        conditions += " WHERE";
+                    } else {
+                        conditions += " OR";
+                    }
+                    conditions += " datname IS NULL";
                 }
                 client
                     .query(conditions.as_str(), Self::to_params(databases).as_slice())
@@ -1023,5 +1039,16 @@ mod integration_tests {
                 assert!(db != "vector" && db != "postgres");
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_host_exclude_databases_empty() {
+        test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            None,
+            Some(vec!["".to_owned()]),
+        )
+        .await;
     }
 }
