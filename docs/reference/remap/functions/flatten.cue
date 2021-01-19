@@ -18,25 +18,25 @@ remap: functions: flatten: {
 	examples: [
 		{
 			title: "Flatten array"
-			input: log: array: [1, [2, 3, 4], [5, [6, 7], 8], 9]
 			source: #"""
-				.array = flatten(.array)
+				flatten([1, [2, 3, 4], [5, [6, 7], 8], 9])
 				"""#
-			output: log: array: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+			return: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 		},
 		{
 			title: "Flatten map"
-			input: log: object: grandparent: {
-				parent1: {
-					child1: 1
-					child2: 2
-				}
-				parent2: child1: 3
-			}
 			source: #"""
-				.object = flatten(.object)
+				flatten({
+					"parent1": {
+						"child1": 1,
+						"child2": 2
+					},
+					"parent2": {
+						"child3": 3
+					}
+				})
 				"""#
-			output: log: object: {
+			return: {
 				"grandparent.parent1.child1": 1
 				"grandparent.parent1.child2": 2
 				"grandparent.parent2.child1": 2

@@ -21,9 +21,10 @@ remap: functions: to_syslog_facility: {
 	examples: [
 		{
 			title: "Coerce to a Syslog facility"
-			input: log: syslog_facility: "4"
-			source: ".syslog_facility = to_syslog_facility(.syslog_facility)"
-			output: log: syslog_facility: "auth"
+			source: """
+				to_syslog_facility("4")
+				"""
+			return: "auth"
 		},
 	]
 }

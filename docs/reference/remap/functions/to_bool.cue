@@ -27,28 +27,39 @@ remap: functions: to_bool: {
 		"""#
 	examples: [
 		{
-			title: "Coerce to a boolean"
-			input: log: {
-				string:  "yes"
-				float:   0.0
-				"null":  null
-				integer: 1
-				boolean: false
-			}
+			title: "Coerce to a boolean (string)"
 			source: """
-				.string = to_bool(.string)
-				.float = to_bool(.float)
-				.null = to_bool(.null)
-				.integer = to_bool(.integer)
-				.boolean = to_bool(.boolean)
+				to_bool("yes")
 				"""
-			output: log: {
-				string:  true
-				float:   false
-				null:    false
-				integer: true
-				boolean: false
-			}
+			return: true
+		},
+		{
+			title: "Coerce to a boolean (float)"
+			source: """
+				to_bool(0.0)
+				"""
+			return: false
+		},
+		{
+			title: "Coerce to a boolean (int)"
+			source: """
+				to_bool(0)
+				"""
+			return: false
+		},
+		{
+			title: "Coerce to a boolean (null)"
+			source: """
+				to_bool(null)
+				"""
+			return: false
+		},
+		{
+			title: "Coerce to a boolean (boolean)"
+			source: """
+				to_bool(true)
+				"""
+			return: true
 		},
 	]
 }

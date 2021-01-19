@@ -26,11 +26,10 @@ remap: functions: parse_aws_vpc_flow_log: {
 	examples: [
 		{
 			title: "Parse AWS VPC Flow log (default format)"
-			input: log: message: #"2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"#
 			source: #"""
-				. = parse_aws_vpc_flow_log(.message)
+				parse_aws_vpc_flow_log("2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA")
 				"""#
-			output: log: {
+			return: {
 				"version":      2
 				"account_id":   123456789010
 				"interface_id": "eni-1235b8ca123456789"
@@ -49,11 +48,13 @@ remap: functions: parse_aws_vpc_flow_log: {
 		},
 		{
 			title: "Parse AWS VPC Flow log (custom format)"
-			input: log: message: #"- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"#
 			source: #"""
-				. = parse_aws_vpc_flow_log(.message, "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
+				parse_aws_vpc_flow_log(
+					"- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5",
+					"instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr"
+				)
 				"""#
-			output: log: {
+			return: {
 				"instance_id":  null
 				"interface_id": "eni-1235b8ca123456789"
 				"srcaddr":      "10.0.1.5"

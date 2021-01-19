@@ -32,19 +32,17 @@ remap: functions: ip_subnet: {
 	examples: [
 		{
 			title: "IPv4 subnet"
-			input: log: address: "192.168.10.32"
 			source: #"""
-				.subnet = ip_subnet(.address, "255.255.255.0")
+				ip_subnet("192.168.10.32", "255.255.255.0")
 				"""#
-			output: input & {log: subnet: "192.168.10.0"}
+			return: "192.168.10.0"
 		},
 		{
 			title: "IPv6 subnet"
-			input: log: address: "2404:6800:4003:c02::64"
 			source: #"""
-				.subnet = ip_subnet(.address, "/32")
+				ip_subnet("2404:6800:4003:c02::64", "/32")
 				"""#
-			output: input & {log: subnet: "2404:6800::"}
+			return: "2404:6800::"
 		},
 	]
 }

@@ -37,27 +37,24 @@ remap: functions: encode_base64: {
 	examples: [
 		{
 			title: "Encode to Base64 (default)"
-			input: log: message: "please encode me"
-			source: ".encoded = encode_base64(.message)"
-			output: input & {log: {
-				encoded: "cGxlYXNlIGVuY29kZSBtZQ=="
-			}}
+			source: """
+				.encoded = encode_base64("please encode me")
+				"""
+			return: "cGxlYXNlIGVuY29kZSBtZQ=="
 		},
 		{
 			title: "Encode to Base64 (without padding)"
-			input: log: message: "please encode me, no padding though"
-			source: ".encoded = encode_base64(.message, padding: false)"
-			output: input & {log: {
-				encoded: "cGxlYXNlIGVuY29kZSBtZSwgbm8gcGFkZGluZyB0aG91Z2g"
-			}}
+			source: """
+				encode_base64("please encode me, no padding though", padding: false)
+				"""
+			return: "cGxlYXNlIGVuY29kZSBtZSwgbm8gcGFkZGluZyB0aG91Z2g"
 		},
 		{
 			title: "Encode to Base64 (URL safe)"
-			input: log: message: "please encode me, but safe for URLs"
-			source: #".encoded = encode_base64(.message, charset: "url_safe")"#
-			output: input & {log: {
-				encoded: "cGxlYXNlIGVuY29kZSBtZSwgYnV0IHNhZmUgZm9yIFVSTHM="
-			}}
+			source: """
+				encode_base64("please encode me, but safe for URLs", charset: "url_safe")
+				"""
+			return: "cGxlYXNlIGVuY29kZSBtZSwgYnV0IHNhZmUgZm9yIFVSTHM="
 		},
 	]
 }

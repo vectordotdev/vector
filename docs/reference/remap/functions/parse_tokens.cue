@@ -26,15 +26,12 @@ remap: functions: parse_tokens: {
 	examples: [
 		{
 			title: "Parse tokens"
-			input: log: text: #"""
-				A sentence "with \"a\" sentence inside" and [some brackets]
-				"""#
 			source: #"""
-				.tokens = parse_tokens(.text)
+				parse_tokens(
+					"A sentence \"with \\"a\\" sentence inside\" and [some brackets]"
+				)
 				"""#
-			output: input & {log: {
-				slice: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
-			}}
+			return: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
 		},
 	]
 }
