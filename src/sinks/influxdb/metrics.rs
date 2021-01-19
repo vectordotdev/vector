@@ -844,7 +844,7 @@ mod integration_tests {
             test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
-        tls::TlsOptions,
+        tls::{self, TlsOptions},
         Event,
     };
     use chrono::Utc;
@@ -870,7 +870,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             tls: Some(TlsOptions {
-                ca_file: Some("tests/data/Vector_CA.crt".into()),
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
             quantiles: default_summary_quantiles(),

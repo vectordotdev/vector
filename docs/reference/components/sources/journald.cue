@@ -28,12 +28,14 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        false
-			"x86_64-pc-windows-msv":      false
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            false
+			"x86_64-pc-windows-msv":          false
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
 
 		requirements: []
@@ -92,13 +94,6 @@ components: sources: journald: {
 				default: "journalctl"
 				examples: ["/usr/local/bin/journalctl"]
 			}
-		}
-		remap_priority: {
-			common:      false
-			description: "If the record from journald contains a `PRIORITY` field, it will be remapped into the equivalent syslog priority level name using the standard (abbreviated) all-capitals names such as `EMERG` or `ERR`."
-			required:    false
-			warnings: []
-			type: bool: default: false
 		}
 	}
 
@@ -194,5 +189,7 @@ components: sources: journald: {
 	telemetry: metrics: {
 		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

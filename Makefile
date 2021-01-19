@@ -301,7 +301,8 @@ test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
+test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+test-integration: test-integration-splunk
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -439,6 +440,18 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 endif
 
+.PHONY: test-integration-postgresql_metrics
+test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh postgresql_metrics stop
+	@scripts/setup_integration_env.sh postgresql_metrics start
+	sleep 5 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh postgresql_metrics stop
+endif
+
 .PHONY: test-integration-prometheus
 test-integration-prometheus: ## Runs Prometheus integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -550,7 +563,8 @@ check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts
-check-all: check-helm-lint check-helm-dependencies check-kubernetes-yaml
+check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
+check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -595,6 +609,10 @@ check-helm-lint: ## Check that Helm charts pass helm lint
 .PHONY: check-helm-dependencies
 check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
+
+.PHONY: check-helm-snapshots
+check-helm-snapshots: ## Check that the Helm template snapshots do not diverge from the Helm charts
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh check
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are up to date
@@ -786,6 +804,10 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 .PHONY: update-helm-dependencies
 update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
+
+.PHONY: update-helm-snapshots
+update-helm-snapshots: ## Update the Helm template snapshots from the Helm charts
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-template-snapshot.sh update
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs

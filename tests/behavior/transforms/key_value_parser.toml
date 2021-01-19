@@ -19,9 +19,11 @@
     [[tests.outputs]]
       extract_from = "key_value_parser"
       [[tests.outputs.conditions]]
-        type = "check_fields"
-        "data.action.equals" = "Accept"
-        "data.ifdir.equals" = "inbound"
+        type = "remap"
+        source = '''
+          .data.action == "Accept"
+          .data.ifdir == "inbound"
+        '''
 
 [transforms.key_value_parser_defaults]
   inputs = []
@@ -37,7 +39,8 @@
     [[tests.outputs]]
       extract_from = "key_value_parser_defaults"
       [[tests.outputs.conditions]]
-        type = "check_fields"
-        "action.equals" = "\"Accept\""
-        "ifdir.equals" = "\"inbound\""
-
+        type = "remap"
+        source = '''
+          .action == "\"Accept\""
+          .ifdir == "\"inbound\""
+        '''

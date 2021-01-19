@@ -1,15 +1,5 @@
-use super::Error as E;
 use crate::{path, state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("missing path: {0}")]
-    Missing(String),
-
-    #[error("unable to resolve path: {0}")]
-    Resolve(String),
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
@@ -62,10 +52,7 @@ impl Path {
 
 impl Expression for Path {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = object
-            .get(&self.path)
-            .map_err(|e| E::from(Error::Resolve(e)))?
-            .unwrap_or(Value::Null);
+        let value = object.get(&self.path).ok().flatten().unwrap_or(Value::Null);
 
         Ok(value)
     }
@@ -74,10 +61,11 @@ impl Expression for Path {
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        state.path_query_type(self).cloned().unwrap_or(TypeDef {
-            fallible: true,
-            ..Default::default()
-        })
+        state
+            .path_query_type(self)
+            .cloned()
+            .unwrap_or_default()
+            .into_fallible(false)
     }
 }
 
@@ -98,7 +86,6 @@ mod tests {
         exact_match {
             expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef {
-                    fallible: true,
                     kind: Kind::Bytes,
                     ..Default::default()
                 });
@@ -106,7 +93,6 @@ mod tests {
                 Path::from("foo")
             },
             def: TypeDef {
-                fallible: true,
                 kind: Kind::Bytes,
                 ..Default::default()
             },
@@ -114,25 +100,16 @@ mod tests {
 
         ident_mismatch {
             expr: |state: &mut state::Compiler| {
-                state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef {
-                    fallible: true,
-                    ..Default::default()
-                });
+                state.path_query_types_mut().insert(Path::from("foo").into(), TypeDef::default());
 
                 Path::from("bar")
             },
-            def: TypeDef {
-                fallible: true,
-                ..Default::default()
-            },
+            def: TypeDef::default(),
         }
 
         empty_state {
             expr: |_| Path::from("foo"),
-            def: TypeDef {
-                fallible: true,
-                ..Default::default()
-            },
+            def: TypeDef::default(),
         }
     ];
 }

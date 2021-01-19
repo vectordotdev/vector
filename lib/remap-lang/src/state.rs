@@ -37,6 +37,18 @@ pub struct Compiler {
     /// going to always return `Any` for coalesced paths. Either way, this is a
     /// known bug that we need to fix soon.
     path_query_types: HashMap<Path, TypeDef>,
+
+    /// On request, the compiler can store its state in this field, which can
+    /// later be used to revert the compiler state to the previously stored
+    /// state.
+    ///
+    /// This is used by the parser to try and parse part of an expression, but
+    /// back out of it if only part of the expression could be parsed. We still
+    /// want the parser to continue parsing, and so it can swap the failed
+    /// expression with a "no-op" one, but has to have a way for the compiler to
+    /// forget any state it started tracking while parsing the old, defunct
+    /// expression.
+    track_changes: Option<Box<Self>>,
 }
 
 impl Compiler {
@@ -54,5 +66,22 @@ impl Compiler {
 
     pub fn path_query_types_mut(&mut self) -> &mut HashMap<Path, TypeDef> {
         &mut self.path_query_types
+    }
+
+    pub fn track_changes(&mut self) {
+        let variable_types = self.variable_types.clone();
+        let path_query_types = self.path_query_types.clone();
+
+        self.track_changes = Some(Box::new(Self {
+            variable_types,
+            path_query_types,
+            track_changes: None,
+        }));
+    }
+
+    pub fn revert_changes(&mut self) {
+        if let Some(state) = self.track_changes.take() {
+            *self = *state;
+        }
     }
 }

@@ -1,5 +1,5 @@
 use super::{repl, Error};
-use remap::{state, Object, Program, Runtime, Value};
+use remap::{state, Formatter, Object, Program, Runtime, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -10,25 +10,21 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]
 pub struct Opts {
-    /// Program to execute
-    ///
-    /// For example, ".foo = true" will set the object's `foo` field to `true`.
+    /// The VRL program to execute. The program ".foo = true", for example, sets the event object's
+    /// `foo` field to `true`.
     #[structopt(name = "PROGRAM")]
     program: Option<String>,
 
-    /// File containing the object(s) to manipulate, leave empty to use stdin
+    /// The file containing the event object(s) to handle. The supported formats are JSON and jsonl.
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
-    /// File containing the program to execute, can be used instead of
-    /// "PROGRAM"
+    /// The file containing the VRL program to execute. This can be used instead of `PROGRAM`.
     #[structopt(short, long = "program", conflicts_with("program"), parse(from_os_str))]
     program_file: Option<PathBuf>,
 
-    /// Print the (modified) object, instead of the result of the final
-    /// expression.
-    ///
-    /// The same result can be achieved by using `.` as the final expression.
+    /// Print the (modified) event object instead of the result of the final expression. Setting
+    /// this flag is equivalent to using `.` as the final expression.
     #[structopt(short = "o", long)]
     print_object: bool,
 }
@@ -44,14 +40,22 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
-    let objects = read_into_objects(opts.input_file.as_ref())?;
-    let program = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+    // Run the REPL if no program or program file is specified
+    if should_open_repl(opts) {
+        // If an input file is provided, use that for the REPL objects, otherwise provide a
+        // generic default object.
+        let repl_objects = match &opts.input_file {
+            Some(file) => read_into_objects(Some(file))?,
+            None => default_objects(),
+        };
 
-    if program.is_empty() {
-        repl(objects)
+        repl(repl_objects)
     } else {
+        let objects = read_into_objects(opts.input_file.as_ref())?;
+        let program = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+
         for mut object in objects {
-            let result = execute(&mut object, &program).map(|v| {
+            let result = execute(&mut object, program.clone()).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -75,16 +79,20 @@ fn repl(objects: Vec<Value>) -> Result<(), Error> {
 }
 
 #[cfg(not(feature = "repl"))]
-fn repl(object: Vec<Value>) -> Result<(), Error> {
+fn repl(_: Vec<Value>) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
-fn execute(object: &mut impl Object, program: &str) -> Result<Value, Error> {
+fn execute(object: &mut impl Object, source: String) -> Result<Value, Error> {
     let state = state::Program::default();
     let mut runtime = Runtime::new(state);
-    let program = Program::new(program, &remap_functions::all(), None, true)?;
+    let (program, _) = Program::new(source.clone(), &remap_functions::all(), None, true).map_err(
+        |diagnostics| Error::Parse(Formatter::new(&source, diagnostics).colored().to_string()),
+    )?;
 
-    runtime.execute(object, &program).map_err(Into::into)
+    runtime
+        .run(object, &program)
+        .map_err(|err| Error::Runtime(err.to_string()))
 }
 
 fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
@@ -135,4 +143,12 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     reader.read_to_string(&mut buffer)?;
 
     Ok(buffer)
+}
+
+fn should_open_repl(opts: &Opts) -> bool {
+    opts.program.is_none() && opts.program_file.is_none()
+}
+
+fn default_objects() -> Vec<Value> {
+    vec![Value::Map(BTreeMap::new())]
 }

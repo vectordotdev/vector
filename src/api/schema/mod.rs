@@ -1,4 +1,5 @@
 pub mod components;
+pub mod filter;
 mod health;
 mod meta;
 mod metrics;

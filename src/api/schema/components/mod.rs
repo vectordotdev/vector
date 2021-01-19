@@ -4,10 +4,15 @@ pub mod state;
 pub mod transform;
 
 use crate::{
-    api::schema::{components::state::component_by_name, relay},
+    api::schema::{
+        components::state::component_by_name,
+        filter::{self, filter_items},
+        relay,
+    },
     config::Config,
+    filter_check,
 };
-use async_graphql::{Interface, Object, Subscription};
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use tokio::stream::{Stream, StreamExt};
@@ -23,6 +28,57 @@ pub enum Component {
     Sink(sink::Sink),
 }
 
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+/// Type of component
+pub enum ComponentType {
+    Source,
+    Transform,
+    Sink,
+}
+
+impl Component {
+    fn get_name(&self) -> &str {
+        match self {
+            Component::Source(c) => c.0.name.as_str(),
+            Component::Transform(c) => c.0.name.as_str(),
+            Component::Sink(c) => c.0.name.as_str(),
+        }
+    }
+
+    fn get_filter_type(&self) -> ComponentType {
+        match self {
+            Component::Source(_) => ComponentType::Source,
+            Component::Transform(_) => ComponentType::Transform,
+            Component::Sink(_) => ComponentType::Sink,
+        }
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct ComponentsFilter {
+    name: Option<Vec<filter::StringFilter>>,
+    component_type: Option<Vec<filter::EqualityFilter<ComponentType>>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<Component> for ComponentsFilter {
+    fn matches(&self, component: &Component) -> bool {
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))),
+            self.component_type.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(component.get_filter_type())))
+        );
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
+    }
+}
+
 #[derive(Default)]
 pub struct ComponentsQuery;
 
@@ -35,9 +91,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<ComponentsFilter>,
     ) -> relay::ConnectionResult<Component> {
+        let filter = filter.unwrap_or_else(ComponentsFilter::default);
+        let components = filter_items(state::get_components().into_iter(), &filter);
+
         relay::query(
-            state::get_components().into_iter(),
+            components.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -51,9 +111,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<source::SourcesFilter>,
     ) -> relay::ConnectionResult<source::Source> {
+        let filter = filter.unwrap_or_else(source::SourcesFilter::default);
+        let sources = filter_items(state::get_sources().into_iter(), &filter);
+
         relay::query(
-            state::get_sources().into_iter(),
+            sources.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -67,9 +131,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<transform::TransformsFilter>,
     ) -> relay::ConnectionResult<transform::Transform> {
+        let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
+        let transforms = filter_items(state::get_transforms().into_iter(), &filter);
+
         relay::query(
-            state::get_transforms().into_iter(),
+            transforms.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -83,9 +151,13 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<sink::SinksFilter>,
     ) -> relay::ConnectionResult<sink::Sink> {
+        let filter = filter.unwrap_or_else(sink::SinksFilter::default);
+        let sinks = filter_items(state::get_sinks().into_iter(), &filter);
+
         relay::query(
-            state::get_sinks().into_iter(),
+            sinks.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -206,4 +278,122 @@ pub fn update_config(config: &Config) {
 
     // Override the old component state
     state::update(new_components);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::DataType;
+
+    /// Generate component fixes for use with tests
+    fn component_fixtures() -> Vec<Component> {
+        vec![
+            Component::Source(source::Source(source::Data {
+                name: "gen1".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen2".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen3".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Transform(transform::Transform(transform::Data {
+                name: "parse_json".to_string(),
+                component_type: "json".to_string(),
+                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+            })),
+            Component::Sink(sink::Sink(sink::Data {
+                name: "devnull".to_string(),
+                component_type: "blackhole".to_string(),
+                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+            })),
+        ]
+    }
+
+    #[test]
+    fn components_filter_contains() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                contains: Some("gen".to_string()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 3);
+    }
+
+    #[test]
+    fn components_filter_equals_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            or: Some(vec![ComponentsFilter {
+                name: Some(vec![filter::StringFilter {
+                    equals: Some("devnull".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn components_filter_and() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_type: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentType::Source),
+                not_equals: None,
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 1);
+    }
+
+    #[test]
+    fn components_filter_and_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_type: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentType::Source),
+                not_equals: None,
+            }]),
+            or: Some(vec![ComponentsFilter {
+                component_type: Some(vec![filter::EqualityFilter {
+                    equals: Some(ComponentType::Sink),
+                    not_equals: None,
+                }]),
+                ..Default::default()
+            }]),
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
 }

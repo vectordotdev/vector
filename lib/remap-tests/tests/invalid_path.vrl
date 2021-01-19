@@ -1,0 +1,15 @@
+# object: { "bar": "bar" }
+# result:
+#
+# error: syntax error
+#   ┌─ :2:6
+#   │
+# 2 │ .foo.
+#   │      ^
+#   │      
+#   │      invalid token
+#   │      expected: path segment
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+.foo.
