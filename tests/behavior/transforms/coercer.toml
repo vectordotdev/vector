@@ -29,8 +29,8 @@
         .boolean_field == true && \
         .float_field == 3.1415926535 && \
         .string_field == "-1" && \
-        .timestamp_field == to_timestamp("2020-02-20T12:34:56.123456789Z") && \
-        .timestamp_field_formatted == to_timestamp("2020-02-20T12:34:56Z")
+        .timestamp_field == to_timestamp!("2020-02-20T12:34:56.123456789Z") && \
+        .timestamp_field_formatted == to_timestamp!("2020-02-20T12:34:56Z")
       '''
 
 [transforms.coercer_nested]

@@ -1,7 +1,7 @@
 use crate::Error;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use remap::{state, Object, Program, Runtime, Value};
+use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::all as funcs;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -27,6 +27,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
+    let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
@@ -113,7 +114,12 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                     _ => line,
                 };
 
-                let value = resolve(objects.get_mut(index), &mut rt, command);
+                let value = resolve(
+                    objects.get_mut(index),
+                    &mut rt,
+                    command,
+                    &mut compiler_state,
+                );
                 println!("{}\n", value);
             }
             Err(ReadlineError::Interrupted) => break,
@@ -128,18 +134,29 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     Ok(())
 }
 
-fn resolve(object: Option<&mut impl Object>, runtime: &mut Runtime, program: &str) -> String {
+fn resolve(
+    object: Option<&mut impl Object>,
+    runtime: &mut Runtime,
+    program: &str,
+    state: &mut state::Compiler,
+) -> String {
     let object = match object {
         None => return Value::Null.to_string(),
         Some(object) => object,
     };
 
-    let program = match Program::new(program, &remap_functions::all(), None, true) {
-        Ok(program) => program,
-        Err(err) => return err.to_string(),
+    let program = match Program::new_with_state(
+        program.to_owned(),
+        &remap_functions::all(),
+        None,
+        true,
+        state,
+    ) {
+        Ok((program, _)) => program,
+        Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };
 
-    match runtime.execute(object, &program) {
+    match runtime.run(object, &program) {
         Ok(value) => value.to_string(),
         Err(err) => err.to_string(),
     }
@@ -237,8 +254,8 @@ fn print_function_list() {
         .chunks(num_columns)
         .map(|funcs| {
             // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
-            // values when num_columns is 3. And so this logic below is necessary to avoid panics
-            // caused by inappropriately calling funcs.get(_) on a None.
+            // values when num_columns is 3, this logic below is necessary to avoid panics caused
+            // by inappropriately calling funcs.get(_) on a None.
             let mut ids: Vec<Cell> = Vec::new();
 
             for n in 0..num_columns {

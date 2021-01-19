@@ -46,6 +46,8 @@ mod ip_to_ipv6;
 mod ipv6_to_ipv4;
 #[cfg(feature = "is_nullish")]
 mod is_nullish;
+#[cfg(feature = "length")]
+mod length;
 #[cfg(feature = "log")]
 mod log;
 #[cfg(feature = "match")]
@@ -183,6 +185,8 @@ pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
 #[cfg(feature = "is_nullish")]
 pub use is_nullish::IsNullish;
+#[cfg(feature = "length")]
+pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
@@ -316,6 +320,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Ipv6ToIpV4),
         #[cfg(feature = "is_nullish")]
         Box::new(IsNullish),
+        #[cfg(feature = "length")]
+        Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
         #[cfg(feature = "md5")]

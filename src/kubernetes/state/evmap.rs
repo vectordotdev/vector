@@ -149,6 +149,28 @@ mod tests {
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
 
+    #[test]
+    fn test_kv_static_pod() {
+        let pod = Pod {
+            metadata: ObjectMeta {
+                uid: Some("uid".to_owned()),
+                annotations: Some(
+                    vec![(
+                        "kubernetes.io/config.mirror".to_owned(),
+                        "config-hashsum".to_owned(),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+                ..ObjectMeta::default()
+            },
+            ..Pod::default()
+        };
+        let (key, val) = kv(pod.clone()).unwrap();
+        assert_eq!(key, "config-hashsum");
+        assert_eq!(val, Box::new(HashValue::new(pod)));
+    }
+
     #[tokio::test]
     async fn test_without_debounce() {
         let (state_reader, state_writer) = evmap::new();
