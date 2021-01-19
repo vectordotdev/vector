@@ -68,6 +68,7 @@
 /docs/reference/remap/compact.cue @FungusHumungus
 /docs/reference/remap/exists.cue @FungusHumungus
 /docs/reference/remap/flatten.cue @FungusHumungus
+/docs/reference/remap/get_hostname.cue @fanatid
 /docs/reference/remap/ip_cidr_contains.cue @FungusHumungus
 /docs/reference/remap/ip_subnet.cue @FungusHumungus
 /docs/reference/remap/ip_to_ipv6.cue @FungusHumungus
@@ -103,6 +104,7 @@
 /lib/remap-functions/src/compact.rs @FungusHumungus
 /lib/remap-functions/src/exists.rs @FungusHumungus
 /lib/remap-functions/src/flatten.rs @FungusHumungus
+/lib/remap-functions/src/get_hostname.rs @fanatid
 /lib/remap-functions/src/ip_cidr_contains.rs @FungusHumungus
 /lib/remap-functions/src/ip_subnet.rs @FungusHumungus
 /lib/remap-functions/src/ip_to_ipv6.rs @FungusHumungus
