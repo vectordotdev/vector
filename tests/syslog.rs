@@ -28,10 +28,12 @@ async fn test_tcp_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Tcp {
+        SyslogConfig::from_mode(Mode::Tcp {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
+            send_buffer_bytes: None,
+            receive_buffer_bytes: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -83,7 +85,7 @@ async fn test_unix_stream_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Unix {
+        SyslogConfig::from_mode(Mode::Unix {
             path: in_path.clone(),
         }),
     );
@@ -145,10 +147,12 @@ async fn test_octet_counting_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Tcp {
+        SyslogConfig::from_mode(Mode::Tcp {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
+            send_buffer_bytes: None,
+            receive_buffer_bytes: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -339,7 +343,7 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 
 fn tcp_json_sink(address: String) -> SocketSinkConfig {
     SocketSinkConfig::new(
-        socket::Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+        socket::Mode::Tcp(TcpSinkConfig::from_address(address)),
         EncodingConfig::from(Encoding::Json),
     )
 }

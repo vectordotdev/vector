@@ -34,7 +34,19 @@ enum StatsdConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UdpConfig {
-    pub address: SocketAddr,
+    address: SocketAddr,
+    send_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
+}
+
+impl UdpConfig {
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            send_buffer_bytes: None,
+            receive_buffer_bytes: None,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,7 +56,9 @@ struct TcpConfig {
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
+    shutdown_timeout_secs: u64,
+    send_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
@@ -57,9 +71,9 @@ inventory::submit! {
 
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::Udp(UdpConfig {
-            address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125)),
-        }))
+        toml::Value::try_from(Self::Udp(UdpConfig::from_address(SocketAddr::V4(
+            SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125),
+        ))))
         .unwrap()
     }
 }
@@ -83,6 +97,8 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    config.send_buffer_bytes,
+                    config.receive_buffer_bytes,
                     shutdown,
                     out,
                 )

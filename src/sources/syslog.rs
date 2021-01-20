@@ -20,6 +20,7 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
@@ -34,11 +35,11 @@ use tokio_util::{
 // #[serde(deny_unknown_fields)]
 pub struct SyslogConfig {
     #[serde(flatten)]
-    pub mode: Mode,
+    mode: Mode,
     #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
-    pub host_key: Option<String>,
+    host_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -48,14 +49,16 @@ pub enum Mode {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
+        send_buffer_bytes: Option<usize>,
+        receive_buffer_bytes: Option<usize>,
     },
     Udp {
         address: SocketAddr,
+        send_buffer_bytes: Option<usize>,
+        receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix {
-        path: PathBuf,
-    },
+    Unix { path: PathBuf },
 }
 
 pub fn default_max_length() -> usize {
@@ -63,7 +66,7 @@ pub fn default_max_length() -> usize {
 }
 
 impl SyslogConfig {
-    pub fn new(mode: Mode) -> Self {
+    pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
@@ -83,6 +86,8 @@ impl GenerateConfig for SyslogConfig {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
                 tls: None,
+                send_buffer_bytes: None,
+                receive_buffer_bytes: None,
             },
             host_key: None,
             max_length: default_max_length(),
@@ -111,6 +116,8 @@ impl SourceConfig for SyslogConfig {
                 address,
                 keepalive,
                 tls,
+                send_buffer_bytes,
+                receive_buffer_bytes,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -118,9 +125,30 @@ impl SourceConfig for SyslogConfig {
                 };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
-                source.run(address, keepalive, shutdown_secs, tls, shutdown, out)
+                source.run(
+                    address,
+                    keepalive,
+                    shutdown_secs,
+                    tls,
+                    send_buffer_bytes,
+                    receive_buffer_bytes,
+                    shutdown,
+                    out,
+                )
             }
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
+            Mode::Udp {
+                address,
+                send_buffer_bytes,
+                receive_buffer_bytes,
+            } => Ok(udp(
+                address,
+                self.max_length,
+                host_key,
+                send_buffer_bytes,
+                receive_buffer_bytes,
+                shutdown,
+                out,
+            )),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
@@ -144,7 +172,7 @@ impl SourceConfig for SyslogConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address } => vec![Resource::udp(address)],
+            Mode::Udp { address, .. } => vec![Resource::udp(address)],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
@@ -276,6 +304,8 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
+    send_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -290,6 +320,25 @@ pub fn udp(
             addr = %addr,
             r#type = "udp"
         );
+
+        {
+            // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
+            let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
+
+            if let Some(send_buffer_bytes) = send_buffer_bytes {
+                if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
+                    warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
+                }
+            }
+
+            if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+                if let Err(error) = socket.set_recv_buffer_size(receive_buffer_bytes) {
+                    warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+                }
+            }
+
+            socket.into_raw_fd();
+        }
 
         let _ = UdpFramed::new(socket, BytesCodec::new())
             .take_until(shutdown)
