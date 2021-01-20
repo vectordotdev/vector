@@ -90,7 +90,6 @@ impl Deref for MetricEntry {
     }
 }
 
-#[derive(Clone, PartialEq)]
 pub struct MetricBuffer {
     state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
