@@ -1125,7 +1125,6 @@ mod integration_tests {
         })
     }
 
-    /// None if docker is not present on the system
     fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
         // trace_init();
         let (sender, recv) = Pipeline::new_test();
