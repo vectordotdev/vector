@@ -18,9 +18,10 @@ remap: functions: to_float: {
 	examples: [
 		{
 			title: "Coerce to a float"
-			input: log: string: "3.14"
-			source: ".string = to_float(.string)"
-			output: log: string: 3.14
+			source: """
+				to_float("3.145")
+				"""
+			return: 3.145
 		},
 	]
 }

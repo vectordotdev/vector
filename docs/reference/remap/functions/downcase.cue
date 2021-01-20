@@ -20,11 +20,10 @@ remap: functions: downcase: {
 	examples: [
 		{
 			title: "Downcase a string"
-			input: log: message: #"Here Is A Message"#
 			source: #"""
-				.message = downcase(.message)
+				downcase("Hello, World!")
 				"""#
-			output: log: message: "here is a message"
+			return: "hello, world!"
 		},
 	]
 }

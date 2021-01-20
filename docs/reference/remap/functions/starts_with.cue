@@ -31,19 +31,17 @@ remap: functions: starts_with: {
 	examples: [
 		{
 			title: "String starts with (case sensitive)"
-			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.starts = starts_with(.message, \"The Needle\")
+				starts_with("The Needle In The Haystack", \"The Needle\")
 				"""#
-			output: input & {log: starts: true}
+			return: true
 		},
 		{
 			title: "String starts with (case insensitive)"
-			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.starts = starts_with(.message, \"the needle\", case_sensitive: false)
+				starts_with("The Needle In The Haystack", \"the needle\", case_sensitive: false)
 				"""#
-			output: input & {log: starts: true}
+			return: true
 		},
 	]
 }

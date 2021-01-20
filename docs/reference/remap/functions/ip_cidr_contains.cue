@@ -27,19 +27,17 @@ remap: functions: ip_cidr_contains: {
 	examples: [
 		{
 			title: "IPv4 contains CIDR"
-			input: log: address: "192.168.10.32"
 			source: #"""
-				.cidr = ip_cidr_contains(.address, "192.168.0.0/16")
+				ip_cidr_contains("192.168.0.0/16", "192.168.10.32")
 				"""#
-			output: input & {log: cidr: true}
+			return: true
 		},
 		{
 			title: "IPv6 contains CIDR"
-			input: log: address: "2001:4f8:3:ba:2e0:81ff:fe22:d1f1"
 			source: #"""
-				.cidr = ip_cidr_contains(.address, "2001:4f8:4:ba::/64")
+				ip_cidr_contains("2001:4f8:4:ba::/64", "2001:4f8:4:ba:2e0:81ff:fe22:d1f1")
 				"""#
-			output: input & {log: cidr: false}
+			return: true
 		},
 	]
 }

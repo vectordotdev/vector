@@ -20,11 +20,10 @@ remap: functions: strip_whitespace: {
 	examples: [
 		{
 			title: "Strip whitespace"
-			input: log: text: "  A sentence.  "
 			source: #"""
-				.text = strip_whitespace(.text)
+				strip_whitespace("  A sentence.  ")
 				"""#
-			output: log: text: "A sentence."
+			return: "A sentence."
 		},
 	]
 }

@@ -15,7 +15,7 @@ remap: {
 		name:        string
 		category:    #FunctionCategory
 		description: string
-		notices?: [string, ...string]
+		notices:     [string, ...string] | *[]
 
 		arguments: [...#Argument]
 		return: [remap.#Type, ...remap.#Type]

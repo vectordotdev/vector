@@ -37,13 +37,12 @@ remap: functions: parse_key_value: {
 	examples: [
 		{
 			title: "Parse logfmt log"
-			input: log: message: #"""
-				@timestamp="Sun Jan 10 16:47:39 EST 2021" level=info msg="Stopping all fetchers" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager
-				"""#
 			source: #"""
-				. = parse_key_value(.message)
+				parse_key_value(
+					"@timestamp=\"Sun Jan 10 16:47:39 EST 2021\" level=info msg=\"Stopping all fetchers\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"
+				)
 				"""#
-			output: log: {
+			return: {
 				"@timestamp":     "Sun Jan 10 16:47:39 EST 2021"
 				level:            "info"
 				msg:              "Stopping all fetchers"
@@ -54,13 +53,14 @@ remap: functions: parse_key_value: {
 		},
 		{
 			title: "Parse comma delimited log"
-			input: log: message: #"""
-				path:"/cart_link", host:store.app.com, fwd: "102.30.171.16", dyno: web.1 connect:0ms, service:87ms, status:304, bytes:632, protocol:https
-				"""#
 			source: #"""
-				. = parse_key_value(.message, field_delimiter: ",", key_value_delimiter: ":")
+				parse_key_value(
+					"path:\"/cart_link\", host:store.app.com, fwd: \"102.30.171.16\", dyno: web.1 connect:0ms, service:87ms, status:304, bytes:632, protocol:https",
+					field_delimiter: ",",
+					key_value_delimiter: ":"
+				)
 				"""#
-			output: log: {
+			return: {
 				path:     "/cart_link"
 				host:     "store.app.com"
 				fwd:      "102.30.171.16"

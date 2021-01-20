@@ -9,6 +9,7 @@ license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
+autobenches = false # our benchmarks are not runnable on their own either way
 
 [[bin]]
 name = "graphql-schema"
@@ -149,7 +150,7 @@ http = "0.2"
 typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
-syslog_loose = "0.7.0"
+syslog_loose = "0.8.0"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
@@ -256,14 +257,15 @@ rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
-default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -576,6 +578,8 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+# Separate benching process for metrics due to the nature of the bootstrap procedures.
+metrics-benches = ["sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
@@ -592,6 +596,21 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "metrics_on"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_no_tracing_integration"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_off"
+harness = false
+required-features = ["metrics-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"

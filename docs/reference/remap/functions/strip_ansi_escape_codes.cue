@@ -18,11 +18,10 @@ remap: functions: strip_ansi_escape_codes: {
 	examples: [
 		{
 			title: "Strip ANSI escape codes"
-			input: log: text: #"\e[46mfoo\e[0m bar"#
 			source: #"""
-				.text = strip_ansi_escape_codes(.text)
+				strip_ansi_escape_codes("\e[46mfoo\e[0m bar")
 				"""#
-			output: log: text: "foo bar"
+			return: "foo bar"
 		},
 	]
 }

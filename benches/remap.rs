@@ -131,7 +131,7 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: parse JSON with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: ".bar = parse_json(.foo)".to_owned(),
+                source: ".bar = parse_json!(.foo)".to_owned(),
                 drop_on_err: false,
             })
             .unwrap(),
@@ -195,9 +195,10 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: r#".number = to_int(.number)
-                .bool = to_bool(.bool)
-                .timestamp = parse_timestamp(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
+                source: r#"
+                .number = to_int!(.number)
+                .bool = to_bool!(.bool)
+                .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
                 "#
                 .to_owned(),
                 drop_on_err: true,

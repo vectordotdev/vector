@@ -37,11 +37,13 @@ remap: functions: parse_grok: {
 	examples: [
 		{
 			title: "Parse via Grok"
-			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
 			source: #"""
-				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+				parse_grok(
+					"2020-10-02T23:22:12.223222Z info Hello world",
+					"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+				)
 				"""#
-			output: log: {
+			return: {
 				timestamp: "2020-10-02T23:22:12.223222Z"
 				level:     "info"
 				message:   "Hello world"

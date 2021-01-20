@@ -20,11 +20,10 @@ remap: functions: upcase: {
 	examples: [
 		{
 			title: "Upcase a string"
-			input: log: message: #"Here Is A Message"#
 			source: #"""
-				.message = upcase(.message)
+				upcase("Hello, World!")
 				"""#
-			output: log: message: "HERE IS A MESSAGE"
+			output: log: message: "HELLO, WORLD!"
 		},
 	]
 }

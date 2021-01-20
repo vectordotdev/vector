@@ -38,27 +38,24 @@ remap: functions: replace: {
 	examples: [
 		{
 			title: "Replace literal text"
-			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.message = replace(.message, "and", "not")
+				replace("Apples and Bananas", "and", "not")
 				"""#
-			output: log: message: "Apples not Bananas"
+			return: "Apples not Bananas"
 		},
 		{
 			title: "Replace via regular expression"
-			input: log: message: #"Apples and Bananas"#
 			source: #"""
-				.message = replace(.message, /bananas/i, "Pineapples")
+				replace("Apples and Bananas", /bananas/i, "Pineapples")
 				"""#
-			output: log: message: "apples and Pineapples"
+			return: "apples and Pineapples"
 		},
 		{
 			title: "Replace first instance"
-			input: log: message: #"Bananas and Bananas"#
 			source: #"""
-				.message = replace(.message, "Bananas", "Pineapples", count: 1)
+				replace("Bananas and Bananas", "Bananas", "Pineapples", count: 1)
 				"""#
-			output: log: message: "Pineapples and Bananas"
+			return: "Pineapples and Bananas"
 		},
 	]
 }

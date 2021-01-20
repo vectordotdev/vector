@@ -24,21 +24,24 @@ remap: functions: is_nullish: {
 	examples: [
 		{
 			title: "Null detection (blank string)"
-			input: log: string: ""
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("")
+				"""
+			return: true
 		},
 		{
 			title: "Null detection (dash string)"
-			input: log: string: "-"
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("-")
+				"""
+			return: true
 		},
 		{
 			title: "Null detection (whitespace)"
-			input: log: string: "\n   \n"
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("\n  \n")
+				"""
+			return: true
 		},
 	]
 }
