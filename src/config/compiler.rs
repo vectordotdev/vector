@@ -106,7 +106,7 @@ fn expand_wildcards(config: &mut Config) {
 fn expand_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
     let raw_inputs = inputs.drain(..).collect::<Vec<_>>();
     for raw_input in raw_inputs {
-        if raw_input.ends_with("*") {
+        if raw_input.ends_with('*') {
             let prefix = &raw_input[0..raw_input.len() - 1];
             for input in candidates {
                 if input.starts_with(prefix) && input != name {
