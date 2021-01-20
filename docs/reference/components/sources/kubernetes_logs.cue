@@ -407,10 +407,12 @@ components: sources: kubernetes_logs: {
 		partial_message_merging: {
 			title: "Partial message merging"
 			body:  """
-					Vector, by default, will merge partial messages that are split due to the Docker
-					size limit. For everything else, the
-					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)) offers `multiline`
-					options to configure custom merging to handle merging things like stacktraces.
+					Vector, by default, will merge partial messages that are
+					split due to the Docker size limit. For everything else, it
+					is recommended to use the [`reduce`
+					transform](\(urls.vector_reduce_transform)) which offers
+					the ability to handle custom merging of things like
+					stacktraces.
 					"""
 		}
 
