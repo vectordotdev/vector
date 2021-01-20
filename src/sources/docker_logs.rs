@@ -353,7 +353,7 @@ impl DockerLogsSource {
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
             host_key,
-            hostname,
+            hostname: hostname.clone(),
             core: Arc::new(core),
             out,
             main_send,
@@ -365,7 +365,7 @@ impl DockerLogsSource {
             events: Box::pin(events),
             containers: HashMap::new(),
             main_recv,
-            hostname: env::var("HOSTNAME").ok(),
+            hostname,
             backoff_duration: Duration::from_secs(backoff_secs),
         })
     }
@@ -1089,6 +1089,10 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DockerLogsConfig>();
+    }
+
+    #[test]
+    fn exclude_self() {
     }
 }
 
