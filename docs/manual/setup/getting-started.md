@@ -1,10 +1,6 @@
 ---
-$schema: "../.schema.json"
 title: Getting Started with Vector
 description: Getting Started with Vector, the "Hello World" of Vector tutorials.
-series_position: 1
-author_github: https://github.com/jamtur01
-tags: ["type: tutorial", "domain: config"]
 ---
 
 Welcome to Vector! 🎈
