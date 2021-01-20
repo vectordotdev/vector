@@ -442,6 +442,7 @@ urls: {
 	vector_receiving_sources:                                 "\(vector_website)/components/?functions%5B%5D=receive"
 	vector_regex_parser:                                      "\(vector_website)/docs/reference/transforms/regex_parser/"
 	vector_releases:                                          "\(vector_website)/releases/latest/"
+	vector_reduce_transform:                                  "\(vector_website)/docs/reference/transforms/reduce/"
 	vector_remap_transform:                                   "\(vector_website)/docs/reference/transforms/remap/"
 	vector_repo:                                              "\(github)/timberio/vector"
 	vector_roadmap:                                           "https://roadmap.vector.dev"
