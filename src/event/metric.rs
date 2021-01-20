@@ -257,11 +257,15 @@ impl Metric {
         self
     }
 
-    /// Create a new Metric from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    pub fn into_parts(self) -> (MetricSeries, MetricData) {
+        (self.series, self.data)
+    }
+
+    /// Rewrite this into a Metric with the data marked as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
-            series: self.series.clone(),
-            data: self.data.to_absolute(),
+            series: self.series,
+            data: self.data.into_absolute(),
         }
     }
 
@@ -350,12 +354,12 @@ impl Metric {
 }
 
 impl MetricData {
-    /// Create new MetricData from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    /// Rewrite this data to mark it as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
             kind: MetricKind::Absolute,
-            value: self.value.clone(),
+            value: self.value,
         }
     }
 

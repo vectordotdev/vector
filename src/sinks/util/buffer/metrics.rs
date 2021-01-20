@@ -203,28 +203,28 @@ impl Batch for MetricBuffer {
                     }
                 }
                 (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
-                    let new = MetricEntry(item.to_absolute());
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.data.add(&item.data);
+                    let entry = MetricEntry(item.into_absolute());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&entry) {
+                        existing.data.update(&entry.data);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         // If the metric is not present in active batch,
                         // then we look it up in permanent state, where we keep track
                         // of its values throughout the entire application uptime
-                        let mut initial = if let Some(default) = self.state.get(&new) {
+                        let mut initial = if let Some(default) = self.state.get(&entry) {
                             default.0.clone()
                         } else {
                             // Otherwise we start from zero value
                             Metric {
-                                series: item.series.clone(),
+                                series: entry.series.clone(),
                                 data: MetricData {
-                                    timestamp: item.data.timestamp,
+                                    timestamp: entry.data.timestamp,
                                     kind: MetricKind::Absolute,
                                     value: MetricValue::Gauge { value: 0.0 },
                                 },
                             }
                         };
-                        initial.data.add(&item.data);
+                        initial.data.update(&entry.data);
                         self.metrics.insert(MetricEntry(initial));
                     }
                 }
@@ -252,7 +252,7 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
-            let data = &entry.0.data;
+            let data = &entry.data;
             if (data.value.is_gauge() || data.value.is_counter()) && data.kind.is_absolute() {
                 state.replace(entry.clone());
             }
