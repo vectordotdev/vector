@@ -15,6 +15,5 @@
   [[tests.outputs]]
     extract_from = "add_fields_nested"
     [[tests.outputs.conditions]]
-      "a.b.equals" = 123
-      "x.y.equals" = 456
-      "x.z.equals" = 789
+      type = "remap"
+      source = ".a.b == 123 && .x.y == 456 && .x.z == 789"

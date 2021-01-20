@@ -4,7 +4,7 @@ use crate::{
     internal_events::RemapConditionExecutionError,
     Event,
 };
-use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
+use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -40,8 +40,12 @@ impl ConditionConfig for RemapConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let program = Program::new(&self.source, &functions, Some(constraint), false)
-            .map_err(|e| e.to_string())?;
+        let (program, _) = Program::new(self.source.clone(), &functions, Some(constraint), false)
+            .map_err(|diagnostics| {
+            remap::Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -55,7 +59,7 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<remap::Value, RemapError> {
+    fn run(&self, event: &Event) -> remap::RuntimeResult {
         // TODO(jean): This clone exists until remap-lang has an "immutable"
         // mode.
         //
@@ -69,15 +73,15 @@ impl Remap {
         //
         // see: https://github.com/timberio/vector/issues/4744
         match event {
-            Event::Log(event) => Runtime::default().execute(&mut event.clone(), &self.program),
-            Event::Metric(event) => Runtime::default().execute(&mut event.clone(), &self.program),
+            Event::Log(event) => Runtime::default().run(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().run(&mut event.clone(), &self.program),
         }
     }
 }
 
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
-        self.execute(&event)
+        self.run(&event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => unreachable!("boolean type constraint set"),
@@ -90,7 +94,7 @@ impl Condition for Remap {
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         let value = self
-            .execute(event)
+            .run(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?;
 
         match value {
@@ -124,7 +128,7 @@ mod test {
             ),
             (
                 log_event!["foo" => true, "bar" => false],
-                "to_bool(.bar || .foo)",
+                "to_bool(.bar || .foo) ?? false",
                 Ok(()),
                 Ok(()),
             ),
@@ -134,24 +138,25 @@ mod test {
                 Ok(()),
                 Err("source execution resolved to false"),
             ),
-            (
-                log_event![],
-                "null",
-                Err("remap error: program error: expected to resolve to an error, or boolean value, but instead resolves to null value"),
-                Ok(()),
-            ),
-            (
-                log_event!["foo" => "string"],
-                ".foo",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
-                Ok(()),
-            ),
-            (
-                log_event![],
-                ".",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
-                Ok(()),
-            ),
+            // TODO: enable once we don't emit large diagnostics with colors when no tty is present.
+            // (
+            //     log_event![],
+            //     "null",
+            //     Err("\n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mnull\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^^^^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: null\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
+            // (
+            //     log_event!["foo" => "string"],
+            //     ".foo",
+            //     Err("\n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m.foo\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^^^^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: any\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
+            // (
+            //     log_event![],
+            //     ".",
+            //     Err("n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m.\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: any\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
             (
                 Event::Metric(Metric {
                     name: "zork".into(),
@@ -168,17 +173,14 @@ mod test {
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
                 Ok(()),
-            )
+            ),
         ];
 
         for (event, source, build, check) in checks {
             let source = source.to_owned();
             let config = RemapConfig { source };
 
-            assert_eq!(
-                config.build().map(|_| ()).map_err(|e| e.to_string()),
-                build.map_err(|e| e.to_string())
-            );
+            assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
 
             if let Ok(cond) = config.build() {
                 assert_eq!(

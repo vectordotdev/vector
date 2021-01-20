@@ -1,0 +1,11 @@
+# SKIP
+#
+# This incorrectly converts the rhs float to an integer, because the lhs is an
+# integer as well.
+#
+# Instead, the lhs should be converted to a float.
+#
+# object: {}
+# result: 2.3
+
+1 + 1.3

@@ -1,5 +1,7 @@
 use crate::Event;
+use futures::Stream;
 use snafu::Snafu;
+use std::pin::Pin;
 
 pub mod util;
 
@@ -182,8 +184,8 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 pub trait TaskTransform: Send {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static;
 }

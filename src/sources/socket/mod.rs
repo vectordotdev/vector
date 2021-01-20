@@ -172,7 +172,7 @@ mod test {
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{TlsConfig, TlsOptions},
+        tls::{self, TlsConfig, TlsOptions},
         Event, Pipeline,
     };
     use bytes::Bytes;
@@ -378,7 +378,7 @@ mod test {
             addr,
             "localhost".into(),
             lines.into_iter(),
-            std::path::Path::new("tests/data/Vector_CA.crt"),
+            std::path::Path::new(tls::TEST_PEM_CA_PATH),
         )
         .await
         .unwrap();

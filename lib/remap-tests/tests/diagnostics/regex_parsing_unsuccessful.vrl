@@ -1,0 +1,16 @@
+# object: { "bar": "bar" }
+# result:
+#
+# error: regex parsing unsuccessful
+#   ┌─ :2:11
+#   │
+# 2 │ invalid = /[/
+#   │           ^^^
+#   │           │
+#   │           invalid regex
+#   │           error: unclosed character class
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+invalid = /[/
+true

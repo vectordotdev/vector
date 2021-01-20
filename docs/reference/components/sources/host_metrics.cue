@@ -27,14 +27,15 @@ components: sources: host_metrics: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		notices: []
 		requirements: []
 		warnings: []
@@ -42,6 +43,24 @@ components: sources: host_metrics: {
 
 	installation: {
 		platform_name: null
+	}
+
+	env_vars: {
+		PROCFS_ROOT: {
+			description: "Sets an arbitrary path to the system's Procfs root. Can be used to expose host metrics from within a container. Unset and uses system `/proc` by default."
+			type: string: {
+				default: null
+				examples: ["/mnt/host/proc"]
+			}
+		}
+
+		SYSFS_ROOT: {
+			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default."
+			type: string: {
+				default: null
+				examples: ["/mnt/host/sys"]
+			}
+		}
 	}
 
 	configuration: {
