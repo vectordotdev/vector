@@ -8,16 +8,12 @@ Welcome to Vector! 🎈
 Vector is a high-performance observability data platform that allows you to collect, transform, and route all your
 logs and metrics.
 
-In this getting started guide, we'll walk you through using Vector for the first time.
-
-We'll install Vector and create our first observability data pipeline so you can begin to see what Vector can do.
+In this getting started guide, we'll walk you through using Vector for the first time. We'll install Vector
+and create our first observability data pipeline so you can begin to see what Vector can do.
 
 ## Install Vector
 
-Installing Vector is quick and easy. We're going to install the `vector` binary, from which we can launch Vector and
-process our observability data.
-
-Here's a script to install Vector:
+Installing Vector is quick and easy. We can use this handy installation script:
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
@@ -33,13 +29,13 @@ vector --version
 
 ## Configure Vector
 
-Vector runs with a [configuration file][docs.setup.configuration] that tells it what
-[components][pages.components] to run and how they should interact. Vector's components are made up of
-sources, transforms, and sinks:
+Vector topologies are defined with a [configuration file][docs.setup.configuration] that tells it what
+[components][pages.components] to run and how they should interact. Vector topologies are made up of three
+types of components:
 
-* [*Sources*][docs.sources] collect or receive data from observability data sources into Vector
-* [*Transforms*][docs.transforms] can manipulate or change that observability data inside Vector
-* [*Sinks*][docs.sinks] send data onwards from Vector to external services or destinations
+* [**Sources**][docs.sources] collect or receive data from observability data sources into Vector
+* [**Transforms**][docs.transforms] can manipulate or change that observability data inside Vector
+* [**Sinks**][docs.sinks] send data onwards from Vector to external services or destinations
 
 Let's create a configuration file:
 
@@ -65,7 +61,7 @@ from. In our case, events are received from our other component, the source iden
 
 ## Hello World!
 
-That's it for our first config, now; let's pipe an event through it:
+That's it for our first config. Now let's pipe an event through it:
 
 ```bash
 echo 'Hello World!' | vector --config ./vector.toml
@@ -74,7 +70,7 @@ echo 'Hello World!' | vector --config ./vector.toml
 The `echo` statement sends a single log to Vector over `STDIN`. The `vector...` command starts Vector with our
 previously created config file.
 
-The event we've just sent will get received by our `sources.foo` component, then sent onto the `sinks.bar` component,
+The event we've just sent will be received by our `sources.foo` component, then sent onto the `sinks.bar` component,
 which will, in turn, echo it back to the console:
 
 ```text
@@ -86,24 +82,11 @@ Hello World!
 
 ## Hello World Mark II
 
-The echoing of events isn't very exciting, though. Let's see what we can do with some real observability data.
+The echoing of events isn't very exciting. Let's see what we can do with some real observability data.
 Let's take a classic problem, collecting and processing Syslog events, and see how Vector handles it.
 
-To do this, we're going to add two new components to our configuration file. The first component uses
-the [`generator` source][docs.sources.generator]. The `generator` source creates sample log data that can allow
-you to simulate different types of events in various formats.
-
-> But, but you said "real" observability data? We choose generated data because it's hard for us to know what
-> platform you're trying Vector on. That means it's also hard to document a single way for everyone to get
-> data into Vector.
-
-The second component is a transform called [`remap`][docs.transforms.remap]. The `remap` transform is at the heart
-of what makes Vector so powerful for processing observability data. The transform exposes
-a simple language called [Vector Remap Language][docs.vrl] that allows you to parse, manipulate, and
-decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
-data that can help you ask and answer questions about your environment's state.
-
-Let's look at our updated configuration now:
+To do this, we're going to add two new components to our configuration file. Let's look at our updated
+configuration now:
 
 ```toml title="vector.toml"
 [sources.generate_syslog]
@@ -124,8 +107,21 @@ Let's look at our updated configuration now:
   encoding.codec = "json"
 ```
 
+The first component uses the [`generator` source][docs.sources.generator]. The `generator` source creates sample
+log data that can allow you to simulate different types of events in various formats.
+
+> But, but you said "real" observability data? We choose generated data because it's hard for us to know what
+> platform you're trying Vector on. That means it's also hard to document a single way for everyone to get
+> data into Vector.
+
+The second component is a transform called [`remap`][docs.transforms.remap]. The `remap` transform is at the heart
+of what makes Vector so powerful for processing observability data. The transform exposes
+a simple language called [Vector Remap Language][docs.vrl] that allows you to parse, manipulate, and
+decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
+data that can help you ask and answer questions about your environment's state.
+
 You can see we've added the `sources.generated_syslog` component. The `format` option tells the generator what
-type of logs to emit, here `syslog`, and the `count` option tells the generator who many lines to emit, here `100`.
+type of logs to emit, here `syslog`, and the `count` option tells the generator how many lines to emit, here 100.
 
 In our second component, `transforms.remap_syslog`, we've specified an `inputs` option of `generate_syslog`, which
 means it will receive events from our `generate_syslog` source. We've also specified the type of transform: `remap`.
