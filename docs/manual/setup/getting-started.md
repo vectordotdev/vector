@@ -17,7 +17,7 @@ We'll install Vector and create our first observability data pipeline so you can
 Installing Vector is quick and easy. We're going to install the `vector` binary, from which we can launch Vector and
 process our observability data.
 
-Here's a script to install Vector.
+Here's a script to install Vector:
 
 ```shell
 curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
@@ -25,7 +25,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or you can [choose your preferred installation method][docs.installation].
 
-Once we have Vector installed, let's check it's working correctly.
+Once we have Vector installed, let's check to make sure that it's working correctly:
 
 ```shell
 vector --version
@@ -75,7 +75,7 @@ The `echo` statement sends a single log to Vector over `STDIN`. The `vector...` 
 previously created config file.
 
 The event we've just sent will get received by our `sources.foo` component, then sent onto the `sinks.bar` component,
-which will, in turn, echo it back to the console.
+which will, in turn, echo it back to the console:
 
 ```text
 ... some logs ...
@@ -103,7 +103,7 @@ of what makes Vector so powerful for processing observability data. The transfor
 through Vector. Using `remap`, you can turn static events into informational data that can help you ask and
 answer questions about your environment's state.
 
-Let's look at our updated configuration now.
+Let's look at our updated configuration now:
 
 ```toml title="vector.toml"
 [sources.generate_syslog]
@@ -147,7 +147,7 @@ Lastly, we've renamed our sink component to `emit_syslog`, updated the `inputs` 
 by the `remap_syslog` transform, and specified that we want to emit events in JSON-format.
 
 Let's rerun Vector. This time we don't need to echo any data to it; just run in on the command line. It'll process
-100 lines of generated Syslog data, emit the processed data as JSON, and exit.
+100 lines of generated Syslog data, emit the processed data as JSON, and exit:
 
 ```shell
 vector --config ./vector.toml
