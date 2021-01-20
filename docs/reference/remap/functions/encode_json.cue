@@ -10,7 +10,7 @@ remap: functions: encode_json: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Codec"
 	description: """
 		Encodes the provided `value` into JSON.

@@ -23,10 +23,10 @@ remap: functions: starts_with: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "String"
 	description: #"""
-		Determines if a given `valuye` begins with the given `substring`.
+		Determines if a given `value` begins with the given `substring`.
 		"""#
 	examples: [
 		{

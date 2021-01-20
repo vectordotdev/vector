@@ -23,7 +23,7 @@ remap: functions: contains: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "String"
 	description: #"""
 		Determines if the provided `value` contains a given `substring`.

@@ -11,7 +11,7 @@ remap: functions: exists: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "Event"
 	description: #"""
 		Checks if the given `path` exists. Nested paths and arrays can also be checked.

@@ -52,7 +52,12 @@ remap: functions: compact: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array", "map"]
+	return: {
+		types: ["array", "map"]
+		rules: [
+			"The return type will match the `value` type.",
+		]
+	}
 	category: "Enumerate"
 	description: #"""
 		Compacts an `array` or `map` by removing "empty" values.

@@ -22,12 +22,15 @@ remap: functions: split: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: {
+		types: ["string"]
+		rules: [
+			"If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.",
+		]
+	}
 	category: "String"
 	description: #"""
 		Splits the given `value` via the provided `pattern`.
-
-		If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.
 		"""#
 	examples: [
 		{

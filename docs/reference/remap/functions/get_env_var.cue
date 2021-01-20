@@ -13,7 +13,7 @@ remap: functions: get_env_var: {
 		"Environment variable `name` does not exist",
 		"Value of environment variable `name` is not valid unicode",
 	]
-	return: ["string"]
+	return: types: ["string"]
 	category: "System"
 	description: #"""
 		Get the value of an environment variable. If the variable does not exists, an error is returned.

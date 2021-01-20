@@ -13,13 +13,19 @@ remap: expressions: assignment: {
 
 	grammar: {
 		source: """
-			target ~ operator ~ expression
+			target ~ ("," ~ error)? ~ operator ~ expression
 			"""
 		definitions: {
 			target: {
 				description: """
 					The `target` must be a path,
 					with an optional second variable for error handling if the right-hand side is fallible.
+					"""
+			}
+			error: {
+				description: """
+					The `error` allows for optional assignment to errors when the right-hand side expression is
+					fallible. This is commonly used when invoking fallible functions.
 					"""
 			}
 			operator: {
