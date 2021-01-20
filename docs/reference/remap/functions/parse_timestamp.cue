@@ -19,7 +19,7 @@ remap: functions: parse_timestamp: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `format`",
 	]
-	return: ["timestamp"]
+	return: types: ["timestamp"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` via the provided `format`.

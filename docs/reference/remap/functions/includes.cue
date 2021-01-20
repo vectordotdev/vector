@@ -16,7 +16,7 @@ remap: functions: includes: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "Enumerate"
 	description: """
 		Determines whether the provided `values` contains the provided `item`.

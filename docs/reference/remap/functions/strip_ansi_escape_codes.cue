@@ -10,7 +10,7 @@ remap: functions: strip_ansi_escape_codes: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Strips any [ANSI escape codes](\(urls.ansi_escape_codes)) from the provided `value`.

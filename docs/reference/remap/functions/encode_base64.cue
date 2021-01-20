@@ -17,7 +17,7 @@ remap: functions: encode_base64: {
 		},
 		{
 			name:        "charset"
-			description: ""
+			description: "The character set to use when encoding the data."
 			required:    false
 			type: ["string"]
 			default: "standard"
@@ -28,7 +28,7 @@ remap: functions: encode_base64: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Codec"
 	description: #"""
 		Encodes the provided `value` to [Base64](\(urls.base64)) either padded or non-padded and

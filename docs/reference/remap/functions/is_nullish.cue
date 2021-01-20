@@ -10,16 +10,17 @@ remap: functions: is_nullish: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: {
+		types: ["boolean"]
+		rules: [
+			#"If `value` is `null`, then `true` is returned."#,
+			#"If `value` is `"-"`, then `true` is returned."#,
+			#"If `value` is whitespace, as defined by [Unicode `White_Space` property](\#(urls.unicode_whitespace)), then `true` is returned."#,
+		]
+	}
 	category: "Type"
 	description: #"""
-		Determines whether the provided `value` is "nullish,"
-
-		Nullish indicates the absence of a meaningful value. The following are considered nullish in VRL:
-
-		* `null`
-		* `"-"` (A single dash)
-		* Whitespace as defined by [Unicode `White_Space` property](\(urls.unicode_whitespace))
+		Determines whether the provided `value` is "nullish,". Nullish indicates the absence of a meaningful value.
 		"""#
 	examples: [
 		{

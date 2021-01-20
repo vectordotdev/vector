@@ -10,7 +10,7 @@ remap: functions: upcase: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Returns a copy of `value` that is entirely uppercase.

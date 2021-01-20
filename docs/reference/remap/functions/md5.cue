@@ -10,7 +10,7 @@ remap: functions: md5: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Hash"
 	description: #"""
 		Calculates an md5 hash of a given `value`.

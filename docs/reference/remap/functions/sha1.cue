@@ -10,7 +10,7 @@ remap: functions: sha1: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Hash"
 	description: #"""
 		Calculates a sha1 hash of the provided `value`.

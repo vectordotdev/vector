@@ -25,7 +25,7 @@ remap: functions: parse_grok: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `pattern`",
 	]
-	return: ["map"]
+	return: types: ["map"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` using the Rust [`grok` library](https://github.com/daschl/grok).
