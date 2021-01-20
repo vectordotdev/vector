@@ -1101,6 +1101,7 @@ mod tests {
             source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
         );
 
+        // hostname too short
         source.hostname = Some("a".to_owned());
         assert!(!source.exclude_self("a29d569bd46c"));
     }
