@@ -31,7 +31,7 @@ Or you can [choose your preferred installation method][docs.installation].
 
 Once we have Vector installed, let's check it's working correctly.
 
-"`shell
+```shell
 vector --version
 ```
 
