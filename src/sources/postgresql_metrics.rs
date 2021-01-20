@@ -877,8 +877,9 @@ mod integration_tests {
             events
                 .iter()
                 .map(|e| e.as_metric())
-                .find(|e| e.name == "up")
+                .find(|e| e.name() == "up")
                 .unwrap()
+                .data
                 .value,
             gauge!(1)
         );
@@ -887,15 +888,12 @@ mod integration_tests {
         for event in &events {
             let metric = event.as_metric();
 
-            assert_eq!(metric.namespace, Some("postgresql".to_owned()));
+            assert_eq!(metric.namespace(), Some("postgresql"));
             assert_eq!(
-                metric.tags.as_ref().unwrap().get("endpoint").unwrap(),
+                metric.tags().unwrap().get("endpoint").unwrap(),
                 &tags_endpoint
             );
-            assert_eq!(
-                metric.tags.as_ref().unwrap().get("host").unwrap(),
-                &tags_host
-            );
+            assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
         }
 
         // test metrics from different queries
@@ -905,7 +903,7 @@ mod integration_tests {
             "pg_stat_bgwriter_checkpoints_timed_total",
         ];
         for name in names {
-            assert!(events.iter().any(|e| e.as_metric().name == name));
+            assert!(events.iter().any(|e| e.as_metric().name() == name));
         }
     }
 
