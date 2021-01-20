@@ -2,13 +2,13 @@ use crate::{
     api::schema::{
         filter::{filter_items, CustomFilter, StringFilter},
         metrics::{self, MetricsFilter},
-        relay,
+        relay, sort,
     },
     event::Metric,
     filter_check,
 };
-use async_graphql::{InputObject, Object};
-use std::collections::BTreeMap;
+use async_graphql::{Enum, InputObject, Object};
+use std::{cmp::Ordering, collections::BTreeMap};
 
 #[derive(Clone)]
 pub struct FileSourceMetricFile<'a> {
@@ -70,6 +70,43 @@ impl FileSourceMetrics {
     }
 }
 
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum FileSourceMetricFilesSortFieldName {
+    Name,
+    ProcessedBytesTotal,
+    ProcessedEventsTotal,
+}
+
+impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMetricFile<'_> {
+    fn sort(&self, rhs: &Self, field: &FileSourceMetricFilesSortFieldName) -> Ordering {
+        match field {
+            FileSourceMetricFilesSortFieldName::Name => Ord::cmp(&self.name, &rhs.name),
+            FileSourceMetricFilesSortFieldName::ProcessedBytesTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .processed_bytes_total()
+                    .map(|m| m.get_processed_bytes_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .processed_bytes_total()
+                    .map(|m| m.get_processed_bytes_total() as i64)
+                    .unwrap_or(0),
+            ),
+            FileSourceMetricFilesSortFieldName::ProcessedEventsTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .processed_events_total()
+                    .map(|m| m.get_processed_events_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .processed_events_total()
+                    .map(|m| m.get_processed_events_total() as i64)
+                    .unwrap_or(0),
+            ),
+        }
+    }
+}
+
 #[Object]
 impl FileSourceMetrics {
     /// File metrics
@@ -80,9 +117,14 @@ impl FileSourceMetrics {
         first: Option<i32>,
         last: Option<i32>,
         filter: Option<FileSourceMetricsFilesFilter>,
+        sort: Option<Vec<sort::SortField<FileSourceMetricFilesSortFieldName>>>,
     ) -> relay::ConnectionResult<FileSourceMetricFile<'_>> {
         let filter = filter.unwrap_or_else(FileSourceMetricsFilesFilter::default);
-        let files = filter_items(self.get_files().into_iter(), &filter);
+        let mut files = filter_items(self.get_files().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut files, &sort_fields);
+        }
 
         relay::query(
             files.into_iter(),
