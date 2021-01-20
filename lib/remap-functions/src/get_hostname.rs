@@ -46,6 +46,7 @@ impl Expression for GetHostnameFn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
+            fallible: true,
             kind: value::Kind::Bytes,
             ..Default::default()
         }
@@ -60,6 +61,7 @@ mod tests {
     remap::test_type_def![static_def {
         expr: |_| GetHostnameFn,
         def: TypeDef {
+            fallible: true,
             kind: value::Kind::Bytes,
             ..Default::default()
         },
