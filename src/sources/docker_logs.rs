@@ -1210,7 +1210,6 @@ mod integration_tests {
         container.ok().map(|c| c.id)
     }
 
-    /// Polling busybox image
     async fn pull_busybox(docker: &Docker) {
         let mut filters = HashMap::new();
         filters.insert("reference", vec!["busybox:latest"]);
