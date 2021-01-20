@@ -112,6 +112,7 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -191,8 +192,7 @@ mod tests {
                 ),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Distribution {
-                    values: vec![1.0, 2.0, 3.0],
-                    sample_rates: vec![100, 200, 300],
+                    samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                     statistic: StatisticKind::Histogram,
                 },
             }),
@@ -202,8 +202,13 @@ mod tests {
         let _ = sink.run(stream::iter(metrics)).await.unwrap();
 
         let output = rx.take(len).collect::<Vec<_>>().await;
-        assert_eq!("{\"event\":{\"counter\":{\"value\":42.0},\"kind\":\"incremental\",\"name\":\"metric1\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784401.0}", output[0].1);
         assert_eq!(
-            "{\"event\":{\"distribution\":{\"sample_rates\":[100,200,300],\"statistic\":\"histogram\",\"values\":[1.0,2.0,3.0]},\"kind\":\"absolute\",\"name\":\"metric2\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784402.0}", output[1].1);
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"}},"fields":{},"time":1597784401.0}"#,
+            output[0].1
+        );
+        assert_eq!(
+            r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"}},"fields":{},"time":1597784402.0}"#,
+            output[1].1
+        );
     }
 }

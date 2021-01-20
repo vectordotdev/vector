@@ -223,18 +223,15 @@ impl From<proto::EventWrapper> for Event {
                             }
                             proto::distribution::StatisticKind::Summary => StatisticKind::Summary,
                         },
-                        values: dist.values,
-                        sample_rates: dist.sample_rates,
+                        samples: metric::zip_samples(dist.values, dist.sample_rates),
                     },
                     MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
-                        buckets: hist.buckets,
-                        counts: hist.counts,
+                        buckets: metric::zip_buckets(hist.buckets, hist.counts),
                         count: hist.count,
                         sum: hist.sum,
                     },
                     MetricProto::AggregatedSummary(summary) => MetricValue::AggregatedSummary {
-                        quantiles: summary.quantiles,
-                        values: summary.values,
+                        quantiles: metric::zip_quantiles(summary.quantiles, summary.values),
                         count: summary.count,
                         sum: summary.sum,
                     },
@@ -330,40 +327,38 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Set { values } => MetricProto::Set(proto::Set {
                         values: values.into_iter().collect(),
                     }),
-                    MetricValue::Distribution {
-                        values,
-                        sample_rates,
-                        statistic,
-                    } => MetricProto::Distribution(proto::Distribution {
-                        values,
-                        sample_rates,
-                        statistic: match statistic {
-                            StatisticKind::Histogram => {
-                                proto::distribution::StatisticKind::Histogram
+                    MetricValue::Distribution { samples, statistic } => {
+                        MetricProto::Distribution(proto::Distribution {
+                            values: samples.iter().map(|s| s.value).collect(),
+                            sample_rates: samples.iter().map(|s| s.rate).collect(),
+                            statistic: match statistic {
+                                StatisticKind::Histogram => {
+                                    proto::distribution::StatisticKind::Histogram
+                                }
+                                StatisticKind::Summary => {
+                                    proto::distribution::StatisticKind::Summary
+                                }
                             }
-                            StatisticKind::Summary => proto::distribution::StatisticKind::Summary,
-                        }
-                        .into(),
-                    }),
+                            .into(),
+                        })
+                    }
                     MetricValue::AggregatedHistogram {
                         buckets,
-                        counts,
                         count,
                         sum,
                     } => MetricProto::AggregatedHistogram(proto::AggregatedHistogram {
-                        buckets,
-                        counts,
+                        buckets: buckets.iter().map(|b| b.upper_limit).collect(),
+                        counts: buckets.iter().map(|b| b.count).collect(),
                         count,
                         sum,
                     }),
                     MetricValue::AggregatedSummary {
                         quantiles,
-                        values,
                         count,
                         sum,
                     } => MetricProto::AggregatedSummary(proto::AggregatedSummary {
-                        quantiles,
-                        values,
+                        quantiles: quantiles.iter().map(|q| q.upper_limit).collect(),
+                        values: quantiles.iter().map(|q| q.value).collect(),
                         count,
                         sum,
                     }),
