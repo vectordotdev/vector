@@ -89,10 +89,10 @@ components: sources: docker_logs: {
 				drivers.
 				""",
 			"""
-				To avoid collecting logs from itself, the Docker source does not
-				collect logs from Vector containers. Please consider using the
-				[`vector` source](\(urls.vector_source)) if you want to collect logs
-				from other Vector containers.
+				To avoid collecting logs from itself when deployed as a container,
+				the Docker source uses current hostname to find out which container
+				it is inside. If a container's ID matches the hostname, that container
+				will be excluded.
 				""",
 		]
 		notices: []
