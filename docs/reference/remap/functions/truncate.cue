@@ -33,11 +33,10 @@ remap: functions: truncate: {
 	examples: [
 		{
 			title: "Truncate a string"
-			input: log: message: #"A rather long sentence."#
 			source: #"""
-				.message = truncate(.message, limit = 11, ellipsis = true)
+				truncate("A rather long sentence.", limit = 11, ellipsis = true)
 				"""#
-			output: log: message: "A rather lo..."
+			return: "A rather lo..."
 		},
 	]
 }

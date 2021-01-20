@@ -17,22 +17,25 @@ remap: functions: to_string: {
 		"""#
 	examples: [
 		{
-			title: "Coerce to a string"
-			input: log: {
-				boolean: true
-				int:     52
-				float:   12.2
-			}
+			title: "Coerce to a string (boolean)"
 			source: #"""
-				.boolean = to_string(.boolean)
-				.int = to_string(.int)
-				.float = to_string(.float)
+				to_string(true)
 				"""#
-			output: log: {
-				boolean: "true"
-				int:     "52"
-				float:   "12.2"
-			}
+			return: true
+		},
+		{
+			title: "Coerce to a string (int)"
+			source: #"""
+				to_string(52)
+				"""#
+			return: "52"
+		},
+		{
+			title: "Coerce to a string (float)"
+			source: #"""
+				to_string(52.2)
+				"""#
+			return: "52.2"
 		},
 	]
 }

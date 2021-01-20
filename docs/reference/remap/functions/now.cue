@@ -11,11 +11,10 @@ remap: functions: now: {
 	examples: [
 		{
 			title: "Generate a current timestamp"
-			input: log: {}
 			source: #"""
-				.timestamp = now()
+				now()
 				"""#
-			output: log: timestamp: "2020-10-21T20:53:12.212221Z"
+			return: "2020-10-21T20:53:12.212221Z"
 		},
 	]
 }

@@ -8,6 +8,7 @@ mod http;
 mod isolated_buffering;
 mod lookup;
 mod lua;
+mod metrics_snapshot;
 mod regex;
 mod template;
 mod topology;
@@ -21,6 +22,7 @@ criterion_main!(
     isolated_buffering::benches,
     lookup::benches,
     lua::benches,
+    metrics_snapshot::benches,
     regex::benches,
     template::benches,
     topology::benches,

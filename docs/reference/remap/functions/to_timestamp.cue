@@ -22,9 +22,10 @@ remap: functions: to_timestamp: {
 	examples: [
 		{
 			title: "Coerce to a timestamp"
-			input: log: date: "2020-10-21T16:00:00Z"
-			source: ".date = to_timestamp(.date)"
-			output: log: date: "2020-10-21T16:00:00Z"
+			source: """
+				to_timestamp("2020-10-21T16:00:00Z")
+				"""
+			return: "2020-10-21T16:00:00Z"
 		},
 	]
 }
