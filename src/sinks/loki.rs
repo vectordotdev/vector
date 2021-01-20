@@ -105,7 +105,7 @@ impl SinkConfig for LokiConfig {
         }
 
         if !self.request.concurrency.is_none() {
-            warn!("`request.concurrency` is not supported.");
+            warn!("Option `request.concurrency` is not supported.");
         }
         let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         request_settings.concurrency = Some(1);
