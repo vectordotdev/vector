@@ -21,6 +21,7 @@ type FilePosition = u64;
 mod test {
     use self::file_watcher::FileWatcher;
     use super::*;
+    use bytes::Bytes;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
     use std::fs;
     use std::io::Write;
@@ -213,8 +214,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw =
-            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), 0, None, 100_000, Bytes::from("\n"))
+            .expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -309,8 +310,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw =
-            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
+        let mut fw = FileWatcher::new(path.clone(), 0, None, 100_000, Bytes::from("\n"))
+            .expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());

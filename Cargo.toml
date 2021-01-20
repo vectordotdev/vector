@@ -214,6 +214,7 @@ tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "w
 # https://github.com/timberio/vector/issues/6005 is resolved
 thread_local = "= 1.0.1"
 dashmap = "3"
+encoding_rs = { version = "0.8", features = ["serde"] }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
