@@ -1126,7 +1126,6 @@ mod integration_tests {
     }
 
     fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
-        // trace_init();
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
