@@ -99,9 +99,9 @@ you to simulate different types of events in various formats.
 
 The second component is a transform called [`remap`][docs.transforms.remap]. The `remap` transform is at the heart
 of what makes Vector so powerful for processing observability data. The transform exposes
-a simple language called [Vector Remap Language][docs.vrl] that allows you to parse, manipulate, and decorate your event data as it passes
-through Vector. Using `remap`, you can turn static events into informational data that can help you ask and
-answer questions about your environment's state.
+a simple language called [Vector Remap Language][docs.vrl] that allows you to parse, manipulate, and
+decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
+data that can help you ask and answer questions about your environment's state.
 
 Let's look at our updated configuration now:
 
