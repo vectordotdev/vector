@@ -1,9 +1,8 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, stream, StreamExt};
 use vector::{
-    config, sinks, sources,
+    config,
     test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
-    transforms,
 };
 
 criterion_group!(
@@ -22,143 +21,110 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let configs: Vec<(&str, config::ConfigBuilder)> = vec![
-        ("remap", {
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-            );
-            config.add_transform(
-                "parser",
-                &["in"],
-                toml::from_str::<transforms::remap::RemapConfig>(
-                    r#"
-source = """
-    . = parse_syslog(.message)
-"""
-"#,
-                )
-                .unwrap(),
-            );
-            config.add_sink(
-                "out",
-                &["parser"],
-                sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-            );
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            r#"
+[transforms.last]
+  type = "remap"
+  inputs = ["in"]
+  source = """
+      . = parse_syslog(.message)
+  """
+         "#,
+        ),
+        (
+            "native",
+            r#"
+[transforms.last]
+  type = "regex_parser"
+  inputs = ["in"]
+  field = "message"
+  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
+  types.appname = "string"
+  types.facility = "string"
+  types.hostname = "string"
+  types.level = "string"
+  types.message = "string"
+  types.msgid = "string"
+  types.procid = "int"
+  types.timestamp = "timestamp|%F"
+         "#,
+        ),
+        (
+            "lua",
+            r#"
+[transforms.last]
+  type = "lua"
+  inputs = ["in"]
+  version = "2"
+  source = """
+  local function parse_syslog(message)
+    local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
+    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-            config
-        }),
-        ("native", {
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-            );
-            config.add_transform(
-                "parse_syslog",
-                &["in"],
-                toml::from_str::<transforms::regex_parser::RegexParserConfig>(
-                    r#"
-field = "message"
-patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
-types.appname = "string"
-types.facility = "string"
-types.hostname = "string"
-types.level = "string"
-types.message = "string"
-types.msgid = "string"
-types.procid = "int"
-types.timestamp = "timestamp|%F"
-                    "#,
-                ).unwrap(),
-            );
-            config.add_sink(
-                "out",
-                &["parse_syslog"],
-                sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-            );
+    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
+  end
 
-            config
-        }),
-        ("lua", {
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-            );
-            config.add_transform(
-                    "parser",
-                    &["in"],
-                toml::from_str::<transforms::lua::LuaConfig>(r#"
-version = "2"
-source = """
-local function parse_syslog(message)
-  local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
-  local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
-
-  return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
-end
-
-function process(event, emit)
-  event.log = parse_syslog(event.log.message)
-  emit(event)
-end
-"""
-hooks.process = "process"
-"#
-
-).unwrap());
-            config.add_sink(
-                "out",
-                &["parser"],
-                sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-            );
-
-            config
-        }),
-        ("wasm", {
-            let mut config = config::Config::builder();
-            config.add_source(
-                "in",
-                sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
-            );
-            config.add_transform(
-                "parser",
-                &["in"],
-                toml::from_str::<transforms::wasm::WasmConfig>(
-                    r#"
-module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
-artifact_cache = "target/artifacts/"
-"#,
-                )
-                .unwrap(),
-            );
-            config.add_sink(
-                "out",
-                &["parser"],
-                sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
-            );
-
-            config
-        }),
+  function process(event, emit)
+    event.log = parse_syslog(event.log.message)
+    emit(event)
+  end
+  """
+  hooks.process = "process"
+        "#,
+        ),
+        (
+            "wasm",
+            r#"
+[transforms.last]
+  type = "lua"
+  inputs = ["in"]
+  module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
+  artifact_cache = "target/artifacts/"
+        "#,
+        ),
     ];
 
     let mut group = c.benchmark_group("language/parse_syslog");
     group.sampling_mode(SamplingMode::Flat);
 
-    for (name, config) in configs.iter() {
+    let source_config = format!(
+        r#"
+[sources.in]
+  type = "socket"
+  mode = "tcp"
+  address = "{}"
+"#,
+        in_addr
+    );
+    let sink_config = format!(
+        r#"
+[sinks.out]
+  inputs = ["last"]
+  type = "socket"
+  mode = "tcp"
+  encoding.codec = "json"
+  address = "{}"
+"#,
+        out_addr
+    );
+
+    for (name, transform_config) in configs.into_iter() {
         group.throughput(Throughput::Elements(num_lines as u64));
         group.bench_function(name.clone(), |b| {
             b.iter_batched(
                 || {
-                    let config = config.clone();
+                    let mut config = source_config.clone();
+                    config.push_str(&transform_config);
+                    config.push_str(&sink_config);
 
+                    let config =  config::load_from_str(&config, Some(config::Format::TOML)).unwrap();
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) =
-                            start_topology(config.build().unwrap(), false).await;
+                            start_topology(config, false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
