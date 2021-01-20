@@ -9,8 +9,7 @@ thread_local! {
 fn get_hostname_inner() -> Result<Value> {
     Ok(hostname::get()
         .map_err(|error| format!("failed to get hostname: {}", error))?
-        .into_string()
-        .map_err(|error| format!("failed to convert hostname to string: {:?}", error))?
+        .to_string_lossy()
         .into())
 }
 
