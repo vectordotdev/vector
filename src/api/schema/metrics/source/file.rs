@@ -107,6 +107,26 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
     }
 }
 
+#[derive(Default, InputObject)]
+pub struct FileSourceMetricsFilesFilter {
+    name: Option<Vec<StringFilter>>,
+    or: Option<Vec<Self>>,
+}
+
+impl CustomFilter<FileSourceMetricFile<'_>> for FileSourceMetricsFilesFilter {
+    fn matches(&self, file: &FileSourceMetricFile<'_>) -> bool {
+        filter_check!(self
+            .name
+            .as_ref()
+            .map(|f| f.iter().all(|f| f.filter_value(file.get_name()))));
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
+    }
+}
+
 #[Object]
 impl FileSourceMetrics {
     /// File metrics
@@ -145,22 +165,161 @@ impl FileSourceMetrics {
     }
 }
 
-#[derive(Default, InputObject)]
-pub struct FileSourceMetricsFilesFilter {
-    name: Option<Vec<StringFilter>>,
-    or: Option<Vec<Self>>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::schema::sort::SortField;
+    use crate::event::{MetricKind, MetricValue};
 
-impl CustomFilter<FileSourceMetricFile<'_>> for FileSourceMetricsFilesFilter {
-    fn matches(&self, file: &FileSourceMetricFile<'_>) -> bool {
-        filter_check!(self
-            .name
-            .as_ref()
-            .map(|f| f.iter().all(|f| f.filter_value(file.get_name()))));
-        true
+    struct FileSourceMetricTest<'a> {
+        name: &'a str,
+        events_metric: Metric,
+        bytes_metric: Metric,
     }
 
-    fn or(&self) -> Option<&Vec<Self>> {
-        self.or.as_ref()
+    impl<'a> FileSourceMetricTest<'a> {
+        fn new(name: &'a str, events_processed: f64, bytes_processed: f64) -> Self {
+            Self {
+                name,
+                events_metric: metric("processed_events_total", events_processed),
+                bytes_metric: metric("processed_bytes_total", bytes_processed),
+            }
+        }
+
+        fn get_metric(&'a self) -> FileSourceMetricFile<'a> {
+            FileSourceMetricFile::from_tuple((
+                self.name.to_string(),
+                vec![&self.bytes_metric, &self.events_metric],
+            ))
+        }
+    }
+
+    fn metric(name: &str, value: f64) -> Metric {
+        Metric {
+            name: name.into(),
+            namespace: None,
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value },
+        }
+    }
+
+    fn by_name(name: &str) -> FileSourceMetricTest {
+        FileSourceMetricTest::new(name, 0.00, 0.00)
+    }
+
+    #[test]
+    fn sort_name_asc() {
+        let t1 = by_name("/path/to/file/2");
+        let t2 = by_name("/path/to/file/3");
+        let t3 = by_name("/path/to/file/1");
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::Name,
+            direction: sort::Direction::Asc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["1", "2", "3"].iter().enumerate() {
+            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{}", f));
+        }
+    }
+
+    #[test]
+    fn sort_name_desc() {
+        let t1 = by_name("/path/to/file/2");
+        let t2 = by_name("/path/to/file/3");
+        let t3 = by_name("/path/to/file/1");
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::Name,
+            direction: sort::Direction::Desc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["3", "2", "1"].iter().enumerate() {
+            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{}", f));
+        }
+    }
+
+    #[test]
+    fn processed_events_asc() {
+        let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
+        let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
+        let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::ProcessedEventsTotal,
+            direction: sort::Direction::Asc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["c", "b", "a"].iter().enumerate() {
+            assert_eq!(&files[i].name, *f);
+        }
+    }
+
+    #[test]
+    fn processed_events_desc() {
+        let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
+        let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
+        let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::ProcessedEventsTotal,
+            direction: sort::Direction::Desc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["a", "b", "c"].iter().enumerate() {
+            assert_eq!(&files[i].name, *f);
+        }
+    }
+
+    #[test]
+    fn processed_bytes_asc() {
+        let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
+        let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
+        let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::ProcessedBytesTotal,
+            direction: sort::Direction::Asc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["a", "c", "b"].iter().enumerate() {
+            assert_eq!(&files[i].name, *f);
+        }
+    }
+
+    #[test]
+    fn processed_bytes_desc() {
+        let t1 = FileSourceMetricTest::new("a", 1000.00, 100.00);
+        let t2 = FileSourceMetricTest::new("b", 500.00, 300.00);
+        let t3 = FileSourceMetricTest::new("c", 250.00, 200.00);
+
+        let mut files = vec![t1.get_metric(), t2.get_metric(), t3.get_metric()];
+        let fields = vec![SortField::<FileSourceMetricFilesSortFieldName> {
+            field: FileSourceMetricFilesSortFieldName::ProcessedBytesTotal,
+            direction: sort::Direction::Desc,
+        }];
+
+        sort::by_fields(&mut files, &fields);
+
+        for (i, f) in ["b", "c", "a"].iter().enumerate() {
+            assert_eq!(&files[i].name, *f);
+        }
     }
 }
