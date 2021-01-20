@@ -61,10 +61,6 @@ macro_rules! gauge {
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display(
-        "null database can not be specified in both `include_databases` and `exclude_databases`"
-    ))]
-    IncludeExcludeEmpty,
     #[snafu(display("invalid endpoint: {}", source))]
     InvalidEndpoint { source: PgError },
     #[snafu(display("host missing"))]
@@ -138,7 +134,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
         let datname_filter = DatnameFilter::new(
             self.include_databases.clone().unwrap_or_default(),
             self.exclude_databases.clone().unwrap_or_default(),
-        )?;
+        );
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let mut sources = try_join_all(self.endpoints.iter().map(|endpoint| {
@@ -190,7 +186,7 @@ struct DatnameFilter {
 }
 
 impl DatnameFilter {
-    fn new(include: Vec<String>, exclude: Vec<String>) -> Result<Self, BuildError> {
+    fn new(include: Vec<String>, exclude: Vec<String>) -> Self {
         let (include_databases, include_null) = Self::clean_databases(include);
         let (exclude_databases, exclude_null) = Self::clean_databases(exclude);
         let (match_sql, match_params) =
@@ -202,15 +198,9 @@ impl DatnameFilter {
             pg_stat_database_sql += &match_sql;
         }
         match (include_null, exclude_null) {
-            (false, false) => {} // nothing
-            (false, true) => {
-                pg_stat_database_sql += if match_sql.is_empty() {
-                    " WHERE"
-                } else {
-                    " AND"
-                };
-                pg_stat_database_sql += " datname IS NOT NULL";
-            }
+            // Nothing
+            (false, false) => {}
+            // Include tracking objects not in database
             (true, false) => {
                 pg_stat_database_sql += if match_sql.is_empty() {
                     " WHERE"
@@ -219,7 +209,15 @@ impl DatnameFilter {
                 };
                 pg_stat_database_sql += " datname IS NULL";
             }
-            (true, true) => return Err(BuildError::IncludeExcludeEmpty),
+            // Exclude tracking objects not in database, precedence over include
+            (false, true) | (true, true) => {
+                pg_stat_database_sql += if match_sql.is_empty() {
+                    " WHERE"
+                } else {
+                    " AND"
+                };
+                pg_stat_database_sql += " datname IS NOT NULL";
+            }
         }
 
         let mut pg_stat_database_conflicts_sql =
@@ -229,11 +227,11 @@ impl DatnameFilter {
             pg_stat_database_conflicts_sql += &match_sql;
         }
 
-        Ok(Self {
+        Self {
             pg_stat_database_sql,
             pg_stat_database_conflicts_sql,
             match_params,
-        })
+        }
     }
 
     fn clean_databases(names: Vec<String>) -> (Vec<String>, bool) {
