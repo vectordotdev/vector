@@ -84,7 +84,7 @@ components: sources: postgresql_metrics: {
 				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
 				the `datname` column for which you want to collect metrics from.
 				If not set, metrics will be collected from all databases.
-				Empty database will include `datname` with `NULL`.
+				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`exclude_databases`](#exclude_databases).
 				"""
 			common:   false
@@ -98,7 +98,7 @@ components: sources: postgresql_metrics: {
 			description: """
 				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
 				the `datname` column for which you don't want to collect metrics from.
-				Empty database will exclude `datname` with `NULL`.
+				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`include_databases`](#include_databases).
 				"""
 			common:   false
