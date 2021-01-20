@@ -256,7 +256,7 @@ impl Metric {
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_metric_kv(key: metrics::Key, handle: metrics_util::Handle) -> Self {
+    pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
         let value = match handle {
             metrics_util::Handle::Counter(_) => MetricValue::Counter {
                 value: handle.read_counter() as f64,

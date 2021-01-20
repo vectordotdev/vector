@@ -26,11 +26,10 @@ remap: functions: push: {
 	examples: [
 		{
 			title: "Push an item onto an array"
-			input: log: array: [72.5, false, [1, 2, 3]]
 			source: """
-				.array = push(.array, "booper")
+				push([1, 2], 3)
 				"""
-			output: log: array: [72.5, false, [1, 2, 3], "booper"]
+			return: [1, 2, 3]
 		},
 	]
 }

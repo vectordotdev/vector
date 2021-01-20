@@ -17,15 +17,17 @@ remap: functions: ipv6_to_ipv4: {
 	category: "IP"
 	description: #"""
 		Converts the provided `ip` to an IPv4 address.
+
+		If the parameter is already an IPv4 address it is passed through untouched. If it is an IPv6 address it has
+		to be an IPv4 compatible address.
 		"""#
 	examples: [
 		{
 			title: "IPv6 to IPv4"
-			input: log: v6: "::ffff:192.168.0.1"
 			source: #"""
-				.v4 = ipv6_to_ipv4(.address)
+				ipv6_to_ipv4("::ffff:192.168.0.1")
 				"""#
-			output: input & {log: v4: "192.168.0.1"}
+			return: "192.168.0.1"
 		},
 	]
 }

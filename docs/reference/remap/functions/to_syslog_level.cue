@@ -21,9 +21,10 @@ remap: functions: to_syslog_level: {
 	examples: [
 		{
 			title: "Coerce to a Syslog level"
-			input: log: severity: "5"
-			source: ".log_level = to_syslog_level(.severity)"
-			output: input & {log: level: "notice"}
+			source: """
+				to_syslog_level("5")
+				"""
+			return: "notice"
 		},
 	]
 }

@@ -35,67 +35,62 @@ remap: functions: merge: {
 	examples: [
 		{
 			title: "Object merge (shallow)"
-			input: log: {
-				map1: {
-					parent1: {
-						child1: 1
-						child2: 2
-					}
-					parent2: child3: 3
-				}
-				map2: parent1: {
-					child2: 4
-					child5: 5
-				}
-			}
 			source: #"""
-				merge(.map1, .map2, deep: false)
-				"""#
-			output: log: {
-				map1: {
-					parent1: {
-						child2: 4
-						child5: 5
+				merge(
+					{
+						"parent1": {
+							"child1": 1,
+							"child2": 2
+						},
+						"parent2": {
+							"child3": 3
+						}
+					},
+					{
+						"parent1": {
+							"child2": 4,
+							"child5": 4
+						}
 					}
-					parent2: child3: 3
-				}
-				map2: parent1: {
+				)
+				"""#
+			return: {
+				parent1: {
 					child2: 4
 					child5: 5
 				}
+				parent2: child3: 3
 			}
 		},
 		{
 			title: "Object merge (deep)"
-			input: log: {
-				map1: {
-					parent1: {
-						child1: 1
-						child2: 2
-					}
-					parent2: child3: 3
-				}
-				map2: parent1: {
-					child2: 4
-					child5: 5
-				}
-			}
 			source: #"""
-				merge(.map1, .map2, deep: true)
+				merge(
+					{
+						"parent1": {
+							"child1": 1,
+							"child2": 2
+						},
+						"parent2": {
+							"child3": 3
+						}
+					},
+					{
+						"parent1": {
+							"child2": 4,
+							"child5": 4
+						}
+					},
+					deep: true
+				)
 				"""#
-			output: log: {
-				map1: {
-					parent1: {
-						child1: 1
-						child2: 4
-						child5: 5
-					}
-					parent2: child3: 3
-				}
-				map2: parent1: {
+			return: {
+				parent1: {
+					child1: 1
 					child2: 4
 					child5: 5
 				}
+				parent2: child3: 3
 			}
 		},
 	]

@@ -34,11 +34,10 @@ remap: functions: sha2: {
 	examples: [
 		{
 			title: "Calculate sha2 hash"
-			input: log: text: "foo"
 			source: #"""
-				.hash = sha2(.text, variant = "SHA-512/224")
+				sha2("foo, variant = "SHA-512/224")
 				"""#
-			output: input & {log: hash: "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"}
+			return: "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"
 		},
 	]
 }
