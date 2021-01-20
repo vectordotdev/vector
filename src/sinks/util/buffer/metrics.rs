@@ -8,7 +8,7 @@ use std::{
     collections::HashSet,
     hash::{Hash, Hasher},
     mem::discriminant,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 #[derive(Clone, Debug)]
@@ -87,6 +87,12 @@ impl Deref for MetricEntry {
     type Target = Metric;
     fn deref(&self) -> &Metric {
         &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
     }
 }
 
@@ -191,22 +197,22 @@ impl Batch for MetricBuffer {
                         });
 
                         // The resulting Counters could be added up normally
-                        if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                            existing.data.add(&item.data);
-                            self.metrics.insert(MetricEntry(existing));
-                        } else {
-                            self.metrics.insert(delta);
-                        }
-                        self.state.replace(item);
-                    } else {
-                        self.state.insert(item);
+                        let new_entry = match self.metrics.take(&delta) {
+                            Some(mut existing) => {
+                                existing.data.add(&item.data);
+                                existing
+                            }
+                            None => delta,
+                        };
+                        self.metrics.insert(new_entry);
                     }
+                    self.state.replace(item);
                 }
                 (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
                     let entry = MetricEntry(item.into_absolute());
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&entry) {
+                    if let Some(mut existing) = self.metrics.take(&entry) {
                         existing.data.update(&entry.data);
-                        self.metrics.insert(MetricEntry(existing));
+                        self.metrics.insert(existing);
                     } else {
                         // If the metric is not present in active batch,
                         // then we look it up in permanent state, where we keep track
@@ -231,13 +237,16 @@ impl Batch for MetricBuffer {
                 (MetricKind::Absolute, _) => {
                     self.metrics.replace(MetricEntry(item));
                 }
-                _ => {
-                    let new = MetricEntry(item);
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.data.add(&new.data);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        self.metrics.insert(new);
+                (MetricKind::Incremental, _) => {
+                    let entry = MetricEntry(item);
+                    match self.metrics.take(&entry) {
+                        Some(mut existing) => {
+                            existing.data.add(&entry.data);
+                            self.metrics.insert(existing);
+                        }
+                        None => {
+                            self.metrics.insert(entry);
+                        }
                     }
                 }
             }
