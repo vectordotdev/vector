@@ -632,12 +632,6 @@ pub(crate) enum ApiError {
     BadRequest,
 }
 
-impl From<ApiError> for Rejection {
-    fn from(error: ApiError) -> Self {
-        warp::reject::custom(error)
-    }
-}
-
 impl warp::reject::Reject for ApiError {}
 
 /// Cached bodies for common responses
