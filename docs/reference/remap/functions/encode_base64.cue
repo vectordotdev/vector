@@ -23,7 +23,7 @@ remap: functions: encode_base64: {
 			default: "standard"
 			enum: {
 				standard: "[Standard](\(urls.base64_standard)) Base64 format."
-				url_safe: "Modified Base64 for [URL variants](\(urls.base64_url_safe)."
+				url_safe: "Modified Base64 for [URL variants](\(urls.base64_url_safe))."
 			}
 		},
 	]
