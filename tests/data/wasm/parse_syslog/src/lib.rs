@@ -1,13 +1,11 @@
 //! VRL Announcement Example
 //!
-//! A WASM implementation of the Remap example in the VRL announcement post for benchmark
-//! comparison.
+//! A WASM implementation of syslog parsing for benchmarks
 
 #![deny(improper_ctypes)]
 use serde_json::Value;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use uuid::Uuid;
 use vector_wasm::{hostcall, Registration, Role};
 
 /// Perform one time initialization and registration.
@@ -54,9 +52,6 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 
     // The following is equivalent to the remap script:
     // . = parse_syslog!(.message)
-    // .severity = "info"
-    // .id = uuid_v4()
-    // .timestamp = to_int(format_timestamp(.timestamp, format: "%s"))
 
     let message = event.remove("message");
 
@@ -74,6 +69,9 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     }
     if let Some(facility) = parsed.facility {
         event.insert("facility".to_owned(), facility.as_str().to_owned().into());
+    }
+    if let Some(severity) = parsed.severity {
+        event.insert("severity".to_owned(), severity.as_str().to_owned().into());
     }
     if let syslog_loose::Protocol::RFC5424(version) = parsed.protocol {
         event.insert("version".to_owned(), (version as i64).into());
@@ -99,10 +97,8 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
         }
     }
 
-    event.insert("severity".to_owned(), "info".to_owned().into());
-    event.insert("id".to_owned(), Uuid::new_v4().to_string().into());
     if let Some(timestamp) = parsed.timestamp {
-        event.insert("timestamp".to_owned(), timestamp.timestamp().into());
+        event.insert("timestamp".to_owned(), timestamp.to_rfc3339().into());
     }
 
     // As with all data, it returns to bytes in the end.

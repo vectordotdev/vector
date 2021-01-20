@@ -296,23 +296,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn vrl_announcement_example() {
+    async fn parse_syslog() {
         crate::test_util::trace_init();
-        let span = span!(
-            tracing::Level::TRACE,
-            "transforms::wasm::vrl_announcement_example"
-        );
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_syslog");
         let _enter = span.enter();
 
         let config = r#"
-            module = "tests/data/wasm/vrl_announcement_example/target/wasm32-wasi/release/vrl_announcement_example.wasm"
+            module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
             artifact_cache = "target/artifacts"
             "#;
 
         test_config(
             config,
-            "tests/data/wasm/vrl_announcement_example/fixtures/a/input.json",
-            "tests/data/wasm/vrl_announcement_example/fixtures/a/expected.json",
+            "tests/data/wasm/parse_syslog/fixtures/a/input.json",
+            "tests/data/wasm/parse_syslog/fixtures/a/expected.json",
         )
         .await;
     }

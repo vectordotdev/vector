@@ -6,7 +6,16 @@ use vector::{
     transforms,
 };
 
-fn benchmark_vrl_announcement(c: &mut Criterion) {
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_parse_syslog
+);
+criterion_main!(benches);
+
+fn benchmark_parse_syslog(c: &mut Criterion) {
     vector::test_util::trace_init();
 
     let num_lines = 10_000;
@@ -27,9 +36,6 @@ fn benchmark_vrl_announcement(c: &mut Criterion) {
                     r#"
 source = """
     . = parse_syslog(.message)
-    .severity = "info"
-    .id = uuid_v4()
-    .timestamp = to_int(.timestamp)
 """
 "#,
                 )
@@ -43,7 +49,7 @@ source = """
 
             config
         }),
-        ("native_and_lua", {
+        ("native", {
             let mut config = config::Config::builder();
             config.add_source(
                 "in",
@@ -67,47 +73,9 @@ types.timestamp = "timestamp|%F"
                     "#,
                 ).unwrap(),
             );
-            config.add_transform(
-                "add_fields",
-                &["parse_syslog"],
-                toml::from_str::<transforms::add_fields::AddFieldsConfig>(
-                    r#"
-fields.severity = "info"
-                    "#,
-                )
-                .unwrap(),
-            );
-            config.add_transform(
-                "lua_parser",
-                &["add_fields"],
-                toml::from_str::<transforms::lua::LuaConfig>(
-                    r#"
-version = "2"
-source = """
-local random = math.random
-
-local function uuid()
-    local template ='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
-    return string.gsub(template, '[xy]', function (c)
-        local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)
-        return string.format('%x', v)
-    end)
-end
-
-function process(event, emit)
-  event.log.id = uuid()
-  event.log.timestamp = os.time(event.log.timestamp)
-  emit(event)
-end
-"""
-hooks.process = "process"
-"#,
-                )
-                .unwrap(),
-            );
             config.add_sink(
                 "out",
-                &["lua_parser"],
+                &["parse_syslog"],
                 sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
             );
 
@@ -125,23 +93,6 @@ hooks.process = "process"
                 toml::from_str::<transforms::lua::LuaConfig>(r#"
 version = "2"
 source = """
-local random = math.random
-
-local function uuid()
-    local template ='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
-    return string.gsub(template, '[xy]', function (c)
-        local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)
-        return string.format('%x', v)
-    end)
-end
-
-local function date_to_timestamp(date)
-  local pattern = "^(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)%.(%d+)Z$"
-  local year, month, day, hour, minute, seconds = string.match(date, pattern)
-
-  return os.time({year = year, month = month, day = day, hour = hour, min = minute, sec = seconds})
-end
-
 local function parse_syslog(message)
   local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
   local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
@@ -151,9 +102,6 @@ end
 
 function process(event, emit)
   event.log = parse_syslog(event.log.message)
-  event.log.severity = "info"
-  event.log.id = uuid()
-  event.log.timestamp = date_to_timestamp(event.log.timestamp)
   emit(event)
 end
 """
@@ -180,7 +128,7 @@ hooks.process = "process"
                 &["in"],
                 toml::from_str::<transforms::wasm::WasmConfig>(
                     r#"
-module = "tests/data/wasm/vrl_announcement_example/target/wasm32-wasi/release/vrl_announcement_example.wasm"
+module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
 artifact_cache = "target/artifacts/"
 "#,
                 )
@@ -196,12 +144,12 @@ artifact_cache = "target/artifacts/"
         }),
     ];
 
-    let mut group = c.benchmark_group("language/vrl_announcement");
+    let mut group = c.benchmark_group("language/parse_syslog");
     group.sampling_mode(SamplingMode::Flat);
 
     for (name, config) in configs.iter() {
         group.throughput(Throughput::Elements(num_lines as u64));
-        group.bench_function(format!("language/vrl_announcement/{}", name), |b| {
+        group.bench_function(name.clone(), |b| {
             b.iter_batched(
                 || {
                     let config = config.clone();
@@ -248,12 +196,3 @@ artifact_cache = "target/artifacts/"
 
     group.finish();
 }
-
-criterion_group!(
-    name = benches;
-    // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
-    config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_vrl_announcement
-);
-criterion_main!(benches);

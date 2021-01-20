@@ -567,7 +567,7 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
-language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-add_fields", "transforms-wasm", "transforms-lua", "transforms-remap"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
 
 [[bench]]
 name = "default"

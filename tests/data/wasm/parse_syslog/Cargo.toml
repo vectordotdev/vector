@@ -1,5 +1,5 @@
 [package]
-name = "vrl_announcement_example"
+name = "parse_syslog"
 version = "0.1.0"
 authors = ["The Vector Authors"]
 edition = "2018"
@@ -13,7 +13,6 @@ chrono = { version = "0.4.19", features = ["serde"] }
 serde = "1.0"
 serde_json = "1.0"
 syslog_loose = "0.7.0"
-uuid = { version = "0.8.2", features = ["v4"] }
 vector-wasm = { version = "0.1", path = "../../../../lib/vector-wasm"}
 
 [workspace]
