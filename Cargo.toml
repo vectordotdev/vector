@@ -115,8 +115,8 @@ goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.4.3", optional = true }
-async-graphql-warp = { version = "2.4.3", optional = true }
+async-graphql = { version = "2.4.10", optional = true }
+async-graphql-warp = { version = "2.4.10", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
@@ -149,7 +149,7 @@ http = "0.2"
 typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
-syslog_loose = "0.7.0"
+syslog_loose = "0.8.0"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
@@ -209,6 +209,9 @@ dirs-next = { version = "2.0.0", optional = true }
 fakedata_generator = "0.2.4"
 postgres-openssl = { version = "0.3.0", optional = true }
 tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "with-chrono-0_4"] }
+# Indirect dependency; pinning until
+# https://github.com/timberio/vector/issues/6005 is resolved
+thread_local = "= 1.0.1"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -252,14 +255,15 @@ rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
-default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.

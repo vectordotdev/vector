@@ -1,4 +1,4 @@
-use crate::{parser::Parser, Error as E};
+use crate::{diagnostic::Formatter, parser::Parser, state};
 use std::fmt;
 use std::str::FromStr;
 
@@ -6,6 +6,9 @@ use std::str::FromStr;
 pub enum Error {
     #[error("unable to create path from alternative string: {0}")]
     Alternative(String),
+
+    #[error("unable to parse path")]
+    Parse(String),
 }
 
 /// Provide easy access to individual [`Segment`]s of a path.
@@ -15,7 +18,7 @@ pub struct Path {
 }
 
 impl FromStr for Path {
-    type Err = E;
+    type Err = Error;
 
     /// Parse a string path into a [`Path`] wrapper with easy access to
     /// individual path [`Segment`]s.
@@ -23,12 +26,19 @@ impl FromStr for Path {
     /// This function fails if the provided path is invalid, as defined by the
     /// parser grammar.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parser = Parser::default();
+        let mut state = state::Compiler::default();
+        let parser = Parser::new(&[], &mut state, false);
         if s.starts_with('.') {
-            parser.path_from_str(s)
+            parser
+                .path_from_str(s)
+                .map(|(path, _)| path)
+                .map_err(|diagnostics| Error::Parse(Formatter::new(s, diagnostics).to_string()))
         } else {
             let s = format!(".{}", s);
-            parser.path_from_str(&s)
+            parser
+                .path_from_str(&s)
+                .map(|(path, _)| path)
+                .map_err(|diagnostics| Error::Parse(Formatter::new(&s, diagnostics).to_string()))
         }
     }
 }
@@ -138,12 +148,12 @@ impl Path {
     /// path.
     ///
     /// This will be replaced once better path handling lands.
-    pub fn from_alternative_string(path: String) -> Result<Self, E> {
+    pub fn from_alternative_string(path: String) -> Result<Self, Error> {
         let mut segments = vec![];
         let mut chars = path.chars().peekable();
         let mut part = String::new();
 
-        let handle_field = |part: &mut String, segments: &mut Vec<Segment>| -> Result<(), E> {
+        let handle_field = |part: &mut String, segments: &mut Vec<Segment>| -> Result<(), Error> {
             let string = part.replace("\\.", ".");
             let field = Field::from_str(&string)?;
             segments.push(Segment::Field(field));
@@ -154,7 +164,7 @@ impl Path {
         let mut handle_char = |c: char,
                                chars: &mut std::iter::Peekable<std::str::Chars>,
                                part: &mut String|
-         -> Result<(), E> {
+         -> Result<(), Error> {
             match c {
                 '\\' if chars.peek() == Some(&'.') || chars.peek() == Some(&'[') => {
                     part.push(c);
@@ -169,7 +179,7 @@ impl Path {
                         if c == ']' {
                             let index = part
                                 .parse::<usize>()
-                                .map_err(|err| E::Path(Error::Alternative(err.to_string())))?;
+                                .map_err(|err| Error::Alternative(err.to_string()))?;
 
                             segments.push(Segment::Index(index));
                             part.clear();
@@ -273,7 +283,7 @@ impl Field {
 }
 
 impl FromStr for Field {
-    type Err = E;
+    type Err = Error;
 
     /// Parse a string path into a [`Path`] wrapper with easy access to
     /// individual path [`Segment`]s.
@@ -281,7 +291,11 @@ impl FromStr for Field {
     /// This function fails if the provided path is invalid, as defined by the
     /// parser grammar.
     fn from_str(field: &str) -> Result<Self, Self::Err> {
-        Parser::default().path_field_from_str(field)
+        let mut state = state::Compiler::default();
+        Parser::new(&[], &mut state, false)
+            .path_field_from_str(field)
+            .map(|(field, _)| field)
+            .map_err(|diagnostics| Error::Parse(Formatter::new(field, diagnostics).to_string()))
     }
 }
 

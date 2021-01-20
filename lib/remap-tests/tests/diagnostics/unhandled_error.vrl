@@ -1,0 +1,16 @@
+# object: { "bar": "bar" }
+# result:
+#
+# error: unhandled error
+#   ┌─ :2:1
+#   │
+# 2 │ parse_json("true")
+#   │ ^^^^^^^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+parse_json("true")

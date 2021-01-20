@@ -502,7 +502,7 @@ mod test {
     #[test]
     fn from_options_ca() {
         let options = TlsOptions {
-            ca_file: Some("tests/data/Vector_CA.crt".into()),
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))

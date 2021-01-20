@@ -51,12 +51,12 @@
   inputs = []
   type = "remap"
   source = """
-    .result_a = .a * .b + .c - .d
-    .result_b = .a * (.b + .c) - .d
-    .result_c = .a + .b * .c / .d
-    .result_d = (.a + .b) * (.c / .d)
-    .result_e = .e / .c
-    .result_f = .e // .c
+    .result_a, err = .a * .b + .c - .d
+    .result_b, err = .a * (.b + .c) - .d
+    .result_c, err = .a + .b * .c / .d
+    .result_d, err = (.a + .b) * (.c / .d)
+    .result_e, err = .e / .c
+    .result_f, err = .e // .c
   """
 [[tests]]
   name = "remap_arithmetic"
@@ -87,29 +87,30 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a / .b
+    a = 10
+    b = 0
+    .a, err = a / b
   """
 [[tests]]
   name = "remap_arithmetic_error"
-  no_outputs_from = ["remap_arithmetic_error"]
   [tests.input]
     insert_at = "remap_arithmetic_error"
-    type = "log"
-    [tests.input.log_fields]
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_arithmetic_error"
+    [[tests.outputs.conditions]]
       type = "remap"
-      source = '''
-        .a = 10 && \
-        .b = 0
-      '''
+      source = ".a == null"
 
 [transforms.remap_boolean_arithmetic]
   inputs = []
   type = "remap"
   source = """
-    .result_a = .a + .b > 9
-    .result_b = .a * .b < 20
-    .result_c = 1 >= .a / .b
-    .result_d = .a + .b > .c + .d
+    .result_a, err = .a + .b > 9
+    .result_b, err = .a * .b < 20
+    .result_c, err = 1 >= .a / .b
+    .result_d, err = .a + .b > .c + .d
   """
 [[tests]]
   name = "remap_boolean_arithmetic"
@@ -136,11 +137,11 @@
   inputs = []
   type = "remap"
   source = """
-    .foo = to_string(.foo)
-    .bar = to_int(.bar)
-    .baz = to_float(.baz)
-    .bev = to_bool(.bev)
-    .a = to_string(to_timestamp(.a))
+    .foo = to_string!(.foo)
+    .bar = to_int!(.bar)
+    .baz = to_float!(.baz)
+    .bev = to_bool!(.bev)
+    .a = to_string(to_timestamp!(.a))
   """
 [[tests]]
   name = "remap_coercion"
@@ -256,12 +257,12 @@
   inputs = []
   type = "remap"
   source = """
-    .a = to_string(.in)
-    .b = to_string(value: .in)
-    .c = to_string(.nope)
-    .d = to_string(value: .nope)
-    .e = to_string(.other)
-    .f = to_string(value: .other)
+    .a = to_string!(.in)
+    .b = to_string!(value: .in)
+    .c = to_string!(.nope)
+    .d = to_string!(value: .nope)
+    .e = to_string!(.other)
+    .f = to_string!(value: .other)
   """
 [[tests]]
   name = "remap_function_arguments"
@@ -288,11 +289,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = upcase(.a)
-    .b = upcase(.b)
-    .c.c = upcase(.c.c)
+    .a = upcase!(.a)
+    .b = upcase!(.b)
+    .c.c = upcase!(.c.c)
 
-    if upcase(.f) == "F" {
+    if upcase!(.f) == "F" {
       .f = "ff"
     }
   """
@@ -322,8 +323,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = upcase(.a)
-    .b = upcase(.b)
+    .a = upcase!(.a)
+    .b = upcase!(.b)
   """
 [[tests]]
   name = "remap_function_upcase_error"
@@ -340,11 +341,11 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = downcase(.a)
-    .b = downcase(.b)
-    .c.c = downcase(.c.c)
+    .a = downcase!(.a)
+    .b = downcase!(.b)
+    .c.c = downcase!(.c.c)
 
-    if downcase(.f) == "f" {
+    if downcase!(.f) == "f" {
       .f = "FF"
     }
   """
@@ -374,8 +375,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = downcase(.a)
-    .b = downcase(.b)
+    .a = downcase!(.a)
+    .b = downcase!(.b)
   """
 [[tests]]
   name = "remap_function_downcase_error"
@@ -409,7 +410,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        match(.a, /(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/) && \
+        match!(.a, /(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/) && \
         .b == "bar"
       '''
 
@@ -417,10 +418,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = sha1(.a)
+    .a = sha1!(.a)
 
-    if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-      .b = sha1(.a + .b + "baz")
+    if sha1!(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+      .b = sha1!(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -445,8 +446,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = sha1(.a)
-    .b = sha1(.b)
+    .a = sha1!(.a)
+    .b = sha1!(.b)
   """
 [[tests]]
   name = "remap_function_sha1_error"
@@ -462,10 +463,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = md5(.a)
+    .a = md5!(.a)
 
-    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
-      .b = md5(.a + .b + "baz")
+    if md5!(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+      .b = md5!(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -490,8 +491,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = md5(.a)
-    .b = md5(.b)
+    .a = md5!(.a)
+    .b = md5!(.b)
   """
 [[tests]]
   name = "remap_function_md5_error"
@@ -520,14 +521,14 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        ends_with(to_string(.a), "UTC")
+        ends_with!(to_string(.a), "UTC")
       '''
 
 [transforms.remap_function_format_timestamp]
   inputs = []
   type = "remap"
   source = """
-    .a = format_timestamp(to_timestamp(.foo), format: "%+")
+    .a = format_timestamp!(to_timestamp(.foo), format: "%+")
   """
 [[tests]]
   name = "remap_function_format_timestamp"
@@ -548,13 +549,13 @@
   inputs = []
   type = "remap"
   source = """
-    .a = contains(.foo, substring: .bar)
-    .b = contains(.bar, substring: "bar")
-    .c = contains(.bar, substring: "BAR", case_sensitive = true)
-    .d = contains(.bar, substring: "BAR", case_sensitive = false)
-    .e = contains(.foobar, substring: "oba")
-    .f = contains(.foobar, substring: "OBA", case_sensitive = true)
-    .g = contains(.foobar, substring: "OBA", case_sensitive = false)
+    .a = contains!(.foo, substring: .bar)
+    .b = contains!(.bar, substring: "bar")
+    .c = contains!(.bar, substring: "BAR", case_sensitive = true)
+    .d = contains!(.bar, substring: "BAR", case_sensitive = false)
+    .e = contains!(.foobar, substring: "oba")
+    .f = contains!(.foobar, substring: "OBA", case_sensitive = true)
+    .g = contains!(.foobar, substring: "OBA", case_sensitive = false)
   """
 [[tests]]
   name = "remap_function_contains"
@@ -583,11 +584,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = starts_with(.foobar, substring: .foo)
-    .b = starts_with(.foobar, substring: "foo")
-    .c = starts_with(.foobar, substring: "bar")
-    .d = starts_with(.foobar, substring: "FOO", case_sensitive: true)
-    .e = starts_with(.foobar, substring: "FOO", case_sensitive: false)
+    .a = starts_with!(.foobar, substring: .foo)
+    .b = starts_with!(.foobar, substring: "foo")
+    .c = starts_with!(.foobar, substring: "bar")
+    .d = starts_with!(.foobar, substring: "FOO", case_sensitive: true)
+    .e = starts_with!(.foobar, substring: "FOO", case_sensitive: false)
   """
 [[tests]]
   name = "remap_function_starts_with"
@@ -613,11 +614,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ends_with(.foobar, substring: .bar)
-    .b = ends_with(.foobar, substring: "bar")
-    .c = ends_with(.foobar, substring: "foo")
-    .d = ends_with(.foobar, substring: "BAR", case_sensitive: true)
-    .e = ends_with(.foobar, substring: "BAR", case_sensitive: false)
+    .a = ends_with!(.foobar, substring: .bar)
+    .b = ends_with!(.foobar, substring: "bar")
+    .c = ends_with!(.foobar, substring: "foo")
+    .d = ends_with!(.foobar, substring: "BAR", case_sensitive: true)
+    .e = ends_with!(.foobar, substring: "BAR", case_sensitive: false)
   """
 [[tests]]
   name = "remap_function_ends_with"
@@ -643,10 +644,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = slice(.foo + .bar, 1)
-    .b = slice(.foo + .bar, 0, 1)
-    .c = slice(.foo + .bar, start: -2)
-    .d = slice(.foo + .bar, start: 1, end: -1)
+    .a = slice!(.foo + .bar, 1)
+    .b = slice!(.foo + .bar, 0, 1)
+    .c = slice!(.foo + .bar, start: -2)
+    .d = slice!(.foo + .bar, start: 1, end: -1)
   """
 [[tests]]
   name = "remap_function_slice"
@@ -671,8 +672,8 @@
   inputs = []
   type = "remap"
   source = '''
-    .a = parse_tokens(.a)
-    .b = parse_tokens(.b)
+    .a = parse_tokens!(.a)
+    .b = parse_tokens!(.b)
   '''
 [[tests]]
   name = "remap_function_parse_tokens"
@@ -700,10 +701,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = sha2(.a)
+    .a = sha2!(.a)
 
-    if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
-      .b = sha2(.a + .b + "baz")
+    if sha2!(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
+      .b = sha2!(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -727,10 +728,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = sha3(.a)
+    .a = sha3!(.a)
 
-    if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
-      .b = sha3(.a + .b + "baz")
+    if sha3!(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
+      .b = sha3!(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -754,8 +755,8 @@
   inputs = []
   type = "remap"
   source = """
-    .a = parse_duration(.a, "ms")
-    .b = parse_duration("100ms", output: .b)
+    .a = parse_duration!(.a, "ms")
+    .b = parse_duration!("100ms", output: .b)
   """
 [[tests]]
   name = "remap_function_parse_duration"
@@ -778,7 +779,7 @@
   inputs = []
   type = "remap"
   source = """
-    .a = format_number(.a, scale: 2, decimal_separator: ",", grouping_separator: ".")
+    .a = format_number!(.a, scale: 2, decimal_separator: ",", grouping_separator: ".")
   """
 [[tests]]
   name = "remap_function_format_number"
@@ -799,7 +800,7 @@
   inputs = []
   type = "remap"
   source = """
-    .parts = parse_url(.url)
+    .parts = parse_url!(.url)
   """
 [[tests]]
   name = "remap_function_parse_url"
@@ -828,9 +829,9 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ceil(.num)
-    .b = ceil(.num, precision: 1)
-    .c = ceil(.num, precision: 2)
+    .a = ceil!(.num)
+    .b = ceil!(.num, precision: 1)
+    .c = ceil!(.num, precision: 2)
   """
 [[tests]]
   name = "remap_function_ceil"
@@ -853,9 +854,9 @@
   inputs = []
   type = "remap"
   source = """
-    .a = floor(.num)
-    .b = floor(.num, precision: 1)
-    .c = floor(.num, precision: 2)
+    .a = floor!(.num)
+    .b = floor!(.num, precision: 1)
+    .c = floor!(.num, precision: 2)
   """
 [[tests]]
   name = "remap_function_floor"
@@ -878,9 +879,9 @@
   inputs = []
   type = "remap"
   source = """
-    .a = round(.num)
-    .b = round(.num, precision: 1)
-    .c = round(.num, precision: 2)
+    .a = round!(.num)
+    .b = round!(.num, precision: 1)
+    .c = round!(.num, precision: 2)
   """
 [[tests]]
   name = "remap_function_round"
@@ -903,7 +904,7 @@
   inputs = []
   type = "remap"
   source = """
-     .a = parse_syslog(.a)
+     .a = parse_syslog!(.a)
    """
 [[tests]]
   name = "remap_function_parse_syslog"
@@ -919,7 +920,7 @@
     source = '''
       .a.facility == "daemon" && \
       .a.severity == "warning" && \
-      .a.timestamp == to_timestamp("2020-05-22T17:59:09.250Z") && \
+      .a.timestamp == to_timestamp!("2020-05-22T17:59:09.250Z") && \
       .a.hostname == "OX-XXX-MX204" && \
       .a.appname == "OX-XXX-CONTEUDO:rpd" && \
       .a.procid == 6589 && \
@@ -930,7 +931,7 @@
   inputs=[]
   type = "remap"
   source = """
-    .foo = split(.foo, /a.b/i, 3)
+    .foo = split!(.foo, /a.b/i, 3)
   """
 [[tests]]
   name = "remap_function_split_regex"
@@ -953,7 +954,7 @@
   inputs=[]
   type = "remap"
   source = """
-    .foo = split(.foo, " ", 3)
+    .foo = split!(.foo, " ", 3)
   """
 [[tests]]
   name = "remap_function_split_string"
@@ -976,7 +977,7 @@
   inputs = []
   type = "remap"
   source = """
-    .foo = parse_timestamp("10", "%s")
+    .foo = parse_timestamp!("10", "%s")
   """
 [[tests]]
   name = "remap_function_parse_timestamp"
@@ -989,7 +990,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .foo == to_timestamp("1970-01-01T00:00:10Z")
+        .foo == to_timestamp!("1970-01-01T00:00:10Z")
       '''
 
 [transforms.remap_function_truncate]
@@ -1038,8 +1039,8 @@
   inputs = []
   type = "remap"
   source = """
-    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
-    .grokked2 = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
+    .grokked = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
+    .grokked2 = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
     """
 [[tests]]
   name = "remap_function_parse_grok"
@@ -1067,10 +1068,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ip_subnet("192.168.10.23", "255.255.0.0")
-    .b = ip_subnet("192.168.10.23", "/8")
-    .c = ip_subnet("2404:6800:4003:c02::64", "ffff:ffff::")
-    .d = ip_subnet("2404:6800:4003:c02::64", "/16")
+    .a = ip_subnet!("192.168.10.23", "255.255.0.0")
+    .b = ip_subnet!("192.168.10.23", "/8")
+    .c = ip_subnet!("2404:6800:4003:c02::64", "ffff:ffff::")
+    .d = ip_subnet!("2404:6800:4003:c02::64", "/16")
   """
 [[tests]]
   name = "remap_function_ip_subnet"
@@ -1093,10 +1094,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ip_cidr_contains(cidr: "192.168.0.0/16", value: "192.168.10.2")
-    .b = ip_cidr_contains(cidr: "192.168.0.0/16", value: "192.169.10.2")
-    .c = ip_cidr_contains(cidr: "2404:6800:4003:c02::/64", value: "2404:6800:4003:c02::aaaa")
-    .d = ip_cidr_contains("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
+    .a = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.168.10.2")
+    .b = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.169.10.2")
+    .c = ip_cidr_contains!(cidr: "2404:6800:4003:c02::/64", value: "2404:6800:4003:c02::aaaa")
+    .d = ip_cidr_contains!("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
   """
 [[tests]]
   name = "remap_function_ip_cidr_contains"
@@ -1119,7 +1120,7 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ip_to_ipv6("192.168.10.2")
+    .a = ip_to_ipv6!("192.168.10.2")
   """
 [[tests]]
   name = "remap_function_ip_to_ipv6"
@@ -1139,7 +1140,7 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ipv6_to_ipv4("::ffff:192.168.10.2")
+    .a = ipv6_to_ipv4!("::ffff:192.168.10.2")
   """
 [[tests]]
   name = "remap_function_ipv6_to_ipv4"
@@ -1159,7 +1160,7 @@
   inputs = []
   type = "remap"
   source = """
-    .data = parse_json(.data)
+    .data = parse_json!(.data)
     .a = exists(.foo)
     .b = exists(.bar)
     .c = exists(.data.child)
@@ -1182,15 +1183,15 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a  && !.b  && .c && !.d  && .e && !.f
+        .a  && !.b  && .c && !.d  && .e && !.f ?? false
       '''
 
 [transforms.remap_function_compact]
   inputs = []
   type = "remap"
   source = """
-    .compactarr = compact(parse_json(.arr))
-    .compactmap = compact(parse_json(.map))
+    .compactarr = compact!(parse_json!(.arr))
+    .compactmap = compact!(parse_json!(.map))
     .a = exists(.compactmap.field1)
     .b = exists(.compactmap.field2)
     .c = exists(.compactmap.field3)
@@ -1231,7 +1232,7 @@
   type = "remap"
   drop_on_err = true
   source = """
-    assert(.foo, message: "assert failed")
+    assert!(.foo, message: "assert failed")
     .check = "checked"
   """
 [[tests]]
@@ -1254,7 +1255,7 @@
   type = "remap"
   drop_on_err = true
   source = """
-    assert(.foo, message: "assert failed")
+    assert!(.foo, message: "assert failed")
   """
 [[tests]]
   name = "remap_function_assert_fail"
@@ -1290,9 +1291,9 @@
   inputs=[]
   type = "remap"
   source = """
-    .foo = parse_json(.foo)
-    .bar = parse_json(.bar)
-    merge(.bar, .foo, deep: true)
+    .foo = parse_json!(.foo)
+    .bar = parse_json!(.bar)
+    merge!(.bar, .foo, deep: true)
   """
 [[tests]]
   name = "remap_function_merge"
@@ -1319,8 +1320,8 @@
   inputs = []
   type = "remap"
   source = """
-    .arr = flatten(parse_json(.arr))
-    .map = flatten(parse_json(.map))
+    .arr = flatten!(parse_json!(.arr))
+    .map = flatten!(parse_json!(.map))
     .a = .map."field1.field2"
     .b = .map."field1.field3"
   """
@@ -1353,11 +1354,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = redact(.input, filters: ["pattern"], patterns: ["hello"])
-    .b = redact(.input, filters: ["pattern"], patterns: ["hello", "wor"])
-    .c = redact(.input, filters: ["pattern"], patterns: [/world|universe/])
-    .d = redact(.input, filters: ["pattern"], patterns: [])
-    .e = redact(.input, filters: ["pattern"], patterns: ["hello", /[uieao]/])
+    .a = redact!(.input, filters: ["pattern"], patterns: ["hello"])
+    .b = redact!(.input, filters: ["pattern"], patterns: ["hello", "wor"])
+    .c = redact!(.input, filters: ["pattern"], patterns: [/world|universe/])
+    .d = redact!(.input, filters: ["pattern"], patterns: [])
+    .e = redact!(.input, filters: ["pattern"], patterns: ["hello", /[uieao]/])
   """
 [[tests]]
   name = "remap_function_redact"
@@ -1405,7 +1406,7 @@
   inputs = []
   type = "remap"
   source = """
-    .parts = parse_aws_alb_log(.log)
+    .parts = parse_aws_alb_log!(.log)
   """
 [[tests]]
   name = "remap_function_parse_aws_alb_log"
@@ -1454,8 +1455,8 @@
   inputs = []
   type = "remap"
   source = """
-    .a = parse_aws_vpc_flow_log(.a)
-    .b = parse_aws_vpc_flow_log(.b, format: "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
+    .a = parse_aws_vpc_flow_log!(.a)
+    .b = parse_aws_vpc_flow_log!(.b, format: "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
   """
 [[tests]]
   name = "remap_function_parse_aws_vpc_flow_log"
@@ -1526,8 +1527,8 @@
   inputs = []
   type = "remap"
   source = """
-    .a = encode_json(parse_json(.a))
-    .b = encode_json(parse_json(.b))
+    .a = encode_json!(parse_json(.a))
+    .b = encode_json!(parse_json(.b))
   """
 [[tests]]
   name = "remap_function_encode_json"
@@ -1550,10 +1551,10 @@
   inputs = []
   type = "remap"
   source = '''
-    . = parse_regex(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
-    .bytes_in = to_int(.bytes_in)
-    .status = to_int(.status)
-    .bytes_out = to_int(.bytes_out)
+    . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
+    .bytes_in = to_int!(.bytes_in)
+    .status = to_int!(.status)
+    .bytes_out = to_int!(.bytes_out)
   '''
 [[tests]]
   name = "remap_function_parse_regex"
@@ -1582,7 +1583,7 @@
   inputs = []
   type = "remap"
   source = '''
-    .result = parse_regex_all(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
+    .result = parse_regex_all!(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
   '''
 [[tests]]
   name = "remap_function_parse_regex_all"
@@ -1608,7 +1609,7 @@
   inputs = []
   type = "remap"
   source = '''
-    .result = parse_aws_cloudwatch_log_subscription_message(.message)
+    .result = parse_aws_cloudwatch_log_subscription_message!(.message)
   '''
 [[tests]]
   name = "remap_function_parse_aws_cloudwatch_log_subscription_message"
@@ -1628,7 +1629,7 @@
         .result.log_group == "" && \
         .result.log_stream == "" && \
         .result.log_events == [{ "id": "",
-                                 "timestamp": to_timestamp("2020-09-14T19:00:03.794Z"),
+                                 "timestamp": to_timestamp!("2020-09-14T19:00:03.794Z"),
                                  "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
       '''
 
@@ -1636,7 +1637,7 @@
   inputs = []
   type = "remap"
   source = '''
-    . = parse_key_value(.message, key_value_delimiter: "=", field_delimiter: " ")
+    . = parse_key_value!(.message, key_value_delimiter: "=", field_delimiter: " ")
   '''
 [[tests]]
   name = "remap_function_parse_key_value"
@@ -1707,9 +1708,9 @@
   inputs = []
   type = "remap"
   source = """
-    .a = to_syslog_facility(.a)
-    .b = to_syslog_facility(.b)
-    .c = to_syslog_facility(.c)
+    .a = to_syslog_facility!(.a)
+    .b = to_syslog_facility!(.b)
+    .c = to_syslog_facility!(.c)
   """
 [[tests]]
   name = "remap_function_to_syslog_facility"
@@ -1734,9 +1735,9 @@
   inputs = []
   type = "remap"
   source = """
-    .secs = to_unix_timestamp(to_timestamp(.time))
-    .millis = to_unix_timestamp(to_timestamp(.time), unit: "milliseconds")
-    .nanos = to_unix_timestamp(to_timestamp(.time), unit: "nanoseconds")
+    .secs = to_unix_timestamp!(to_timestamp(.time))
+    .millis = to_unix_timestamp!(to_timestamp(.time), unit: "milliseconds")
+    .nanos = to_unix_timestamp!(to_timestamp(.time), unit: "nanoseconds")
   """
 [[tests]]
   name = "remap_function_to_unix_timestamp"
@@ -1759,7 +1760,7 @@
   inputs = []
   type = "remap"
   source = """
-    .result = push(parse_json(.fruits), .fruit)
+    .result = push!(parse_json(.fruits), .fruit)
   """
 [[tests]]
   name = "remap_function_push_to_array"
@@ -1784,7 +1785,7 @@
   inputs = []
   type = "remap"
   source = """
-    .result = append(parse_json(.fruits), parse_json(.other_fruits))
+    .result = append!(parse_json(.fruits), parse_json!(.other_fruits))
   """
 [[tests]]
   name = "remap_function_append_to_array"
@@ -1809,7 +1810,7 @@
   inputs = []
   type = "remap"
   source = '''
-    .result = encode_base64(.message)
+    .result = encode_base64!(.message)
   '''
 [[tests]]
   name = "remap_function_encode_base64"
@@ -1829,7 +1830,7 @@
   inputs = []
   type = "remap"
   source = '''
-    .result = decode_base64(.message)
+    .result = decode_base64!(.message)
   '''
 [[tests]]
   name = "remap_function_decode_base64"
@@ -1894,3 +1895,26 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '.a == "A long multiline string"'
+
+[transforms.remap_function_length]
+  inputs = []
+  type = "remap"
+  source = '''
+    .a = length!(parse_json!(.a))
+    .b = length!(parse_json!(.b))
+    .c = length!(parse_json!(.c))
+  '''
+[[tests]]
+  name = "remap_function_length"
+  [tests.input]
+    insert_at = "remap_function_length"
+    type = "log"
+    [tests.input.log_fields]
+    a = '[1, 2, 3]'
+    b = '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
+    c = '[[1, 2, 3], [4, 5, 6], []]'
+  [[tests.outputs]]
+    extract_from = "remap_function_length"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '[.a, .b, .c] == [3, 2, 3]'
