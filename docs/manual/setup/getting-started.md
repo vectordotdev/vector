@@ -171,13 +171,13 @@ observability data. You can then route and output your events to dozens of desti
 
 **TBD - what do you want for the next steps?***
 
-[docs.sinks.console]: /docs/reference/sinks/console
-[docs.sources.generator]: /docs/reference/sources/generator
+[docs.sinks.console]: /docs/reference/components/sinks/console
+[docs.sources.generator]: /docs/reference/components/sources/generator
 [docs.installation]: /docs/manual/installation
-[docs.transforms.remap]: /docs/reference/transforms/remap
-[docs.sources.stdin]: /docs/reference/sources/stdin
-[docs.sinks]: /docs/reference/sinks
+[docs.transforms.remap]: /docs/reference/components/transforms/remap
+[docs.sources.stdin]: /docs/reference/components/sources/stdin
+[docs.sinks]: /docs/reference/components/sinks
 [docs.sources]: /docs/reference/sources
-[docs.transforms]: /docs/reference/transforms
+[docs.transforms]: /docs/reference/components/transforms
 [docs.vrl]: /docs/reference/vrl
 [docs.vrl.parse_syslog]: /docs/reference/vrl/functions/#parse_syslog
