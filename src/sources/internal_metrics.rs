@@ -113,16 +113,14 @@ mod tests {
         assert_eq!(MetricValue::Counter { value: 7.0 }, output["bar"].value);
         assert_eq!(
             MetricValue::Distribution {
-                values: vec![5.0, 6.0],
-                sample_rates: vec![1, 1],
+                samples: crate::samples![5.0 => 1, 6.0 => 1],
                 statistic: StatisticKind::Histogram
             },
             output["baz"].value
         );
         assert_eq!(
             MetricValue::Distribution {
-                values: vec![7.0, 8.0],
-                sample_rates: vec![1, 1],
+                samples: crate::samples![7.0 => 1, 8.0 => 1],
                 statistic: StatisticKind::Histogram
             },
             output["quux"].value

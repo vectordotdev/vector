@@ -16,7 +16,12 @@ remap: functions: push: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array"]
+	return: {
+		types: ["array"]
+		rules: [
+			"A new array is returned, the `value` is not modified in place.",
+		]
+	}
 	category: "Array"
 	description: """
 		Adds the provided `item` to the end of the `value` array.
@@ -26,11 +31,10 @@ remap: functions: push: {
 	examples: [
 		{
 			title: "Push an item onto an array"
-			input: log: array: [72.5, false, [1, 2, 3]]
 			source: """
-				.array = push(.array, "booper")
+				push([1, 2], 3)
 				"""
-			output: log: array: [72.5, false, [1, 2, 3], "booper"]
+			return: [1, 2, 3]
 		},
 	]
 }

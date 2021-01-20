@@ -37,7 +37,7 @@ installation: _interfaces: homebrew: {
 				},
 				{
 					title:   "Configure Vector"
-					command: "fix me"
+					command: commands.configure
 				},
 				{
 					title:   "Restart Vector"

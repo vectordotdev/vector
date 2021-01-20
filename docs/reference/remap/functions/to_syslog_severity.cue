@@ -12,21 +12,25 @@ remap: functions: to_syslog_severity: {
 	internal_failure_reasons: [
 		"`value` is not a valid Syslog level keyword",
 	]
-	return: ["integer"]
+	return: {
+		types: ["integer"]
+		rules: [
+			"The now-deprecated keywords `panic`, `error`, and `warn` are converted to `0`, `3`, and `4` respectively.",
+		]
+	}
 	category:    "Coerce"
 	description: """
 		Coerces the provided `value`, a Syslog [log level keyword](\(urls.syslog_levels)), into an Syslog integer
 		severity level (0 to 7).
-
-		The now-deprecated keywords `panic`, `error`, and `warn` are converted to `0`, `3`, and `4` respectively.
 		"""
 
 	examples: [
 		{
 			title: "Coerce to Syslog serverity"
-			input: log: level: "alert"
-			source: ".severity = to_syslog_severity(.level)"
-			output: input & {log: severity: 1}
+			source: """
+				to_syslog_severity("alert")
+				"""
+			return: 1
 		},
 	]
 }

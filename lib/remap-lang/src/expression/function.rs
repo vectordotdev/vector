@@ -1,7 +1,6 @@
-use super::Error as E;
 use crate::{
-    expression, function::ArgumentList, state, Expr, Expression, Function as Fn, Object, Result,
-    TypeDef, Value,
+    expression, function::ArgumentList, state, Expr, Expression, Function as Fn, Object, TypeDef,
+    Value,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -9,17 +8,20 @@ pub enum Error {
     #[error("undefined")]
     Undefined,
 
-    #[error("invalid argument count (expected at most {0}, got {0})")]
-    Arity(usize, usize),
+    #[error("invalid argument count (expected at most {max}, got {got})")]
+    ArityMismatch { max: usize, got: usize },
 
     #[error(r#"unknown argument keyword "{0}""#)]
-    Keyword(String),
+    UnknownKeyword(String),
 
-    #[error(r#"missing required argument "{0}" (position {1})"#)]
-    Required(String, usize),
+    #[error(r#"missing required argument "{argument}" (position {position})"#)]
+    MissingArg {
+        argument: &'static str,
+        position: usize,
+    },
 
-    #[error(r#"unknown keyword "{0}""#)]
-    Unknown(&'static str),
+    #[error("compilation error: {0}")]
+    Compile(String),
 
     #[error(r#"error for argument "{0}""#)]
     Argument(String, #[source] expression::argument::Error),
@@ -47,27 +49,26 @@ impl PartialEq for Function {
 
 impl Function {
     pub fn new(
-        ident: String,
+        ident: &str,
         abort_on_error: bool,
         arguments: Vec<(Option<String>, Expr)>,
         definitions: &[Box<dyn Fn>],
         state: &state::Compiler,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let definition = definitions
             .iter()
             .find(|b| b.identifier() == ident)
-            .ok_or_else(|| E::Function(ident.clone(), Error::Undefined))?;
+            .ok_or(Error::Undefined)?;
 
         let ident = definition.identifier();
         let parameters = definition.parameters();
 
         // check function arity
         if arguments.len() > parameters.len() {
-            return Err(E::Function(
-                ident.to_owned(),
-                Error::Arity(parameters.len(), arguments.len()),
-            )
-            .into());
+            return Err(Error::ArityMismatch {
+                max: parameters.len(),
+                got: arguments.len(),
+            });
         }
 
         // Keeps track of positional argument indices.
@@ -99,12 +100,7 @@ impl Function {
                         param
                     }),
             }
-            .ok_or_else(|| {
-                E::Function(
-                    ident.to_owned(),
-                    Error::Keyword(keyword.expect("arity checked")),
-                )
-            })?;
+            .ok_or_else(|| Error::UnknownKeyword(keyword.expect("arity checked")))?;
 
             let argument =
                 expression::Argument::new(Box::new(argument), param.accepts, param.keyword, ident)
@@ -119,18 +115,23 @@ impl Function {
             .enumerate()
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
-            .try_for_each(|(i, p)| -> Result<_> {
-                Err(E::Function(ident.to_owned(), Error::Required(p.keyword.to_owned(), i)).into())
+            .try_for_each(|(i, p)| -> Result<_, _> {
+                Err(Error::MissingArg {
+                    argument: p.keyword,
+                    position: i,
+                })
             })?;
 
-        let function = definition.compile(list)?;
+        let function = definition
+            .compile(list)
+            .map_err(|err| Error::Compile(err.to_string()))?;
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         let type_def = function.type_def(state);
         if abort_on_error && !type_def.is_fallible() {
-            return Err(E::Function(ident.to_owned(), Error::AbortInfallible).into());
+            return Err(Error::AbortInfallible);
         }
 
         Ok(Self {
@@ -144,10 +145,14 @@ impl Function {
     pub fn abort_on_error(&self) -> bool {
         self.abort_on_error
     }
+
+    pub fn ident(&self) -> &'static str {
+        self.ident
+    }
 }
 
 impl Expression for Function {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> crate::Result<Value> {
         self.function.execute(state, object)
     }
 

@@ -10,29 +10,42 @@ remap: functions: to_string: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: {
+		types: ["string"]
+		rules: [
+			#"If `value` is an integer then its string representation is returned."#,
+			#"If `value` is an float then its string representation is returned."#,
+			#"If `value` is an boolean then `"true"` or `"false"` is returned."#,
+			#"If `value` is an timestamp then its RFC3339 representation is returned."#,
+			#"If `value` is a map then it is encoded into JSON."#,
+			#"If `value` is a list then it is encoded into JSON."#,
+		]
+	}
 	category: "Coerce"
 	description: #"""
 		Coerces the provided `value` into a `string`.
 		"""#
 	examples: [
 		{
-			title: "Coerce to a string"
-			input: log: {
-				boolean: true
-				int:     52
-				float:   12.2
-			}
+			title: "Coerce to a string (boolean)"
 			source: #"""
-				.boolean = to_string(.boolean)
-				.int = to_string(.int)
-				.float = to_string(.float)
+				to_string(true)
 				"""#
-			output: log: {
-				boolean: "true"
-				int:     "52"
-				float:   "12.2"
-			}
+			return: true
+		},
+		{
+			title: "Coerce to a string (int)"
+			source: #"""
+				to_string(52)
+				"""#
+			return: "52"
+		},
+		{
+			title: "Coerce to a string (float)"
+			source: #"""
+				to_string(52.2)
+				"""#
+			return: "52.2"
 		},
 	]
 }

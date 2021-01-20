@@ -1,3 +1,4 @@
+use crate::event::metric::Sample;
 use snafu::Snafu;
 use std::cmp::Ordering;
 
@@ -19,15 +20,11 @@ pub struct DistributionStatistic {
 }
 
 impl DistributionStatistic {
-    pub fn new(values: &[f64], counts: &[u32], quantiles: &[f64]) -> Option<Self> {
-        if values.len() != counts.len() {
-            return None;
-        }
-
+    pub fn from_samples(source: &[Sample], quantiles: &[f64]) -> Option<Self> {
         let mut samples = Vec::new();
-        for (v, c) in values.iter().zip(counts.iter()) {
-            for _ in 0..*c {
-                samples.push(*v);
+        for sample in source {
+            for _ in 0..sample.rate {
+                samples.push(sample.value);
             }
         }
 

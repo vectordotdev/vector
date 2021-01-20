@@ -10,7 +10,7 @@ remap: functions: sha1: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Hash"
 	description: #"""
 		Calculates a sha1 hash of the provided `value`.
@@ -18,11 +18,10 @@ remap: functions: sha1: {
 	examples: [
 		{
 			title: "Calculate sha1 hash"
-			input: log: text: #"foo"#
 			source: #"""
-				.hash = sha1(.text)
+				sha1("foo")
 				"""#
-			output: input & {log: hash: "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"}
+			return: "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
 		},
 	]
 }

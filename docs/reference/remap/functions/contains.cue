@@ -23,7 +23,7 @@ remap: functions: contains: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "String"
 	description: #"""
 		Determines if the provided `value` contains a given `substring`.
@@ -31,23 +31,17 @@ remap: functions: contains: {
 	examples: [
 		{
 			title: "String contains (case sensitive)"
-			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = contains(.message, "Needle")
+				contains("The Needle In The Haystack", "Needle")
 				"""#
-			output: input & {
-				log: contains: true
-			}
+			return: true
 		},
 		{
 			title: "String contains (case insensitive)"
-			input: log: message: #"The Needle In The Haystack"#
 			source: #"""
-				.contains = contains(.message, "needle", case_sensitive: false)
+				contains("The Needle In The Haystack", "needle", case_sensitive: false)
 				"""#
-			output: input & {
-				log: contains: true
-			}
+			return: true
 		},
 	]
 }

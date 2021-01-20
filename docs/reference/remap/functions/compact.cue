@@ -52,7 +52,12 @@ remap: functions: compact: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array", "map"]
+	return: {
+		types: ["array", "map"]
+		rules: [
+			"The return type will match the `value` type.",
+		]
+	}
 	category: "Enumerate"
 	description: #"""
 		Compacts an `array` or `map` by removing "empty" values.
@@ -62,24 +67,17 @@ remap: functions: compact: {
 	examples: [
 		{
 			title: "Compact an array"
-			input: log: array: ["foo", "bar", "", null, [], "buzz"]
 			source: #"""
-				.log = compact(.array, string: true, array: true, null: true)
+				compact(["foo", "bar", "", null, [], "buzz"], string: true, array: true, null: true)
 				"""#
-			output: log: array: ["foo", "bar", "buzz"]
+			return: ["foo", "bar", "buzz"]
 		},
 		{
 			title: "Compact a map"
-			input: log: map: {
-				field1: 1
-				field2: ""
-				field3: []
-				field4: null
-			}
 			source: #"""
-				.map = compact(.map, string: true, array: true, null: true)
+				compact({"field1": 1, "field2": "", "field3": [], "field4": null}, string: true, array: true, null: true)
 				"""#
-			output: log: map: field1: 1
+			return: field1: 1
 		},
 	]
 }

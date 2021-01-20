@@ -72,7 +72,9 @@ enum BuildError {
     #[snafu(display("failed to connect ({}): {}", endpoint, source))]
     ConnectionFailed { source: PgError, endpoint: String },
     #[snafu(display("failed to get PostgreSQL version ({}): {}", endpoint, source))]
-    VersionFailed { source: PgError, endpoint: String },
+    SelectVersionFailed { source: PgError, endpoint: String },
+    #[snafu(display("version ({}) is not supported", version))]
+    InvalidVersion { version: String },
 }
 
 #[derive(Debug, Snafu)]
@@ -279,6 +281,7 @@ struct PostgresqlMetrics {
     config: Config,
     tls_config: Option<PostgresqlMetricsTlsConfig>,
     client: Option<Client>,
+    version: Option<usize>,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
     datname_filter: DatnameFilter,
@@ -316,6 +319,7 @@ impl PostgresqlMetrics {
             config,
             tls_config,
             client: None,
+            version: None,
             namespace,
             tags,
             datname_filter,
@@ -360,17 +364,48 @@ impl PostgresqlMetrics {
         let version_row = client
             .query_one("SELECT version()", &[])
             .await
-            .with_context(|| VersionFailed {
+            .with_context(|| SelectVersionFailed {
                 endpoint: config_to_endpoint(&self.config),
             })?;
         let version = version_row
             .try_get::<&str, &str>("version")
-            .with_context(|| VersionFailed {
+            .with_context(|| SelectVersionFailed {
                 endpoint: config_to_endpoint(&self.config),
             })?;
         debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
 
         self.client = Some(client);
+        self.verify_version().await?;
+
+        Ok(())
+    }
+
+    async fn verify_version(&mut self) -> Result<(), BuildError> {
+        let row = self
+            .client
+            .as_ref()
+            .unwrap()
+            .query_one("SHOW server_version_num", &[])
+            .await
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        let version = row
+            .try_get::<&str, &str>("server_version_num")
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        self.version = Some(match version.parse::<usize>() {
+            Ok(version) if version >= 90600 => version,
+            Ok(_) | Err(_) => {
+                return Err(BuildError::InvalidVersion {
+                    version: version.to_string(),
+                })
+            }
+        });
+
         Ok(())
     }
 
@@ -505,11 +540,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if row
-                .columns()
-                .iter()
-                .any(|column| column.name() == "checksum_failures")
-            {
+            if self.version.expect("version is set above") >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
@@ -799,6 +830,14 @@ mod integration_tests {
     async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
         trace_init();
 
+        let config: Config = endpoint.parse().unwrap();
+        let tags_endpoint = config_to_endpoint(&config);
+        let tags_host = match config.get_hosts().get(0).unwrap() {
+            Host::Tcp(host) => host.clone(),
+            #[cfg(unix)]
+            Host::Unix(path) => path.to_string_lossy().to_string(),
+        };
+
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
@@ -832,6 +871,42 @@ mod integration_tests {
             }
         }
         assert!(events.len() > 1);
+
+        // test up metric
+        assert_eq!(
+            events
+                .iter()
+                .map(|e| e.as_metric())
+                .find(|e| e.name == "up")
+                .unwrap()
+                .value,
+            gauge!(1)
+        );
+
+        // test namespace and tags
+        for event in &events {
+            let metric = event.as_metric();
+
+            assert_eq!(metric.namespace, Some("postgresql".to_owned()));
+            assert_eq!(
+                metric.tags.as_ref().unwrap().get("endpoint").unwrap(),
+                &tags_endpoint
+            );
+            assert_eq!(
+                metric.tags.as_ref().unwrap().get("host").unwrap(),
+                &tags_host
+            );
+        }
+
+        // test metrics from different queries
+        let names = vec![
+            "pg_stat_database_datid",
+            "pg_stat_database_conflicts_confl_tablespace_total",
+            "pg_stat_bgwriter_checkpoints_timed_total",
+        ];
+        for name in names {
+            assert!(events.iter().any(|e| e.as_metric().name == name));
+        }
     }
 
     #[tokio::test]

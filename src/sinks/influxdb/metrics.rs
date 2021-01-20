@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricValue, StatisticKind},
+    event::metric::{Metric, MetricValue, Sample, StatisticKind},
     http::HttpClient,
     sinks::{
         influxdb::{
@@ -256,14 +256,17 @@ fn get_type_and_fields(
         MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
         MetricValue::AggregatedHistogram {
             buckets,
-            counts,
             count,
             sum,
         } => {
             let mut fields: HashMap<String, Field> = buckets
                 .iter()
-                .zip(counts.iter())
-                .map(|pair| (format!("bucket_{}", pair.0), Field::UnsignedInt(*pair.1)))
+                .map(|sample| {
+                    (
+                        format!("bucket_{}", sample.upper_limit),
+                        Field::UnsignedInt(sample.count),
+                    )
+                })
                 .collect();
             fields.insert("count".to_owned(), Field::UnsignedInt(count));
             fields.insert("sum".to_owned(), Field::Float(sum));
@@ -272,41 +275,36 @@ fn get_type_and_fields(
         }
         MetricValue::AggregatedSummary {
             quantiles,
-            values,
             count,
             sum,
         } => {
             let mut fields: HashMap<String, Field> = quantiles
                 .iter()
-                .zip(values.iter())
-                .map(|pair| (format!("quantile_{}", pair.0), Field::Float(*pair.1)))
+                .map(|quantile| {
+                    (
+                        format!("quantile_{}", quantile.upper_limit),
+                        Field::Float(quantile.value),
+                    )
+                })
                 .collect();
             fields.insert("count".to_owned(), Field::UnsignedInt(count));
             fields.insert("sum".to_owned(), Field::Float(sum));
 
             ("summary", Some(fields))
         }
-        MetricValue::Distribution {
-            values,
-            sample_rates,
-            statistic,
-        } => {
+        MetricValue::Distribution { samples, statistic } => {
             let quantiles = match statistic {
                 StatisticKind::Histogram => &[0.95] as &[_],
                 StatisticKind::Summary => quantiles,
             };
-            let fields = encode_distribution(&values, &sample_rates, quantiles);
+            let fields = encode_distribution(&samples, quantiles);
             ("distribution", fields)
         }
     }
 }
 
-fn encode_distribution(
-    values: &[f64],
-    counts: &[u32],
-    quantiles: &[f64],
-) -> Option<HashMap<String, Field>> {
-    let statistic = DistributionStatistic::new(values, counts, quantiles)?;
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<String, Field>> {
+    let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
     let fields: HashMap<String, Field> = vec![
         ("min".to_owned(), Field::Float(statistic.min)),
@@ -423,8 +421,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.1, 3.0],
-                counts: vec![1, 2, 3],
+                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -463,8 +460,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.1, 3.0],
-                counts: vec![1, 2, 3],
+                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -503,8 +499,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.01, 0.5, 0.99],
-                values: vec![1.5, 2.0, 3.0],
+                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -543,8 +538,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.01, 0.5, 0.99],
-                values: vec![1.5, 2.0, 3.0],
+                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -584,8 +578,7 @@ mod tests {
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![1.0, 2.0, 3.0],
-                    sample_rates: vec![3, 3, 2],
+                    samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             },
@@ -596,8 +589,12 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (0..20).map(f64::from).collect::<Vec<_>>(),
-                    sample_rates: vec![1; 20],
+                    samples: (0..20)
+                        .map(|v| Sample {
+                            value: f64::from(v),
+                            rate: 1,
+                        })
+                        .collect(),
                     statistic: StatisticKind::Histogram,
                 },
             },
@@ -608,8 +605,12 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: (1..5).map(f64::from).collect::<Vec<_>>(),
-                    sample_rates: (1..5).collect::<Vec<_>>(),
+                    samples: (1..5)
+                        .map(|v| Sample {
+                            value: f64::from(v),
+                            rate: v,
+                        })
+                        .collect(),
                     statistic: StatisticKind::Histogram,
                 },
             },
@@ -686,8 +687,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![],
-                sample_rates: vec![],
+                samples: vec![],
                 statistic: StatisticKind::Histogram,
             },
         }];
@@ -705,27 +705,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![1.0, 2.0],
-                sample_rates: vec![0, 0],
-                statistic: StatisticKind::Histogram,
-            },
-        }];
-
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
-        assert_eq!(line_protocols.len(), 0);
-    }
-
-    #[test]
-    fn test_encode_distribution_unequal_stats() {
-        let events = vec![Metric {
-            name: "requests".into(),
-            namespace: Some("ns".into()),
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
-                values: vec![1.0],
-                sample_rates: vec![1, 2, 3],
+                samples: crate::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         }];
@@ -743,8 +723,7 @@ mod tests {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![1.0, 2.0, 3.0],
-                sample_rates: vec![3, 3, 2],
+                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         }];

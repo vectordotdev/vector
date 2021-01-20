@@ -321,6 +321,7 @@ impl StreamSink for PrometheusExporter {
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
+                    metrics.map.remove(&new);
                     metrics.map.insert(new, false);
                 }
             };
@@ -414,6 +415,71 @@ mod tests {
         }
         .into();
         (name, event)
+    }
+
+    #[tokio::test]
+    async fn sink_absolute() {
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
+            tls: None,
+            ..Default::default()
+        };
+        let cx = SinkContext::new_test();
+
+        let mut sink = PrometheusExporter::new(config, cx.acker());
+
+        let m1 = Metric {
+            name: "absolute".to_string(),
+            namespace: None,
+            timestamp: None,
+            tags: Some(
+                vec![("tag1".to_owned(), "value1".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 32. },
+        };
+
+        let m2 = Metric {
+            tags: Some(
+                vec![("tag1".to_owned(), "value2".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..m1.clone()
+        };
+
+        let metrics = vec![
+            Event::Metric(Metric {
+                value: MetricValue::Counter { value: 32. },
+                ..m1.clone()
+            }),
+            Event::Metric(Metric {
+                value: MetricValue::Counter { value: 33. },
+                ..m2.clone()
+            }),
+            Event::Metric(Metric {
+                value: MetricValue::Counter { value: 40. },
+                ..m1.clone()
+            }),
+        ];
+
+        sink.run(Box::pin(futures::stream::iter(metrics)))
+            .await
+            .unwrap();
+
+        let map = &sink.metrics.read().unwrap().map;
+
+        assert_eq!(
+            map.get_full(&MetricEntry(m1)).unwrap().1 .0.value,
+            MetricValue::Counter { value: 40. }
+        );
+
+        assert_eq!(
+            map.get_full(&MetricEntry(m2)).unwrap().1 .0.value,
+            MetricValue::Counter { value: 33. }
+        );
     }
 }
 

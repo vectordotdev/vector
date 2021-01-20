@@ -18,7 +18,7 @@ remap: functions: assert: {
 	internal_failure_reasons: [
 		"`condition` evaluates to `false`",
 	]
-	return: ["null"]
+	return: types: ["null"]
 	category: "Debug"
 	description: #"""
 		Checks a given condition.
@@ -28,17 +28,15 @@ remap: functions: assert: {
 	examples: [
 		{
 			title: "Assertion (true)"
-			input: log: foo: "foo"
 			source: #"""
-				assert(.foo == "foo", message: "Foo must be foo!")
+				assert("foo" == "foo", message: "Foo must be foo!")
 				"""#
-			output: input
+			return: null
 		},
 		{
 			title: "Assertion (false)"
-			input: log: foo: "bar"
 			source: #"""
-				assert(.foo == "foo", message: "Foo must be foo!")
+				assert("foo" == "bar", message: "Foo must be foo!")
 				"""#
 			raises: "Foo must be foo!"
 		},

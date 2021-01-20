@@ -1,4 +1,4 @@
-use super::components::{source, ComponentType};
+use super::components::{source, ComponentKind};
 use async_graphql::{InputObject, InputType};
 
 /// Takes an &Option<bool> and returns early if false
@@ -45,7 +45,7 @@ impl StringFilter {
 }
 
 #[derive(InputObject)]
-#[graphql(concrete(name = "ComponentTypeFilter", params(ComponentType)))]
+#[graphql(concrete(name = "ComponentKindFilter", params(ComponentKind)))]
 #[graphql(concrete(name = "SourceOutputTypeFilter", params(source::SourceOutputType)))]
 pub struct EqualityFilter<T: InputType + PartialEq + Eq> {
     pub equals: Option<T>,

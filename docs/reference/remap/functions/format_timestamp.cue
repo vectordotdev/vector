@@ -16,7 +16,7 @@ remap: functions: format_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Timestamp"
 	description: #"""
 		Formats the provided `value` into a `string` as described by `format`.
@@ -24,19 +24,17 @@ remap: functions: format_timestamp: {
 	examples: [
 		{
 			title: "Format a timestamp (ISO8601/RFC 3339)"
-			input: log: {}
 			source: #"""
-				.timestamp = format_timestamp(now(), format: "%+")
+				format_timestamp(now(), format: "%+")
 				"""#
-			output: log: timestamp: "2020-10-21T16:00:00Z"
+			return: "2020-10-21T16:00:00Z"
 		},
 		{
 			title: "Format a timestamp (custom)"
-			input: log: {}
 			source: #"""
-				.timestamp = format_timestamp(now(), format: "%v %R")
+				format_timestamp(now(), format: "%v %R")
 				"""#
-			output: log: timestamp: "10-Oct-2020 16:00"
+			return: "10-Oct-2020 16:00"
 		},
 	]
 }

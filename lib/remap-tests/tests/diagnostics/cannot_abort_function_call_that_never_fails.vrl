@@ -1,0 +1,15 @@
+# object: { "bar": "bar" }
+# result:
+#
+# error: cannot abort function that never fails
+#   ┌─ :2:1
+#   │
+# 2 │ now!()
+#   │ ^^^- remove this abort-instruction
+#   │ │   
+#   │ this function cannot fail
+#   │
+#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+now!()

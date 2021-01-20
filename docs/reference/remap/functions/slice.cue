@@ -23,7 +23,7 @@ remap: functions: slice: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Returns a slice of the provided `value` between the `start` and `end` positions specified.
@@ -35,19 +35,17 @@ remap: functions: slice: {
 	examples: [
 		{
 			title: "Slice a string (positve index)"
-			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.text = slice(.text, start: 5, end: 13)
+				slice("Supercalifragilisticexpialidocious", start: 5, end: 13)
 				"""#
-			output: log: text: "califrag"
+			return: "califrag"
 		},
 		{
 			title: "Slice a string (negative index)"
-			input: log: text: #"Supercalifragilisticexpialidocious"#
 			source: #"""
-				.text = slice(.text, start: 5, end: -14)
+				slice("Supercalifragilisticexpialidocious", start: 5, end: -14)
 				"""#
-			output: log: text: "califragilistic"
+			return: "califragilistic"
 		},
 	]
 }

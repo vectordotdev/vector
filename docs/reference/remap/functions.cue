@@ -15,10 +15,13 @@ remap: {
 		name:        string
 		category:    #FunctionCategory
 		description: string
-		notices?: [string, ...string]
+		notices:     [string, ...string] | *[]
 
 		arguments: [...#Argument]
-		return: [remap.#Type, ...remap.#Type]
+		return: {
+			types: [remap.#Type, ...remap.#Type]
+			rules?: [string, ...string]
+		}
 		internal_failure_reasons: [...string]
 		examples?: [remap.#Example, ...remap.#Example]
 	}
