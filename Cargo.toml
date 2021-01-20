@@ -9,6 +9,7 @@ license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
+autobenches = false # our benchmarks are not runnable on their own either way
 
 [[bin]]
 name = "graphql-schema"
@@ -212,6 +213,7 @@ tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "w
 # Indirect dependency; pinning until
 # https://github.com/timberio/vector/issues/6005 is resolved
 thread_local = "= 1.0.1"
+dashmap = "3"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -576,6 +578,8 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+# Separate benching process for metrics due to the nature of the bootstrap procedures.
+metrics-benches = ["sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
@@ -592,6 +596,21 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "metrics_on"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_no_tracing_integration"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_off"
+harness = false
+required-features = ["metrics-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"
