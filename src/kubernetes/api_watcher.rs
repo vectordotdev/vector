@@ -482,6 +482,74 @@ mod tests {
                     }),
                 ],
             ),
+            // Non-desync Stream Error
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(500);
+                }),
+                vec![Box::new(|item| {
+                    let error = item.unwrap_err();
+                    match error {
+                        watcher::stream::Error::Other { .. } => {}
+                        _ => panic!("Expect an 'other' error"),
+                    }
+                })],
+            ),
+            // Bad JSON from API
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(200)
+                        .header("Content-Type", "application/json")
+                        .body(
+                            r#"
+                            "type": "ADDED",
+                            "object":
+                                "kind": "Pod",
+                                "apiVersion": "v1",
+                                "metadata": {
+                                    "uid": "uid0"
+                                }
+                            }
+                         }"#,
+                        );
+                }),
+                vec![Box::new(|item| {
+                    let error = item.unwrap_err();
+                    match error {
+                        watcher::stream::Error::Other { .. } => {}
+                        _ => panic!("Expect an 'other' error"),
+                    }
+                })],
+            ),
+            // Incorrect object type
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(200)
+                        .header("Content-Type", "application/json")
+                        .body(
+                            r#"
+                            "type": "MODIFIED",
+                            "object": {
+                                "kind": "StatefulSet",
+                                "apiVersion": "v1",
+                                "metadata": {
+                                    "uid": "uid0"
+                                }
+                            }
+                         }"#,
+                        );
+                }),
+                vec![Box::new(|item| {
+                    let error = item.unwrap_err();
+                    match error {
+                        watcher::stream::Error::Other { .. } => {}
+                        _ => panic!("Expect an 'other' error"),
+                    }
+                })],
+            ),
         ];
 
         for (mock_config, assertions) in cases {
