@@ -21,7 +21,7 @@ VRL REPL commands:
   exit              Terminate the program
 "#;
 
-const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl/introduction";
+const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
