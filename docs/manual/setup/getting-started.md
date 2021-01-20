@@ -31,7 +31,7 @@ Once we have Vector installed, let's check it's working correctly.
 vector --version
 ```
 
-### Configure Vector
+## Configure Vector
 
 Vector runs with a [configuration file][docs.setup.configuration] that tells it what
 [components][pages.components] to run and how they should interact. Vector's components are made up of
@@ -63,7 +63,7 @@ The `inputs` option creates a pipeline from our source, which receives events, t
 events onwards. The `inputs` option in our `sinks.bar` component tells Vector where this sink's events are coming
 from. In our case, events are received from our other component, the source identified as `foo`.
 
-### Hello World!
+## Hello World!
 
 That's it for our first config, now; let's pipe an event through it:
 
@@ -84,7 +84,7 @@ Hello World!
 
 > Hey, if you want to see something cool, try setting `encoding.codec = "json"` in the sink config.
 
-### Hello World Mark II
+## Hello World Mark II
 
 The echoing of events isn't very exciting, though. Let's see what we can do with some real observability data.
 Let's take a classic problem, collecting and processing Syslog events, and see how Vector handles it.
@@ -166,6 +166,8 @@ fields. All with one line of Vector's remap language. This example is just the b
 You can receive logs and events from dozens of sources. You can use Vector and remap to change data, add fields
 to decorate data, convert logs into metrics, drop fields, and dozens of other tasks you use daily to process your
 observability data. You can then route and output your events to dozens of destinations.
+
+## What's next?
 
 **TBD - what do you want for the next steps?***
 
