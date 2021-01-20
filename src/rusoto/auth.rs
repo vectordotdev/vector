@@ -52,41 +52,52 @@ mod tests {
 
     #[test]
     fn parsing_default() {
-        toml::from_str::<ComponentConfig>(
+        let config = toml::from_str::<ComponentConfig>(
             r#"
         "#,
         )
         .unwrap();
+
+        assert!(matches!(config.auth, AWSAuthentication::Default {}));
     }
 
     #[test]
     fn parsing_old_assume_role() {
-        toml::from_str::<ComponentConfig>(
+        let config = toml::from_str::<ComponentConfig>(
             r#"
             assume_role = "root"
         "#,
         )
         .unwrap();
+
+        assert!(matches!(config.auth, AWSAuthentication::Default {}));
     }
 
     #[test]
     fn parsing_assume_role() {
-        toml::from_str::<ComponentConfig>(
+        let config = toml::from_str::<ComponentConfig>(
             r#"
             auth.assume_role = "root"
         "#,
         )
         .unwrap();
+
+        assert!(matches!(config.auth, AWSAuthentication::Role{..}));
     }
 
     #[test]
     fn parsing_both_assume_role() {
-        toml::from_str::<ComponentConfig>(
+        let config = toml::from_str::<ComponentConfig>(
             r#"
             assume_role = "root"
-            auth.assume_role = "root"
+            auth.assume_role = "auth.root"
         "#,
         )
         .unwrap();
+
+        match config.auth {
+            AWSAuthentication::Role { assume_role } => assert_eq!(&assume_role, "auth.root"),
+            _ => panic!(),
+        }
     }
 }
