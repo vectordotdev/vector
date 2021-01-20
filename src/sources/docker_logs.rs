@@ -41,13 +41,13 @@ use tokio::sync::mpsc;
 // From bollard source.
 const DEFAULT_TIMEOUT: u64 = 120;
 
-/// The beginning of image names of vector docker images packaged by vector.
-const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
 const NAME: &str = "container_name";
 const STREAM: &str = "stream";
 const CONTAINER: &str = "container_id";
+// Prevent short hostname from being wrongly regconized as a container's short ID.
+const MIN_HOSTNAME_LENGTH: usize = 6;
 
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
@@ -396,12 +396,11 @@ impl DockerLogsSource {
             .for_each(|container| {
                 let id = container.id.unwrap();
                 let names = container.names.unwrap();
-                let image = container.image.unwrap();
 
                 trace!(message = "Found already running container.", id = %id, names = ?names);
 
-                if self.exclude_vector(id.as_str(), image.as_str()) {
-                    info!(message = "Excluded vector container.", id = %id);
+                if self.exclude_self(id.as_str()) {
+                    info!(message = "Excluded self container.", id = %id);
                     return;
                 }
 
@@ -417,7 +416,7 @@ impl DockerLogsSource {
                         }
                     }),
                 ) {
-                    info!(message = "Container excluded.", id = %id);
+                    info!(message = "Excluded container.", id = %id);
                     return;
                 }
 
@@ -493,12 +492,9 @@ impl DockerLogsSource {
                                                 attributes.get("name").map(|s| s.as_str()),
                                             );
 
-                                        let exclude_vector = self.exclude_vector(
-                                            id.as_str(),
-                                            attributes.get("image").map(|s| s.as_str()),
-                                        );
+                                        let exclude_self = self.exclude_self(id.as_str());
 
-                                        if include_name && !exclude_vector {
+                                        if include_name && !exclude_self {
                                             self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
                                     }
@@ -519,23 +515,11 @@ impl DockerLogsSource {
         }
     }
 
-    /// True if container with the given id and image must be excluded from logging,
-    /// because it's a vector instance, probably this one.
-    fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
-        // Find out it's own container id, if it's inside a docker container.
-        // Since docker doesn't readily provide such information,
-        // various approaches need to be made. As such the solution is not
-        // exact, but probable.
-        let match_hostname = self
-            .hostname
+    fn exclude_self<'a>(&self, id: &str) -> bool {
+        self.hostname
             .as_ref()
-            .map(|maybe_short_id| id.starts_with(maybe_short_id))
-            .unwrap_or(false);
-        let match_image = image
-            .into()
-            .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
-            .unwrap_or(false);
-        match_hostname || match_image
+            .map(|hostname| id.starts_with(hostname) && hostname.len() >= MIN_HOSTNAME_LENGTH)
+            .unwrap_or(false)
     }
 }
 
