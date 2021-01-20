@@ -171,14 +171,14 @@ mod tests {
     use crate::api::schema::sort::SortField;
     use crate::event::{MetricKind, MetricValue};
 
-    struct FileSourceMetricTest<'a> {
-        name: &'a str,
+    struct FileSourceMetricTest {
+        name: &'static str,
         events_metric: Metric,
         bytes_metric: Metric,
     }
 
-    impl<'a> FileSourceMetricTest<'a> {
-        fn new(name: &'a str, events_processed: f64, bytes_processed: f64) -> Self {
+    impl FileSourceMetricTest {
+        fn new(name: &'static str, events_processed: f64, bytes_processed: f64) -> Self {
             Self {
                 name,
                 events_metric: metric("processed_events_total", events_processed),
@@ -186,7 +186,7 @@ mod tests {
             }
         }
 
-        fn get_metric(&'a self) -> FileSourceMetricFile<'a> {
+        fn get_metric(&self) -> FileSourceMetricFile {
             FileSourceMetricFile::from_tuple((
                 self.name.to_string(),
                 vec![&self.bytes_metric, &self.events_metric],
@@ -205,7 +205,7 @@ mod tests {
         }
     }
 
-    fn by_name(name: &str) -> FileSourceMetricTest {
+    fn by_name(name: &'static str) -> FileSourceMetricTest {
         FileSourceMetricTest::new(name, 0.00, 0.00)
     }
 
