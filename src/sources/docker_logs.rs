@@ -515,7 +515,7 @@ impl DockerLogsSource {
         }
     }
 
-    fn exclude_self<'a>(&self, id: &str) -> bool {
+    fn exclude_self(&self, id: &str) -> bool {
         self.hostname
             .as_ref()
             .map(|hostname| id.starts_with(hostname) && hostname.len() >= MIN_HOSTNAME_LENGTH)
