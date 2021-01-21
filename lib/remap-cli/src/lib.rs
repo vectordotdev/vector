@@ -1,6 +1,8 @@
 pub mod cmd;
 #[cfg(feature = "repl")]
 mod repl;
+#[cfg(feature = "tutorial")]
+mod tutorial;
 
 pub use cmd::{cmd, Opts};
 

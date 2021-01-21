@@ -1,4 +1,4 @@
-use super::{repl, Error};
+use super::{repl, tutorial::tutorial, Error};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -27,6 +27,10 @@ pub struct Opts {
     /// this flag is equivalent to using `.` as the final expression.
     #[structopt(short = "o", long)]
     print_object: bool,
+
+    /// Run an interactive tutorial to learn VRL.
+    #[structopt(short = "t", long)]
+    tutorial: bool,
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -40,6 +44,11 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 }
 
 fn run(opts: &Opts) -> Result<(), Error> {
+    if opts.tutorial {
+        return tutorial();
+    }
+
+
     // Run the REPL if no program or program file is specified
     if should_open_repl(opts) {
         // If an input file is provided, use that for the REPL objects, otherwise provide a

@@ -24,5 +24,6 @@ prettytable-rs = { version = "0.8.0", default-features = false, optional = true 
 webbrowser = { version = "0.5.5", default-features = false, optional = true }
 
 [features]
-default = ["repl"]
+default = ["repl", "tutorial"]
 repl = ["prettytable-rs", "regex", "rustyline", "webbrowser"]
+tutorial = ["rustyline"]

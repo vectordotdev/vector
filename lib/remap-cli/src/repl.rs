@@ -23,18 +23,7 @@ VRL REPL commands:
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
-
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
-    let mut index = 0;
-    let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
-
-    let mut compiler_state = state::Compiler::default();
-    let mut rt = Runtime::new(state::Program::default());
-    let mut rl = Editor::<Repl>::new();
-    rl.set_helper(Some(Repl::new()));
-
-    println!(
-        r#"
+const INTRO_BANNER: &str = r#"
 > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
 > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
 > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
@@ -70,8 +59,18 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 > Any other value is resolved to a VRL expression.
 >
 > Try it out now by typing `.` and hitting [enter] to see the result.
-"#
-    );
+"#;
+
+pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+    let mut index = 0;
+    let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
+
+    let mut compiler_state = state::Compiler::default();
+    let mut rt = Runtime::new(state::Program::default());
+    let mut rl = Editor::<Repl>::new();
+    rl.set_helper(Some(Repl::new()));
+
+    println!("{}", INTRO_BANNER);
 
     loop {
         let readline = rl.readline("$ ");
@@ -135,7 +134,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     Ok(())
 }
 
-fn resolve(
+pub fn resolve(
     object: Option<&mut impl Object>,
     runtime: &mut Runtime,
     program: &str,
@@ -163,7 +162,7 @@ fn resolve(
     }
 }
 
-struct Repl {
+pub struct Repl {
     highlighter: MatchingBracketHighlighter,
     validator: MatchingBracketValidator,
     hinter: HistoryHinter,
@@ -171,7 +170,7 @@ struct Repl {
 }
 
 impl Repl {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
             hinter: HistoryHinter {},
