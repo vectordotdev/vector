@@ -265,7 +265,7 @@ default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks"
 default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "non-unix", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
@@ -281,9 +281,7 @@ target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transf
 target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["vector-global-alloc/jemallocator"]
-# Enables features that work only on systems providing `cfg(not(unix))`
-non-unix = ["vector-global-alloc/force-system"]
+unix = []
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-sasl", "vendor-openssl", "vendor-libz"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
