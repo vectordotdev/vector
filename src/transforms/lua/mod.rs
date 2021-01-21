@@ -8,7 +8,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum V1 {
+enum V1 {
     #[serde(rename = "1")]
     V1,
 }
@@ -16,13 +16,13 @@ pub enum V1 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV1 {
-    pub version: Option<V1>,
+    version: Option<V1>,
     #[serde(flatten)]
-    pub config: v1::LuaConfig,
+    config: v1::LuaConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum V2 {
+enum V2 {
     #[serde(rename = "2")]
     V2,
 }
@@ -30,9 +30,9 @@ pub enum V2 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV2 {
-    pub version: V2,
+    version: V2,
     #[serde(flatten)]
-    pub config: v2::LuaConfig,
+    config: v2::LuaConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
