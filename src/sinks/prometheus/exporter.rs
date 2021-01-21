@@ -401,19 +401,13 @@ mod tests {
 
     pub fn create_metric(name: Option<String>, value: MetricValue) -> (String, Event) {
         let name = name.unwrap_or_else(|| format!("vector_set_{}", random_string(16)));
-        let event = Metric::new(
-            name.clone(),
-            None,
-            None,
-            Some(
+        let event = Metric::new(name.clone(), MetricKind::Incremental, value)
+            .with_tags(Some(
                 vec![("some_tag".to_owned(), "some_value".to_owned())]
                     .into_iter()
                     .collect(),
-            ),
-            MetricKind::Incremental,
-            value,
-        )
-        .into();
+            ))
+            .into();
         (name, event)
     }
 
@@ -430,16 +424,14 @@ mod tests {
 
         let m1 = Metric::new(
             "absolute".to_string(),
-            None,
-            None,
-            Some(
-                vec![("tag1".to_owned(), "value1".to_owned())]
-                    .into_iter()
-                    .collect(),
-            ),
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
-        );
+        )
+        .with_tags(Some(
+            vec![("tag1".to_owned(), "value1".to_owned())]
+                .into_iter()
+                .collect(),
+        ));
 
         let m2 = Metric {
             series: MetricSeries {

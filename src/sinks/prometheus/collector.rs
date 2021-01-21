@@ -466,12 +466,10 @@ vector_hits{code="200"} 10
     fn encode_counter<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "hits".to_owned(),
-            None,
-            None,
-            Some(tags()),
             MetricKind::Absolute,
             MetricValue::Counter { value: 10.0 },
-        );
+        )
+        .with_tags(Some(tags()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -497,12 +495,10 @@ vector_temperature{code="200"} -1.1
     fn encode_gauge<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "temperature".to_owned(),
-            None,
-            None,
-            Some(tags()),
             MetricKind::Absolute,
             MetricValue::Gauge { value: -1.1 },
-        );
+        )
+        .with_tags(Some(tags()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -528,9 +524,6 @@ vector_users 1
     fn encode_set<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "users".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["foo".into()].into_iter().collect(),
@@ -561,9 +554,6 @@ vector_users 0
     fn encode_expired_set<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "users".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["foo".into()].into_iter().collect(),
@@ -608,9 +598,6 @@ vector_requests_count 8
     fn encode_distribution<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "requests".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
@@ -656,9 +643,6 @@ vector_requests_count 6
     fn encode_histogram<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "requests".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
@@ -703,16 +687,14 @@ ns_requests_count{code="200"} 6
     fn encode_summary<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "requests".to_owned(),
-            None,
-            None,
-            Some(tags()),
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
-        );
+        )
+        .with_tags(Some(tags()));
         encode_one::<T>(Some("ns"), &[], &[], false, &metric)
     }
 
@@ -760,15 +742,13 @@ ns_requests_avg{code="200"} 1.875
     fn encode_distribution_summary<T: MetricCollector>() -> T::Output {
         let metric = Metric::new(
             "requests".to_owned(),
-            None,
-            None,
-            Some(tags()),
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
-        );
+        )
+        .with_tags(Some(tags()));
         encode_one::<T>(
             Some("ns"),
             &[],
@@ -801,15 +781,13 @@ temperature 2 1234567890123
         use chrono::{DateTime, NaiveDateTime, Utc};
         let metric = Metric::new(
             "temperature".to_owned(),
-            None,
-            Some(DateTime::<Utc>::from_utc(
-                NaiveDateTime::from_timestamp(1234567890, 123456789),
-                Utc,
-            )),
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 2.0 },
-        );
+        )
+        .with_timestamp(Some(DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp(1234567890, 123456789),
+            Utc,
+        )));
         encode_one::<T>(None, &[], &[], false, &metric)
     }
 }

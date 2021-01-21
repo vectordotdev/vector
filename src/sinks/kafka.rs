@@ -480,9 +480,6 @@ mod tests {
     fn kafka_encode_event_metric_text() {
         let metric = Metric::new(
             "kafka-metric".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.0 },
         );
@@ -500,9 +497,6 @@ mod tests {
     fn kafka_encode_event_metric_json() {
         let metric = Metric::new(
             "kafka-metric".to_owned(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.0 },
         );

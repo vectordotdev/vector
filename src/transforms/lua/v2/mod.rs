@@ -786,9 +786,6 @@ mod tests {
 
         let event = Event::Metric(Metric::new(
             "example counter".into(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         ));
@@ -799,9 +796,6 @@ mod tests {
 
         let expected = Event::Metric(Metric::new(
             "example counter".into(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 2.0 },
         ));

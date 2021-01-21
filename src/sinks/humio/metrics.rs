@@ -169,33 +169,35 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            Event::from(Metric::new(
-                "metric1".to_string(),
-                None,
-                Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
-                Some(
+            Event::from(
+                Metric::new(
+                    "metric1".to_string(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 42.0 },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 42.0 },
-            )),
-            Event::from(Metric::new(
-                "metric2".to_string(),
-                None,
-                Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
-                Some(
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+            ),
+            Event::from(
+                Metric::new(
+                    "metric2".to_string(),
+                    MetricKind::Absolute,
+                    MetricValue::Distribution {
+                        samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        statistic: StatisticKind::Histogram,
+                    },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                MetricKind::Absolute,
-                MetricValue::Distribution {
-                    samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
-                    statistic: StatisticKind::Histogram,
-                },
-            )),
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
+            ),
         ];
 
         let len = metrics.len();

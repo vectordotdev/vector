@@ -65,9 +65,6 @@ mod test {
         assert_eq!(
             cond.check(&Event::from(Metric::new(
                 "test metric".to_string(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             ))),

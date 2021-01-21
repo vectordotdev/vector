@@ -237,7 +237,12 @@ impl From<proto::EventWrapper> for Event {
                     },
                 };
 
-                Event::Metric(Metric::new(name, namespace, timestamp, tags, kind, value))
+                Event::Metric(
+                    Metric::new(name, kind, value)
+                        .with_namespace(namespace)
+                        .with_tags(tags)
+                        .with_timestamp(timestamp),
+                )
             }
         }
     }

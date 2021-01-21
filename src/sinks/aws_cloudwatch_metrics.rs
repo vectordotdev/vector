@@ -296,32 +296,30 @@ mod tests {
         let events = vec![
             Metric::new(
                 "exception_total".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             ),
             Metric::new(
                 "bytes_out".into(),
-                None,
-                Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 2.5 },
-            ),
+            )
+            .with_timestamp(Some(
+                Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            )),
             Metric::new(
                 "healthcheck".into(),
-                None,
-                Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
-                Some(
-                    vec![("region".to_owned(), "local".to_owned())]
-                        .into_iter()
-                        .collect(),
-                ),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
-            ),
+            )
+            .with_tags(Some(
+                vec![("region".to_owned(), "local".to_owned())]
+                    .into_iter()
+                    .collect(),
+            ))
+            .with_timestamp(Some(
+                Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+            )),
         ];
 
         assert_eq!(
@@ -356,9 +354,6 @@ mod tests {
     fn encode_events_absolute_gauge() {
         let events = vec![Metric::new(
             "temperature".into(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         )];
@@ -377,9 +372,6 @@ mod tests {
     fn encode_events_distribution() {
         let events = vec![Metric::new(
             "latency".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![11.0 => 100, 12.0 => 50],
@@ -402,9 +394,6 @@ mod tests {
     fn encode_events_set() {
         let events = vec![Metric::new(
             "users".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
@@ -455,11 +444,13 @@ mod integration_tests {
         let mut events = Vec::new();
 
         for i in 0..100 {
-            let event = Event::Metric(Metric::new(
-                format!("counter-{}", 0),
-                None,
-                None,
-                Some(
+            let event = Event::Metric(
+                Metric::new(
+                    format!("counter-{}", 0),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: i as f64 },
+                )
+                .with_tags(Some(
                     vec![
                         ("region".to_owned(), "us-west-1".to_owned()),
                         ("production".to_owned(), "true".to_owned()),
@@ -467,10 +458,8 @@ mod integration_tests {
                     ]
                     .into_iter()
                     .collect(),
-                ),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: i as f64 },
-            ));
+                )),
+            );
             events.push(event);
         }
 
@@ -478,9 +467,6 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric::new(
                 format!("gauge-{}", gauge_name),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: i as f64 },
             ));
@@ -489,17 +475,19 @@ mod integration_tests {
 
         let distribution_name = random_string(10);
         for i in 0..10 {
-            let event = Event::Metric(Metric::new(
-                format!("distribution-{}", distribution_name),
-                None,
-                Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
-                None,
-                MetricKind::Incremental,
-                MetricValue::Distribution {
-                    samples: crate::samples![i as f64 => 100],
-                    statistic: StatisticKind::Histogram,
-                },
-            ));
+            let event = Event::Metric(
+                Metric::new(
+                    format!("distribution-{}", distribution_name),
+                    MetricKind::Incremental,
+                    MetricValue::Distribution {
+                        samples: crate::samples![i as f64 => 100],
+                        statistic: StatisticKind::Histogram,
+                    },
+                )
+                .with_timestamp(Some(
+                    Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
+                )),
+            );
             events.push(event);
         }
 
@@ -518,14 +506,14 @@ mod integration_tests {
 
         for namespace in ["ns1", "ns2", "ns3", "ns4"].iter() {
             for _ in 0..100 {
-                let event = Event::Metric(Metric::new(
-                    "counter".to_string(),
-                    Some(namespace.to_string()),
-                    None,
-                    None,
-                    MetricKind::Incremental,
-                    MetricValue::Counter { value: 1.0 },
-                ));
+                let event = Event::Metric(
+                    Metric::new(
+                        "counter".to_string(),
+                        MetricKind::Incremental,
+                        MetricValue::Counter { value: 1.0 },
+                    )
+                    .with_namespace(Some(namespace.to_string())),
+                );
                 events.push(event);
             }
         }

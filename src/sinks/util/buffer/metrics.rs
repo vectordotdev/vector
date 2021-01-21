@@ -611,50 +611,38 @@ mod test {
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
             format!("counter-{}", num),
-            None,
-            None,
-            Some(tag(tagstr)),
             kind,
             MetricValue::Counter { value },
         )
+        .with_tags(Some(tag(tagstr)))
     }
 
     fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(
-            format!("gauge-{}", num),
-            None,
-            None,
-            Some(tag("staging")),
-            kind,
-            MetricValue::Gauge { value },
-        )
+        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+            .with_tags(Some(tag("staging")))
     }
 
     fn sample_set<T: ToString>(num: usize, values: &[T]) -> Metric {
         Metric::new(
             format!("set-{}", num),
-            None,
-            None,
-            Some(tag("production")),
             MetricKind::Incremental,
             MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
             },
         )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_distribution_histogram(num: u32, rate: u32) -> Metric {
         Metric::new(
             format!("dist-{}", num),
-            None,
-            None,
-            Some(tag("production")),
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_aggregated_histogram(
@@ -666,9 +654,6 @@ mod test {
     ) -> Metric {
         Metric::new(
             format!("buckets-{}", num),
-            None,
-            None,
-            Some(tag("production")),
             kind,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![
@@ -680,14 +665,12 @@ mod test {
                 sum,
             },
         )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_aggregated_summary(factor: u32) -> Metric {
         Metric::new(
             format!("quantiles-{}", factor),
-            None,
-            None,
-            Some(tag("production")),
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![
@@ -699,5 +682,6 @@ mod test {
                 sum: 10.0,
             },
         )
+        .with_tags(Some(tag("production")))
     }
 }

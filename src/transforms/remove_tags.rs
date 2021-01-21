@@ -86,11 +86,13 @@ mod tests {
 
     #[test]
     fn remove_tags() {
-        let event = Event::Metric(Metric::new(
-            "foo".into(),
-            None,
-            None,
-            Some(
+        let event = Event::Metric(
+            Metric::new(
+                "foo".into(),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 10.0 },
+            )
+            .with_tags(Some(
                 vec![
                     ("env".to_owned(), "production".to_owned()),
                     ("region".to_owned(), "us-east-1".to_owned()),
@@ -98,10 +100,8 @@ mod tests {
                 ]
                 .into_iter()
                 .collect(),
-            ),
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 10.0 },
-        ));
+            )),
+        );
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
@@ -115,18 +115,18 @@ mod tests {
 
     #[test]
     fn remove_all_tags() {
-        let event = Event::Metric(Metric::new(
-            "foo".into(),
-            None,
-            None,
-            Some(
+        let event = Event::Metric(
+            Metric::new(
+                "foo".into(),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 10.0 },
+            )
+            .with_tags(Some(
                 vec![("env".to_owned(), "production".to_owned())]
                     .into_iter()
                     .collect(),
-            ),
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 10.0 },
-        ));
+            )),
+        );
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
@@ -138,9 +138,6 @@ mod tests {
     fn remove_tags_from_none() {
         let event = Event::Metric(Metric::new(
             "foo".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bar".into()].into_iter().collect(),

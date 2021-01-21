@@ -58,28 +58,21 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric::new(
                 name,
-                None,
-                None,
-                tags,
                 MetricKind::Incremental,
                 MetricValue::Counter {
                     value: val * sample_rate,
                 },
             )
+            .with_tags(tags)
         }
         unit @ "h" | unit @ "ms" | unit @ "d" => {
             let val: f64 = parts[0].parse()?;
             Metric::new(
-                name,
-                None,
-                None,
-                tags,
-                MetricKind::Incremental,
-                MetricValue::Distribution {
+                name, MetricKind::Incremental, MetricValue::Distribution {
                     samples: crate::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
-            )
+            ).with_tags(tags)
         }
         "g" => {
             let value = if parts[0]
@@ -94,36 +87,26 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             };
 
             match parse_direction(parts[0])? {
-                None => Metric::new(
-                    name,
-                    None,
-                    None,
-                    tags,
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value },
-                ),
+                None => Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+                    .with_tags(tags),
                 Some(sign) => Metric::new(
                     name,
-                    None,
-                    None,
-                    tags,
                     MetricKind::Incremental,
                     MetricValue::Gauge {
                         value: value * sign,
                     },
-                ),
+                )
+                .with_tags(tags),
             }
         }
         "s" => Metric::new(
             name,
-            None,
-            None,
-            tags,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec![parts[0].into()].into_iter().collect(),
             },
-        ),
+        )
+        .with_tags(tags),
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };
     Ok(metric)
@@ -248,9 +231,6 @@ mod test {
             parse("foo:1|c"),
             Ok(Metric::new(
                 "foo".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )),
@@ -263,19 +243,17 @@ mod test {
             parse("foo:1|c|#tag1,tag2:value"),
             Ok(Metric::new(
                 "foo".into(),
-                None,
-                None,
-                Some(
-                    vec![
-                        ("tag1".to_owned(), "true".to_owned()),
-                        ("tag2".to_owned(), "value".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
-            )),
+            )
+            .with_tags(Some(
+                vec![
+                    ("tag1".to_owned(), "true".to_owned()),
+                    ("tag2".to_owned(), "value".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -285,9 +263,6 @@ mod test {
             parse("bar:2|c|@0.1"),
             Ok(Metric::new(
                 "bar".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 20.0 },
             )),
@@ -300,9 +275,6 @@ mod test {
             parse("bar:2|c|@0"),
             Ok(Metric::new(
                 "bar".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 2.0 },
             )),
@@ -315,9 +287,6 @@ mod test {
             parse("glork:320|ms|@0.1"),
             Ok(Metric::new(
                 "glork".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![0.320 => 10],
@@ -333,23 +302,21 @@ mod test {
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
             Ok(Metric::new(
                 "glork".into(),
-                None,
-                None,
-                Some(
-                    vec![
-                        ("region".to_owned(), "us-west1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                        ("e".to_owned(), "".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
-            )),
+            )
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                    ("e".to_owned(), "".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -359,23 +326,21 @@ mod test {
             parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
             Ok(Metric::new(
                 "glork".into(),
-                None,
-                None,
-                Some(
-                    vec![
-                        ("region".to_owned(), "us-west1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                        ("e".to_owned(), "".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
-            )),
+            )
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                    ("e".to_owned(), "".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -385,9 +350,6 @@ mod test {
             parse("gaugor:333|g"),
             Ok(Metric::new(
                 "gaugor".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 333.0 },
             )),
@@ -400,9 +362,6 @@ mod test {
             parse("gaugor:-4|g"),
             Ok(Metric::new(
                 "gaugor".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -4.0 },
             )),
@@ -411,9 +370,6 @@ mod test {
             parse("gaugor:+10|g"),
             Ok(Metric::new(
                 "gaugor".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: 10.0 },
             )),
@@ -426,9 +382,6 @@ mod test {
             parse("uniques:765|s"),
             Ok(Metric::new(
                 "uniques".into(),
-                None,
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["765".into()].into_iter().collect()

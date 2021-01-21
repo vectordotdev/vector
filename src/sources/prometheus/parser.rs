@@ -40,14 +40,12 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for metric in vec {
                     let counter = Metric::new(
                         group.name.clone(),
-                        None,
-                        None,
-                        has_values_or_none(metric.labels),
                         MetricKind::Absolute,
                         MetricValue::Counter {
                             value: metric.value,
                         },
-                    );
+                    )
+                    .with_tags(has_values_or_none(metric.labels));
 
                     result.push(counter);
                 }
@@ -56,14 +54,12 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for metric in vec {
                     let gauge = Metric::new(
                         group.name.clone(),
-                        None,
-                        None,
-                        has_values_or_none(metric.labels),
                         MetricKind::Absolute,
                         MetricValue::Gauge {
                             value: metric.value,
                         },
-                    );
+                    )
+                    .with_tags(has_values_or_none(metric.labels));
 
                     result.push(gauge);
                 }
@@ -97,16 +93,14 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
                     let hist = Metric::new(
                         group.name.clone(),
-                        None,
-                        None,
-                        has_values_or_none(tags),
                         MetricKind::Absolute,
                         MetricValue::AggregatedHistogram {
                             buckets: aggregate.buckets,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
-                    );
+                    )
+                    .with_tags(has_values_or_none(tags));
 
                     result.push(hist);
                 }
@@ -135,16 +129,14 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for (tags, aggregate) in aggregates {
                     let summary = Metric::new(
                         group.name.clone(),
-                        None,
-                        None,
-                        has_values_or_none(tags),
                         MetricKind::Absolute,
                         MetricValue::AggregatedSummary {
                             quantiles: aggregate.quantiles,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
-                    );
+                    )
+                    .with_tags(has_values_or_none(tags));
 
                     result.push(summary);
                 }
@@ -185,9 +177,6 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "uptime".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 123.0 },
             )]),
@@ -238,50 +227,44 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "name".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![
-                            ("labelname".into(), "val2".into()),
-                            ("basename".into(), "base\"v\\al\nue".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.23 },
-                ),
+                )
+                .with_tags(Some(
+                    vec![
+                        ("labelname".into(), "val2".into()),
+                        ("basename".into(), "base\"v\\al\nue".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
                 Metric::new(
                     "name2".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![
-                            ("labelname".into(), "val2".into()),
-                            ("basename".into(), "basevalue2".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: std::f64::INFINITY
                     },
-                ),
+                )
+                .with_tags(Some(
+                    vec![
+                        ("labelname".into(), "val2".into()),
+                        ("basename".into(), "basevalue2".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
                 Metric::new(
                     "name2".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![("labelname".into(), "val1".into()),]
-                            .into_iter()
-                            .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: std::f64::NEG_INFINITY
                     },
-                ),
+                )
+                .with_tags(Some(
+                    vec![("labelname".into(), "val1".into()),]
+                        .into_iter()
+                        .collect()
+                )),
             ]),
         );
     }
@@ -300,34 +283,30 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "http_requests_total".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![
-                            ("method".into(), "post".into()),
-                            ("code".into(), "200".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1027.0 },
-                ),
+                )
+                .with_tags(Some(
+                    vec![
+                        ("method".into(), "post".into()),
+                        ("code".into(), "200".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
                 Metric::new(
                     "http_requests_total".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![
-                            ("method".into(), "post".into()),
-                            ("code".into(), "400".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 3.0 },
                 )
+                .with_tags(Some(
+                    vec![
+                        ("method".into(), "post".into()),
+                        ("code".into(), "400".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                ))
             ]),
         );
     }
@@ -344,9 +323,6 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "latency".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 123.0 },
             )]),
@@ -363,9 +339,6 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "metric_without_timestamp_and_labels".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 12.47 },
             )]),
@@ -382,9 +355,6 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "no_labels".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 3.0 },
             )]),
@@ -401,21 +371,19 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "msdos_file_access_time_seconds".into(),
-                None,
-                None,
-                Some(
-                    vec![
-                        ("path".into(), "C:\\DIR\\FILE.TXT".into()),
-                        ("error".into(), "Cannot find file:\n\"FILE.TXT\"".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ),
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: 1458255915.0
                 },
-            )]),
+            )
+            .with_tags(Some(
+                vec![
+                    ("path".into(), "C:\\DIR\\FILE.TXT".into()),
+                    ("error".into(), "Cannot find file:\n\"FILE.TXT\"".into())
+                ]
+                .into_iter()
+                .collect()
+            )),]),
         );
     }
 
@@ -430,12 +398,10 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "name".into(),
-                None,
-                None,
-                Some(map! {"tag" => "}"}),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
-            )]),
+            )
+            .with_tags(Some(map! {"tag" => "}"}))]),
         );
     }
 
@@ -450,12 +416,10 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "name".into(),
-                None,
-                None,
-                Some(map! {"tag" => "a,b"}),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
-            )]),
+            )
+            .with_tags(Some(map! {"tag" => "a,b"}))]),
         );
     }
 
@@ -470,12 +434,10 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "name".into(),
-                None,
-                None,
-                Some(map! {"tag" => "\\n"}),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
-            )]),
+            )
+            .with_tags(Some(map! {"tag" => "\\n"}))]),
         );
     }
 
@@ -490,12 +452,10 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "name".into(),
-                None,
-                None,
-                Some(map! {"tag" => " * "}),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
-            )]),
+            )
+            .with_tags(Some(map! {"tag" => " * "}))]),
         );
     }
 
@@ -509,19 +469,17 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "telemetry_scrape_size_bytes_count".into(),
-                None,
-                None,
-                Some(
-                    vec![
-                        ("registry".into(), "default".into()),
-                        ("content_type".into(), "text/plain; version=0.0.4".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ),
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 1890.0 },
-            )]),
+            )
+            .with_tags(Some(
+                vec![
+                    ("registry".into(), "default".into()),
+                    ("content_type".into(), "text/plain; version=0.0.4".into())
+                ]
+                .into_iter()
+                .collect()
+            ))]),
         );
     }
 
@@ -553,18 +511,16 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "something_weird".into(),
-                None,
-                None,
-                Some(
-                    vec![("problem".into(), "division by zero".into())]
-                        .into_iter()
-                        .collect()
-                ),
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: std::f64::INFINITY
                 },
-            )]),
+            )
+            .with_tags(Some(
+                vec![("problem".into(), "division by zero".into())]
+                    .into_iter()
+                    .collect()
+            ))]),
         );
     }
 
@@ -581,24 +537,22 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "latency".into(),
-                    None,
-                    None,
-                    Some(
-                        vec![("env".into(), "production".into())]
-                            .into_iter()
-                            .collect()
-                    ),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 1.0 },
-                ),
+                )
+                .with_tags(Some(
+                    vec![("env".into(), "production".into())]
+                        .into_iter()
+                        .collect()
+                )),
                 Metric::new(
                     "latency".into(),
-                    None,
-                    None,
-                    Some(vec![("env".into(), "testing".into())].into_iter().collect()),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
+                .with_tags(Some(
+                    vec![("env".into(), "testing".into())].into_iter().collect()
+                ))
             ]),
         );
     }
@@ -619,25 +573,16 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "uptime".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 123.0 },
                 ),
                 Metric::new(
                     "temperature".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: -1.5 },
                 ),
                 Metric::new(
                     "launch_count".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 10.0 },
                 )
@@ -681,33 +626,21 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "uptime".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 123.0 },
                 ),
                 Metric::new(
                     "last_downtime".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 4.0 },
                 ),
                 Metric::new(
                     "temperature".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: -1.5 },
                 ),
                 Metric::new(
                     "temperature_7_days_average".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 0.1 },
                 )
@@ -734,9 +667,6 @@ mod test {
             parse(exp),
             Ok(vec![Metric::new(
                 "http_request_duration_seconds".into(),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     buckets: crate::buckets![
@@ -799,12 +729,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(),
-                    None,
-                    None,
-                    Some(vec![("runner".into(), "z".into())].into_iter().collect()),
-                    MetricKind::Absolute,
-                    MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 327,
                             60.0 => 147,
@@ -820,14 +745,9 @@ mod test {
                         count: 536,
                         sum: 19690.129384881966,
                     },
-                ),
+                ).with_tags(Some(vec![("runner".into(), "z".into())].into_iter().collect())),
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(),
-                    None,
-                    None,
-                    Some(vec![("runner".into(), "x".into())].into_iter().collect()),
-                    MetricKind::Absolute,
-                    MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 1,
                             60.0 => 0,
@@ -843,14 +763,9 @@ mod test {
                         count: 1,
                         sum: 28.975436316,
                     },
-                ),
+                ).with_tags(Some(vec![("runner".into(), "x".into())].into_iter().collect())),
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(),
-                    None,
-                    None,
-                    Some(vec![("runner".into(), "y".into())].into_iter().collect()),
-                    MetricKind::Absolute,
-                    MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
@@ -858,7 +773,7 @@ mod test {
                         count: 3255,
                         sum: 381111.7498891335,
                     },
-                )
+                ).with_tags(Some(vec![("runner".into(), "y".into())].into_iter().collect()))
             ]),
         );
     }
@@ -891,9 +806,6 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "rpc_duration_seconds".into(),
-                    None,
-                    None,
-                    Some(vec![("service".into(), "a".into())].into_iter().collect()),
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: crate::quantiles![
@@ -906,12 +818,12 @@ mod test {
                         count: 2693,
                         sum: 1.7560473e+07,
                     },
-                ),
+                )
+                .with_tags(Some(
+                    vec![("service".into(), "a".into())].into_iter().collect()
+                )),
                 Metric::new(
                     "go_gc_duration_seconds".into(),
-                    None,
-                    None,
-                    None,
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: crate::quantiles![
@@ -956,100 +868,80 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "in", "host" => "*"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 263719.0 },
-                ),
+                )
+                .with_tags(Some(map! {"direction" => "in", "host" => "*"})),
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "in", "host" => "_"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 255061.0 },
-                ),
+                )
+                .with_tags(Some(map! {"direction" => "in", "host" => "_"})),
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "in", "host" => "nginx-vts-status"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 8658.0 },
-                ),
+                )
+                .with_tags(Some(
+                    map! {"direction" => "in", "host" => "nginx-vts-status"}
+                )),
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "out", "host" => "*"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 944199.0 },
-                ),
+                )
+                .with_tags(Some(map! {"direction" => "out", "host" => "*"})),
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "out", "host" => "_"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 360775.0 },
-                ),
+                )
+                .with_tags(Some(map! {"direction" => "out", "host" => "_"})),
                 Metric::new(
                     "nginx_server_bytes".into(),
-                    None,
-                    None,
-                    Some(map! {"direction" => "out", "host" => "nginx-vts-status"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 583424.0 },
-                ),
+                )
+                .with_tags(Some(
+                    map! {"direction" => "out", "host" => "nginx-vts-status"}
+                )),
                 Metric::new(
                     "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "bypass"}),
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 0.0 },
-                ),
-                Metric::new(
-                    "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "expired"}),
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 0.0 },
-                ),
-                Metric::new(
-                    "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "hit"}),
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 0.0 },
-                ),
-                Metric::new(
-                    "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "miss"}),
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 0.0 },
-                ),
-                Metric::new(
-                    "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "revalidated"}),
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 0.0 },
-                ),
-                Metric::new(
-                    "nginx_server_cache".into(),
-                    None,
-                    None,
-                    Some(map! {"host" => "*", "status" => "scarce"}),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
+                .with_tags(Some(map! {"host" => "*", "status" => "bypass"})),
+                Metric::new(
+                    "nginx_server_cache".into(),
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(map! {"host" => "*", "status" => "expired"})),
+                Metric::new(
+                    "nginx_server_cache".into(),
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(map! {"host" => "*", "status" => "hit"})),
+                Metric::new(
+                    "nginx_server_cache".into(),
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(map! {"host" => "*", "status" => "miss"})),
+                Metric::new(
+                    "nginx_server_cache".into(),
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(map! {"host" => "*", "status" => "revalidated"})),
+                Metric::new(
+                    "nginx_server_cache".into(),
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(map! {"host" => "*", "status" => "scarce"}))
             ])
         );
     }

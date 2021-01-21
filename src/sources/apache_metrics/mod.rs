@@ -191,12 +191,12 @@ fn apache_metrics(
                                 )
                                 .chain(vec![Ok(Metric::new(
                                     "up".into(),
-                                    namespace.clone(),
-                                    Some(Utc::now()),
-                                    Some(tags.clone()),
                                     MetricKind::Absolute,
                                     MetricValue::Gauge { value: 1.0 },
-                                ))]);
+                                )
+                                .with_namespace(namespace.clone())
+                                .with_tags(Some(tags.clone()))
+                                .with_timestamp(Some(Utc::now())))]);
 
                                 let metrics = results
                                     .filter_map(|res| match res {
@@ -225,12 +225,12 @@ fn apache_metrics(
                                 Some(
                                     stream::iter(vec![Metric::new(
                                         "up".into(),
-                                        namespace.clone(),
-                                        Some(Utc::now()),
-                                        Some(tags.clone()),
                                         MetricKind::Absolute,
                                         MetricValue::Gauge { value: 1.0 },
-                                    )])
+                                    )
+                                    .with_namespace(namespace.clone())
+                                    .with_tags(Some(tags.clone()))
+                                    .with_timestamp(Some(Utc::now()))])
                                     .map(Event::Metric)
                                     .map(Ok),
                                 )
@@ -243,12 +243,12 @@ fn apache_metrics(
                                 Some(
                                     stream::iter(vec![Metric::new(
                                         "up".into(),
-                                        namespace.clone(),
-                                        Some(Utc::now()),
-                                        Some(tags.clone()),
                                         MetricKind::Absolute,
                                         MetricValue::Gauge { value: 0.0 },
-                                    )])
+                                    )
+                                    .with_namespace(namespace.clone())
+                                    .with_tags(Some(tags.clone()))
+                                    .with_timestamp(Some(Utc::now()))])
                                     .map(Event::Metric)
                                     .map(Ok),
                                 )

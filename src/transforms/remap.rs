@@ -149,9 +149,6 @@ mod tests {
     fn check_remap_metric() {
         let metric = Event::Metric(Metric::new(
             "counter".into(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         ));
@@ -169,18 +166,19 @@ mod tests {
         let result = tform.transform_one(metric).unwrap();
         assert_eq!(
             result,
-            Event::Metric(Metric::new(
-                "zork".into(),
-                Some("zerk".into()),
-                None,
-                Some({
+            Event::Metric(
+                Metric::new(
+                    "zork".into(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(Some("zerk".into()))
+                .with_tags(Some({
                     let mut tags = BTreeMap::new();
                     tags.insert("host".into(), "zoobub".into());
                     tags
-                }),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 1.0 },
-            ))
+                }))
+            )
         );
     }
 }

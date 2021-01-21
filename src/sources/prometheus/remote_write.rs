@@ -130,15 +130,10 @@ fn decode_timeseries(timeseries: proto::TimeSeries) -> Option<impl Iterator<Item
             } else {
                 MetricValue::Gauge { value }
             };
-            Metric::new(
-                name.clone(),
-                None,
-                parse_timestamp(sample.timestamp),
-                tags.clone(),
-                MetricKind::Absolute,
-                value,
-            )
-            .into()
+            Metric::new(name.clone(), MetricKind::Absolute, value)
+                .with_tags(tags.clone())
+                .with_timestamp(parse_timestamp(sample.timestamp))
+                .into()
         })),
         None => {
             emit!(PrometheusNoNameError);
@@ -237,14 +232,14 @@ mod test {
         (0..10)
             .map(|num| {
                 let timestamp = Utc::now().trunc_subsecs(3);
-                Event::Metric(Metric::new(
-                    format!("gauge_{}", num),
-                    None,
-                    Some(timestamp),
-                    None,
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: num as f64 },
-                ))
+                Event::Metric(
+                    Metric::new(
+                        format!("gauge_{}", num),
+                        MetricKind::Absolute,
+                        MetricValue::Gauge { value: num as f64 },
+                    )
+                    .with_timestamp(Some(timestamp)),
+                )
             })
             .collect()
     }

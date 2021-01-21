@@ -141,12 +141,11 @@ mod tests {
     fn transform_counter() {
         let counter = Metric::new(
             "counter".into(),
-            None,
-            Some(ts()),
-            Some(tags()),
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
-        );
+        )
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -168,12 +167,10 @@ mod tests {
     fn transform_gauge() {
         let gauge = Metric::new(
             "gauge".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
-        );
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -193,14 +190,12 @@ mod tests {
     fn transform_set() {
         let set = Metric::new(
             "set".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
-        );
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -221,15 +216,13 @@ mod tests {
     fn transform_distribution() {
         let distro = Metric::new(
             "distro".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        );
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -268,16 +261,14 @@ mod tests {
     fn transform_histogram() {
         let histo = Metric::new(
             "histo".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
-        );
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -314,16 +305,14 @@ mod tests {
     fn transform_summary() {
         let summary = Metric::new(
             "summary".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
-        );
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.all_fields().collect();

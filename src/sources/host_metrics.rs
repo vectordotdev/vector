@@ -652,12 +652,12 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric::new(
             name.into(),
-            self.namespace.0.clone(),
-            Some(timestamp),
-            Some(tags),
             MetricKind::Absolute,
             MetricValue::Counter { value },
         )
+        .with_namespace(self.namespace.0.clone())
+        .with_tags(Some(tags))
+        .with_timestamp(Some(timestamp))
     }
 
     fn gauge(
@@ -669,12 +669,12 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric::new(
             name.into(),
-            self.namespace.0.clone(),
-            Some(timestamp),
-            Some(tags),
             MetricKind::Absolute,
             MetricValue::Gauge { value },
         )
+        .with_namespace(self.namespace.0.clone())
+        .with_tags(Some(tags))
+        .with_timestamp(Some(timestamp))
     }
 }
 

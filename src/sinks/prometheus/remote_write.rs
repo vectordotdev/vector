@@ -325,21 +325,18 @@ mod tests {
     }
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
-        Event::Metric(Metric::new(
-            name,
-            None,
-            Some(chrono::Utc::now()),
-            Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-            MetricKind::Absolute,
-            MetricValue::Gauge { value },
-        ))
+        Event::Metric(
+            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+                .with_tags(Some(
+                    vec![
+                        ("region".to_owned(), "us-west-1".to_owned()),
+                        ("production".to_owned(), "true".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ))
+                .with_timestamp(Some(chrono::Utc::now())),
+        )
     }
 }
 

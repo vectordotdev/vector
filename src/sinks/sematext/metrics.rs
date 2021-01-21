@@ -260,12 +260,11 @@ mod tests {
     fn test_encode_counter_event() {
         let events = vec![Metric::new(
             "pool.used".into(),
-            Some("jvm".into()),
-            Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-            None,
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
-        )];
+        )
+        .with_namespace(Some("jvm".into()))
+        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
@@ -277,12 +276,10 @@ mod tests {
     fn test_encode_counter_event_no_namespace() {
         let events = vec![Metric::new(
             "used".into(),
-            None,
-            Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-            None,
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
-        )];
+        )
+        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
@@ -295,20 +292,18 @@ mod tests {
         let events = vec![
             Metric::new(
                 "pool.used".into(),
-                Some("jvm".into()),
-                Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 42.0 },
-            ),
+            )
+            .with_namespace(Some("jvm".into()))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0))),
             Metric::new(
                 "pool.committed".into(),
-                Some("jvm".into()),
-                Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 18874368.0 },
-            ),
+            )
+            .with_namespace(Some("jvm".into()))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1))),
         ];
 
         assert_eq!(
@@ -359,18 +354,20 @@ mod tests {
 
         let mut events = Vec::new();
         for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
-            let event = Event::from(Metric::new(
-                metric.to_string(),
-                Some(namespace.to_string()),
-                Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
-                Some(
+            let event = Event::from(
+                Metric::new(
+                    metric.to_string(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: *val as f64 },
+                )
+                .with_namespace(Some(namespace.to_string()))
+                .with_tags(Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]
                         .into_iter()
                         .collect(),
-                ),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: *val as f64 },
-            ));
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32))),
+            );
             events.push(event);
         }
 

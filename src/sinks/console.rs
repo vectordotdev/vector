@@ -190,11 +190,14 @@ mod test {
 
     #[test]
     fn encodes_counter() {
-        let event = Event::Metric(Metric::new(
-            "foos".into(),
-            Some("vector".into()),
-            Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
-            Some(
+        let event = Event::Metric(
+            Metric::new(
+                "foos".into(),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 100.0 },
+            )
+            .with_namespace(Some("vector".into()))
+            .with_tags(Some(
                 vec![
                     ("key2".to_owned(), "value2".to_owned()),
                     ("key1".to_owned(), "value1".to_owned()),
@@ -202,10 +205,9 @@ mod test {
                 ]
                 .into_iter()
                 .collect(),
-            ),
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 100.0 },
-        ));
+            ))
+            .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
+        );
         assert_eq!(
             r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
@@ -216,9 +218,6 @@ mod test {
     fn encodes_set() {
         let event = Event::Metric(Metric::new(
             "users".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bob".into()].into_iter().collect(),
@@ -234,9 +233,6 @@ mod test {
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric::new(
             "glork".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![10.0 => 1],
@@ -253,9 +249,6 @@ mod test {
     fn encodes_metric_text() {
         let event = Event::Metric(Metric::new(
             "users".into(),
-            None,
-            None,
-            None,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bob".into()].into_iter().collect(),

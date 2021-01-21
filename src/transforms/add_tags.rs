@@ -116,9 +116,6 @@ mod tests {
     fn add_tags() {
         let event = Event::Metric(Metric::new(
             "bar".into(),
-            None,
-            None,
-            None,
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         ));
@@ -143,14 +140,14 @@ mod tests {
     fn add_tags_override() {
         let mut tags = BTreeMap::new();
         tags.insert("region".to_string(), "us-east-1".to_string());
-        let event = Event::Metric(Metric::new(
-            "bar".into(),
-            None,
-            None,
-            Some(tags),
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 10.0 },
-        ));
+        let event = Event::Metric(
+            Metric::new(
+                "bar".into(),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 10.0 },
+            )
+            .with_tags(Some(tags)),
+        );
 
         let map: IndexMap<String, String> = vec![("region".to_string(), "overridden".to_string())]
             .into_iter()

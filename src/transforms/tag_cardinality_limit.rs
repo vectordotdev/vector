@@ -280,14 +280,14 @@ mod tests {
     }
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
-        Event::Metric(Metric::new(
-            "event".into(),
-            None,
-            None,
-            Some(tags),
-            metric::MetricKind::Incremental,
-            metric::MetricValue::Counter { value: 1.0 },
-        ))
+        Event::Metric(
+            Metric::new(
+                "event".into(),
+                metric::MetricKind::Incremental,
+                metric::MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(tags)),
+        )
     }
 
     fn make_transform_hashset(

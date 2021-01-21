@@ -174,9 +174,6 @@ mod test {
             Event::from("source"),
             Event::Metric(Metric::new(
                 String::from("also test a metric"),
-                None,
-                None,
-                None,
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             )),

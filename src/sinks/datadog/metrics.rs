@@ -543,28 +543,26 @@ mod tests {
         let events = vec![
             Metric::new(
                 "total".into(),
-                Some("test".into()),
-                None,
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
-            ),
+            )
+            .with_namespace(Some("test".into())),
             Metric::new(
                 "check".into(),
-                Some("test".into()),
-                Some(ts()),
-                Some(tags()),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
-            ),
+            )
+            .with_namespace(Some("test".into()))
+            .with_tags(Some(tags()))
+            .with_timestamp(Some(ts())),
             Metric::new(
                 "unsupported".into(),
-                Some("test".into()),
-                Some(ts()),
-                Some(tags()),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
-            ),
+            )
+            .with_namespace(Some("test".into()))
+            .with_tags(Some(tags()))
+            .with_timestamp(Some(ts())),
         ];
         let req = sink
             .build_request(PartitionInnerBuffer::new(events, DatadogEndpoint::Series))
@@ -597,28 +595,27 @@ mod tests {
         let events = vec![
             Metric::new(
                 "total".into(),
-                Some("ns".into()),
-                Some(ts()),
-                None,
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
-            ),
+            )
+            .with_namespace(Some("ns".into()))
+            .with_timestamp(Some(ts())),
             Metric::new(
                 "check".into(),
-                Some("ns".into()),
-                Some(ts()),
-                Some(tags()),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
-            ),
+            )
+            .with_namespace(Some("ns".into()))
+            .with_tags(Some(tags()))
+            .with_timestamp(Some(ts())),
             Metric::new(
                 "unsupported".into(),
-                Some("ns".into()),
-                Some(ts()),
-                Some(tags()),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
-            ),
+            )
+            .with_namespace(Some("ns".into()))
+            .with_tags(Some(tags()))
+            .with_timestamp(Some(ts())),
         ];
         let input = encode_events(events, None, interval);
         let json = serde_json::to_string(&input).unwrap();
@@ -634,20 +631,16 @@ mod tests {
         let events = vec![
             Metric::new(
                 "unsupported".into(),
-                None,
-                Some(ts()),
-                None,
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: 0.1 },
-            ),
+            )
+            .with_timestamp(Some(ts())),
             Metric::new(
                 "volume".into(),
-                None,
-                Some(ts()),
-                None,
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: -1.1 },
-            ),
+            )
+            .with_timestamp(Some(ts())),
         ];
         let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
@@ -662,14 +655,12 @@ mod tests {
     fn encode_set() {
         let events = vec![Metric::new(
             "users".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
-        )];
+        )
+        .with_timestamp(Some(ts()))];
         let input = encode_events(events, Some("ns"), 60);
         let json = serde_json::to_string(&input).unwrap();
 
@@ -766,15 +757,13 @@ mod tests {
         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
         let events = vec![Metric::new(
             "requests".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
-        )];
+        )
+        .with_timestamp(Some(ts()))];
         let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
@@ -789,15 +778,13 @@ mod tests {
         // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
         let events = vec![Metric::new(
             "requests".into(),
-            None,
-            Some(ts()),
-            None,
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
-        )];
+        )
+        .with_timestamp(Some(ts()))];
         let input = encode_distribution_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
