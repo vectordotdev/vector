@@ -116,6 +116,19 @@ components: sinks: loki: {
 				}
 			}
 		}
+		out_of_order_action: {
+			common:      false
+			description: "Configure what to do with out-of-order events."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "drop"
+				enum: {
+					"drop":              "Drop the event."
+					"rewrite_timestamp": "Rewrite timestamp to the current time."
+				}
+			}
+		}
 		remove_label_fields: {
 			common:      false
 			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
