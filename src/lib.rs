@@ -20,7 +20,8 @@ extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate remap_cli;
 
-// Enable global allocator.
+// Configure the global allocator. Do not remove this line, even if it appears
+// unused.
 extern crate vector_global_alloc;
 
 #[macro_use]
