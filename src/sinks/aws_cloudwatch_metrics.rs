@@ -4,7 +4,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
         PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
@@ -44,7 +44,10 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -114,7 +117,7 @@ impl CloudWatchMetricsSinkConfig {
         };
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(CloudWatchClient::new_with_client(client, region))
@@ -171,13 +174,12 @@ impl CloudWatchMetricsSvc {
                             ..Default::default()
                         }),
                         MetricValue::Distribution {
-                            values,
-                            sample_rates,
+                            samples,
                             statistic: _,
                         } => Some(MetricDatum {
                             metric_name,
-                            values: Some(values.to_vec()),
-                            counts: Some(sample_rates.iter().cloned().map(f64::from).collect()),
+                            values: Some(samples.iter().map(|s| s.value).collect()),
+                            counts: Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
                             timestamp,
                             dimensions,
                             ..Default::default()
@@ -381,8 +383,7 @@ mod tests {
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![11.0, 12.0],
-                sample_rates: vec![100, 50],
+                samples: crate::samples![11.0 => 100, 12.0 => 50],
                 statistic: StatisticKind::Histogram,
             },
         }];
@@ -496,8 +497,7 @@ mod integration_tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![i as f64],
-                    sample_rates: vec![100],
+                    samples: crate::samples![i as f64 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             });

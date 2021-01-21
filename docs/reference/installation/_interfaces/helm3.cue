@@ -41,9 +41,8 @@ installation: _interfaces: "helm3": {
 				  stdout:
 				    type: console
 				    inputs: ["kubernetes_logs"]
-				    rawConfig: |
-				      target = "stdout"
-				      encoding = "json"
+				    target: "stdout"
+				    encoding: "json"
 				VALUES
 				"""#
 			install:   #"helm install --namespace \#(_namespace) --create-namespace \#(_release_name) \#(_repo_name)/\#(_chart_name) --values values.yaml"#

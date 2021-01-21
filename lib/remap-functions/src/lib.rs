@@ -32,6 +32,8 @@ mod floor;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get_env_var")]
+mod get_env_var;
 #[cfg(feature = "includes")]
 mod includes;
 #[cfg(feature = "ip_cidr_contains")]
@@ -44,6 +46,8 @@ mod ip_to_ipv6;
 mod ipv6_to_ipv4;
 #[cfg(feature = "is_nullish")]
 mod is_nullish;
+#[cfg(feature = "length")]
+mod length;
 #[cfg(feature = "log")]
 mod log;
 #[cfg(feature = "match")]
@@ -54,8 +58,6 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
-#[cfg(feature = "only_fields")]
-mod only_fields;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -169,6 +171,8 @@ pub use floor::Floor;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get_env_var")]
+pub use get_env_var::GetEnvVar;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
 #[cfg(feature = "ip_cidr_contains")]
@@ -181,14 +185,14 @@ pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
 #[cfg(feature = "is_nullish")]
 pub use is_nullish::IsNullish;
+#[cfg(feature = "length")]
+pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
-#[cfg(feature = "only_fields")]
-pub use only_fields::OnlyFields;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -302,6 +306,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get_env_var")]
+        Box::new(GetEnvVar),
         #[cfg(feature = "includes")]
         Box::new(Includes),
         #[cfg(feature = "ip_cidr_contains")]
@@ -314,6 +320,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Ipv6ToIpV4),
         #[cfg(feature = "is_nullish")]
         Box::new(IsNullish),
+        #[cfg(feature = "length")]
+        Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
         #[cfg(feature = "md5")]
@@ -322,8 +330,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
-        #[cfg(feature = "only_fields")]
-        Box::new(OnlyFields),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]

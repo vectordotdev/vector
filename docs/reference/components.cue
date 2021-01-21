@@ -165,6 +165,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
 
@@ -223,6 +224,8 @@ components: {
 	}
 
 	#FeaturesExpose: {
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
+
 		for: {
 			service:    #Service
 			interface?: #Interface
@@ -240,6 +243,10 @@ components: {
 	}
 
 	#FeaturesMultiline: {
+		enabled: bool
+	}
+
+	#FeaturesEncoding: {
 		enabled: bool
 	}
 

@@ -309,6 +309,7 @@ pub(in crate::sinks) fn encode_uri(
 #[allow(dead_code)]
 pub mod test_util {
     use super::*;
+    use crate::tls;
     use chrono::{offset::TimeZone, Utc};
     use std::fs::File;
     use std::io::Read;
@@ -368,7 +369,7 @@ pub mod test_util {
 
     fn client() -> reqwest::Client {
         let mut test_ca = Vec::<u8>::new();
-        File::open("tests/data/Vector_CA.crt")
+        File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();

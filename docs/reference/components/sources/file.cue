@@ -25,18 +25,20 @@ components: sources: file: {
 			}
 		}
 		multiline: enabled: true
+		encoding: enabled:  true
 	}
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -141,6 +143,15 @@ components: sources: file: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
 			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
+		}
+		line_delimiter: {
+			common:      false
+			description: "String sequence used to separate one file line from another"
+			required:    false
+			type: string: {
+				default: "\n"
+				examples: ["\r\n"]
+			}
 		}
 		max_line_bytes: {
 			common:      false
@@ -363,8 +374,9 @@ components: sources: file: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
-				is found.
+				Each line is read until a new line delimiter (by default, `\n` i.e.
+				the `0xA` byte) or `EOF` is found. If needed, the default line
+				delimiter can be overriden via the `line_delimiter` option.
 				"""
 		}
 

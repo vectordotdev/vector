@@ -311,16 +311,6 @@ impl Object for LogEvent {
 
         Ok(())
     }
-
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        if self.is_empty() {
-            return Ok(vec![remap::Path::root()]);
-        }
-
-        self.keys()
-            .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
-            .collect()
-    }
 }
 
 #[cfg(test)]
@@ -663,47 +653,6 @@ mod test {
 
             assert_eq!(Object::remove(&mut event, &path, compact), Ok(removed));
             assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
-        }
-    }
-
-    #[test]
-    fn object_paths() {
-        use crate::map;
-        use remap::{Object, Path};
-        use std::str::FromStr;
-
-        let cases = vec![
-            (map![], Ok(vec!["."])),
-            (map!["foo bar baz": "bar"], Ok(vec![r#"."foo bar baz""#])),
-            (map!["foo": "bar", "baz": "qux"], Ok(vec![".baz", ".foo"])),
-            (map!["foo": map!["bar": "baz"]], Ok(vec![".foo.bar"])),
-            (map!["a": vec![0, 1]], Ok(vec![".a[0]", ".a[1]"])),
-            (
-                map!["a": map!["b": "c"], "d": 12, "e": vec![
-                    map!["f": 1],
-                    map!["g": 2],
-                    map!["h": 3],
-                ]],
-                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
-            ),
-            (
-                map![
-                    "a": vec![map![
-                        "b": vec![map!["c": map!["d": map!["e": vec![vec![0, 1]]]]]]
-                    ]]
-                ],
-                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
-            ),
-        ];
-
-        for (object, expect) in cases {
-            let object: BTreeMap<String, Value> = object;
-            let event = LogEvent::from(object);
-
-            assert_eq!(
-                event.paths(),
-                expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())
-            );
         }
     }
 }

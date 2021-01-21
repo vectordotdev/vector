@@ -4,10 +4,9 @@ use crate::{
     event::Event,
     wasm::WasmModule,
 };
-use futures01::Stream as Stream01;
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, future::ready, path::PathBuf, pin::Pin};
 use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
@@ -98,17 +97,19 @@ impl Wasm {
 impl TaskTransform for Wasm {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send> {
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>> {
         let mut inner = self;
 
-        Box::new(
+        Box::pin(
             task.filter_map(move |event| {
-                inner
-                    .module
-                    .process(event)
-                    .map(|events| futures01::stream::iter_ok(events))
-                    .ok()
+                ready({
+                    inner
+                        .module
+                        .process(event)
+                        .map(|events| stream::iter(events))
+                        .ok()
+                })
             })
             .flatten(),
         )
@@ -119,7 +120,7 @@ impl TaskTransform for Wasm {
 mod tests {
     use super::{Wasm, WasmConfig};
     use crate::{event::Event, transforms::TaskTransform};
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::{stream, StreamExt};
     use serde_json::Value;
     use std::{collections::HashMap, fs, io::Read, path::Path};
 
@@ -162,13 +163,11 @@ mod tests {
                 .collect();
 
         let actual = transform
-            .transform(Box::new(futures01::stream::iter_ok(input)))
-            .compat()
+            .transform(Box::pin(stream::iter(input)))
             .collect::<Vec<_>>()
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Vec<_>>();
 
         assert_eq!(actual, expected);
     }
