@@ -46,9 +46,10 @@ components: transforms: "remap": {
 	configuration: {
 		source: {
 			description: """
-				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) expression to execute for each event. Please
-				refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of operations and
-				functions.
+				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
+
+				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of expressions
+				and functions.
 				"""
 			required:    true
 			type: string: {

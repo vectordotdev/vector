@@ -503,9 +503,11 @@ components: {
 					}
 					source: {
 						description:   """
-							The [Vector Remap Language](\(urls.vrl_reference)) (VRL) expression to execute for each event. Please
-							refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of operations and
-							functions.
+							The [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_ to execute
+							for each event. This expression _MUST_ return a boolean.
+
+							Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
+							expressions and functions.
 							"""
 						relevant_when: #"`type` is `"remap"`"#
 						required:      true
