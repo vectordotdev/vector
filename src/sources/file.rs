@@ -65,7 +65,7 @@ pub struct FileConfig {
     pub file_key: Option<String>,
     pub start_at_beginning: Option<bool>,
     pub ignore_checkpoints: Option<bool>,
-    pub read_from: Option<ReadFrom>,
+    pub read_from: Option<ReadFromConfig>,
     pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
@@ -97,6 +97,22 @@ pub enum FingerprintConfig {
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFromConfig {
+    Beginning,
+    End,
+}
+
+impl From<ReadFromConfig> for ReadFrom {
+    fn from(rfc: ReadFromConfig) -> Self {
+        match rfc {
+            ReadFromConfig::Beginning => ReadFrom::Beginning,
+            ReadFromConfig::End => ReadFrom::End,
+        }
+    }
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -326,7 +342,7 @@ pub fn file_source(
 fn reconcile_position_options(
     start_at_beginning: Option<bool>,
     ignore_checkpoints: Option<bool>,
-    read_from: Option<ReadFrom>,
+    read_from: Option<ReadFromConfig>,
 ) -> (bool, ReadFrom) {
     if start_at_beginning.is_some() {
         warn!(message = "Use of deprecated option `start_at_beginning`. Replace with `ignore_checkpoints` and `read_from`.")
@@ -335,12 +351,12 @@ fn reconcile_position_options(
     match start_at_beginning {
         Some(true) => (
             ignore_checkpoints.unwrap_or(true),
-            read_from.unwrap_or(ReadFrom::Beginning),
+            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
         ),
         _ => (
             ignore_checkpoints.unwrap_or(false),
             // TODO: this is funky, but probably matches current behavior?
-            read_from.unwrap_or(ReadFrom::Beginning),
+            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
         ),
     }
 }
@@ -485,6 +501,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "beginning"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "end"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::End));
     }
 
     #[test]
@@ -942,7 +974,7 @@ mod tests {
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
-                read_from: Some(ReadFrom::Beginning),
+                read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = Pipeline::new_test();
@@ -1038,7 +1070,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_checkpoints: Some(true),
-            read_from: Some(ReadFrom::Beginning),
+            read_from: Some(ReadFromConfig::Beginning),
             ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
@@ -1316,7 +1348,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_checkpoints: Some(true),
-            read_from: Some(ReadFrom::Beginning),
+            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             oldest_first: false,
             ..test_default_file_config(&dir)
@@ -1381,7 +1413,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_checkpoints: Some(true),
-            read_from: Some(ReadFrom::Beginning),
+            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             oldest_first: true,
             ..test_default_file_config(&dir)
@@ -1446,7 +1478,7 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_checkpoints: Some(true),
-            read_from: Some(ReadFrom::Beginning),
+            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
         };
