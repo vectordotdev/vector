@@ -3,8 +3,8 @@ use derive_is_enum_variant::is_enum_variant;
 use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::{BTreeMap, BTreeSet};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::FromIterator,
@@ -373,55 +373,7 @@ impl MetricData {
 
     /// Update this MetricData by adding the value from another.
     pub fn update(&mut self, other: &Self) {
-        match (&mut self.value, &other.value) {
-            (MetricValue::Counter { ref mut value }, MetricValue::Counter { value: value2 }) => {
-                *value += value2;
-            }
-            (MetricValue::Gauge { ref mut value }, MetricValue::Gauge { value: value2 }) => {
-                *value += value2;
-            }
-            (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
-                values.extend(values2.iter().map(Into::into));
-            }
-            (
-                MetricValue::Distribution {
-                    ref mut samples,
-                    statistic: statistic_a,
-                },
-                MetricValue::Distribution {
-                    samples: samples2,
-                    statistic: statistic_b,
-                },
-            ) if statistic_a == statistic_b => {
-                samples.extend_from_slice(&samples2);
-            }
-            (
-                MetricValue::AggregatedHistogram {
-                    ref mut buckets,
-                    ref mut count,
-                    ref mut sum,
-                },
-                MetricValue::AggregatedHistogram {
-                    buckets: buckets2,
-                    count: count2,
-                    sum: sum2,
-                },
-            ) => {
-                if buckets.len() == buckets2.len()
-                    && buckets
-                        .iter()
-                        .zip(buckets2.iter())
-                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                {
-                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
-                        b1.count += b2.count;
-                    }
-                    *count += count2;
-                    *sum += sum2;
-                }
-            }
-            _ => {}
-        }
+        self.value.add(&other.value)
     }
 
     /// Add the data from the other metric to this one. The `other` must
@@ -480,6 +432,171 @@ impl MetricValue {
                 count: 0,
                 sum: 0.0,
             },
+        }
+    }
+
+    /// Add another same value to this.
+    pub fn add(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
+                *value += value2;
+            }
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+                *value += value2;
+            }
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+                values.extend(values2.iter().map(Into::into));
+            }
+            (
+                Self::Distribution {
+                    ref mut samples,
+                    statistic: statistic_a,
+                },
+                Self::Distribution {
+                    samples: samples2,
+                    statistic: statistic_b,
+                },
+            ) if statistic_a == statistic_b => {
+                samples.extend_from_slice(&samples2);
+            }
+            (
+                Self::AggregatedHistogram {
+                    ref mut buckets,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: buckets2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets.len() == buckets2.len()
+                    && buckets
+                        .iter()
+                        .zip(buckets2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                        b1.count += b2.count;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value += b2.value;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Subtract another (same type) value from this.
+    pub fn subtract(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
+                *value -= value2;
+            }
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+                *value -= value2;
+            }
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+                for item in values2 {
+                    values.remove(item);
+                }
+            }
+            (
+                Self::Distribution {
+                    ref mut samples,
+                    statistic: statistic_a,
+                },
+                Self::Distribution {
+                    samples: samples2,
+                    statistic: statistic_b,
+                },
+            ) if statistic_a == statistic_b => {
+                // This is an ugly algorithm, but the use of a HashSet
+                // or equivalent is complicated by neither Hash nor Eq
+                // being implemented for the f64 part of Sample.
+                *samples = samples
+                    .iter()
+                    .copied()
+                    .filter(|sample| samples2.iter().find(|sample2| sample == *sample2).is_none())
+                    .collect();
+            }
+            (
+                Self::AggregatedHistogram {
+                    ref mut buckets,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: buckets2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets.len() == buckets2.len()
+                    && buckets
+                        .iter()
+                        .zip(buckets2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                        b1.count -= b2.count;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
+                }
+            }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value -= b2.value;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
+                }
+            }
+            _ => {}
         }
     }
 }
