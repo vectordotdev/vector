@@ -600,11 +600,11 @@ harness = false
 required-features = ["remap-benches"]
 
 [[bench]]
-<<<<<<< HEAD
 name = "language"
 harness = false
 required-features = ["language-benches"]
-=======
+
+[[bench]]
 name = "metrics_on"
 harness = false
 required-features = ["metrics-benches"]
@@ -618,7 +618,6 @@ required-features = ["metrics-benches"]
 name = "metrics_off"
 harness = false
 required-features = ["metrics-benches"]
->>>>>>> origin/master
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"
