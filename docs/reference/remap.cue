@@ -43,7 +43,7 @@ remap: #Remap & {
 	real_world_examples: [
 		{
 			title: "Parse Syslog logs"
-			input: log: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
 			source: """
 				. = parse_syslog!(.message)
 				"""
