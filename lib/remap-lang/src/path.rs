@@ -343,16 +343,16 @@ mod tests {
     #[test]
     fn test_starts_with() {
         assert!(Path::from_str(".noog.nork.nink")
-                .unwrap()
-                .starts_with(&Path::from_str(".noog.nork").unwrap()));
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork").unwrap()));
 
         assert!(!Path::from_str(".noog.nork")
-                .unwrap()
-                .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
 
         assert!(Path::from_str(".noog.nork.nink")
-                .unwrap()
-                .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
     }
 
     #[test]

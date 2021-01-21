@@ -1,4 +1,7 @@
-use crate::{Error, Expr, Expression, Object, Result, TypeDef, Value, expression::Literal, state, type_def::InnerTypeDef, value};
+use crate::{
+    expression::Literal, state, type_def::InnerTypeDef, value, Error, Expr, Expression, Object,
+    Result, TypeDef, Value,
+};
 use std::convert::TryFrom;
 use std::fmt;
 use std::iter::IntoIterator;
@@ -122,7 +125,7 @@ impl Expression for Array {
 
         TypeDef {
             fallible,
-            kind:  value::Kind::Array,
+            kind: value::Kind::Array,
             inner_type_def,
         }
     }

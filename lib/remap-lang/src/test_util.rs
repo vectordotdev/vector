@@ -151,7 +151,6 @@ macro_rules! __prep_bench_or_test {
     }};
 }
 
-
 #[macro_export]
 macro_rules! type_def_map {
     () => (

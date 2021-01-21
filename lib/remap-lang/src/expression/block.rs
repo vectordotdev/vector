@@ -1,6 +1,4 @@
-use crate::{
-    state, value, Expr, Expression, Object, Result, TypeDef, Value,
-};
+use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
