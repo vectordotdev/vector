@@ -61,6 +61,20 @@ struct TcpConfig {
     receive_buffer_bytes: Option<usize>,
 }
 
+impl TcpConfig {
+    #[cfg(all(test, feature = "sinks-prometheus"))]
+    pub fn from_address(address: SocketListenAddr) -> Self {
+        Self {
+            address,
+            keepalive: None,
+            tls: None,
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            send_buffer_bytes: None,
+            receive_buffer_bytes: None,
+        }
+    }
+}
+
 fn default_shutdown_timeout_secs() -> u64 {
     30
 }
@@ -230,7 +244,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_udp() {
         let in_addr = next_addr();
-        let config = StatsdConfig::Udp(UdpConfig { address: in_addr });
+        let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
             let bind_addr = next_addr();
@@ -246,12 +260,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_tcp() {
         let in_addr = next_addr();
-        let config = StatsdConfig::Tcp(TcpConfig {
-            address: in_addr.into(),
-            keepalive: None,
-            tls: None,
-            shutdown_timeout_secs: 30,
-        });
+        let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
             while let Some(bytes) = receiver.recv().await {
