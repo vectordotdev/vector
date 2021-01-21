@@ -29,13 +29,18 @@ cfg_if::cfg_if! {
         // When jemallocator is forced...
         feature = "force-jemallocator",
         // Or when we want to use it as a platform default.
-        target_os = "linux",
-        target_os = "android",
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd",
-        target_os = "openbsd",
-        target_os = "netbsd"
+        all(
+            any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "macos",
+                target_os = "ios",
+                target_os = "freebsd",
+                target_os = "openbsd",
+                target_os = "netbsd"
+            ),
+            not(target = "armv7-unknown-linux-musleabihf")
+        )
     ))] {
         // Use jemalloc as global allocator.
         #[global_allocator]

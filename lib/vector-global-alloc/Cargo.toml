@@ -16,7 +16,7 @@ trybuild = "1.0"
 
 # Platform defaults for systems that should use jemalloc.
 # Ensure they are in line with the conditions at the `src/lib.rs`.
-[target.'cfg(any(target_os = "linux", target_os = "android", target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
+[target.'cfg(all(any(target_os = "linux", target_os = "android", target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"), not(target = "armv7-unknown-linux-musleabihf")))'.dependencies]
 jemallocator = { version = "0.3.2", optional = false }
 
 # FIXME: https://github.com/gnzlbg/jemallocator/issues/91
