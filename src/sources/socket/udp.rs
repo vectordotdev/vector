@@ -13,8 +13,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
 
@@ -29,8 +27,10 @@ pub struct UdpConfig {
     max_length: usize,
     #[get = "pub"]
     host_key: Option<String>,
+    #[cfg(unix)]
     #[get_copy = "pub"]
     send_buffer_bytes: Option<usize>,
+    #[cfg(unix)]
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
 }
@@ -45,7 +45,9 @@ impl UdpConfig {
             address,
             max_length: default_max_length(),
             host_key: None,
+            #[cfg(unix)]
             send_buffer_bytes: None,
+            #[cfg(unix)]
             receive_buffer_bytes: None,
         }
     }
@@ -55,8 +57,8 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
-    send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
+    #[cfg(unix)] send_buffer_bytes: Option<usize>,
+    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
@@ -68,18 +70,10 @@ pub fn udp(
             .expect("Failed to bind to udp listener socket");
         info!(message = "Listening.", address = %address);
 
+        #[cfg(unix)]
         {
             // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
-            let socket = unsafe {
-                #[cfg(unix)]
-                {
-                    socket2::Socket::from_raw_fd(socket.as_raw_fd())
-                }
-                #[cfg(windows)]
-                {
-                    socket2::Socket::from_raw_socket(socket.as_raw_socket())
-                }
-            };
+            let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
 
             if let Some(send_buffer_bytes) = send_buffer_bytes {
                 if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
@@ -93,12 +87,10 @@ pub fn udp(
                 }
             }
 
-            #[cfg(unix)]
             socket.into_raw_fd();
-            #[cfg(windows)]
-            socket.into_raw_socket();
         }
 
+        #[cfg(unix)]
         let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
             std::cmp::min(max_length, receive_buffer_bytes)
         } else {

@@ -112,7 +112,9 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
+                    #[cfg(unix)]
                     config.send_buffer_bytes(),
+                    #[cfg(unix)]
                     config.receive_buffer_bytes(),
                     shutdown,
                     out,

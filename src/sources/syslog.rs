@@ -22,8 +22,6 @@ use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
@@ -57,7 +55,9 @@ pub enum Mode {
     },
     Udp {
         address: SocketAddr,
+        #[cfg(unix)]
         send_buffer_bytes: Option<usize>,
+        #[cfg(unix)]
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
@@ -139,6 +139,7 @@ impl SourceConfig for SyslogConfig {
                     out,
                 )
             }
+            #[cfg(unix)]
             Mode::Udp {
                 address,
                 send_buffer_bytes,
@@ -152,6 +153,8 @@ impl SourceConfig for SyslogConfig {
                 shutdown,
                 out,
             )),
+            #[cfg(not(unix))]
+            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
@@ -307,8 +310,8 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
-    send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
+    #[cfg(unix)] send_buffer_bytes: Option<usize>,
+    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -324,18 +327,10 @@ pub fn udp(
             r#type = "udp"
         );
 
+        #[cfg(unix)]
         {
             // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
-            let socket = unsafe {
-                #[cfg(unix)]
-                {
-                    socket2::Socket::from_raw_fd(socket.as_raw_fd())
-                }
-                #[cfg(windows)]
-                {
-                    socket2::Socket::from_raw_socket(socket.as_raw_socket())
-                }
-            };
+            let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
 
             if let Some(send_buffer_bytes) = send_buffer_bytes {
                 if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
@@ -349,10 +344,7 @@ pub fn udp(
                 }
             }
 
-            #[cfg(unix)]
             socket.into_raw_fd();
-            #[cfg(windows)]
-            socket.into_raw_socket();
         }
 
         let _ = UdpFramed::new(socket, BytesCodec::new())

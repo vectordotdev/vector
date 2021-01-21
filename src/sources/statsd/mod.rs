@@ -12,6 +12,8 @@ use codec::BytesDelimitedCodec;
 use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
@@ -35,7 +37,9 @@ enum StatsdConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UdpConfig {
     address: SocketAddr,
+    #[cfg(unix)]
     send_buffer_bytes: Option<usize>,
+    #[cfg(unix)]
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -43,7 +47,9 @@ impl UdpConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
+            #[cfg(unix)]
             send_buffer_bytes: None,
+            #[cfg(unix)]
             receive_buffer_bytes: None,
         }
     }
