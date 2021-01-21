@@ -269,6 +269,14 @@ impl Metric {
         }
     }
 
+    /// Rewrite this into a Metric with the data marked as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            series: self.series,
+            data: self.data.into_incremental(),
+        }
+    }
+
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
     pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
@@ -367,6 +375,15 @@ impl MetricData {
         Self {
             timestamp: self.timestamp,
             kind: MetricKind::Absolute,
+            value: self.value,
+        }
+    }
+
+    /// Rewrite this data to mark it as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: MetricKind::Incremental,
             value: self.value,
         }
     }

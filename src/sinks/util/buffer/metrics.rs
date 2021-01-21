@@ -335,6 +335,40 @@ impl MetricsState for AbsoluteMetricsState {
     }
 }
 
+/// This normalization state converts all metrics into incremental
+/// metrics by using the state buffer to keep track of the previous
+/// absolute value and then generating incremental values for all
+/// subsequent metrics.
+#[derive(Default)]
+pub struct IncrementalMetricsState {
+    state: MetricSet,
+}
+
+impl MetricsState for IncrementalMetricsState {
+    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+        match metric.data.kind {
+            MetricKind::Incremental => Some(metric),
+            MetricKind::Absolute => {
+                // Save the value here to avoid cloning the whole metric later.
+                let mut saved_value = metric.data.value.clone();
+                let entry = MetricEntry(metric);
+                let result = self.state.take(&entry).map(|mut increment| {
+                    std::mem::swap(&mut saved_value, &mut increment.data.value);
+                    increment.data.value.subtract(&saved_value);
+                    increment.0.into_incremental()
+                });
+                self.state.replace(entry);
+                result
+            }
+        }
+    }
+
+    fn fresh(&self, _metrics: &MetricSet) -> Self {
+        let state = self.state.clone();
+        Self { state }
+    }
+}
+
 fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
     if samples.is_empty() {
         return Vec::new();
@@ -450,6 +484,33 @@ mod test {
     }
 
     #[test]
+    fn inc_buffer_incremental_counters() {
+        let buffer = rebuffer_incremental_counters::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(0, "production", Incremental, 6.0),
+                sample_counter(0, "staging", Incremental, 0.0),
+                sample_counter(1, "production", Incremental, 1.0),
+                sample_counter(1, "staging", Incremental, 1.0),
+                sample_counter(2, "staging", Incremental, 2.0),
+                sample_counter(3, "staging", Incremental, 3.0),
+            ]
+        );
+
+        assert_eq!(
+            buffer[1],
+            [
+                sample_counter(2, "production", Incremental, 2.0),
+                sample_counter(3, "production", Incremental, 3.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 2);
+    }
+
+    #[test]
     fn std_buffer_incremental_counters() {
         let buffer = rebuffer_incremental_counters::<StdMetricsState>();
 
@@ -507,6 +568,23 @@ mod test {
     }
 
     #[test]
+    fn inc_buffer_absolute_counters() {
+        let buffer = rebuffer_absolute_counters::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(0, "production", Incremental, 0.0),
+                sample_counter(1, "production", Incremental, 2.0),
+                sample_counter(2, "production", Incremental, 4.0),
+                sample_counter(3, "production", Incremental, 6.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
     fn std_buffer_absolute_counters() {
         let buffer = rebuffer_absolute_counters::<StdMetricsState>();
 
@@ -554,6 +632,23 @@ mod test {
     }
 
     #[test]
+    fn inc_buffer_incremental_gauges() {
+        let buffer = rebuffer_incremental_gauges::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(1, Incremental, 2.0),
+                sample_gauge(2, Incremental, 4.0),
+                sample_gauge(3, Incremental, 6.0),
+                sample_gauge(4, Incremental, 8.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
     fn std_buffer_incremental_gauges() {
         let buffer = rebuffer_incremental_gauges::<StdMetricsState>();
 
@@ -572,16 +667,12 @@ mod test {
 
     fn rebuffer_absolute_gauges<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
-        for i in 3..6 {
-            events.push(sample_gauge(i, Absolute, i as f64 * 10.0));
-        }
-
-        for i in 1..4 {
-            events.push(sample_gauge(i, Incremental, i as f64));
-        }
-
         for i in 2..5 {
             events.push(sample_gauge(i, Absolute, i as f64 * 2.0));
+        }
+
+        for i in 3..6 {
+            events.push(sample_gauge(i, Absolute, i as f64 * 10.0));
         }
 
         rebuffer::<State>(events)
@@ -594,11 +685,25 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
-                sample_gauge(3, Absolute, 6.0),
-                sample_gauge(4, Absolute, 8.0),
+                sample_gauge(3, Absolute, 30.0),
+                sample_gauge(4, Absolute, 40.0),
                 sample_gauge(5, Absolute, 50.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_absolute_gauges() {
+        let buffer = rebuffer_absolute_gauges::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(3, Incremental, 24.0),
+                sample_gauge(4, Incremental, 32.0),
             ]
         );
 
@@ -612,10 +717,9 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
-                sample_gauge(3, Absolute, 6.0),
-                sample_gauge(4, Absolute, 8.0),
+                sample_gauge(3, Absolute, 30.0),
+                sample_gauge(4, Absolute, 40.0),
                 sample_gauge(5, Absolute, 50.0),
             ]
         );
@@ -623,7 +727,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_sets<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_sets<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
         for i in 0..4 {
             events.push(sample_set(0, Incremental, &[i]));
@@ -637,8 +741,8 @@ mod test {
     }
 
     #[test]
-    fn abs_buffer_sets() {
-        let buffer = rebuffer_sets::<AbsoluteMetricsState>();
+    fn abs_buffer_incremental_sets() {
+        let buffer = rebuffer_incremental_sets::<AbsoluteMetricsState>();
 
         assert_eq!(buffer[0], [sample_set(0, Absolute, &[0, 1, 2, 3])]);
 
@@ -646,8 +750,17 @@ mod test {
     }
 
     #[test]
-    fn std_buffer_sets() {
-        let buffer = rebuffer_sets::<StdMetricsState>();
+    fn inc_buffer_incremental_sets() {
+        let buffer = rebuffer_incremental_sets::<IncrementalMetricsState>();
+
+        assert_eq!(buffer[0], [sample_set(0, Incremental, &[0, 1, 2, 3])]);
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn std_buffer_incremental_sets() {
+        let buffer = rebuffer_incremental_sets::<StdMetricsState>();
 
         assert_eq!(buffer[0], [sample_set(0, Incremental, &[0, 1, 2, 3])]);
 
@@ -678,6 +791,23 @@ mod test {
                 sample_distribution_histogram(3, Absolute, 10),
                 sample_distribution_histogram(4, Absolute, 10),
                 sample_distribution_histogram(5, Absolute, 10),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_distributions() {
+        let buffer = rebuffer_incremental_distributions::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_distribution_histogram(2, Incremental, 50),
+                sample_distribution_histogram(3, Incremental, 10),
+                sample_distribution_histogram(4, Incremental, 10),
+                sample_distribution_histogram(5, Incremental, 10),
             ]
         );
 
@@ -727,7 +857,11 @@ mod test {
 
         for i in 2..5 {
             events.push(sample_aggregated_histogram(
-                i, Absolute, 1.0, i as u32, 10.0,
+                i,
+                Absolute,
+                1.0,
+                i as u32,
+                i as f64 * 10.0,
             ));
         }
 
@@ -741,10 +875,22 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_histogram(2, Absolute, 1.0, 2, 10.0),
-                sample_aggregated_histogram(3, Absolute, 1.0, 3, 10.0),
-                sample_aggregated_histogram(4, Absolute, 1.0, 4, 10.0),
+                sample_aggregated_histogram(2, Absolute, 1.0, 2, 20.0),
+                sample_aggregated_histogram(3, Absolute, 1.0, 3, 30.0),
+                sample_aggregated_histogram(4, Absolute, 1.0, 4, 40.0),
             ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_absolute_aggregated_histograms() {
+        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0)]
         );
 
         assert_eq!(buffer.len(), 1);
@@ -757,9 +903,9 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_histogram(2, Absolute, 1.0, 2, 10.0),
-                sample_aggregated_histogram(3, Absolute, 1.0, 3, 10.0),
-                sample_aggregated_histogram(4, Absolute, 1.0, 4, 10.0),
+                sample_aggregated_histogram(2, Absolute, 1.0, 2, 20.0),
+                sample_aggregated_histogram(3, Absolute, 1.0, 3, 30.0),
+                sample_aggregated_histogram(4, Absolute, 1.0, 4, 40.0),
             ]
         );
 
@@ -795,6 +941,21 @@ mod test {
     }
 
     #[test]
+    fn inc_buffer_incremental_aggregated_histograms() {
+        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
+                sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
     fn std_buffer_incremental_aggregated_histograms() {
         let buffer = rebuffer_incremental_aggregated_histograms::<StdMetricsState>();
 
@@ -811,9 +972,13 @@ mod test {
 
     fn rebuffer_aggregated_summaries<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
-        for _ in 0..10 {
-            for i in 2..5 {
-                events.push(sample_aggregated_summary(i));
+        for factor in 0..10 {
+            for num in 2..5 {
+                events.push(sample_aggregated_summary(
+                    num,
+                    Absolute,
+                    (factor + num) as f64,
+                ));
             }
         }
 
@@ -827,9 +992,25 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_summary(2),
-                sample_aggregated_summary(3),
-                sample_aggregated_summary(4),
+                sample_aggregated_summary(2, Absolute, 11.0),
+                sample_aggregated_summary(3, Absolute, 12.0),
+                sample_aggregated_summary(4, Absolute, 13.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_aggregated_summaries() {
+        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricsState>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_summary(2, Incremental, 9.0),
+                sample_aggregated_summary(3, Incremental, 9.0),
+                sample_aggregated_summary(4, Incremental, 9.0),
             ]
         );
 
@@ -843,9 +1024,9 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_aggregated_summary(2),
-                sample_aggregated_summary(3),
-                sample_aggregated_summary(4),
+                sample_aggregated_summary(2, Absolute, 11.0),
+                sample_aggregated_summary(3, Absolute, 12.0),
+                sample_aggregated_summary(4, Absolute, 13.0),
             ]
         );
 
@@ -863,7 +1044,6 @@ mod test {
 
     fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
         Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
-            .with_tags(Some(tag("staging")))
     }
 
     fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
@@ -874,7 +1054,6 @@ mod test {
                 values: values.iter().map(|s| s.to_string()).collect(),
             },
         )
-        .with_tags(Some(tag("production")))
     }
 
     fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
@@ -886,7 +1065,6 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_tags(Some(tag("production")))
     }
 
     fn sample_aggregated_histogram(
@@ -909,23 +1087,21 @@ mod test {
                 sum,
             },
         )
-        .with_tags(Some(tag("production")))
     }
 
-    fn sample_aggregated_summary(factor: u32) -> Metric {
+    fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
         Metric::new(
-            format!("quantiles-{}", factor),
-            MetricKind::Absolute,
+            format!("quantiles-{}", num),
+            kind,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![
-                    0.0 => factor as f64,
-                    0.5 => factor as f64 * 2.0,
-                    1.0 => factor as f64 * 4.0
+                    0.0 => factor,
+                    0.5 => factor * 2.0,
+                    1.0 => factor * 4.0
                 ],
-                count: factor * 10,
-                sum: factor as f64 * 7.0,
+                count: factor as u32 * 10,
+                sum: factor * 7.0,
             },
         )
-        .with_tags(Some(tag("production")))
     }
 }
