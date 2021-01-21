@@ -9,9 +9,11 @@ remap: functions: parse_syslog_severity: {
 			type: ["string"]
 		},
 	]
-
-	return: ["integer"]
-	category:    "Coerce"
+	internal_failure_reasons: [
+		"`value` is not a defined Syslog level",
+	]
+	return: types: ["integer"]
+	category:    "Parse"
 	description: """
 		Converts a Syslog [log level keyword](\(urls.syslog_levels)) into an integer severity level
 		(0 to 7). Throws an error if the level isn't recognized. The now-deprecated keywords
@@ -20,10 +22,9 @@ remap: functions: parse_syslog_severity: {
 
 	examples: [
 		{
-			title: "Concert Syslog level to severity"
-			input: log: level: "alert"
-			source: ".severity = parse_syslog_severity(.level)"
-			output: input & {log: severity: 1}
+			title:  "Concert Syslog level to severity"
+			source: #".severity = parse_syslog_severity("alert")"#
+			return: severity: 1
 		},
 	]
 }
