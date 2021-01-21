@@ -108,7 +108,7 @@ components: sinks: _humio: {
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
 			type: string: {
