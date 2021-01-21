@@ -303,7 +303,7 @@ impl StreamSink for PrometheusExporter {
                     .drain(..)
                     .map(|(MetricEntry(mut metric), is_incremental_set)| {
                         if is_incremental_set {
-                            metric.data.reset();
+                            metric.data.value = metric.data.value.zero();
                         }
                         (MetricEntry(metric), is_incremental_set)
                     })

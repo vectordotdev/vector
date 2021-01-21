@@ -351,6 +351,14 @@ impl Metric {
     pub fn delete_tag(&mut self, name: &str) -> Option<String> {
         self.series.tags.as_mut().and_then(|tags| tags.remove(name))
     }
+
+    /// Create a new metric from this with the data zeroed.
+    pub fn zero(&self) -> Self {
+        Self {
+            series: self.series.clone(),
+            data: self.data.zero(),
+        }
+    }
 }
 
 impl MetricData {
@@ -424,50 +432,54 @@ impl MetricData {
         }
     }
 
-    /// Set all the values of this metric to zero without emptying
-    /// it. This keeps all the bucket/value vectors for the histogram
+    /// Create a new metric data from this with a zero value.
+    pub fn zero(&self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: self.kind,
+            value: self.value.zero(),
+        }
+    }
+}
+
+impl MetricValue {
+    /// Create a new metric value with all the contained values set to
+    /// zero. This keeps all the bucket/value vectors for the histogram
     /// and summary metric types intact while zeroing the
     /// counts. Distribution metrics are emptied of all their values.
-    pub fn reset(&mut self) {
-        match &mut self.value {
-            MetricValue::Counter { ref mut value } => {
-                *value = 0.0;
-            }
-            MetricValue::Gauge { ref mut value } => {
-                *value = 0.0;
-            }
-            MetricValue::Set { ref mut values } => {
-                values.clear();
-            }
-            MetricValue::Distribution {
-                ref mut samples, ..
-            } => {
-                samples.clear();
-            }
-            MetricValue::AggregatedHistogram {
-                ref mut buckets,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for bucket in buckets {
-                    bucket.count = 0;
-                }
-                *count = 0;
-                *sum = 0.0;
-            }
-            MetricValue::AggregatedSummary {
-                ref mut quantiles,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for quantile in quantiles {
-                    quantile.value = 0.0;
-                }
-                *count = 0;
-                *sum = 0.0;
-            }
+    pub fn zero(&self) -> Self {
+        match self {
+            Self::Counter { .. } => Self::Counter { value: 0.0 },
+            Self::Gauge { .. } => Self::Gauge { value: 0.0 },
+            Self::Set { .. } => Self::Set {
+                values: BTreeSet::default(),
+            },
+            Self::Distribution { samples, statistic } => Self::Distribution {
+                samples: Vec::with_capacity(samples.len()),
+                statistic: *statistic,
+            },
+            Self::AggregatedHistogram { buckets, .. } => Self::AggregatedHistogram {
+                buckets: buckets
+                    .iter()
+                    .map(|&Bucket { upper_limit, .. }| Bucket {
+                        upper_limit,
+                        count: 0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
+            Self::AggregatedSummary { quantiles, .. } => Self::AggregatedSummary {
+                quantiles: quantiles
+                    .iter()
+                    .map(|&Quantile { upper_limit, .. }| Quantile {
+                        upper_limit,
+                        value: 0.0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
         }
     }
 }
