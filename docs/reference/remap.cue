@@ -110,6 +110,38 @@ remap: #Remap & {
 			}
 		},
 		{
+			title: "Modify metric tags"
+			input: metric: {
+				kind: "incremental"
+				name: "user_login_total"
+				counter: {
+					value: 102.0
+				}
+				tags: {
+					host:        "my.host.com"
+					instance_id: "abcd1234"
+					email:       "vic@vector.dev"
+				}
+			}
+			source: #"""
+				.environment = get_env_var!("ENV") # add
+				.hostname = del(.host) # rename
+				del(.email)
+				"""#
+			output: metric: {
+				kind: "incremental"
+				name: "user_login_total"
+				counter: {
+					value: 102.0
+				}
+				tags: {
+					environment: "production"
+					hostname:    "my.host.com"
+					instance_id: "abcd1234"
+				}
+			}
+		},
+		{
 			title: "Type safety"
 			input: log: not_a_string: 1
 			source: """
