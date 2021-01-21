@@ -304,6 +304,7 @@ urls: {
 	perl_windows:                                             "https://www.perl.org/get.html#win32"
 	postgresql:                                               "https://www.postgresql.org/"
 	postgresql_csvlog:                                        "https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG"
+	postgresql_matching:                                      "https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP"
 	prometheus:                                               "https://prometheus.io/"
 	prometheus_client:                                        "https://prometheus.io/docs/instrumenting/clientlibs/"
 	prometheus_counter:                                       "https://prometheus.io/docs/concepts/metric_types/#counter"
