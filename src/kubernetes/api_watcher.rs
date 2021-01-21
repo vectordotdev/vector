@@ -202,7 +202,7 @@ mod tests {
     use httpmock::{Method::GET, Then, When};
     use k8s_openapi::{
         api::core::v1::Pod,
-        apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
+        apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
     };
     use k8s_openapi::{WatchOptional, WatchResponse};
 
@@ -486,14 +486,34 @@ mod tests {
             (
                 Box::new(|when, then| {
                     when.method(GET).path("/api/v1/pods");
-                    then.status(500);
+                    then.status(200)
+                        .header("Content-Type", "application/json")
+                        .body(
+                            r#"{
+                            "type": "ERROR",
+                            "object": {
+                                "apiVersion": "v1",
+                                "code": 500,
+                                "kind": "Status",
+                                "message": "Internal Server Error",
+                                "metadata": {},
+                                "reason": "Puter go BOOM",
+                                "status": "Failure"
+                            }
+                        }"#,
+                        );
                 }),
                 vec![Box::new(|item| {
-                    let error = item.unwrap_err();
-                    match error {
-                        watcher::stream::Error::Other { .. } => {}
-                        _ => panic!("Expect an 'other' error"),
-                    }
+                    assert_watch_response(
+                        item,
+                        WatchEvent::ErrorStatus(Status {
+                            code: Some(500),
+                            message: Some("Internal Server Error".to_owned()),
+                            reason: Some("Puter go BOOM".to_owned()),
+                            status: Some("Failure".to_owned()),
+                            ..Default::default()
+                        }),
+                    );
                 })],
             ),
             // Bad JSON from API
