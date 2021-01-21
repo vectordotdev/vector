@@ -22,7 +22,7 @@ remap: functions: to_unix_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["integer"]
+	return: types: ["integer"]
 	category:    "Coerce"
 	description: """
 		Coerces the provided `value` into a [Unix timestamp](\(urls.unix_timestamp)).

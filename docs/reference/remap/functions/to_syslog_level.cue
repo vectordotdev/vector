@@ -10,9 +10,9 @@ remap: functions: to_syslog_level: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a valid Syslog level",
+		"`value` is not a valid Syslog [severity level](\(urls.syslog_levels)).",
 	]
-	return: ["string"]
+	return: types: ["string"]
 	category:    "Coerce"
 	description: """
 		Coerces the provided `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,

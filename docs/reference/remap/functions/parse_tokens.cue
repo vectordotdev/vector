@@ -12,7 +12,7 @@ remap: functions: parse_tokens: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted tokenized string",
 	]
-	return: ["array"]
+	return: types: ["array"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` in token format.

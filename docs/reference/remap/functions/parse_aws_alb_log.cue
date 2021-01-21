@@ -12,7 +12,7 @@ remap: functions: parse_aws_alb_log: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted AWS ALB log",
 	]
-	return: ["map"]
+	return: types: ["map"]
 	category: "Parse"
 	description: #"""
 		Parses a Elastic Load Balancer Access log into it's constituent components.

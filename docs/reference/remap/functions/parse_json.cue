@@ -12,7 +12,7 @@ remap: functions: parse_json: {
 	internal_failure_reasons: [
 		"`value` is not a valid JSON formatted payload",
 	]
-	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
+	return: types: ["boolean", "integer", "float", "string", "map", "array", "null"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` as JSON.

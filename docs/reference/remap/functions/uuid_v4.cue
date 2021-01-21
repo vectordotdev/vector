@@ -3,7 +3,7 @@ package metadata
 remap: functions: uuid_v4: {
 	arguments: []
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Random"
 	description: #"""
 		Generates a random [UUIDv4](\(urls.uuidv4)) string.

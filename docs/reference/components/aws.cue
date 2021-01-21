@@ -2,14 +2,25 @@ package metadata
 
 components: _aws: {
 	configuration: {
-		assume_role: {
-			category:    "Auth"
+		auth: {
 			common:      false
-			description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
+			description: "Options for the authentication strategy."
 			required:    false
-			type: string: {
-				default: null
-				examples: ["arn:aws:iam::123456789098:role/my_role"]
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					assume_role: {
+						category:    "Auth"
+						common:      false
+						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["arn:aws:iam::123456789098:role/my_role"]
+						}
+					}
+				}
 			}
 		}
 

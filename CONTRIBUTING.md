@@ -92,14 +92,14 @@ expanding into more specifics.
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
    - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
-2. One approved, [fork the Vector repository][urls.fork_repo] in your own
+2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
    Github account.
 3. [Create a new Git branch][urls.create_branch].
-4. Review the Vector [workflow](#workflow) and [development](#development).
+4. Review the Vector [change control](#change-control) and [development](#development) workflows.
 5. Make your changes.
 6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
    repo. A Vector team member should comment and/or review your pull request
-   with a few days. Although, depending on the circumstances, it may take
+   within a few days. Although, depending on the circumstances, it may take
    longer.
 
 ### New sources, sinks, and transforms

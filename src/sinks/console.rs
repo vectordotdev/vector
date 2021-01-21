@@ -159,6 +159,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -238,13 +239,12 @@ mod test {
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![10.0],
-                sample_rates: vec![1],
+                samples: crate::samples![10.0 => 1],
                 statistic: StatisticKind::Histogram,
             },
         });
         assert_eq!(
-            r#"{"name":"glork","kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }

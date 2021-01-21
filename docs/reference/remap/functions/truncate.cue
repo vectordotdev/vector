@@ -22,13 +22,16 @@ remap: functions: truncate: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: {
+		types: ["string"]
+		rules: [
+			"If `limit` is larger than the length of the string, the string is returned unchanged.",
+			"If `ellipsis` is `true`, then an ellipsis (...) will be appended to the string (beyond the specified limit).",
+		]
+	}
 	category: "String"
 	description: #"""
 		Truncates the provided `value` up to the provided `limit`.
-
-		* If `limit` is larger than the length of the string, the string is returned unchanged.
-		* If `ellipsis` is `true`, then an ellipsis (...) will be appended to the string (beyond the specified limit).
 		"""#
 	examples: [
 		{

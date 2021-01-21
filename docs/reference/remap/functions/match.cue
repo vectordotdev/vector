@@ -16,7 +16,7 @@ remap: functions: match: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "String"
 	description: """
 		Returns `true` if the provided `value` matches the provided `pattern`.

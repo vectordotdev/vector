@@ -23,7 +23,7 @@ remap: functions: ends_with: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "String"
 	description: #"""
 		Determines if the provided `value` ends with a given `substring`.

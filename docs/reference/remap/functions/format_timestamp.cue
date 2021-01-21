@@ -16,7 +16,7 @@ remap: functions: format_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Timestamp"
 	description: #"""
 		Formats the provided `value` into a `string` as described by `format`.

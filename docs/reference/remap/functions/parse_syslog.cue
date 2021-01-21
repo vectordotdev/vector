@@ -10,7 +10,7 @@ remap: functions: parse_syslog: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted Syslog 5424 or 3164 formatted log",
 	]
-	return: ["map"]
+	return: types: ["map"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` in Syslog format.

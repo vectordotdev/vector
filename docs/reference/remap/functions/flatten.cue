@@ -10,7 +10,12 @@ remap: functions: flatten: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array", "map"]
+	return: {
+		types: ["array", "map"]
+		rules: [
+			"The return type will match the `value` type.",
+		]
+	}
 	category: "Enumerate"
 	description: #"""
 		Returns a nested `array` or `map` that has been flattened to a single level.

@@ -1,3 +1,4 @@
+mod encoding_config;
 #[cfg(feature = "sources-utils-fake")]
 pub mod fake;
 #[cfg(feature = "sources-utils-http")]
@@ -16,6 +17,7 @@ pub(crate) use self::http::add_query_parameters;
 pub(crate) use self::http::decode;
 #[cfg(feature = "sources-utils-http")]
 pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
