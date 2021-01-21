@@ -1,5 +1,5 @@
 //! This crate is intended for sharing global allocator preferences and choices
-//! across various dependent crates.
+//! across various dependent targets (vector itself, standalone benches).
 //!
 //! # Usage
 //!
