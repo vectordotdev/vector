@@ -7,10 +7,13 @@ package metadata
 	}
 
 	#Example: {
-		title:   string
-		input?:  #Event
-		source:  string
-		raises?: string
+		title:  string
+		input?: #Event
+		source: string
+		raises?: {
+			compiletime?: string
+			runtime?:     string
+		}
 
 		if raises == _|_ {
 			return?: _
@@ -45,7 +48,8 @@ remap: #Remap & {
 			title: "Parse Syslog logs"
 			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
 			source: """
-				. = parse_syslog!(.message)
+				structured = parse_syslog!(.message)
+				. = merge(., structured)
 				"""
 			output: log: {
 				appname:   "su"
@@ -62,7 +66,8 @@ remap: #Remap & {
 			title: "Parse key/value logs"
 			input: log: message: "@timestamp=\"Sun Jan 10 16:47:39 EST 2021\" level=info msg=\"Stopping all fetchers\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"
 			source: """
-				. = parse_key_value!(.message)
+				structured = parse_key_value!(.message)
+				. = merge(., structured)
 				"""
 			output: log: {
 				"@timestamp":     "Sun Jan 10 16:47:39 EST 2021"
@@ -77,7 +82,8 @@ remap: #Remap & {
 			title: "Parse custom logs"
 			input: log: message: #"2021/01/20 06:39:15 [error] 17755#17755: *3569904 open() "/usr/share/nginx/html/test.php" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: "GET /test.php HTTP/1.1", host: "yyy.yyy.yyy.yyy""#
 			source: #"""
-				. = parse_regex!(.message, /^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$/)
+				structured = parse_regex!(.message, /^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$/)
+				. = merge(., structured)
 
 				# Coerce parsed fields
 				.timestamp = parse_timestamp(.timestamp, "%Y/%m/%d %H:%M:%S") ?? now()
@@ -102,6 +108,48 @@ remap: #Remap & {
 				request:   "GET /test.php HTTP/1.1"
 				host:      "yyy.yyy.yyy.yyy"
 			}
+		},
+		{
+			title: "Type safety"
+			input: log: not_a_string: 1
+			source: """
+				structured = parse_syslog!(.not_a_string)
+				. = merge(., structured)
+				"""
+			raises: compiletime: """
+				error: program aborted
+				  ┌─ :1:1
+				  │
+				1 │ structured = parse_syslog!(.not_a_string)
+				  │                            ^^^^^^^^^^^^^
+				  │ │
+				  │ function call error
+				  │ unable to parse syslog: key must be a string at line 1 column 3
+				  │
+				  = see function documentation at: https://master.vector.dev/docs/reference/remap/#parse_json
+				  = see language documentation at: https://vector.dev/docs/reference/vrl/
+				"""
+		},
+		{
+			title: "Error safety"
+			input: log: message: "key1=value1 key2=value2"
+			source: """
+				structured = parse_key_value(.message)
+				. = merge(., structured)
+				"""
+			raises: compiletime: """
+				error: unhandled error
+				  ┌─ :1:1
+				  │
+				1 │ structured = parse_key_value(.message)
+				  │ ^^^^^^^^^^
+				  │ │
+				  │ expression can result in runtime error
+				  │ handle the error case to ensure runtime success
+				  │
+				  = see error handling documentation at: https://vector.dev/docs/reference/vrl/errors/
+				  = see language documentation at: https://vector.dev/docs/reference/vrl/
+				"""
 		},
 	]
 }
