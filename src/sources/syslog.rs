@@ -499,6 +499,31 @@ mod test {
     }
 
     #[test]
+    fn config_tcp_with_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            send_buffer_bytes = 2048
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let (send_buffer_bytes, receive_buffer_bytes) = match config.mode {
+            Mode::Tcp {
+                send_buffer_bytes,
+                receive_buffer_bytes,
+                ..
+            } => (send_buffer_bytes, receive_buffer_bytes),
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        assert_eq!(send_buffer_bytes, Some(2048));
+        assert_eq!(receive_buffer_bytes, Some(256));
+    }
+
+    #[test]
     fn config_tcp_keepalive_empty() {
         let config: SyslogConfig = toml::from_str(
             r#"
@@ -548,6 +573,33 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_udp());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_udp_with_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "udp"
+            address = "127.0.0.1:1235"
+            max_length = 32187
+            send_buffer_bytes = 2048
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let (send_buffer_bytes, receive_buffer_bytes) = match config.mode {
+            Mode::Udp {
+                send_buffer_bytes,
+                receive_buffer_bytes,
+                ..
+            } => (send_buffer_bytes, receive_buffer_bytes),
+            _ => panic!("expected Mode::Udp"),
+        };
+
+        assert_eq!(send_buffer_bytes, Some(2048));
+        assert_eq!(receive_buffer_bytes, Some(256));
     }
 
     #[cfg(unix)]
