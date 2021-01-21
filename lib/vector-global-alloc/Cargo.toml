@@ -1,0 +1,19 @@
+[package]
+name = "vector-global-alloc"
+version = "0.1.1"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+description = "A crate for sharing Vector global allocator preferences across various build targets (vector itself, benches, etc)."
+publish = false
+license = "MPL-2.0"
+
+[dependencies]
+cfg-if = "1.0"
+jemallocator = { version = "0.3.2", optional = true }
+
+[dev-dependencies]
+trybuild = "1.0"
+
+[features]
+default = ["jemallocator"]
+force-system = []

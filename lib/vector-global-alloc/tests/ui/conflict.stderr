@@ -1,0 +1,1 @@
+error: the `#[global_allocator]` in this crate conflicts with global allocator in: vector_global_alloc
