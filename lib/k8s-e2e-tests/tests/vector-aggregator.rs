@@ -7,18 +7,16 @@ const HELM_VALUES_DUMMY_TOPOLOGY: &str = r#"
 sources:
   dummy:
     type: "generator"
-    rawConfig: |
-      format = "shuffle"
-      lines = ["Hello world"]
-      interval = 60 # once a minute
+    format: "shuffle"
+    lines: ["Hello world"]
+    interval: 60 # once a minute
 
 sinks:
   stdout:
     type: "console"
     inputs: ["dummy"]
-    rawConfig: |
-      target = "stdout"
-      encoding = "json"
+    target: "stdout"
+    encoding: "json"
 "#;
 
 /// This test validates that vector-aggregator can deploy with the default

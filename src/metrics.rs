@@ -1,9 +1,11 @@
 use crate::{event::Metric, Event};
+use dashmap::DashMap;
 use metrics::{GaugeValue, Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
-use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
+use metrics_util::{CompositeKey, Handle, MetricKind};
 use once_cell::sync::OnceCell;
+use std::hash::Hash;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -22,9 +24,29 @@ static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KE
 static CARDINALITY_KEY: CompositeKey =
     CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
+fn metrics_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
+}
+
+fn tracing_context_layer_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
+}
+
 pub fn init() -> crate::Result<()> {
+    // An escape hatch to allow disabing internal metrics core.
+    // May be used for performance reasons.
+    // This is a hidden and undocumented functionality.
+    if !metrics_enabled() {
+        metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
+            .map_err(|_| "recorder already initialized")?;
+        info!(message = "Internal metrics core is disabled.");
+        return Ok(());
+    }
+
     // Prepare the registry.
-    let registry = Registry::new();
+    let registry = VectorRegistry {
+        map: DashMap::new(),
+    };
     let registry = Arc::new(registry);
 
     // Init the cardinality counter.
@@ -50,19 +72,68 @@ pub fn init() -> crate::Result<()> {
         registry: Arc::clone(&registry),
         cardinality_counter: Arc::clone(&cardinality_counter),
     };
-    // Apply a layer to capture tracing span fields as labels.
-    let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
+
+    // If enabled, apply a layer to capture tracing span fields as labels.
+    let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
+        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
+    } else {
+        Box::new(recorder)
+    };
+
     // Register the recorder globally.
-    metrics::set_boxed_recorder(Box::new(recorder)).map_err(|_| "recorder already initialized")?;
+    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
 
     // Done.
     Ok(())
 }
 
+/// [`VectorRegistry`] is a vendored version of [`metrics_util::Registry`].
+///
+/// We are removing the generational wrappers that upstream added, as they
+/// might've been the cause of the performance issues on the multi-core systems
+/// under high paralellism.
+///
+/// The suspicion is that the atomics usage in the generational somehow causes
+/// permanent cache invalidation starvation at some scenarios - however, it's
+/// based on the empiric observations, and we currently don't have
+/// a comprehensive mental model to back up this behaviour.
+/// It was decided to just eliminate the generationals - for now.
+/// Maybe in the long term too - we don't need them, so why pay the price?
+/// They're not zero-cost.
+#[derive(Debug)]
+struct VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    pub map: DashMap<K, H>,
+}
+
+impl<K, H> VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    /// Perform an operation on a given key.
+    ///
+    /// The `op` function will be called for the handle under the given `key`.
+    ///
+    /// If the `key` is not already mapped, the `init` function will be
+    /// called, and the resulting handle will be stored in the registry.
+    pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
+    where
+        I: FnOnce() -> H,
+        O: FnOnce(&H) -> V,
+    {
+        let valref = self.map.entry(key).or_insert_with(init);
+        op(valref.value())
+    }
+}
+
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
 struct VectorRecorder {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
     cardinality_counter: Arc<AtomicU64>,
 }
 
@@ -145,7 +216,7 @@ impl LabelFilter for VectorLabelFilter {
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
@@ -156,14 +227,17 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 }
 
 fn snapshot(controller: &Controller) -> Vec<Event> {
-    let handles = controller.registry.get_handles();
-    handles
-        .into_iter()
-        .map(|(ck, (_generation, m))| {
-            let (_, k) = ck.into_parts();
-            Metric::from_metric_kv(k, m).into()
-        })
+    controller
+        .registry
+        .map
+        .iter()
+        .map(|valref| Metric::from_metric_kv(valref.key().key(), valref.value()).into())
         .collect()
+}
+
+/// Clear all metrics from the registry.
+pub fn reset(controller: &Controller) {
+    controller.registry.map.clear()
 }
 
 /// Take a snapshot of all gathered metrics and expose them as metric

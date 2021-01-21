@@ -12,11 +12,11 @@ tags: ["type: breaking change", "domain: sources", "source: splunk_hec"]
 
 The `splunk_hec` source now emits events with a `message` key instead of a
 `line` key. This can be renamed via the [global `log_schema`
-options][docs.reference.global-options#log_schema].
+options][docs.reference.configuration.global-options#log_schema].
 
 ## Upgrade Guide
 
 There are no changes you need to make. Just be aware that your events will
 no longer have a `line` field.
 
-[docs.reference.global-options#log_schema]: /docs/reference/global-options/#log_schema
+[docs.reference.configuration.global-options#log_schema]: /docs/reference/global-options/#log_schema

@@ -59,25 +59,24 @@ pub(super) trait MetricCollector {
                     self.emit_value(timestamp, &name, "", value as f64, tags, None);
                 }
                 MetricValue::Distribution {
-                    values,
-                    sample_rates,
+                    samples,
                     statistic: StatisticKind::Histogram,
                 } => {
                     // convert distributions into aggregated histograms
                     let mut counts = vec![0; buckets.len()];
                     let mut sum = 0.0;
                     let mut count = 0;
-                    for (v, c) in values.iter().zip(sample_rates.iter()) {
+                    for sample in samples {
                         buckets
                             .iter()
                             .enumerate()
-                            .skip_while(|&(_, b)| b < v)
+                            .skip_while(|&(_, b)| *b < sample.value)
                             .for_each(|(i, _)| {
-                                counts[i] += c;
+                                counts[i] += sample.rate;
                             });
 
-                        sum += v * (*c as f64);
-                        count += c;
+                        sum += sample.value * (sample.rate as f64);
+                        count += sample.rate;
                     }
 
                     for (b, c) in buckets.iter().zip(counts.iter()) {
@@ -102,12 +101,10 @@ pub(super) trait MetricCollector {
                     self.emit_value(timestamp, &name, "_count", count as f64, tags, None);
                 }
                 MetricValue::Distribution {
-                    values,
-                    sample_rates,
+                    samples,
                     statistic: StatisticKind::Summary,
                 } => {
-                    if let Some(statistic) =
-                        DistributionStatistic::new(values, sample_rates, quantiles)
+                    if let Some(statistic) = DistributionStatistic::from_samples(samples, quantiles)
                     {
                         for (q, v) in statistic.quantiles.iter() {
                             self.emit_value(
@@ -138,22 +135,21 @@ pub(super) trait MetricCollector {
                 }
                 MetricValue::AggregatedHistogram {
                     buckets,
-                    counts,
                     count,
                     sum,
                 } => {
                     let mut value = 0f64;
-                    for (b, c) in buckets.iter().zip(counts.iter()) {
+                    for bucket in buckets {
                         // prometheus uses cumulative histogram
                         // https://prometheus.io/docs/concepts/metric_types/#histogram
-                        value += *c as f64;
+                        value += bucket.count as f64;
                         self.emit_value(
                             timestamp,
                             &name,
                             "_bucket",
                             value,
                             tags,
-                            Some(("le", b.to_string())),
+                            Some(("le", bucket.upper_limit.to_string())),
                         );
                     }
                     self.emit_value(
@@ -169,18 +165,17 @@ pub(super) trait MetricCollector {
                 }
                 MetricValue::AggregatedSummary {
                     quantiles,
-                    values,
                     count,
                     sum,
                 } => {
-                    for (q, v) in quantiles.iter().zip(values.iter()) {
+                    for quantile in quantiles {
                         self.emit_value(
                             timestamp,
                             &name,
                             "",
-                            *v,
+                            quantile.value,
                             tags,
-                            Some(("quantile", q.to_string())),
+                            Some(("quantile", quantile.upper_limit.to_string())),
                         );
                     }
                     self.emit_value(timestamp, &name, "_sum", *sum, tags, None);
@@ -622,8 +617,7 @@ vector_requests_count 8
             tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
-                values: vec![1.0, 2.0, 3.0],
-                sample_rates: vec![3, 3, 2],
+                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         };
@@ -671,8 +665,7 @@ vector_requests_count 6
             tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.1, 3.0],
-                counts: vec![1, 2, 3],
+                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -719,8 +712,7 @@ ns_requests_count{code="200"} 6
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.01, 0.5, 0.99],
-                values: vec![1.5, 2.0, 3.0],
+                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -777,8 +769,7 @@ ns_requests_avg{code="200"} 1.875
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
-                values: vec![1.0, 2.0, 3.0],
-                sample_rates: vec![3, 3, 2],
+                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         };

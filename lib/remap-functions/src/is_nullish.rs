@@ -56,7 +56,7 @@ mod tests {
                 value: Literal::from("some string").boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -66,7 +66,7 @@ mod tests {
                 value: Literal::from(()).boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -77,7 +77,7 @@ mod tests {
                 value: lit!(42).boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -88,8 +88,7 @@ mod tests {
                 value: array!["foo"].boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
-                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }

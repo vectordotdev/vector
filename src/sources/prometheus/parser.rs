@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::metric::{Bucket, Metric, MetricKind, MetricValue, Quantile};
 use indexmap::IndexMap;
 use std::collections::BTreeMap;
 
@@ -6,16 +6,14 @@ pub use prometheus_parser::*;
 
 #[derive(Default)]
 struct AggregatedHistogram {
-    buckets: Vec<f64>,
-    counts: Vec<u32>,
+    buckets: Vec<Bucket>,
     count: u32,
     sum: f64,
 }
 
 #[derive(Default)]
 struct AggregatedSummary {
-    quantiles: Vec<f64>,
-    values: Vec<f64>,
+    quantiles: Vec<Quantile>,
     count: u32,
     sum: f64,
 }
@@ -86,16 +84,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         HistogramMetricValue::Bucket { bucket, count } => {
                             // last bucket is implicit, because we store its value in 'count'
                             if bucket != f64::INFINITY {
-                                aggregate.buckets.push(bucket);
-                                aggregate.counts.push(count);
+                                let upper_limit = bucket;
+                                aggregate.buckets.push(Bucket { upper_limit, count });
                             }
                         }
                     }
                 }
 
                 for (tags, mut aggregate) in aggregates {
-                    for i in (1..aggregate.counts.len()).rev() {
-                        aggregate.counts[i] -= aggregate.counts[i - 1];
+                    for i in (1..aggregate.buckets.len()).rev() {
+                        aggregate.buckets[i].count -= aggregate.buckets[i - 1].count;
                     }
                     let hist = Metric {
                         name: group.name.clone(),
@@ -105,7 +103,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
                             buckets: aggregate.buckets,
-                            counts: aggregate.counts,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -129,8 +126,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.sum = sum;
                         }
                         SummaryMetricValue::Quantile { quantile, value } => {
-                            aggregate.quantiles.push(quantile);
-                            aggregate.values.push(value);
+                            let upper_limit = quantile;
+                            aggregate.quantiles.push(Quantile { upper_limit, value });
                         }
                     }
                 }
@@ -144,7 +141,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedSummary {
                             quantiles: aggregate.quantiles,
-                            values: aggregate.values,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -743,8 +739,9 @@ mod test {
                 tags: None,
                 kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
-                    buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                    counts: vec![24054, 9390, 66948, 28997, 4599],
+                    buckets: crate::buckets![
+                        0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
+                    ],
                     count: 144320,
                     sum: 53423.0,
                 },
@@ -808,11 +805,18 @@ mod test {
                     tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                        buckets: crate::buckets![
+                            30.0 => 327,
+                            60.0 => 147,
+                            300.0 => 61,
+                            600.0 => 1,
+                            1800.0 => 0,
+                            3600.0 => 0,
+                            7200.0 => 0,
+                            10800.0 => 0,
+                            18000.0 => 0,
+                            36000.0 => 0
                         ],
-                        counts: vec![327, 147, 61, 1, 0, 0, 0, 0, 0, 0],
                         count: 536,
                         sum: 19690.129384881966,
                     },
@@ -824,11 +828,18 @@ mod test {
                     tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                        buckets: crate::buckets![
+                            30.0 => 1,
+                            60.0 => 0,
+                            300.0 => 0,
+                            600.0 => 0,
+                            1800.0 => 0,
+                            3600.0 => 0,
+                            7200.0 => 0,
+                            10800.0 => 0,
+                            18000.0 => 0,
+                            36000.0 => 0
                         ],
-                        counts: vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         count: 1,
                         sum: 28.975436316,
                     },
@@ -840,11 +851,10 @@ mod test {
                     tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                        buckets: crate::buckets![
+                            30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
+                            7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
-                        counts: vec![285, 880, 1906, 80, 101, 3, 0, 0, 0, 0],
                         count: 3255,
                         sum: 381111.7498891335,
                     },
@@ -886,8 +896,13 @@ mod test {
                     tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
-                        values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
+                        quantiles: crate::quantiles![
+                            0.01 => 3102.0,
+                            0.05 => 3272.0,
+                            0.5 => 4773.0,
+                            0.9 => 9001.0,
+                            0.99 => 76656.0
+                        ],
                         count: 2693,
                         sum: 1.7560473e+07,
                     },
@@ -899,13 +914,12 @@ mod test {
                     tags: None,
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
-                        values: vec![
-                            0.009460965,
-                            0.009793382,
-                            0.009870205,
-                            0.01001838,
-                            0.018827136
+                        quantiles: crate::quantiles![
+                            0.0 => 0.009460965,
+                            0.25 => 0.009793382,
+                            0.5 => 0.009870205,
+                            0.75 => 0.01001838,
+                            1.0 => 0.018827136
                         ],
                         count: 602767,
                         sum: 4668.551713715,

@@ -5,16 +5,12 @@ use crate::{
     value::Kind,
     Expr, Expression, Object, Result, TypeDef, Value,
 };
+use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("unable to insert value in path: {0}")]
     PathInsertion(String),
-
-    #[error(
-        r#"the {0} "{1}" does not need to handle the error-case, because its result is infallible"#
-    )]
-    UneededInfallibleAssignment(&'static str, String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,16 +20,16 @@ pub enum Target {
     Infallible { ok: Box<Target>, err: Box<Target> },
 }
 
-impl Target {
-    fn as_str(&self) -> &'static str {
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Target::Path(_) => "path",
-            Target::Variable(_) => "variable",
-            Target::Infallible { ok, .. } => match ok.as_ref() {
-                Target::Path(_) => "infallible path",
-                Target::Variable(_) => "infallible variable",
-                Target::Infallible { .. } => unimplemented!("nested infallible target"),
-            },
+            Target::Path(path) => path.fmt(f),
+            Target::Variable(var) => var.fmt(f),
+            Target::Infallible { ok, err } => {
+                ok.as_ref().fmt(f)?;
+                f.write_str(", ")?;
+                err.as_ref().fmt(f)
+            }
         }
     }
 }
@@ -45,7 +41,7 @@ pub struct Assignment {
 }
 
 impl Assignment {
-    pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Result<Self> {
+    pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Self {
         let type_def = value.type_def(state);
 
         let var_type_def = |state: &mut state::Compiler, var: &Variable, type_def| {
@@ -64,20 +60,11 @@ impl Assignment {
             Target::Variable(var) => var_type_def(state, var, type_def),
             Target::Path(path) => path_type_def(state, path, type_def),
             Target::Infallible { ok, err } => {
-                // if the type definition of the rhs expression is infallible,
-                // then an infallible assignment is redundant, and we provide a
-                // compile-time error.
-                if !type_def.is_fallible() {
-                    return Err(E::from(Error::UneededInfallibleAssignment(
-                        ok.as_str(),
-                        match ok.as_ref() {
-                            Target::Variable(v) => v.ident().to_owned(),
-                            Target::Path(v) => v.to_string(),
-                            Target::Infallible { .. } => unimplemented!("nested infallible target"),
-                        },
-                    ))
-                    .into());
-                }
+                // If the type definition of the rhs expression is infallible,
+                // then an infallible assignment is redundant.
+                //
+                // This invariant is upheld (for now) by the parser.
+                assert!(type_def.is_fallible());
 
                 // "ok" target takes on the type definition of the value, but is
                 // set to being infallible, as the error will be captured by the
@@ -105,7 +92,7 @@ impl Assignment {
             }
         }
 
-        Ok(Self { target, value })
+        Self { target, value }
     }
 }
 
@@ -226,7 +213,7 @@ mod tests {
                 let target = Target::Variable(Variable::new("foo".to_owned(), None));
                 let value = Box::new(Literal::from(true).into());
 
-                Assignment::new(target, value, state).unwrap()
+                Assignment::new(target, value, state)
             },
             def: TypeDef {
                 kind: Kind::Boolean,
@@ -239,7 +226,7 @@ mod tests {
                 let target = Target::Path(Path::from("foo"));
                 let value = Box::new(Literal::from("foo").into());
 
-                Assignment::new(target, value, state).unwrap()
+                Assignment::new(target, value, state)
             },
             def: TypeDef {
                 kind: Kind::Bytes,
@@ -259,7 +246,7 @@ mod tests {
                     Operator::Multiply,
                 ).into());
 
-                Assignment::new(target, value, state).unwrap()
+                Assignment::new(target, value, state)
             },
             def: TypeDef {
                 fallible: false,

@@ -3,7 +3,7 @@
 #![deny(missing_docs)]
 
 use super::path_helpers::build_pod_logs_directory;
-use crate::kubernetes as k8s;
+use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::Pod;
@@ -60,11 +60,38 @@ impl PathsProvider for K8sPathsProvider {
     }
 }
 
+/// This function takes a `Pod` resource and returns the path to where the logs
+/// for the said `Pod` are expected to be found.
+///
+/// In the common case, the effective path is built using the `namespace`,
+/// `name` and `uid` of the Pod. However, there's a special case for
+/// `Static Pod`s: they keep their logs at the path that consists of config
+/// hashsum instead of the `Pod` `uid`. The reason for this is `kubelet` is
+/// locally authoritative over those `Pod`s, and the API only has
+/// `Monitor Pod`s - the "dummy" entires useful for discovery and association.
+/// Their UIDs are generated at the Kubernetes API side, and do not represent
+/// the actual config hashsum as one would expect.
+///
+/// To work around this, we use the mirror pod annotations (if any) to obtain
+/// the effective config hashsum, see the `extract_static_pod_config_hashsum`
+/// function that does this.
+///
+/// See https://github.com/timberio/vector/issues/6001
+/// See https://github.com/kubernetes/kubernetes/blob/ef3337a443b402756c9f0bfb1f844b1b45ce289d/pkg/kubelet/pod/pod_manager.go#L30-L44
+/// See https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81
 fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
     let metadata = &pod.metadata;
     let namespace = metadata.namespace.as_ref()?;
     let name = metadata.name.as_ref()?;
-    let uid = metadata.uid.as_ref()?;
+
+    let uid = if let Some(static_pod_config_hashsum) = extract_static_pod_config_hashsum(metadata) {
+        // If there's a static pod config hashsum - use it instead of uid.
+        static_pod_config_hashsum
+    } else {
+        // In the common case - just fallback to the real pod uid.
+        metadata.uid.as_ref()?
+    };
+
     Some(build_pod_logs_directory(&namespace, &name, &uid))
 }
 
@@ -174,7 +201,9 @@ mod tests {
     #[test]
     fn test_extract_pod_logs_directory() {
         let cases = vec![
+            // Empty pod.
             (Pod::default(), None),
+            // Happy path.
             (
                 Pod {
                     metadata: ObjectMeta {
@@ -187,6 +216,7 @@ mod tests {
                 },
                 Some("/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid"),
             ),
+            // No uid.
             (
                 Pod {
                     metadata: ObjectMeta {
@@ -198,6 +228,7 @@ mod tests {
                 },
                 None,
             ),
+            // No name.
             (
                 Pod {
                     metadata: ObjectMeta {
@@ -209,6 +240,7 @@ mod tests {
                 },
                 None,
             ),
+            // No namespace.
             (
                 Pod {
                     metadata: ObjectMeta {
@@ -219,6 +251,27 @@ mod tests {
                     ..Pod::default()
                 },
                 None,
+            ),
+            // Static pod config hashsum as uid.
+            (
+                Pod {
+                    metadata: ObjectMeta {
+                        namespace: Some("sandbox0-ns".to_owned()),
+                        name: Some("sandbox0-name".to_owned()),
+                        uid: Some("sandbox0-uid".to_owned()),
+                        annotations: Some(
+                            vec![(
+                                "kubernetes.io/config.mirror".to_owned(),
+                                "sandbox0-config-hashsum".to_owned(),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        ..ObjectMeta::default()
+                    },
+                    ..Pod::default()
+                },
+                Some("/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-config-hashsum"),
             ),
         ];
 

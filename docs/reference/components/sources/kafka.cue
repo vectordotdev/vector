@@ -215,5 +215,12 @@ components: sources: kafka: {
 		}
 	}
 
+	telemetry: metrics: {
+		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
+		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+	}
+
 	how_it_works: components._kafka.how_it_works
 }

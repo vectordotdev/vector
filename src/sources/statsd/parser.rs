@@ -76,8 +76,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 tags,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![convert_to_base_units(unit, val)],
-                    sample_rates: vec![sample_rate as u32],
+                    samples: crate::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
             }
@@ -321,8 +320,7 @@ mod test {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![0.320],
-                    sample_rates: vec![10],
+                    samples: crate::samples![0.320 => 10],
                     statistic: StatisticKind::Histogram
                 },
             }),
@@ -348,8 +346,7 @@ mod test {
                 ),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![320.0],
-                    sample_rates: vec![10],
+                    samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
             }),
@@ -375,8 +372,7 @@ mod test {
                 ),
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![320.0],
-                    sample_rates: vec![10],
+                    samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
             }),

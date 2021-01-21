@@ -1,12 +1,9 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use remap::{Object, Path, Segment};
+use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, BTreeSet};
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
@@ -73,22 +70,16 @@ pub enum MetricValue {
     Gauge { value: f64 },
     /// A Set contains a set of (unordered) unique values for a key.
     Set { values: BTreeSet<String> },
-    /// A Distribution contains a set of sampled values paired with the
-    /// rate at which they were observed.
+    /// A Distribution contains a set of sampled values.
     Distribution {
-        values: Vec<f64>,
-        sample_rates: Vec<u32>,
+        samples: Vec<Sample>,
         statistic: StatisticKind,
     },
     /// An AggregatedHistogram contains a set of observations which are
-    /// counted into buckets. The value of the bucket is the upper bound
-    /// on the range of values within the bucket. The lower bound on the
-    /// range is just higher than the previous bucket, or zero for the
-    /// first bucket. It also contains the total count of all
+    /// counted into buckets. It also contains the total count of all
     /// observations and their sum to allow calculating the mean.
     AggregatedHistogram {
-        buckets: Vec<f64>,
-        counts: Vec<u32>,
+        buckets: Vec<Bucket>,
         count: u32,
         sum: f64,
     },
@@ -98,11 +89,93 @@ pub enum MetricValue {
     /// total count of all observations and their sum to allow
     /// calculating the mean.
     AggregatedSummary {
-        quantiles: Vec<f64>,
-        values: Vec<f64>,
+        quantiles: Vec<Quantile>,
         count: u32,
         sum: f64,
     },
+}
+
+/// A single sample from a `MetricValue::Distribution`, containing the
+/// sampled value paired with the rate at which it was observed.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Sample {
+    pub value: f64,
+    pub rate: u32,
+}
+
+/// A single value from a `MetricValue::AggregatedHistogram`. The value
+/// of the bucket is the upper bound on the range of values within the
+/// bucket. The lower bound on the range is just higher than the
+/// previous bucket, or zero for the first bucket.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Bucket {
+    pub upper_limit: f64,
+    pub count: u32,
+}
+
+/// A single value from a `MetricValue::AggregatedSummary`.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Quantile {
+    pub upper_limit: f64,
+    pub value: f64,
+}
+
+// Constructor helper macros
+
+#[macro_export]
+macro_rules! samples {
+    ( $( $value:expr => $rate:expr ),* ) => {
+        vec![ $( crate::event::metric::Sample { value: $value, rate: $rate }, )* ]
+    }
+}
+
+#[macro_export]
+macro_rules! buckets {
+    ( $( $limit:expr => $count:expr ),* ) => {
+        vec![ $( crate::event::metric::Bucket { upper_limit: $limit, count: $count }, )* ]
+    }
+}
+
+#[macro_export]
+macro_rules! quantiles {
+    ( $( $limit:expr => $value:expr ),* ) => {
+        vec![ $( crate::event::metric::Quantile { upper_limit: $limit, value: $value }, )* ]
+    }
+}
+
+// Convenience functions for compatibility with older split-vector data types
+
+pub fn zip_samples(
+    values: impl IntoIterator<Item = f64>,
+    rates: impl IntoIterator<Item = u32>,
+) -> Vec<Sample> {
+    values
+        .into_iter()
+        .zip(rates.into_iter())
+        .map(|(value, rate)| Sample { value, rate })
+        .collect()
+}
+
+pub fn zip_buckets(
+    limits: impl IntoIterator<Item = f64>,
+    counts: impl IntoIterator<Item = u32>,
+) -> Vec<Bucket> {
+    limits
+        .into_iter()
+        .zip(counts.into_iter())
+        .map(|(upper_limit, count)| Bucket { upper_limit, count })
+        .collect()
+}
+
+pub fn zip_quantiles(
+    limits: impl IntoIterator<Item = f64>,
+    values: impl IntoIterator<Item = f64>,
+) -> Vec<Quantile> {
+    limits
+        .into_iter()
+        .zip(values.into_iter())
+        .map(|(upper_limit, value)| Quantile { upper_limit, value })
+        .collect()
 }
 
 /// Convert the Metric value into a remap value.
@@ -158,36 +231,36 @@ impl Metric {
             }
             (
                 MetricValue::Distribution {
-                    ref mut values,
-                    ref mut sample_rates,
+                    ref mut samples,
                     statistic: statistic_a,
                 },
                 MetricValue::Distribution {
-                    values: values2,
-                    sample_rates: sample_rates2,
+                    samples: samples2,
                     statistic: statistic_b,
                 },
             ) if statistic_a == statistic_b => {
-                values.extend_from_slice(&values2);
-                sample_rates.extend_from_slice(&sample_rates2);
+                samples.extend_from_slice(&samples2);
             }
             (
                 MetricValue::AggregatedHistogram {
-                    ref buckets,
-                    ref mut counts,
+                    ref mut buckets,
                     ref mut count,
                     ref mut sum,
                 },
                 MetricValue::AggregatedHistogram {
                     buckets: buckets2,
-                    counts: counts2,
                     count: count2,
                     sum: sum2,
                 },
             ) => {
-                if buckets == buckets2 && counts.len() == counts2.len() {
-                    for (i, c) in counts2.iter().enumerate() {
-                        counts[i] += c;
+                if buckets.len() == buckets2.len()
+                    && buckets
+                        .iter()
+                        .zip(buckets2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                        b1.count += b2.count;
                     }
                     *count += count2;
                     *sum += sum2;
@@ -223,33 +296,30 @@ impl Metric {
                 values.clear();
             }
             MetricValue::Distribution {
-                ref mut values,
-                ref mut sample_rates,
-                ..
+                ref mut samples, ..
             } => {
-                values.clear();
-                sample_rates.clear();
+                samples.clear();
             }
             MetricValue::AggregatedHistogram {
-                ref mut counts,
+                ref mut buckets,
                 ref mut count,
                 ref mut sum,
                 ..
             } => {
-                for c in counts.iter_mut() {
-                    *c = 0;
+                for bucket in buckets {
+                    bucket.count = 0;
                 }
                 *count = 0;
                 *sum = 0.0;
             }
             MetricValue::AggregatedSummary {
-                ref mut values,
+                ref mut quantiles,
                 ref mut count,
                 ref mut sum,
                 ..
             } => {
-                for v in values.iter_mut() {
-                    *v = 0.0;
+                for quantile in quantiles {
+                    quantile.value = 0.0;
                 }
                 *count = 0;
                 *sum = 0.0;
@@ -259,7 +329,7 @@ impl Metric {
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_metric_kv(key: metrics::Key, handle: metrics_util::Handle) -> Self {
+    pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
         let value = match handle {
             metrics_util::Handle::Counter(_) => MetricValue::Counter {
                 value: handle.read_counter() as f64,
@@ -269,14 +339,17 @@ impl Metric {
             },
             metrics_util::Handle::Histogram(_) => {
                 let values = handle.read_histogram();
-                let values = values.into_iter().map(|i| i as f64).collect::<Vec<_>>();
                 // Each sample in the source measurement has an
-                // effective sample rate of 1, so create an array of
-                // such of the same length as the values.
-                let sample_rates = vec![1; values.len()];
+                // effective sample rate of 1.
+                let samples = values
+                    .into_iter()
+                    .map(|i| Sample {
+                        value: i as f64,
+                        rate: 1,
+                    })
+                    .collect();
                 MetricValue::Distribution {
-                    values,
-                    sample_rates,
+                    samples,
                     statistic: StatisticKind::Histogram,
                 }
             }
@@ -376,11 +449,7 @@ impl Display for Metric {
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
             }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
+            MetricValue::Distribution { samples, statistic } => {
                 write!(
                     fmt,
                     "{} ",
@@ -389,40 +458,29 @@ impl Display for Metric {
                         StatisticKind::Summary => "summary",
                     }
                 )?;
-                write_list(
-                    fmt,
-                    " ",
-                    values.iter().zip(sample_rates.iter()),
-                    |fmt, (value, rate)| write!(fmt, "{}@{}", rate, value),
-                )
+                write_list(fmt, " ", samples, |fmt, sample| {
+                    write!(fmt, "{}@{}", sample.rate, sample.value)
+                })
             }
             MetricValue::AggregatedHistogram {
                 buckets,
-                counts,
                 count,
                 sum,
             } => {
                 write!(fmt, "count={} sum={} ", count, sum)?;
-                write_list(
-                    fmt,
-                    " ",
-                    buckets.iter().zip(counts.iter()),
-                    |fmt, (bucket, count)| write!(fmt, "{}@{}", count, bucket),
-                )
+                write_list(fmt, " ", buckets, |fmt, bucket| {
+                    write!(fmt, "{}@{}", bucket.count, bucket.upper_limit)
+                })
             }
             MetricValue::AggregatedSummary {
                 quantiles,
-                values,
                 count,
                 sum,
             } => {
                 write!(fmt, "count={} sum={} ", count, sum)?;
-                write_list(
-                    fmt,
-                    " ",
-                    quantiles.iter().zip(values.iter()),
-                    |fmt, (quantile, value)| write!(fmt, "{}@{}", quantile, value),
-                )
+                write_list(fmt, " ", quantiles, |fmt, quantile| {
+                    write!(fmt, "{}@{}", quantile.upper_limit, quantile.value)
+                })
             }
         }
     }
@@ -538,28 +596,6 @@ impl Object for Metric {
         }
     }
 
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        let mut result = Vec::new();
-
-        result.push(Path::from_str("name").expect("invalid path"));
-        if self.namespace.is_some() {
-            result.push(Path::from_str("namespace").expect("invalid path"));
-        }
-        if self.timestamp.is_some() {
-            result.push(Path::from_str("timestamp").expect("invalid path"));
-        }
-        if let Some(tags) = &self.tags {
-            result.push(Path::from_str("tags").expect("invalid path"));
-            for name in tags.keys() {
-                result.push(Path::from_str(&format!("tags.{}", name)).expect("invalid path"));
-            }
-        }
-        result.push(Path::from_str("kind").expect("invalid path"));
-        result.push(Path::from_str("type").expect("invalid path"));
-
-        Ok(result)
-    }
-
     fn remove(
         &mut self,
         path: &remap::Path,
@@ -599,11 +635,11 @@ fn write_list<I, T, W>(
     writer: W,
 ) -> Result<(), fmt::Error>
 where
-    I: Iterator<Item = T>,
+    I: IntoIterator<Item = T>,
     W: Fn(&mut Formatter<'_>, T) -> Result<(), fmt::Error>,
 {
     let mut this_sep = "";
-    for item in items {
+    for item in items.into_iter() {
         write!(fmt, "{}", this_sep)?;
         writer(fmt, item)?;
         this_sep = sep;
@@ -625,6 +661,7 @@ mod test {
     use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use remap::{Path, Value};
+    use std::str::FromStr;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -757,8 +794,7 @@ mod test {
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![1.0],
-                sample_rates: vec![10],
+                samples: samples![1.0 => 10],
                 statistic: StatisticKind::Histogram,
             },
         };
@@ -770,8 +806,7 @@ mod test {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![1.0],
-                sample_rates: vec![20],
+                samples: samples![1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         };
@@ -786,8 +821,7 @@ mod test {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![1.0, 1.0],
-                    sample_rates: vec![10, 20],
+                    samples: samples![1.0 => 10, 1.0 => 20],
                     statistic: StatisticKind::Histogram
                 },
             }
@@ -886,8 +920,7 @@ mod test {
                     tags: None,
                     kind: MetricKind::Absolute,
                     value: MetricValue::Distribution {
-                        values: vec![1.0, 2.0],
-                        sample_rates: vec![3, 4],
+                        samples: samples![1.0 => 3, 2.0 => 4],
                         statistic: StatisticKind::Histogram,
                     }
                 }
@@ -905,8 +938,7 @@ mod test {
                     tags: None,
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedHistogram {
-                        buckets: vec![51.0, 52.0],
-                        counts: vec![53, 54],
+                        buckets: buckets![51.0 => 53, 52.0 => 54],
                         count: 107,
                         sum: 103.0,
                     }
@@ -925,8 +957,7 @@ mod test {
                     tags: None,
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
-                        quantiles: vec![1.0, 2.0],
-                        values: vec![63.0, 64.0],
+                        quantiles: quantiles![1.0 => 63.0, 2.0 => 64.0],
                         count: 2,
                         sum: 127.0,
                     }
@@ -963,38 +994,6 @@ mod test {
                 .into()
             )),
             metric.get(&Path::from_str(".").unwrap())
-        );
-    }
-
-    #[test]
-    fn object_metric_paths() {
-        let metric = Metric {
-            name: "zub".into(),
-            namespace: Some("zoob".into()),
-            timestamp: Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)),
-            tags: Some({
-                let mut map = BTreeMap::new();
-                map.insert("tig".to_string(), "tog".to_string());
-                map
-            }),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.23 },
-        };
-
-        assert_eq!(
-            Ok([
-                "name",
-                "namespace",
-                "timestamp",
-                "tags",
-                "tags.tig",
-                "kind",
-                "type"
-            ]
-            .iter()
-            .map(|path| Path::from_str(path).expect("invalid path"))
-            .collect()),
-            metric.paths()
         );
     }
 

@@ -165,6 +165,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
 
@@ -223,6 +224,8 @@ components: {
 	}
 
 	#FeaturesExpose: {
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
+
 		for: {
 			service:    #Service
 			interface?: #Interface
@@ -240,6 +243,10 @@ components: {
 	}
 
 	#FeaturesMultiline: {
+		enabled: bool
+	}
+
+	#FeaturesEncoding: {
 		enabled: bool
 	}
 
@@ -1046,10 +1053,12 @@ components: {
 			}
 		}
 
-		telemetry: metrics: {
-			// Default metrics for each component
-			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		if Kind == "transform" {
+			telemetry: metrics: {
+				// Default metrics for each transform
+				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+			}
 		}
 	}}
 }

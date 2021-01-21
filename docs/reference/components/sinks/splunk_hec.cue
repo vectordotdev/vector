@@ -73,14 +73,15 @@ components: sinks: splunk_hec: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -96,7 +97,7 @@ components: sinks: splunk_hec: {
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
 			type: string: {
@@ -160,9 +161,11 @@ components: sinks: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		encode_errors_total:    components.sources.internal_metrics.output.metrics.encode_errors_total
-		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		encode_errors_total:       components.sources.internal_metrics.output.metrics.encode_errors_total
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		missing_keys_total:        components.sources.internal_metrics.output.metrics.missing_keys_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:    components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

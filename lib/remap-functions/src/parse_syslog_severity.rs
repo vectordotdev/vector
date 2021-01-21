@@ -58,7 +58,7 @@ impl Expression for ParseSyslogSeverityFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(Kind::Integer)
     }
 }

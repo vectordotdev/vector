@@ -14,9 +14,8 @@ vector-aggregator:
     stdout:
       type: "console"
       inputs: ["vector"]
-      rawConfig: |
-        target = "stdout"
-        encoding = "json"
+      target: "stdout"
+      encoding: "json"
 "#;
 
 /// This test validates that vector picks up logs with an agent and

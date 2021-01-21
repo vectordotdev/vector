@@ -258,8 +258,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 tags,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![value],
-                    sample_rates: vec![1],
+                    samples: crate::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
             })
@@ -284,8 +283,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 tags,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![value],
-                    sample_rates: vec![1],
+                    samples: crate::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
             })
@@ -768,8 +766,7 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![2.5],
-                    sample_rates: vec![1],
+                    samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
             }
@@ -799,8 +796,7 @@ mod tests {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![2.5],
-                    sample_rates: vec![1],
+                    samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
             }

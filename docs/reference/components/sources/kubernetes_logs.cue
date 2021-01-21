@@ -36,14 +36,15 @@ components: sources: kubernetes_logs: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -168,9 +169,9 @@ components: sources: kubernetes_logs: {
 				The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time.
 				"""
 			required: false
-			type: array: {
-				default: []
-				items: type: string: examples: ["metadata.name!=pod-name-to-exclude"]
+			type: string: {
+				default: ""
+				examples: ["metadata.name!=pod-name-to-exclude", "metadata.name!=pod-name-to-exclude,metadata.name=mypod"]
 			}
 		}
 		extra_label_selector: {
@@ -180,9 +181,9 @@ components: sources: kubernetes_logs: {
 				addition to the built-in `vector.dev/exclude` filter.
 				"""
 			required: false
-			type: array: {
-				default: []
-				items: type: string: examples: ["my_custom_label!=my_value"]
+			type: string: {
+				default: ""
+				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
 			}
 		}
 	}
@@ -406,10 +407,12 @@ components: sources: kubernetes_logs: {
 		partial_message_merging: {
 			title: "Partial message merging"
 			body:  """
-					Vector, by default, will merge partial messages that are split due to the Docker
-					size limit. For everything else, the
-					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)) offers `multiline`
-					options to configure custom merging to handle merging things like stacktraces.
+					Vector, by default, will merge partial messages that are
+					split due to the Docker size limit. For everything else, it
+					is recommended to use the [`reduce`
+					transform](\(urls.vector_reduce_transform)) which offers
+					the ability to handle custom merging of things like
+					stacktraces.
 					"""
 		}
 
@@ -510,5 +513,7 @@ components: sources: kubernetes_logs: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
+		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

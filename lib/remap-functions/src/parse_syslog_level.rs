@@ -56,7 +56,7 @@ impl Expression for ParseSyslogLevelFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::Integer)
+            .into_fallible(true)
             .with_constraint(Kind::Bytes)
     }
 }

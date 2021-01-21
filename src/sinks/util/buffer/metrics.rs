@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue, Sample},
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
@@ -35,12 +35,12 @@ impl Hash for MetricEntry {
         match &metric.value {
             MetricValue::AggregatedHistogram { buckets, .. } => {
                 for bucket in buckets {
-                    bucket.to_bits().hash(state);
+                    bucket.upper_limit.to_bits().hash(state);
                 }
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.to_bits().hash(state);
+                    quantile.upper_limit.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -66,7 +66,13 @@ impl PartialEq for MetricEntry {
                     MetricValue::AggregatedHistogram {
                         buckets: buckets2, ..
                     },
-                ) => buckets1 == buckets2,
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
                 (
                     MetricValue::AggregatedSummary {
                         quantiles: quantiles1,
@@ -76,7 +82,13 @@ impl PartialEq for MetricEntry {
                         quantiles: quantiles2,
                         ..
                     },
-                ) => quantiles1 == quantiles2,
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
                 _ => true,
             }
     }
@@ -263,18 +275,9 @@ impl Batch for MetricBuffer {
             .into_iter()
             .map(|e| {
                 let mut metric = e.0;
-                if let MetricValue::Distribution {
-                    values,
-                    sample_rates,
-                    statistic,
-                } = metric.value
-                {
-                    let compressed = compress_distribution(values, sample_rates);
-                    metric.value = MetricValue::Distribution {
-                        values: compressed.0,
-                        sample_rates: compressed.1,
-                        statistic,
-                    };
+                if let MetricValue::Distribution { samples, statistic } = metric.value {
+                    let samples = compress_distribution(samples);
+                    metric.value = MetricValue::Distribution { samples, statistic };
                 };
                 metric
             })
@@ -286,33 +289,30 @@ impl Batch for MetricBuffer {
     }
 }
 
-fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>, Vec<u32>) {
-    if values.is_empty() || sample_rates.is_empty() {
-        return (Vec::new(), Vec::new());
+fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+    if samples.is_empty() {
+        return Vec::new();
     }
 
-    let mut pairs: Vec<_> = values.into_iter().zip(sample_rates.into_iter()).collect();
-    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+    samples.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
 
-    let mut prev_value = pairs[0].0;
-    let mut acc = 0;
-    let mut values = vec![];
-    let mut sample_rates = vec![];
+    let mut acc = Sample {
+        value: samples[0].value,
+        rate: 0,
+    };
+    let mut result = Vec::new();
 
-    for (v, c) in pairs {
-        if v == prev_value {
-            acc += c;
+    for sample in samples {
+        if acc.value == sample.value {
+            acc.rate += sample.rate;
         } else {
-            values.push(prev_value);
-            sample_rates.push(acc);
-            prev_value = v;
-            acc = c;
+            result.push(acc);
+            acc = sample;
         }
     }
-    values.push(prev_value);
-    sample_rates.push(acc);
+    result.push(acc);
 
-    (values, sample_rates)
+    result
 }
 
 #[cfg(test)]
@@ -526,12 +526,19 @@ mod test {
 
     #[test]
     fn metric_buffer_compress_distribution() {
-        let values = vec![2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0];
-        let sample_rates = vec![12, 12, 13, 11, 12, 12, 13];
+        let samples = crate::samples![
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13,
+            1.0 => 11,
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13
+        ];
 
         assert_eq!(
-            compress_distribution(values, sample_rates),
-            (vec![1.0, 2.0, 3.0], vec![11, 48, 26])
+            compress_distribution(samples),
+            crate::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 
@@ -652,8 +659,7 @@ mod test {
             tags: Some(tag("production")),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![num as f64],
-                sample_rates: vec![rate],
+                samples: crate::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         }
@@ -673,8 +679,11 @@ mod test {
             tags: Some(tag("production")),
             kind,
             value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0f64.powf(bpower), 4.0f64.powf(bpower)],
-                counts: vec![cfactor, 2 * cfactor, 4 * cfactor],
+                buckets: crate::buckets![
+                    1.0 => cfactor,
+                    2.0f64.powf(bpower) => cfactor * 2,
+                    4.0f64.powf(bpower) => cfactor * 4
+                ],
                 count: 6 * cfactor,
                 sum,
             },
@@ -689,8 +698,11 @@ mod test {
             tags: Some(tag("production")),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.0, 0.5, 1.0],
-                values: vec![factor as f64, (2 * factor) as f64, (4 * factor) as f64],
+                quantiles: crate::quantiles![
+                    0.0 => factor as f64,
+                    0.5 => factor as f64 * 2.0,
+                    1.0 => factor as f64 * 4.0
+                ],
                 count: 6 * factor,
                 sum: 10.0,
             },
