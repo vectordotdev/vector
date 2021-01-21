@@ -20,7 +20,10 @@ use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
+#[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket};
 #[cfg(unix)]
 use std::path::PathBuf;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
@@ -323,7 +326,16 @@ pub fn udp(
 
         {
             // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
-            let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
+            let socket = unsafe {
+                #[cfg(unix)]
+                {
+                    socket2::Socket::from_raw_fd(socket.as_raw_fd())
+                }
+                #[cfg(windows)]
+                {
+                    socket2::Socket::from_raw_socket(socket.as_raw_socket())
+                }
+            };
 
             if let Some(send_buffer_bytes) = send_buffer_bytes {
                 if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
@@ -337,7 +349,10 @@ pub fn udp(
                 }
             }
 
+            #[cfg(unix)]
             socket.into_raw_fd();
+            #[cfg(windows)]
+            socket.into_raw_socket();
         }
 
         let _ = UdpFramed::new(socket, BytesCodec::new())
