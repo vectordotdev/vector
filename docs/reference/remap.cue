@@ -22,6 +22,7 @@ package metadata
 
 	concepts:    _
 	description: string
+	example:     string
 	expressions: _
 	features:    _
 	functions:   _
@@ -34,20 +35,19 @@ remap: #Remap & {
 		**Vector Remap Language** (VRL) is an [expression-oriented](\#(urls.expression_oriented_language)) language
 		designed for expressing obervability data (logs and metrics) transformations. It features a simple
 		[syntax](\#(urls.vrl_spec)) and a rich set of built-in [functions](\#(urls.vrl_functions)) tailored
-		specifically to observability use cases. For example, the following script parses, shapes, generates an ID,
-		and converces a timestamp in 4 lines:
-
-		```vrl title="example VRL program"
-		# Parse into named fields, and abort if parsing fails
-		. = parse_syslog!(.message)
-		# Overwrite the severity
-		.severity = "info"
-		# Add a unique ID to the event
-		.id = uuid_v4()
-		# Convert the timestamp to seconds since the Unix epoch
-		.timestamp = to_int(.timestamp)
-		```
+		specifically to observability use cases.
 
 		For a more in-depth picture, see the [announcement blog post](\#(urls.vrl_announcement)) for more details.
+		"""#
+
+	example: #"""
+		The following program parses, shapes, generates an ID, and conerces a timestamp in 4 lines:
+
+		```vrl title="example VRL program"
+		. = parse_syslog!(.message)
+		.severity = "info"
+		.id = uuid_v4()
+		.timestamp = to_int(.timestamp)
+		```
 		"""#
 }
