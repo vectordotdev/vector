@@ -3,6 +3,8 @@ extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
+use serde::{Deserialize, Serialize};
+
 mod checkpointer;
 mod file_server;
 mod file_watcher;
@@ -16,6 +18,14 @@ pub use self::fingerprinter::{FingerprintStrategy, Fingerprinter};
 pub use self::internal_events::FileSourceInternalEvents;
 
 type FilePosition = u64;
+
+#[derive(Deserialize, Serialize, Copy, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFrom {
+    Beginning,
+    End,
+    Checkpoint(FilePosition),
+}
 
 #[cfg(test)]
 mod test {
