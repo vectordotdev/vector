@@ -4,8 +4,9 @@ components: transforms: remap: {
 	title: "Remap"
 
 	description: """
-		Transforms events using the [Vector Remap Language](\(urls.vrl_reference)) (VRL), a lean, single-purpose
-		language for transforming observability data (logs and metrics) in Vector.
+		Is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
+		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
+		obervability data (logs and metrics) in safe and performant manner.
 
 		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
 		"""
@@ -83,12 +84,13 @@ components: transforms: remap: {
 			configuration: {
 				source: #"""
 					.new_field = "new value"
-					.new_field_name = .old_field_name
-					del(.old_name)
+					.new_field_name = del(.old_field_name)
+					del(.unwanted_field)
 					"""#
 			}
 			input: log: {
 				old_field_name: "old value"
+				unwanted_field: "unwanted"
 			}
 			output: log: {
 				new_field:      "new value"
@@ -96,65 +98,60 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Allowlisting fields"
+			title: "Parsing Syslog messages"
+			configuration: source: """
+				. = parse_syslog(.)
+				"""
+			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+			output: log: {
+				appname:   "su"
+				facility:  "ntp"
+				hostname:  "vector-user.biz"
+				message:   "Something went wrong"
+				msgid:     "ID389"
+				procid:    2666
+				severity:  "info"
+				timestamp: "2020-12-22 15:22:31.111 UTC"
+			}
+		},
+		{
+			title: "Parsing Syslog severity and level"
+			configuration: source: """
+				.level = to_syslog_level(.level)
+				.severity = to_syslog_severity(.severity)
+				"""
+			input: log: {
+				level:    1
+				severity: "error"
+			}
+			output: log: {
+				level:    "alert"
+				severity: 3
+			}
+		},
+		{
+			title: "Parsing JSON"
 			configuration: {
-				source: """
-					only_fields(.field1, .field2)
-					"""
+				source: ". = parse_json(.message)"
 			}
 			input: log: {
-				field1: "value1"
-				field2: "value2"
-				field3: "value3"
+				message: #"{"key": "val"}"#
 			}
 			output: log: {
-				field1: "value1"
-				field2: "value2"
+				key: "val"
 			}
 		},
 		{
-			title: "Checking for the existence of values"
+			title: "Parse using Grok"
 			configuration: source: """
-				.has_name = exists(.name)
-				del(.name)
-				"""
-			input: log: name:      "Vector Vic"
-			output: log: has_name: true
-		},
-		{
-			title: "Working with strings"
-			configuration: source: """
-				.message = strip_whitespace(.message)
-				.upper = upcase(.message)
-				.lower = downcase(.message)
-				.has_hello = contains(.lower, "hello")
-				.truncated = truncate(.lower, 5, ellipsis = true)
-				.ends_with_booper = ends_with(.lower, "booper")
+				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
 				del(.message)
 				"""
-			input: log: message: "  hEllo WoRlD   "
+			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
 			output: log: {
-				upper:            "HELLO WORLD"
-				lower:            "hello world"
-				has_hello:        true
-				truncated:        "hello..."
-				ends_with_booper: false
-			}
-		},
-		{
-			title: "Working with numbers"
-			configuration: {
-				source: """
-					.rounded_temp = round(.temperature)
-					.floor_temp = floor(.temperature)
-					.ceil_temp = ceil(.temperature)
-					"""
-			}
-			input: log: temperature: 105.1
-			output: log: {
-				rounded_temp: 105
-				floor_temp:   105
-				ceil_temp:    106
+				level:     "info"
+				message:   "Hello world"
+				timestamp: "2020-10-02T23:22:12.223222Z"
 			}
 		},
 		{
@@ -176,31 +173,6 @@ components: transforms: remap: {
 			output: log: text: "foo bar"
 		},
 		{
-			title: "Parsing strings using Grok"
-			configuration: source: """
-				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
-				del(.message)
-				"""
-			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
-			output: log: {
-				level:     "info"
-				message:   "Hello world"
-				timestamp: "2020-10-02T23:22:12.223222Z"
-			}
-		},
-		{
-			title: "Parsing JSON"
-			configuration: {
-				source: ". = parse_json(.message)"
-			}
-			input: log: {
-				message: #"{"key": "val"}"#
-			}
-			output: log: {
-				key: "val"
-			}
-		},
-		{
 			title: "Formatting timestamps"
 			configuration: source: """
 				.timestamp = to_timestamp(.timestamp)
@@ -220,19 +192,7 @@ components: transforms: remap: {
 			}
 		},
 		{
-			title: "Encoding JSON"
-			configuration: {
-				source: ".message = encode_json(.)"
-			}
-			input: log: {
-				key: "val"
-			}
-			output: log: {
-				message: #"{"key": "val"}"#
-			}
-		},
-		{
-			title: "Working with durations"
+			title: "Parse durations"
 			configuration: source: """
 				.seconds = parse_duration(.time, "s")
 				.minutes = parse_duration(.time, "m")
@@ -268,38 +228,6 @@ components: transforms: remap: {
 				float:     1.234
 				int:       1
 				timestamp: "2020-10-01T02:22:11.223212Z"
-			}
-		},
-		{
-			title: "Parsing Syslog messages"
-			configuration: source: """
-				. = parse_syslog(.)
-				"""
-			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
-			output: log: {
-				appname:   "su"
-				facility:  "ntp"
-				hostname:  "vector-user.biz"
-				message:   "Something went wrong"
-				msgid:     "ID389"
-				procid:    2666
-				severity:  "info"
-				timestamp: "2020-12-22 15:22:31.111 UTC"
-			}
-		},
-		{
-			title: "Parsing Syslog severity and level"
-			configuration: source: """
-				.level = to_syslog_level(.level)
-				.severity = to_syslog_severity(.severity)
-				"""
-			input: log: {
-				level:    1
-				severity: "error"
-			}
-			output: log: {
-				level:    "alert"
-				severity: 3
 			}
 		},
 		{
