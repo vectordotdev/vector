@@ -40,24 +40,24 @@ types of components:
 Let's create a configuration file:
 
 ```toml title="vector.toml"
-[sources.foo]
+[sources.in]
   type = "stdin"
 
-[sinks.bar]
-  inputs = ["foo"]
+[sinks.out]
+  inputs = ["in"]
   type = "console"
   encoding.codec = "text"
 ```
 
 Each component has a unique identifier and is prefixed with the type of component, for example, `sources` for a
-source. Our first component, `sources.foo`, uses the [`stdin` source][docs.sources.stdin] which tells Vector to receive
-data over `STDIN` and is identified as `foo`.
+source. Our first component, `sources.in`, uses the [`stdin` source][docs.sources.stdin] which tells Vector to receive
+data over stdin and is identified as `in`.
 
-Our second component, `sinks.bar`, uses the [`console` source][docs.sinks.console] which tells Vector to simply print
-the data to `STDOUT`. The `encoding.codec` option tells Vector to print the data as plain text (unencoded).
+Our second component, `sinks.out`, uses the [`console` source][docs.sinks.console] which tells Vector to simply print
+the data to stdout. The `encoding.codec` option tells Vector to print the data as plain text (unencoded).
 The `inputs` option creates a pipeline from our source, which receives events, to our sink, which sends those
-events onwards. The `inputs` option in our `sinks.bar` component tells Vector where this sink's events are coming
-from. In our case, events are received from our other component, the source identified as `foo`.
+events onwards. The `inputs` option in our `sinks.out` component tells Vector where this sink's events are coming
+from. In our case, events are received from our other component, the source identified as `in`.
 
 ## Hello World!
 
@@ -67,10 +67,10 @@ That's it for our first config. Now let's pipe an event through it:
 echo 'Hello World!' | vector --config ./vector.toml
 ```
 
-The `echo` statement sends a single log to Vector over `STDIN`. The `vector...` command starts Vector with our
+The `echo` statement sends a single log to Vector via stdin. The `vector...` command starts Vector with our
 previously created config file.
 
-The event we've just sent will be received by our `sources.foo` component, then sent onto the `sinks.bar` component,
+The event we've just sent will be received by our `sources.in` component, then sent onto the `sinks.out` component,
 which will, in turn, echo it back to the console:
 
 ```text
