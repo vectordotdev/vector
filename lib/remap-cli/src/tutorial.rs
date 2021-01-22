@@ -34,7 +34,9 @@ pub fn tutorial() -> Result<(), Error> {
         title: "Deleting values",
         help_text: DELETION_TEXT,
         correct_answer: Some(r#"del(.password)"#),
-        object: Value::from(map!["timestamp": "2021-01-21T18:46:59.991Z", "method": "POST", "endpoint": "/inventions", "user": "adalovelace", "password": "opensesame"]),
+        object: Value::from(
+            map!["timestamp": "2021-01-21T18:46:59.991Z", "method": "POST", "endpoint": "/inventions", "user": "adalovelace", "password": "opensesame"],
+        ),
     };
 
     let syslog_tut = Tutorial {
@@ -112,7 +114,7 @@ pub fn tutorial() -> Result<(), Error> {
                         println!("{}\n", value);
 
                         if let Some(correct_answer) = tut.correct_answer {
-                            if &command == &correct_answer {
+                            if command == correct_answer {
                                 println!("That is correct!");
                                 index = index.saturating_add(1);
 
@@ -149,10 +151,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 
     println!(
         "\nTutorial {}: {}\n{}\nEvent:\n{}\n",
-        tut.number,
-        tut.title,
-        tut.help_text,
-        tut.object
+        tut.number, tut.title, tut.help_text, tut.object
     );
 }
 
