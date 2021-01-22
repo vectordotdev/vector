@@ -560,11 +560,7 @@ async fn build_unit_test(
     }
 }
 
-#[cfg(all(
-    test,
-    feature = "transforms-add_fields",
-    feature = "transforms-route"
-))]
+#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
