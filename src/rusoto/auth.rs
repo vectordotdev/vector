@@ -119,4 +119,17 @@ mod tests {
             _ => panic!(),
         }
     }
+
+    #[test]
+    fn parsing_static() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.access_key_id = "key"
+            auth.secret_access_key = "other"
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(config.auth, AWSAuthentication::Static{..}));
+    }
 }
