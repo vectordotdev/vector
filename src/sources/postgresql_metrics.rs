@@ -994,7 +994,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db == "vector" || db == "postgres");
             }
         }
@@ -1013,7 +1013,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db != "vector" && db != "postgres");
             }
         }
@@ -1043,7 +1043,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db == "template1");
             }
         }
