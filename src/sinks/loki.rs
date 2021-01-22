@@ -17,7 +17,7 @@ use crate::{
     event::{self, Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
-        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
+        buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         service::ConcurrencyOption,
@@ -129,7 +129,7 @@ impl SinkConfig for LokiConfig {
             sink,
             PartitionBuffer::new(LokiBuffer::new(
                 batch_settings.size,
-                Default::default(),
+                GlobalTimestamps::default(),
                 config.out_of_order_action.clone(),
             )),
             request_settings,
