@@ -3,10 +3,10 @@ title: Getting Started with Vector
 description: Getting Started with Vector, the "Hello World" of Vector tutorials.
 ---
 
-Welcome to Vector! 🎈
+Welcome to Vector!
 
-Vector is a high-performance observability data platform that allows you to collect, transform, and route all your
-logs and metrics.
+Vector is a high-performance observability data pipeline that allows you to collect, transform,
+and route all your logs and metrics.
 
 In this getting started guide, we'll walk you through using Vector for the first time. We'll install Vector
 and create our first observability data pipeline so you can begin to see what Vector can do.
