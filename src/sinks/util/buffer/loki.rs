@@ -140,7 +140,7 @@ impl Batch for LokiBuffer {
             match self.out_of_order_action {
                 OutOfOrderAction::Drop => {
                     warn!(
-                        msg = "Received out-of-order event; Dropping event.",
+                        msg = "Received out-of-order event; dropping event.",
                         internal_log_rate_secs = 30
                     );
                     return PushResult::Ok(false);
