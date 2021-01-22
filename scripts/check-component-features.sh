@@ -11,17 +11,24 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Here are all the features that will be added along the tested features.
+# Used mainly for passing mandatory, mutually exclusive features -
+# which are designed to force an error in not properly set.
+FORCED_FEATURES=(
+  alloc-jemalloc # check with jemalloc
+)
+
 toml-extract() {
   WHAT="$1"
   remarshal --if toml --of json | jq -r "$WHAT"
 }
 
 check-listed-features() {
-  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features '${FORCED_FEATURES[*]}' --features {}) || exit 255"
 }
 
 echo "Checking that Vector and tests can be built without default features..."
-cargo check --tests --no-default-features
+cargo check --tests --no-default-features --features "${FORCED_FEATURES[@]}"
 
 echo "Checking that all components have corresponding features in Cargo.toml..."
 COMPONENTS="$(cargo run --no-default-features -- list)"
