@@ -191,9 +191,27 @@ components: sources: file: {
 				unit: "seconds"
 			}
 		}
+		read_from: {
+			common:      true
+			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
+			required:    false
+			type: string: {
+				default: "beginning"
+				enum: {
+					"beginning": "Read from the beginning of the file."
+					"end":       "Start reading from the current end of the file."
+				}
+			}
+		}
+		ignore_checkpoints: {
+			common:      false
+			description: "This causes Vector to ignore existing checkpoints when determining where to start reading a file. Checkpoints are still written normally."
+			required:    false
+			type: bool: default: false
+		}
 		start_at_beginning: {
 			common:      false
-			description: "For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint. "
+			description: "For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint. This setting is deprecated in favor of `read_from` and `ignore_checkpoints`."
 			required:    false
 			type: bool: default: false
 		}
