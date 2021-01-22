@@ -442,14 +442,17 @@ mod test {
     fn rebuffer_incremental_counters<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
         for i in 0..4 {
+            // counter-0 is repeated 5 times
             events.push(sample_counter(0, "production", Incremental, i as f64));
         }
 
         for i in 0..4 {
+            // these counters cause a buffer flush
             events.push(sample_counter(i, "staging", Incremental, i as f64));
         }
 
         for i in 0..4 {
+            // counter-0 increments the previous buffer, the rest are new
             events.push(sample_counter(i, "production", Incremental, i as f64));
         }
 
@@ -539,11 +542,14 @@ mod test {
 
     fn rebuffer_absolute_counters<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
+        // counter-0 and -1 only emitted once
+        // counter-2 and -3 emitted twice
+        // counter-4 and -5 emitted once
         for i in 0..4 {
             events.push(sample_counter(i, "production", Absolute, i as f64));
         }
 
-        for i in 0..4 {
+        for i in 2..6 {
             events.push(sample_counter(i, "production", Absolute, i as f64 * 3.0));
         }
 
@@ -558,9 +564,11 @@ mod test {
             buffer[0],
             [
                 sample_counter(0, "production", Absolute, 0.0),
-                sample_counter(1, "production", Absolute, 3.0),
+                sample_counter(1, "production", Absolute, 1.0),
                 sample_counter(2, "production", Absolute, 6.0),
                 sample_counter(3, "production", Absolute, 9.0),
+                sample_counter(4, "production", Absolute, 12.0),
+                sample_counter(5, "production", Absolute, 15.0),
             ]
         );
 
@@ -574,8 +582,6 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_counter(0, "production", Incremental, 0.0),
-                sample_counter(1, "production", Incremental, 2.0),
                 sample_counter(2, "production", Incremental, 4.0),
                 sample_counter(3, "production", Incremental, 6.0),
             ]
@@ -591,8 +597,6 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_counter(0, "production", Incremental, 0.0),
-                sample_counter(1, "production", Incremental, 2.0),
                 sample_counter(2, "production", Incremental, 4.0),
                 sample_counter(3, "production", Incremental, 6.0),
             ]
@@ -603,11 +607,14 @@ mod test {
 
     fn rebuffer_incremental_gauges<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
+        // gauge-1 emitted once
+        // gauge-2 through -4 are emitted twice
+        // gauge-5 emitted once
         for i in 1..5 {
             events.push(sample_gauge(i, Incremental, i as f64));
         }
 
-        for i in 1..5 {
+        for i in 2..6 {
             events.push(sample_gauge(i, Incremental, i as f64));
         }
 
@@ -621,10 +628,11 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_gauge(1, Absolute, 2.0),
+                sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
                 sample_gauge(3, Absolute, 6.0),
                 sample_gauge(4, Absolute, 8.0),
+                sample_gauge(5, Absolute, 5.0),
             ]
         );
 
@@ -638,10 +646,11 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_gauge(1, Incremental, 2.0),
+                sample_gauge(1, Incremental, 1.0),
                 sample_gauge(2, Incremental, 4.0),
                 sample_gauge(3, Incremental, 6.0),
                 sample_gauge(4, Incremental, 8.0),
+                sample_gauge(5, Incremental, 5.0),
             ]
         );
 
@@ -655,10 +664,11 @@ mod test {
         assert_eq!(
             buffer[0],
             [
-                sample_gauge(1, Absolute, 2.0),
+                sample_gauge(1, Absolute, 1.0),
                 sample_gauge(2, Absolute, 4.0),
                 sample_gauge(3, Absolute, 6.0),
                 sample_gauge(4, Absolute, 8.0),
+                sample_gauge(5, Absolute, 5.0),
             ]
         );
 
@@ -667,6 +677,9 @@ mod test {
 
     fn rebuffer_absolute_gauges<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
+        // gauge-2 emitted once
+        // gauge-3 and -4 emitted twice
+        // gauge-5 emitted once
         for i in 2..5 {
             events.push(sample_gauge(i, Absolute, i as f64 * 2.0));
         }
@@ -729,6 +742,8 @@ mod test {
 
     fn rebuffer_incremental_sets<State: MetricsState>() -> Buffer {
         let mut events = Vec::new();
+        // set-0 emitted 8 times with 4 different values
+        // set-1 emitted once with 4 values
         for i in 0..4 {
             events.push(sample_set(0, Incremental, &[i]));
         }
@@ -736,6 +751,8 @@ mod test {
         for i in 0..4 {
             events.push(sample_set(0, Incremental, &[i]));
         }
+
+        events.push(sample_set(1, Incremental, &[1, 2, 3, 4]));
 
         rebuffer::<State>(events)
     }
@@ -744,7 +761,13 @@ mod test {
     fn abs_buffer_incremental_sets() {
         let buffer = rebuffer_incremental_sets::<AbsoluteMetricsState>();
 
-        assert_eq!(buffer[0], [sample_set(0, Absolute, &[0, 1, 2, 3])]);
+        assert_eq!(
+            buffer[0],
+            [
+                sample_set(0, Absolute, &[0, 1, 2, 3]),
+                sample_set(1, Absolute, &[1, 2, 3, 4]),
+            ]
+        );
 
         assert_eq!(buffer.len(), 1);
     }
@@ -753,7 +776,13 @@ mod test {
     fn inc_buffer_incremental_sets() {
         let buffer = rebuffer_incremental_sets::<IncrementalMetricsState>();
 
-        assert_eq!(buffer[0], [sample_set(0, Incremental, &[0, 1, 2, 3])]);
+        assert_eq!(
+            buffer[0],
+            [
+                sample_set(0, Incremental, &[0, 1, 2, 3]),
+                sample_set(1, Incremental, &[1, 2, 3, 4]),
+            ]
+        );
 
         assert_eq!(buffer.len(), 1);
     }
@@ -762,7 +791,13 @@ mod test {
     fn std_buffer_incremental_sets() {
         let buffer = rebuffer_incremental_sets::<StdMetricsState>();
 
-        assert_eq!(buffer[0], [sample_set(0, Incremental, &[0, 1, 2, 3])]);
+        assert_eq!(
+            buffer[0],
+            [
+                sample_set(0, Incremental, &[0, 1, 2, 3]),
+                sample_set(1, Incremental, &[1, 2, 3, 4]),
+            ]
+        );
 
         assert_eq!(buffer.len(), 1);
     }
