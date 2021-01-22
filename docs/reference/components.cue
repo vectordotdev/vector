@@ -122,10 +122,10 @@ components: {
 			// Specify either the name of the function that replaces the transform or, when that isn't applicable, as
 			// with the add_fields transform, provide a description and VRL examples
 			#VRLReplacement: {
-				replacement_func: string
+				replacement_funcs: [string, ...string]
 			} | {
 				description?: string
-				examples:     [string, ...string]
+				examples: [string, ...string]
 			}
 
 			vrl_replacement?: #VRLReplacement

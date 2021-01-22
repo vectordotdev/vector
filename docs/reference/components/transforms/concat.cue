@@ -7,6 +7,16 @@ components: transforms: concat: {
 		Slices log string fields and joins them into a single field.
 		"""
 
+	vrl_replacement: {
+		description: "In VRL, you can concatenate strings using the `+` operator."
+		examples: [
+			"\"Hello\" + \" \" + \"World\"",
+			#"""
+				.message = "The severity level is " + .level
+				"""#,
+		]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"

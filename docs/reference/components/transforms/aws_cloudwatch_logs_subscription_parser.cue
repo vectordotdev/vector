@@ -8,6 +8,10 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 		subscriptions) coming from the `aws_kinesis_firehose` source.
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_aws_cloudwatch_log_subscription_message"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"

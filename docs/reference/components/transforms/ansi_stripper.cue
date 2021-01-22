@@ -8,7 +8,7 @@ components: transforms: ansi_stripper: {
 		"""
 
 	vrl_replacement: {
-		replacement_func: "strip_ansi_escape_codes"
+		replacement_funcs: ["strip_ansi_escape_codes"]
 	}
 
 	classes: {
