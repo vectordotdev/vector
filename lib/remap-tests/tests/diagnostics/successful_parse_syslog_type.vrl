@@ -1,0 +1,6 @@
+# object: { "message": "<14> syslog message" }
+# result: "a02c01b762fe5fbec7c9dd03736f81ee6e93c4c5288235e46b8e12451f40a24683725981fb6469e0f814cdf6843b02eb365d7f721ff6b474f6cc4dc1130a817d<no app name>"
+
+result = parse_syslog!(.message)
+sha = sha3(value: result.message)
+sha + (result.appname || "<no app name>") ?? ""
