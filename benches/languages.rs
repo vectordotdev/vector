@@ -23,7 +23,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
   type = "remap"
   inputs = ["in"]
   source = """
-      . = parse_syslog(.message)
+      . = parse_syslog!(.message)
   """
          "#,
         ),
