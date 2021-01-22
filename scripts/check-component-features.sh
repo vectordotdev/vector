@@ -27,6 +27,13 @@ check-listed-features() {
   xargs -I{} sh -cx "(cargo check --tests --no-default-features --features '${FORCED_FEATURES[*]}' --features {}) || exit 255"
 }
 
+cargo-clean-when-in-ci() {
+  if [[ "${CI:-"false"}" == "true" ]]; then
+    echo "Cleaning to save some disk space"
+    cargo clean
+  fi
+}
+
 echo "Checking that Vector and tests can be built without default features..."
 cargo check --tests --no-default-features --features "${FORCED_FEATURES[@]}"
 
@@ -42,18 +49,12 @@ fi
 echo "Checking that each source feature can be built without other features..."
 toml-extract ".features.sources|.[]" < Cargo.toml | check-listed-features
 
-if (${CI:-false}); then
-  echo "Cleaning to save some disk space"
-  cargo clean
-fi
+cargo-clean-when-in-ci
 
 echo "Checking that each transform feature can be built without other features..."
 toml-extract ".features.transforms|.[]" < Cargo.toml | check-listed-features
 
-if (${CI:-false}); then
-  echo "Cleaning to save some disk space"
-  cargo clean
-fi
+cargo-clean-when-in-ci
 
 echo "Checking that each sink feature can be built without other features..."
 toml-extract ".features.sinks|.[]" < Cargo.toml | check-listed-features
