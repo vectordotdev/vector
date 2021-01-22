@@ -709,7 +709,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = (0..10).map(|i| i.to_string()).collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()
@@ -717,9 +717,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
 
-        let base = (chrono::Utc::now() - Duration::seconds(20))
-            .with_nanosecond(0)
-            .unwrap();
+        let base = chrono::Utc::now() - Duration::seconds(20);
         for (i, event) in events.iter_mut().enumerate() {
             let log = event.as_mut_log();
             log.insert(
