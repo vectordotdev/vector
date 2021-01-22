@@ -2724,7 +2724,7 @@ version = "0.1.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba5fb13a3b90581d22b4edf99e87c54316444622ae123d36816a227a7caa6df"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "futures 0.3.15",
  "glob 0.3.0",
  "heim-common",
@@ -5504,9 +5504,9 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54c0fb387dcbe19412ee9e7ddcca2aa31bedcc62e7f9faef6db431da5fadb883"
 dependencies = [
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.24",
  "quote 1.0.7",
- "syn 1.0.39",
+ "syn 1.0.54",
 ]
 
 [[package]]
@@ -7951,9 +7951,9 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
+ "trust-dns-proto",
  "tui",
  "twox-hash",
- "trust-dns-proto",
  "typetag",
  "url",
  "uuid 0.8.2",

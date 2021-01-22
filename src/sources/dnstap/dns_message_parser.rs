@@ -207,7 +207,7 @@ impl DnsMessageParser {
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
                         port_string.push_str(&current_bit.to_string());
-                        port_string.push_str(" ");
+                        port_string.push(' ');
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -339,7 +339,7 @@ impl DnsMessageParser {
                 address,
                 prefix.to_string()
             ));
-            apl_rdata.push_str(" ");
+            apl_rdata.push(' ');
         }
         Ok((Some(apl_rdata.trim_end().to_string()), None))
     }
@@ -643,7 +643,7 @@ impl DnsMessageParser {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let mut text = String::new();
                     while !decoder.is_empty() {
-                        text.push_str("\"");
+                        text.push('\"');
                         text.push_str(&parse_character_string(&mut decoder)?);
                         text.push_str("\" ");
                     }
@@ -734,7 +734,9 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 caa.issuer_critical() as u8,
                 caa.tag().as_str(),
                 match caa.value() {
-                    Value::Url(url) => { url.as_str().to_string()}
+                    Value::Url(url) => {
+                        url.as_str().to_string()
+                    }
                     Value::Issuer(option_name, vec_keyvalue) => {
                         let mut final_issuer = String::new();
                         if let Some(name) = option_name {
@@ -742,14 +744,15 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                             for keyvalue in vec_keyvalue.iter() {
                                 final_issuer.push_str("; ");
                                 final_issuer.push_str(&keyvalue.key());
-                                final_issuer.push_str("=");
+                                final_issuer.push('=');
                                 final_issuer.push_str(&keyvalue.value());
                             }
                         }
                         final_issuer.trim_end().to_string()
                     }
-                    Value::Unknown(unknown) => std::str::from_utf8(unknown).context(Utf8ParsingError)?.to_string()
-
+                    Value::Unknown(unknown) => std::str::from_utf8(unknown)
+                        .context(Utf8ParsingError)?
+                        .to_string(),
                 }
             );
             Ok((Some(caa_rdata), None))
@@ -1278,12 +1281,12 @@ mod tests {
                 Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
             },
             domain::Name,
-            rdata::{null, NAPTR, SSHFP, TLSA, TXT, CAA},
             rdata::{
+                caa::KeyValue,
                 sshfp::{Algorithm, FingerprintType},
                 tlsa::{CertUsage, Matching, Selector},
-                caa::KeyValue,
             },
+            rdata::{null, CAA, NAPTR, SSHFP, TLSA, TXT},
         },
         serialize::binary::Restrict,
     };
@@ -1536,7 +1539,7 @@ mod tests {
         ));
         let rdata_text1 = format_rdata(&rdata1);
         let rdata_text2 = format_rdata(&rdata2);
-        
+
         assert!(rdata_text1.is_ok());
         assert!(rdata_text2.is_ok());
 

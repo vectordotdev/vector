@@ -942,12 +942,13 @@ mod tests {
                     Value::Integer(time) => time == 1_593_541_950_792_494_106,
                     _ => false,
                 }));
-            assert!(log_event.all_fields().any(|(key, value)| key
-                == "requestData.header.qr"
-                && match *value {
-                    Value::Integer(qr) => qr == 1,
-                    _ => false,
-                }));
+            assert!(log_event
+                .all_fields()
+                .any(|(key, value)| key == "requestData.header.qr"
+                    && match *value {
+                        Value::Integer(qr) => qr == 1,
+                        _ => false,
+                    }));
             assert!(log_event
                 .all_fields()
                 .any(|(key, value)| key == "messageType"
@@ -956,13 +957,14 @@ mod tests {
                             *data_type == Bytes::from_static(b"UpdateResponse"),
                         _ => false,
                     }));
-            assert!(log_event.all_fields().any(|(key, value)| key
-                == "requestData.zone.zName"
-                && match value {
-                    Value::Bytes(domain_name) =>
-                        *domain_name == Bytes::from_static(b"example.com."),
-                    _ => false,
-                }));
+            assert!(log_event
+                .all_fields()
+                .any(|(key, value)| key == "requestData.zone.zName"
+                    && match value {
+                        Value::Bytes(domain_name) =>
+                            *domain_name == Bytes::from_static(b"example.com."),
+                        _ => false,
+                    }));
         } else {
             error!("Invalid base64 encoded data");
         }

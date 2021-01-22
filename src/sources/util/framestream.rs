@@ -12,7 +12,6 @@ use futures::{
     future,
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
-    FutureExt, TryFutureExt,
 };
 use futures01::Sink as Sink01;
 use std::convert::TryInto;
@@ -435,7 +434,7 @@ pub fn build_framestream_unix_source(
             };
         };
 
-        let parsing_task_counter = Arc::new(AtomicI32::new(0));
+        let active_parsing_task_nums = Arc::new(AtomicI32::new(0));
 
         info!(message = "Listening...", ?path, r#type = "unix");
 
@@ -452,7 +451,7 @@ pub fn build_framestream_unix_source(
             let content_type = frame_handler.content_type();
             let listen_path = path.clone();
             let event_sink = out.clone();
-            let task_counter = Arc::clone(&parsing_task_counter);
+            let active_task_nums_ = Arc::clone(&active_parsing_task_nums);
 
             let span = info_span!("connection");
             let path = if let Some(addr) = peer_addr {
@@ -513,30 +512,23 @@ pub fn build_framestream_unix_source(
                 let handler = async move {
                     frames
                         .for_each(move |f| {
-                            let max_frame_handling_tasks =
-                                frame_handler_copy.max_frame_handling_tasks();
-                            let f_handler = frame_handler_copy.clone();
-                            let received_from_copy = received_from.clone();
-                            let event_sink_copy = event_sink.clone();
-                            let task_counter_copy = Arc::clone(&task_counter);
+                            future::ready({
+                                let max_frame_handling_tasks =
+                                    frame_handler_copy.max_frame_handling_tasks();
+                                let f_handler = frame_handler_copy.clone();
+                                let received_from_copy = received_from.clone();
+                                let event_sink_copy = event_sink.clone();
+                                let active_task_nums_copy = Arc::clone(&active_task_nums_);
 
-                            let event_handler = move || {
-                                if let Some(evt) = f_handler.handle_event(received_from_copy, f) {
-                                    if let Err(err) = event_sink_copy.wait().send(evt) {
-                                        error!(
-                                            "Encountered error '{:#?}' while sending event",
-                                            err
-                                        );
-                                    }
-                                }
-                            };
-
-                            spawn_event_handling_tasks(
-                                event_handler,
-                                task_counter_copy,
-                                max_frame_handling_tasks,
-                            );
-                            future::ready(())
+                                spawn_event_handling_tasks(
+                                    f,
+                                    f_handler,
+                                    event_sink_copy,
+                                    received_from_copy,
+                                    active_task_nums_copy,
+                                    max_frame_handling_tasks,
+                                );
+                            })
                         })
                         .await;
                     info!("finished sending");
@@ -547,33 +539,40 @@ pub fn build_framestream_unix_source(
         Ok(())
     };
 
-    Box::new(fut.boxed().compat())
+    Box::pin(fut)
 }
 
-fn spawn_event_handling_tasks<F>(
-    event_handler: F,
-    task_counter: Arc<AtomicI32>,
+fn spawn_event_handling_tasks<S>(
+    event_data: Bytes,
+    event_handler: impl FrameHandler + Send + Sync + 'static,
+    event_sink: S,
+    received_from: Option<Bytes>,
+    active_task_nums: Arc<AtomicI32>,
     max_frame_handling_tasks: i32,
 ) -> JoinHandle<()>
 where
-    F: Send + Sync + Clone + FnOnce() + 'static,
+    S: Sink01<SinkItem = Event, SinkError = ()> + Send + 'static,
 {
-    wait_for_task_quota(&task_counter, max_frame_handling_tasks);
+    wait_for_task_quota(&active_task_nums, max_frame_handling_tasks);
 
     tokio::spawn(async move {
         future::ready({
-            event_handler();
-            task_counter.fetch_sub(1, Ordering::Relaxed);
+            if let Some(evt) = event_handler.handle_event(received_from, event_data) {
+                if event_sink.sink_compat().send(evt).await.is_err() {
+                    error!("Encountered error while sending event");
+                }
+            }
+            active_task_nums.fetch_sub(1, Ordering::AcqRel);
         })
         .await;
     })
 }
 
-fn wait_for_task_quota(task_counter: &Arc<AtomicI32>, max_tasks: i32) {
-    while max_tasks > 0 && max_tasks < task_counter.load(Ordering::Relaxed) {
+fn wait_for_task_quota(active_task_nums: &Arc<AtomicI32>, max_tasks: i32) {
+    while max_tasks > 0 && max_tasks < active_task_nums.load(Ordering::Acquire) {
         thread::sleep(Duration::from_millis(3));
     }
-    task_counter.fetch_add(1, Ordering::Relaxed);
+    active_task_nums.fetch_add(1, Ordering::AcqRel);
 }
 
 #[cfg(test)]
@@ -586,11 +585,7 @@ mod test {
         config::log_schema,
         test_util::{collect_n, collect_n_stream},
     };
-    use crate::{
-        event::{self, Event},
-        shutdown::SourceShutdownCoordinator,
-        Pipeline,
-    };
+    use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
     use bytes::{buf::Buf, Bytes, BytesMut};
     use futures::{
         compat::Future01CompatExt,
@@ -598,13 +593,13 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
-    use futures01::sync::mpsc;
+    use futures01::Sink as Sink01;
     #[cfg(unix)]
     use std::{
         path::PathBuf,
         sync::{
             atomic::{AtomicI32, Ordering},
-            Arc, Mutex,
+            Arc,
         },
         thread,
     };
@@ -617,7 +612,7 @@ mod test {
     use tokio_util::codec::{length_delimited, Framed};
 
     #[derive(Clone)]
-    struct MockFrameHandler {
+    struct MockFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {
         content_type: String,
         max_frame_length: usize,
         host_key: String,
@@ -627,25 +622,27 @@ mod test {
         socket_file_mode: Option<u32>,
         socket_receive_buffer_size: Option<usize>,
         socket_send_buffer_size: Option<usize>,
+        extra_task_handling_routine: F,
     }
 
-    impl MockFrameHandler {
-        pub fn new(content_type: String) -> Self {
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
+        pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,
                 host_key: "test_framestream".to_string(),
                 socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
-                multithreaded: false,
+                multithreaded,
                 max_frame_handling_tasks: 0,
                 socket_file_mode: None,
                 socket_receive_buffer_size: None,
                 socket_send_buffer_size: None,
+                extra_task_handling_routine: extra_routine,
             }
         }
     }
 
-    impl FrameHandler for MockFrameHandler {
+    impl<F: Send + Sync + Clone + FnOnce() + 'static> FrameHandler for MockFrameHandler<F> {
         fn content_type(&self) -> String {
             self.content_type.clone()
         }
@@ -664,6 +661,9 @@ mod test {
             if let Some(host) = received_from {
                 event.as_mut_log().insert(self.host_key(), host);
             }
+
+            (self.extra_task_handling_routine.clone())();
+
             Some(event)
         }
 
@@ -692,8 +692,8 @@ mod test {
 
     fn init_framstream_unix(
         source_name: &str,
-        frame_handler: MockFrameHandler,
-        sender: mpsc::Sender<event::Event>,
+        frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
+        pipeline: Pipeline,
     ) -> (
         PathBuf,
         JoinHandle<Result<(), ()>>,
@@ -702,12 +702,7 @@ mod test {
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
-        let server = build_framestream_unix_source(
-            frame_handler,
-            shutdown_signal,
-            Pipeline::from_sender(sender),
-        )
-        .compat();
+        let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline);
 
         // let mut rt = runtime::Runtime::new().unwrap();
         // rt.spawn(server);
@@ -782,6 +777,10 @@ mod test {
         assert_eq!(&frame[..], &expected_content_type[..]);
     }
 
+    fn create_frame_handler(multithreaded: bool) -> impl FrameHandler + Send + Sync + Clone {
+        MockFrameHandler::new("test_content".to_string(), multithreaded, move || {})
+    }
+
     async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -791,14 +790,11 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn normal_framestream() {
+    async fn normal_framestream_singlethreaded() {
         let source_name = "test_source";
-        let (tx, rx) = mpsc::channel(2);
-        let (path, source_handle, mut shutdown) = init_framstream_unix(
-            source_name,
-            MockFrameHandler::new("test_content".to_string()),
-            tx,
-        );
+        let (tx, rx) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
@@ -844,14 +840,59 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn normal_framestream_multithreaded() {
+        let source_name = "test_source";
+        let (tx, rx) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(true), tx);
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
+
+        //1 - send READY frame (with content_type)
+        let content_type = Bytes::from(&b"test_content"[..]);
+        let ready_msg =
+            create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
+        send_control_frame(&mut sock_sink, ready_msg).await;
+
+        //2 - wait for ACCEPT frame
+        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
+        //take second element, because first will be empty (signifying control frame)
+        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
+        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
+
+        //3 - send START frame
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Start)).await;
+
+        //4 - send data
+        send_data_frames(
+            &mut sock_sink,
+            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+        )
+        .await;
+        let events = collect_n(rx, 2).await.unwrap();
+
+        //5 - send STOP frame
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
+
+        assert!(events
+            .iter()
+            .any(|e| e.as_log()[&log_schema().message_key()] == "hello".into()));
+        assert!(events
+            .iter()
+            .any(|e| e.as_log()[&log_schema().message_key()] == "world".into()));
+
+        std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn multiple_content_types() {
         let source_name = "test_source";
-        let (tx, _) = mpsc::channel(2);
-        let (path, source_handle, mut shutdown) = init_framstream_unix(
-            source_name,
-            MockFrameHandler::new("test_content".to_string()),
-            tx,
-        );
+        let (tx, _) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
@@ -879,12 +920,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn wrong_content_type() {
         let source_name = "test_source";
-        let (tx, _) = mpsc::channel(2);
-        let (path, source_handle, mut shutdown) = init_framstream_unix(
-            source_name,
-            MockFrameHandler::new("test_content".to_string()),
-            tx,
-        );
+        let (tx, _) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with WRONG content_type)
@@ -917,12 +955,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn data_too_soon() {
         let source_name = "test_source";
-        let (tx, rx) = mpsc::channel(2);
-        let (path, source_handle, mut shutdown) = init_framstream_unix(
-            source_name,
-            MockFrameHandler::new("test_content".to_string()),
-            tx,
-        );
+        let (tx, rx) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send data frame (too soon!)
@@ -978,12 +1013,9 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn unidirectional_framestream() {
         let source_name = "test_source";
-        let (tx, rx) = mpsc::channel(2);
-        let (path, source_handle, mut shutdown) = init_framstream_unix(
-            source_name,
-            MockFrameHandler::new("test_content".to_string()),
-            tx,
-        );
+        let (tx, rx) = Pipeline::new_test();
+        let (path, source_handle, mut shutdown) =
+            init_framstream_unix(source_name, create_frame_handler(false), tx);
         let (mut sock_sink, _) = make_unix_stream(path).await.split();
 
         //1 - send START frame (with content_type)
@@ -1020,40 +1052,59 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_spawn_event_handling_tasks() {
-        let max_frame_handling_tasks = 100;
-        let task_counter = Arc::new(AtomicI32::new(0));
-        let task_counter_copy = Arc::clone(&task_counter);
-        let max_task_counter_value = Arc::new(Mutex::new(0));
-        let max_task_counter_value_copy = Arc::clone(&max_task_counter_value);
+        let (tx, rx) = Pipeline::new_test();
+        let out = tx.sink_map_err(|e| error!("error sending event: {:?}", e));
 
-        let mut handles = vec![];
-        let task_counter_copy_2 = Arc::clone(&task_counter_copy);
-        let mock_event_handler = move || {
-            info!("{}", "mock event handler");
-            let current_task_counter = task_counter_copy_2.load(Ordering::Relaxed);
+        let max_frame_handling_tasks = 20;
+        let active_task_nums = Arc::new(AtomicI32::new(0));
+        let active_task_nums_copy = Arc::clone(&active_task_nums);
+        let max_task_nums_reached = Arc::new(AtomicI32::new(0));
+        let max_task_nums_reached_copy = Arc::clone(&max_task_nums_reached);
+
+        let mut join_handles = vec![];
+        let active_task_nums_copy_2 = Arc::clone(&active_task_nums_copy);
+        let extra_routine = move || {
             thread::sleep(Duration::from_millis(10));
-            let mut max = max_task_counter_value_copy.lock().unwrap(); // Also to simulate writing to a single sink
-            if *max < current_task_counter {
-                *max = current_task_counter
-            };
+            max_task_nums_reached_copy.fetch_max(
+                active_task_nums_copy_2.load(Ordering::Acquire),
+                Ordering::AcqRel,
+            );
         };
-        for _ in 0..max_frame_handling_tasks * 10 {
-            handles.push(spawn_event_handling_tasks(
-                mock_event_handler.clone(),
-                Arc::clone(&task_counter_copy),
+
+        let total_events = max_frame_handling_tasks * 10;
+
+        join_handles.push(tokio::spawn(async move {
+            future::ready({
+                let events = collect_n(rx, total_events as usize).await.unwrap();
+                assert_eq!(total_events as usize, events.len(), "Missed events");
+            })
+            .await;
+        }));
+
+        for i in 0..total_events {
+            join_handles.push(spawn_event_handling_tasks(
+                Bytes::from(format!("event_{}", i)),
+                MockFrameHandler::new("test_content".to_string(), true, extra_routine.clone()),
+                out.clone(),
+                None,
+                Arc::clone(&active_task_nums_copy),
                 max_frame_handling_tasks,
             ));
         }
-        future::join_all(handles).await;
 
-        let final_task_counter = task_counter.load(Ordering::Relaxed);
+        future::join_all(join_handles).await;
+
+        let final_task_nums = active_task_nums.load(Ordering::Acquire);
         assert_eq!(
-            0, final_task_counter,
+            0, final_task_nums,
             "There should be NO left-over tasks at the end"
         );
 
-        let max_counter_value = max_task_counter_value.lock().unwrap();
-        assert!(*max_counter_value > 1, "MultiThreaded mode does NOT work");
-        assert!((*max_counter_value - max_frame_handling_tasks) < 2, "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much");
+        let max_task_nums_reached_value = max_task_nums_reached.load(Ordering::Acquire);
+        assert!(
+            max_task_nums_reached_value > 1,
+            "MultiThreaded mode does NOT work"
+        );
+        assert!((max_task_nums_reached_value - max_frame_handling_tasks) < 2, "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much");
     }
 }
