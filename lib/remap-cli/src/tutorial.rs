@@ -18,7 +18,9 @@ First, parse the message to named Syslog fields using the parse_syslog function:
 
 . = parse_syslog!(.message)
 
-Then, you can modify the event however you like. Some example operations:
+Run "." to see the new state of the event. Then you can modify the event however you like.
+
+Some example operations:
 
 .timestamp = to_unix_timestamp!(.timestamp)
 .msgid = uuid_v4()
@@ -28,7 +30,9 @@ const JSON_HELP_TEXT: &str = r#"First, parse the message string as JSON using th
 
 . = parse_json!(.message)
 
-Then, you can modify the event however you like. Some example operations:
+Run "." to see the new state of the event. Then you can modify the event however you like.
+
+Some example operations:
 
 del(.method); del(.host)
 url = parse_url!(.referer)
@@ -36,7 +40,18 @@ del(.referer)
 .referer_host = url.host
 "#;
 
-const GROK_HELP_TEXT: &str = "";
+const GROK_HELP_TEXT: &str = r#"First, parse the message string using Grok with the parse_grok function:
+
+pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+. = parse_grok!(.message, pattern)
+
+Run "." to see the new state of the event. Then you can modify the event however you like.
+
+Some example operations:
+
+.timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
+.message = downcase(.message)
+"#;
 
 struct Tutorial {
     title: &'static str,
@@ -72,14 +87,16 @@ pub fn tutorial() -> Result<(), Error> {
     let grok_tut = Tutorial {
         title: "Grok patterns",
         help_text: GROK_HELP_TEXT,
-        object: Value::from(map![]),
+        object: Value::from(map![
+            "message": "2021-01-21T18:46:59.991Z error Too many cooks in the kitchen"
+        ]),
     };
 
     let mut tutorials = vec![syslog_tut, json_tut, grok_tut];
 
     println!("Welcome to the Vector Remap Language interactive tutorial!\n");
 
-    print_tutorial_help_text(index, &tutorials);
+    print_tutorial_help_text(index, &tutorials, false);
 
     loop {
         let readline = rl.readline("$ ");
@@ -96,15 +113,19 @@ pub fn tutorial() -> Result<(), Error> {
                                 "You've finished all the steps! Taking you back to the beginning\n"
                             );
                             index = 0;
-                            print_tutorial_help_text(index, &tutorials);
+                            print_tutorial_help_text(index, &tutorials, true);
                         } else {
                             index = index.saturating_add(1);
-                            print_tutorial_help_text(index, &tutorials);
+                            print_tutorial_help_text(index, &tutorials, true,);
                         }
                     }
                     "prev" => {
+                        if index == 0 {
+                            println!("You're back at the beginning!\n");
+                        }
+
                         index = index.saturating_sub(1);
-                        print_tutorial_help_text(index, &tutorials);
+                        print_tutorial_help_text(index, &tutorials, true);
                     }
                     "" => continue,
                     command => {
@@ -130,8 +151,13 @@ fn help() {
     println!("{}", HELP_TEXT);
 }
 
-fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>) {
+fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>, include_topline: bool) {
     let tut = &tutorials[index];
+
+    if include_topline {
+        println!("------------");
+    }
+
     println!(
         "\nTutorial {}: {}\n\n{}\nEvent:\n{}\n",
         index + 1,
