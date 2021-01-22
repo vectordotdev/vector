@@ -623,6 +623,43 @@ mod integration_tests {
         }
     }
 
+    #[tokio::test]
+    async fn out_of_order() {
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "json"
+            tenant_id = "default"
+            batch.max_events = 5
+        "#,
+        )
+        .unwrap();
+
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+
+        *test_name = Template::try_from(stream.to_string()).unwrap();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+
+        let events = lines.clone().into_iter().map(Event::from);
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
+            .await
+            .unwrap();
+
+        let outputs = fetch_stream(stream.to_string(), "default").await;
+        for (i, output) in outputs.iter().enumerate() {
+            assert_eq!(output, &lines[i]);
+        }
+    }
+
     async fn fetch_stream(stream: String, tenant: &str) -> Vec<String> {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(

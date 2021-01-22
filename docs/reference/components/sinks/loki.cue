@@ -125,7 +125,7 @@ components: sinks: loki: {
 				default: "drop"
 				enum: {
 					"drop":              "Drop the event."
-					"rewrite_timestamp": "Rewrite timestamp to the current time."
+					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
 		}

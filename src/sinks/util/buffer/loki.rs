@@ -157,8 +157,7 @@ impl Batch for LokiBuffer {
                 match self.out_of_order_action {
                     OutOfOrderAction::Drop => return PushResult::Ok(false),
                     OutOfOrderAction::RewriteTimestamp => {
-                        item.event.timestamp =
-                            i64::max(latest_timestamp, chrono::Utc::now().timestamp_nanos());
+                        item.event.timestamp = latest_timestamp;
                     }
                 }
             }
