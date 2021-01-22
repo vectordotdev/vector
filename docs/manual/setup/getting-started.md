@@ -55,9 +55,9 @@ data over stdin and is identified as `in`.
 
 Our second component, `sinks.out`, uses the [`console` source][docs.sinks.console] which tells Vector to simply print
 the data to stdout. The `encoding.codec` option tells Vector to print the data as plain text (unencoded).
-The `inputs` option creates a pipeline from our source, which receives events, to our sink, which sends those
-events onwards. The `inputs` option in our `sinks.out` component tells Vector where this sink's events are coming
-from. In our case, events are received from our other component, the source identified as `in`.
+
+The `inputs` option in our `sinks.out` component tells Vector where this sink's events are
+coming from. In our case, events are received from our other component, the source identified as `in`.
 
 ## Hello World!
 
@@ -165,8 +165,14 @@ observability data. You can then route and output your events to dozens of desti
 
 ## What's next?
 
-**TBD - what do you want for the next steps?***
+We're just scatching the surface in this post. To get your hands dirty with Vector
+check out:
 
+* All of Vector's [sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks].
+* The [Vector Remap Language][docs.vrl], the heart of data processing in Vector.
+* Finally, [deploying Vector][docs.deployment] to launch Vector in your production environment.
+
+[docs.deployment]: /docs/setup/deployment/
 [docs.installation]: /docs/manual/installation
 [docs.setup.configuration]: /docs/setup/configuration/
 [docs.sinks]: /docs/reference/components/sinks
