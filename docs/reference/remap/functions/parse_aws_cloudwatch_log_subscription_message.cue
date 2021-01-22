@@ -12,7 +12,7 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted AWS Cloudwatch Log subscription message",
 	]
-	return: ["map"]
+	return: types: ["map"]
 	category: "Parse"
 	description: #"""
 		Parses AWS CloudWatch Logs events (configured through AWS Cloudwatch

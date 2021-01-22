@@ -10,7 +10,7 @@ remap: functions: strip_whitespace: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Strips the whitespace from the start and end of the provided `value`.

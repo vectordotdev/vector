@@ -30,7 +30,7 @@ remap: functions: format_number: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Number"
 	description: #"""
 		Formats the given `value` into a string representation of the number.

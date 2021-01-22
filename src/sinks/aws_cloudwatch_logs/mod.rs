@@ -3,7 +3,7 @@ mod request;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
@@ -72,7 +72,10 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig<Option<usize>>,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 inventory::submit! {
@@ -97,6 +100,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         assume_role: Default::default(),
+        auth: Default::default(),
     }
 }
 
@@ -158,7 +162,7 @@ impl CloudwatchLogsSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(CloudWatchLogsClient::new_with_client(client, region))
@@ -884,6 +888,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -930,6 +935,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -995,6 +1001,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1066,6 +1073,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1117,6 +1125,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1164,6 +1173,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1249,6 +1259,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let client = config.create_client().unwrap();

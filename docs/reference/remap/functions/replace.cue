@@ -30,7 +30,7 @@ remap: functions: replace: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Replaces any matching patterns in the provided `value` via the provided `pattern`.

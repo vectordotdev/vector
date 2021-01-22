@@ -25,6 +25,7 @@ components: sources: file: {
 			}
 		}
 		multiline: enabled: true
+		encoding: enabled:  true
 	}
 
 	support: {
@@ -118,7 +119,7 @@ components: sources: file: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			type: string: default: "host"
 		}
@@ -142,6 +143,15 @@ components: sources: file: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
 			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
+		}
+		line_delimiter: {
+			common:      false
+			description: "String sequence used to separate one file line from another"
+			required:    false
+			type: string: {
+				default: "\n"
+				examples: ["\r\n"]
+			}
 		}
 		max_line_bytes: {
 			common:      false
@@ -364,8 +374,9 @@ components: sources: file: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
-				is found.
+				Each line is read until a new line delimiter (by default, `\n` i.e.
+				the `0xA` byte) or `EOF` is found. If needed, the default line
+				delimiter can be overriden via the `line_delimiter` option.
 				"""
 		}
 

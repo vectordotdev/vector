@@ -23,7 +23,7 @@ remap: functions: merge: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["map"]
 	category: "Map"
 	description: #"""
 		Merges the `from` map provided into the `to` map.

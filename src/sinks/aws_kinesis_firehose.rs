@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -46,7 +46,10 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -127,7 +130,7 @@ impl KinesisFirehoseSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(KinesisFirehoseClient::new_with_client(client, region))
@@ -333,6 +336,7 @@ mod integration_tests {
                 ..Default::default()
             },
             assume_role: None,
+            auth: Default::default(),
         };
 
         let cx = SinkContext::new_test();
@@ -348,7 +352,7 @@ mod integration_tests {
         delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()

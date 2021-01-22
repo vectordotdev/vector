@@ -23,7 +23,7 @@ remap: functions: slice: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Returns a slice of the provided `value` between the `start` and `end` positions specified.

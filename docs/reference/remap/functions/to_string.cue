@@ -10,7 +10,17 @@ remap: functions: to_string: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: {
+		types: ["string"]
+		rules: [
+			#"If `value` is an integer then its string representation is returned."#,
+			#"If `value` is an float then its string representation is returned."#,
+			#"If `value` is an boolean then `"true"` or `"false"` is returned."#,
+			#"If `value` is an timestamp then its RFC3339 representation is returned."#,
+			#"If `value` is a map then it is encoded into JSON."#,
+			#"If `value` is a list then it is encoded into JSON."#,
+		]
+	}
 	category: "Coerce"
 	description: #"""
 		Coerces the provided `value` into a `string`.

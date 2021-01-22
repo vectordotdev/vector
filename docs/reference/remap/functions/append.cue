@@ -16,7 +16,7 @@ remap: functions: append: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array"]
+	return: types: ["array"]
 	category: "Array"
 	description: """
 		Adds each item from an array to the end of another array.

@@ -30,7 +30,7 @@ remap: functions: parse_duration: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted duration",
 	]
-	return: ["float"]
+	return: types: ["float"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` representing a duration in the specified `unit`.

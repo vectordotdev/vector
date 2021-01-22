@@ -22,7 +22,7 @@ remap: functions: ip_subnet: {
 		"`ip` is not a valid IP address",
 		"`subnet` is not a valid subnet.",
 	]
-	return: ["string"]
+	return: types: ["string"]
 	category: "IP"
 	description: #"""
 		Extracts the subnet address from the given `ip` using the supplied `subnet`.
