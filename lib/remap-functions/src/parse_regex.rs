@@ -55,26 +55,10 @@ impl Expression for ParseRegexFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let mut inner_type = BTreeMap::new();
-
-        // Add typedefs for each capture by numerical index.
-        for num in 0..self.pattern.captures_len() {
-            inner_type.insert(num.to_string(), TypeDef::new_with_kind(value::Kind::Bytes));
-        }
-
-        // Add a typedef for each capture name.
-        for name in self
-            .pattern
-            .capture_names()
-            .filter_map(std::convert::identity)
-        {
-            inner_type.insert(name.to_owned(), TypeDef::new_with_kind(value::Kind::Bytes));
-        }
-
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
-            .with_inner_type(InnerTypeDef::Map(inner_type))
+            .with_inner_type(util::regex_type_def(&self.pattern))
             .with_constraint(value::Kind::Map)
     }
 }
@@ -96,8 +80,7 @@ mod tests {
                                remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
                                                       "1": TypeDef::new_with_kind(Kind::Bytes),
                                                       "group": TypeDef::new_with_kind(Kind::Bytes)
-                               ]
-                           ),
+                               ]),
                            ..Default::default() },
         }
 
@@ -112,8 +95,7 @@ mod tests {
                                remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
                                                       "1": TypeDef::new_with_kind(Kind::Bytes),
                                                       "group": TypeDef::new_with_kind(Kind::Bytes)
-                               ]
-                           ),
+                               ]),
             },
         }
 

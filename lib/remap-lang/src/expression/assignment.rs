@@ -1,9 +1,10 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    path, state,
+    path,
+    state,
     value::Kind,
-    Expr, Expression, Field, InnerTypeDef, Object, Result, Segment, TypeDef, Value,
+    Expr, Expression, InnerTypeDef, Field, Object, Result, Segment, TypeDef, Value,
 };
 use std::fmt;
 use std::str::FromStr;
@@ -53,6 +54,10 @@ fn path_type_def(state: &mut state::Compiler, path: &path::Path, type_def: TypeD
     query_types.insert(path.clone(), type_def.clone());
 
     // Recursively insert new ones from the inner type def.
+    // Note we are not handling Array inner types, since array indexing
+    // is fallible (there may not be enough elements in the array) any
+    // indexing needs to be handled.
+    // This may change in future.
     if let InnerTypeDef::Map(map) = type_def.inner_type_def {
         for (field, type_def) in map {
             if let Ok(field) = Field::from_str(&field) {
@@ -222,7 +227,7 @@ mod tests {
     use super::*;
     use crate::{
         expression::{Arithmetic, Literal},
-        lit, path, test_type_def, Operator,
+        lit, path, test_type_def, InnerTypeDef, Operator,
     };
     use std::collections::BTreeMap;
 
