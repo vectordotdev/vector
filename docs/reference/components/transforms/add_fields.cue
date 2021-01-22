@@ -5,7 +5,7 @@ components: transforms: add_fields: {
 	description: "Adds fields to log events."
 
 	vrl_replacement: {
-		replacement: "In VRL, you can add fields to an event by assigning values to not-yet-existing fields."
+		description: "In VRL, you can add fields to an event by assigning values to not-yet-existing fields."
 		examples: [
 			#".severity = "crit""#,
 			".status = 200",

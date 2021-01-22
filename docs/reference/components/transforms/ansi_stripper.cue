@@ -8,10 +8,7 @@ components: transforms: ansi_stripper: {
 		"""
 
 	vrl_replacement: {
-		replacement: remap.functions.strip_ansi_escape_codes
-		examples: [
-			#"strip_ansi_escape_codes("\e[46mfoo\e[0m bar")"#
-		]
+		replacement_func: "strip_ansi_escape_codes"
 	}
 
 	classes: {

@@ -119,9 +119,13 @@ components: {
 		}
 
 		if Kind == "transform" {
+			// Specify either the name of the function that replaces the transform or, when that isn't applicable, as
+			// with the add_fields transform, provide a description and VRL examples
 			#VRLReplacement: {
-				replacement: string | remap.#Function // Either a reference to a function or a description
-				examples: [string, ...string]
+				replacement_func: string
+			} | {
+				description?: string
+				examples:     [string, ...string]
 			}
 
 			vrl_replacement?: #VRLReplacement
