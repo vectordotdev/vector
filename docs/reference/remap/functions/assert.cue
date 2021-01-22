@@ -38,7 +38,7 @@ remap: functions: assert: {
 			source: #"""
 				assert("foo" == "bar", message: "Foo must be foo!")
 				"""#
-			raises: "Foo must be foo!"
+			raises: runtime: "Foo must be foo!"
 		},
 	]
 }

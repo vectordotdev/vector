@@ -119,7 +119,7 @@ components: sources: file: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			type: string: default: "host"
 		}
