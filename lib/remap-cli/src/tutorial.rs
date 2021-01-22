@@ -151,7 +151,7 @@ fn help() {
     println!("{}", HELP_TEXT);
 }
 
-fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>, include_topline: bool) {
+fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial], include_topline: bool) {
     let tut = &tutorials[index];
 
     if include_topline {
