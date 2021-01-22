@@ -145,13 +145,7 @@ pub fn resolve(
         Some(object) => object,
     };
 
-    let program = match Program::new_with_state(
-        program.to_owned(),
-        &funcs(),
-        None,
-        true,
-        state,
-    ) {
+    let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
         Ok((program, _)) => program,
         Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };

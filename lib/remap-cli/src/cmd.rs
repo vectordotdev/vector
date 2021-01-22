@@ -48,7 +48,6 @@ fn run(opts: &Opts) -> Result<(), Error> {
         return tutorial();
     }
 
-
     // Run the REPL if no program or program file is specified
     if should_open_repl(opts) {
         // If an input file is provided, use that for the REPL objects, otherwise provide a
