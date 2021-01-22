@@ -1,35 +1,55 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
+Internal template to render service ports depending on whether service is a headless service or not. Use
+either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePorts' as entry points.
+*/}}
+{{- define "vector-aggregator.internalServicePorts" -}}
+{{- $headless := index . 0 -}}
+{{- $values := index . 1 -}}
+{{- if $values.vectorSource.enabled }}
+- name: vector
+{{- if and $values.vectorSource.nodePort (not $headless) (eq "NodePort" $values.service.type) }}
+  nodePort: {{ $values.vectorSource.nodePort }}
+{{- end }}
+  port: {{ $values.vectorSource.listenPort }}
+  protocol: TCP
+{{- if not $headless }}
+  targetPort: {{ $values.vectorSource.listenPort }}
+{{- end }}
+{{- end }}
+{{- range $values.service.ports }}
+- port: {{ .port }}
+{{- if not $headless }}
+  targetPort: {{ .targetPort }}
+{{- end }}
+{{- if and .nodePort (not $headless) (eq "NodePort" $values.service.type) }}
+  nodePort: {{ .nodePort }}
+{{- end }}
+{{- with .name }}
+  name: {{.}}
+{{- end }}
+{{- with .protocol }}
+  protocol: {{.}}
+{{- end }}
+{{- with .appProtocol }}
+  appProtocol: {{.}}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Resolve effective service ports to use.
 */}}
 {{- define "vector-aggregator.servicePorts" -}}
-ports:
-{{- if .Values.vectorSource.enabled }}
-- name: vector
-{{- if and .Values.vectorSource.nodePort (eq "NodePort" .Values.service.type) }}
-  nodePort: {{ .Values.vectorSource.nodePort }}
-{{- end }}
-  port: {{ .Values.vectorSource.listenPort }}
-  protocol: TCP
-  targetPort: {{ .Values.vectorSource.listenPort }}
-{{- end }}
-{{- with .Values.service.ports }}
-{{ toYaml . }}
-{{- end }}
-{{- end }}
+{{- tuple false .Values | include "vector-aggregator.internalServicePorts" -}}
+{{- end -}}
 
 {{/*
 Generate effective service ports omitting the 'nodePort' for headless definition.
 */}}
 {{- define "vector-aggregator.headlessServicePorts" -}}
-{{- $ports := include "vector-aggregator.servicePorts" . | fromYaml -}}
-{{- $headlessPorts := list -}}
-{{- range $port := $ports.ports -}}
-{{- $headlessPorts = append $headlessPorts (omit $port "nodePort") -}}
-{{- end -}}
-ports:
-{{ $headlessPorts | toYaml | indent 2 }}
+{{- tuple true .Values | include "vector-aggregator.internalServicePorts" -}}
 {{- end }}
 
 {{/*
