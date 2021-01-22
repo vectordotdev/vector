@@ -10,6 +10,26 @@ components: _aws: {
 			type: object: {
 				examples: []
 				options: {
+					access_key_id: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["AKIAIOSFODNN7EXAMPLE"]
+						}
+					}
+					secret_access_key: {
+						category:    "Auth"
+						common:      false
+						description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+						}
+					}
 					assume_role: {
 						category:    "Auth"
 						common:      false
@@ -124,10 +144,11 @@ components: _aws: {
 			body:  """
 				Vector checks for AWS credentials in the following order:
 
-				1. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-				2. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file. (usually located at `~/.aws/config`)
-				3. The [AWS credentials file](\(urls.aws_credentials_file)). (usually located at `~/.aws/credentials`)
-				4. The [IAM instance profile](\(urls.iam_instance_profile)). (will only work if running on an EC2 instance with an instance profile/role)
+				1. Options [`access_key_id`](#access_key_id) and [`secret_access_key`](#secret_access_key).
+				2. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file. (usually located at `~/.aws/config`)
+				4. The [AWS credentials file](\(urls.aws_credentials_file)). (usually located at `~/.aws/credentials`)
+				5. The [IAM instance profile](\(urls.iam_instance_profile)). (will only work if running on an EC2 instance with an instance profile/role)
 
 				If credentials are not found the [healtcheck](#healthchecks) will fail and an
 				error will be [logged][docs.monitoring#logs].
@@ -139,7 +160,8 @@ components: _aws: {
 						In general, we recommend using instance profiles/roles whenever possible. In
 						cases where this is not possible you can generate an AWS access key for any user
 						within your AWS account. AWS provides a [detailed guide](\(urls.aws_access_keys)) on
-						how to do this.
+						how to do this. Such created AWS access keys can be used via [`access_key_id`](#access_key_id)
+						and [`secret_access_key`](#secret_access_key) options.
 						"""
 				},
 				{
