@@ -355,8 +355,7 @@ fn reconcile_position_options(
         ),
         _ => (
             ignore_checkpoints.unwrap_or(false),
-            // TODO: this is funky, but probably matches current behavior?
-            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+            read_from.map(Into::into).unwrap_or_default(),
         ),
     }
 }

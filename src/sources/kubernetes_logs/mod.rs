@@ -253,8 +253,8 @@ impl Source {
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
             ignore_checkpoints: false,
-            // TODO: this probably matches current behavior, but should be changed
-            read_from: ReadFrom::Beginning,
+            // Match the default behavior
+            read_from: ReadFrom::default(),
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may

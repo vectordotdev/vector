@@ -24,6 +24,12 @@ pub enum ReadFrom {
     Checkpoint(FilePosition),
 }
 
+impl Default for ReadFrom {
+    fn default() -> Self {
+        ReadFrom::Beginning
+    }
+}
+
 #[cfg(test)]
 mod test {
     use self::file_watcher::FileWatcher;
