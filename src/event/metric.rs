@@ -308,22 +308,18 @@ impl Metric {
             })
     }
 
-    #[inline]
     pub fn name(&self) -> &str {
         &self.series.name.name
     }
 
-    #[inline]
     pub fn namespace(&self) -> Option<&str> {
         self.series.name.namespace.as_deref()
     }
 
-    #[inline]
     pub fn tags(&self) -> Option<&MetricTags> {
         self.series.tags.as_ref()
     }
 
-    #[inline]
     pub fn tags_mut(&mut self) -> &mut Option<MetricTags> {
         &mut self.series.tags
     }
