@@ -99,6 +99,9 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
 
     let mut group = c.benchmark_group(format!("{}/{}", bench_name, "topology"));
     group.sampling_mode(SamplingMode::Flat);
+    // Encapsulate noise seen in
+    // https://github.com/timberio/vector/runs/1746002475
+    group.noise_threshold(0.10);
 
     for &num_writers in [1, 2, 4, 8, 16].iter() {
         group.throughput(Throughput::Bytes(
@@ -180,6 +183,8 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
 #[inline]
 fn bench_micro(c: &mut Criterion, bench_name: &'static str) {
     let mut group = c.benchmark_group(format!("{}/{}", bench_name, "micro"));
+    // https://github.com/timberio/vector/runs/1746002475
+    group.noise_threshold(0.05);
     group.bench_function("bare_counter", |b| {
         b.iter(|| {
             counter!("test", 1);
