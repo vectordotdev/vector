@@ -431,7 +431,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
-    use chrono::{Duration, Timelike};
+    use chrono::{DateTime, Duration, Utc};
     use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
@@ -676,16 +676,20 @@ mod integration_tests {
 
         let _ = sink
             .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
+            .send_all(&mut stream::iter(events.clone()).map(Ok))
             .await
             .unwrap();
 
         lines.remove(5);
+        events.remove(5);
 
-        let (_ts, outputs) = fetch_stream(stream.to_string(), "default").await;
+        let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(lines.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
+        }
+        for (i, ts) in timestamps.iter().enumerate() {
+            assert_eq!(get_timestamp(&events[i]).timestamp_nanos(), *ts,);
         }
     }
 
@@ -735,15 +739,32 @@ mod integration_tests {
 
         let _ = sink
             .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
+            .send_all(&mut stream::iter(events.clone()).map(Ok))
             .await
             .unwrap();
 
-        let (_ts, outputs) = fetch_stream(stream.to_string(), "default").await;
+        let time = get_timestamp(&events[4]);
+        events[5]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), time);
+
+        let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(lines.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
+        for (i, ts) in timestamps.iter().enumerate() {
+            assert_eq!(get_timestamp(&events[i]).timestamp_nanos(), *ts,);
+        }
+    }
+
+    fn get_timestamp(event: &Event) -> DateTime<Utc> {
+        *event
+            .as_log()
+            .get(log_schema().timestamp_key())
+            .unwrap()
+            .as_timestamp()
+            .unwrap()
     }
 
     async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
