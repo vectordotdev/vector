@@ -147,7 +147,7 @@ pub fn resolve(
 
     let program = match Program::new_with_state(
         program.to_owned(),
-        &remap_functions::all(),
+        &funcs(),
         None,
         true,
         state,
