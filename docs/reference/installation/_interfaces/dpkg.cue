@@ -22,7 +22,7 @@ installation: _interfaces: dpkg: {
 			_config_path: paths.config
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{version}-{arch}.deb && \
-					sudo dpkg -i vector-{arch}.deb
+					sudo dpkg -i vector-{version}-{arch}.deb
 				"""#
 			uninstall: "sudo dpkg -r vector"
 			upgrade:   null
