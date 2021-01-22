@@ -296,6 +296,10 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 test-behavior: ## Runs behaviorial test
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
 
+.PHONY: test-global-alloc
+test-global-alloc: ## Runs custom tests for lib/vector-global-alloc
+	${MAYBE_ENVIRONMENT_EXEC} cd lib/vector-global-alloc && ./test.sh
+
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
