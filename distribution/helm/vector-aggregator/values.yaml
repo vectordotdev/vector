@@ -160,6 +160,7 @@ service:
     #   port: 1234
     #   protocol: TCP
     #   targetPort: 1234
+    #   nodePort: 1243  (optional but useful with `service.type` is set to `NodePort`)
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
@@ -191,10 +192,10 @@ vectorSource:
   # Additional config to embed at the vector source.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the vector source (deprecated).
-  rawConfig: null
   # Specific node port to bind (useful if `service.type` is set to `NodePort`).
   nodePort: null  # 9090 (must be a number)
+  # Raw TOML config to embed at the vector source (deprecated).
+  rawConfig: null
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
