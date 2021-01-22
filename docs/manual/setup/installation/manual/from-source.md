@@ -423,7 +423,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-rename_fields`                           | Enables building of [`rename_fields` transform][docs.transforms.rename_fields].                                                            |
 | `transforms-sampler`                                 | Enables building of [`sampler` transform][docs.transforms.sampler].                                                                        |
 | `transforms-split`                                   | Enables building of [`split` transform][docs.transforms.split].                                                                            |
-| `transforms-swimlanes`                               | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].                                                                    |
+| `transforms-route`                                   | Enables building of [`route` transform][docs.transforms.route].                                                                    |
 | `transforms-tag_cardinality_limit`                   | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].                                            |
 | `transforms-tokenizer`                               | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].                                                                    |
 | `transforms-wasm`                                    | Enables building of [`wasm` transform][docs.transforms.wasm].                                                                              |

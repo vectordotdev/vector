@@ -745,11 +745,11 @@ async fn parses_sink_full_es_aws() {
 
 #[cfg(all(
     feature = "sources-socket",
-    feature = "transforms-swimlanes",
+    feature = "transforms-route",
     feature = "sinks-socket"
 ))]
 #[tokio::test]
-async fn swimlanes() {
+async fn route() {
     let warnings = load(
         r#"
         [sources.in]
@@ -758,7 +758,7 @@ async fn swimlanes() {
         address = "127.0.0.1:1235"
 
         [transforms.splitting_gerrys]
-        type = "swimlanes"
+        type = "route"
         inputs = ["in"]
 
         [transforms.splitting_gerrys.lanes.only_gerrys]

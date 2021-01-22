@@ -563,7 +563,7 @@ async fn build_unit_test(
 #[cfg(all(
     test,
     feature = "transforms-add_fields",
-    feature = "transforms-swimlanes"
+    feature = "transforms-route"
 ))]
 mod tests {
     use super::*;
@@ -986,12 +986,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_swimlanes() {
+    async fn test_route() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
-  type = "swimlanes"
+  type = "route"
   [transforms.foo.lanes.first]
     type = "check_fields"
     "message.eq" = "test swimlane 1"
@@ -1006,7 +1006,7 @@ mod tests {
     new_field = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 1"
+  name = "successful route test 1"
 
   [tests.input]
     insert_at = "foo"
@@ -1026,7 +1026,7 @@ mod tests {
       "new_field.equals" = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 2"
+  name = "successful route test 2"
 
   [tests.input]
     insert_at = "foo"
