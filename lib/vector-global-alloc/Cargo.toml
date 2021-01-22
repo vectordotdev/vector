@@ -6,6 +6,11 @@ edition = "2018"
 description = "A crate for sharing Vector global allocator preferences across various build targets (vector itself, benches, etc)."
 publish = false
 license = "MPL-2.0"
+autotests = false
+
+[lib]
+test = false
+doctest = false
 
 [dependencies]
 cfg-if = "1.0"
@@ -14,19 +19,12 @@ jemallocator = { version = "0.3.2", optional = true }
 [dev-dependencies]
 trybuild = "1.0"
 
-# Platform defaults for systems that should use jemalloc.
-# Ensure they are in line with the conditions at the `src/lib.rs`.
-[target.'cfg(all(any(target_os = "linux", target_os = "android", target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"), not(target = "armv7-unknown-linux-musleabihf")))'.dependencies]
-jemallocator = { version = "0.3.2", optional = false }
-
-# FIXME: https://github.com/gnzlbg/jemallocator/issues/91
-# [target.'cfg(target_os = "windows")'.dependencies]
-# jemallocator = { version = "0.3.2", optional = false }
-
 [features]
-# Features are only intended for when you need to manually force the usage of
-# a particular allocator.
-# This crate will try to autodetect the "best" (according to our considertaion)
-# allocator available on the current `target_os` by default.
-force-system = []
-force-jemallocator = ["jemallocator"]
+system = []
+jemalloc = ["jemallocator"]
+
+# Define test targets manually.
+
+# This test is to be run with either `system` or `jemalloc` features.
+[[test]]
+name = "conflict"
