@@ -431,7 +431,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
-    use chrono::Duration;
+    use chrono::{Duration, Timelike};
     use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
@@ -466,6 +466,7 @@ mod integration_tests {
             .unwrap();
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(lines.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
@@ -504,6 +505,7 @@ mod integration_tests {
             .unwrap();
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
@@ -626,6 +628,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn out_of_order_drop() {
+        crate::test_util::trace_init();
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
@@ -647,7 +650,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+        let mut lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()
@@ -655,7 +658,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
 
-        let base = chrono::Utc::now();
+        let base = chrono::Utc::now() - Duration::seconds(20);
         for (i, event) in events.iter_mut().enumerate() {
             let log = event.as_mut_log();
             log.insert(
@@ -663,6 +666,9 @@ mod integration_tests {
                 base + Duration::seconds(i as i64),
             );
         }
+        events[5]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), base);
 
         let _ = sink
             .into_sink()
@@ -670,7 +676,69 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        lines.remove(5);
+
+        let (_ts, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(lines.len(), outputs.len());
+        for (i, output) in outputs.iter().enumerate() {
+            assert_eq!(output, &lines[i]);
+        }
+    }
+
+    #[tokio::test]
+    async fn out_of_order_rewrite() {
+        crate::test_util::trace_init();
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "text"
+            tenant_id = "default"
+            batch.max_events = 5
+            out_of_order_action = "rewrite_timestamp"
+        "#,
+        )
+        .unwrap();
+
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+
+        *test_name = Template::try_from(stream.to_string()).unwrap();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let lines = (0..10).map(|i| i.to_string()).collect::<Vec<_>>();
+
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = (chrono::Utc::now() - Duration::seconds(20))
+            .with_nanosecond(0)
+            .unwrap();
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+        events[5]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), base);
+
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
+            .await
+            .unwrap();
+
+        let (_ts, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(lines.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
