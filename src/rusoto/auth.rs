@@ -4,9 +4,14 @@ use serde::{Deserialize, Serialize};
 
 /// Configuration for configuring authentication strategy for AWS.
 #[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
-#[serde(untagged)]
 #[derivative(Default)]
+#[serde(untagged)]
+#[serde(deny_unknown_fields)]
 pub enum AWSAuthentication {
+    Static {
+        access_key_id: String,
+        secret_access_key: String,
+    },
     Role {
         assume_role: String,
     },
@@ -28,9 +33,23 @@ impl AWSAuthentication {
             warn!("Option `assume_role` has been renamed to `auth.assume_role`. Please use that one instead.");
         }
         match self {
+            Self::Static {
+                access_key_id,
+                secret_access_key,
+            } => {
+                if old_assume_role.is_some() {
+                    warn!("Ignoring option `assume_role`, instead using access options.");
+                }
+                Ok(AwsCredentialsProvider::new_minimal(
+                    access_key_id,
+                    secret_access_key,
+                ))
+            }
             Self::Role { assume_role } => {
                 if old_assume_role.is_some() {
-                    warn!("Ignoring option `assume_role` and using option `auth.assume_role` instead.");
+                    warn!(
+                        "Ignoring option `assume_role`, instead using option `auth.assume_role`."
+                    );
                 }
                 AwsCredentialsProvider::new(region, Some(assume_role.clone()))
             }
@@ -99,5 +118,18 @@ mod tests {
             AWSAuthentication::Role { assume_role } => assert_eq!(&assume_role, "auth.root"),
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn parsing_static() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.access_key_id = "key"
+            auth.secret_access_key = "other"
+        "#,
+        )
+        .unwrap();
+
+        assert!(matches!(config.auth, AWSAuthentication::Static{..}));
     }
 }
