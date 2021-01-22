@@ -96,16 +96,6 @@ components: sinks: elasticsearch: {
 			type: object: {
 				examples: []
 				options: components._aws.configuration.auth.type.object.options & {
-					assume_role: {
-						common:      false
-						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["arn:aws:iam::123456789098:role/my_role"]
-						}
-					}
 					password: {
 						description: "The basic authentication password."
 						required:    true
