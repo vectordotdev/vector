@@ -118,6 +118,20 @@ components: {
 			output: #Output
 		}
 
+		if Kind == "transform" {
+			deprecation_notice?: !=""
+			vrl_examples?: [#VRLExample, ...#VRLExample]
+
+			if vrl_examples != _|_ {
+				deprecation_notice: """
+					This transform has been deprecated in favor of the [`remap`](\(urls.vector_remap_transform))
+					transform, which enables you to use [Vector Remap Language](\(urls.vrl_intro)) (VRL for short) to
+					create transform logic of any degree of complexity. The examples below show how you can use VRL to
+					replace this transform's functionality.
+					"""
+			}
+		}
+
 		// `support` communicates the varying levels of support of the component.
 		support: #Support & {_args: kind: Kind}
 
@@ -470,6 +484,10 @@ components: {
 		// For example, the `lua` transform offers a Lua version notice that
 		// communicate which version of Lua is embedded.
 		notices: [...string] | null // Allow for empty list
+	}
+
+	#VRLExample: {
+
 	}
 
 	sources:    #Components
