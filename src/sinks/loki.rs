@@ -431,6 +431,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
+    use chrono::Duration;
     use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
@@ -464,7 +465,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string(), "default").await;
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
@@ -502,7 +503,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string(), "default").await;
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
@@ -550,8 +551,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream1.to_string(), "default").await;
-        let outputs2 = fetch_stream(stream2.to_string(), "default").await;
+        let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
+        let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -609,8 +610,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream.to_string(), "tenant1").await;
-        let outputs2 = fetch_stream(stream.to_string(), "tenant2").await;
+        let (_, outputs1) = fetch_stream(stream.to_string(), "tenant1").await;
+        let (_, outputs2) = fetch_stream(stream.to_string(), "tenant2").await;
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -624,16 +625,17 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn out_of_order() {
+    async fn out_of_order_drop() {
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
-            encoding = "json"
+            encoding = "text"
             tenant_id = "default"
             batch.max_events = 5
+            out_of_order_action = "drop"
         "#,
         )
         .unwrap();
@@ -647,20 +649,34 @@ mod integration_tests {
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
-        let events = lines.clone().into_iter().map(Event::from);
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now();
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+
         let _ = sink
             .into_sink()
             .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string(), "default").await;
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
     }
 
-    async fn fetch_stream(stream: String, tenant: &str) -> Vec<String> {
+    async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(
             "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
@@ -691,11 +707,15 @@ mod integration_tests {
 
         let values = results[0].get("values").unwrap().as_array().unwrap();
 
-        values
+        // the array looks like: [ts, line].
+        let timestamps = values
             .iter()
-            // Lets check the message field of the array where
-            // the array looks like: [ts, line].
+            .map(|v| v[0].as_str().unwrap().parse().unwrap())
+            .collect();
+        let lines = values
+            .iter()
             .map(|v| v[1].as_str().unwrap().to_string())
-            .collect::<Vec<_>>()
+            .collect();
+        (timestamps, lines)
     }
 }
