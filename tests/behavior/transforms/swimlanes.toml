@@ -1,6 +1,6 @@
 [transforms.foo]
   inputs = ["ignored"]
-  type = "swimlanes"
+  type = "route"
   [transforms.foo.lanes.first]
     type = "remap"
     source = '''
@@ -21,7 +21,7 @@
     new_field = "new field added"
 
 [[tests]]
-  name = "swimlanes test 1"
+  name = "route test 1"
   no_outputs_from = [ "foo.second" ]
 
   [[tests.inputs]]
@@ -54,7 +54,7 @@
       '''
 
 [[tests]]
-  name = "swimlanes test 2"
+  name = "route test 2"
   no_outputs_from = [ "foo.first", "bar" ]
 
   [[tests.inputs]]

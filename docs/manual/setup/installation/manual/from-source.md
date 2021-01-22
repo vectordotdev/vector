@@ -550,7 +550,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
 [docs.transforms.sampler]: /docs/reference/transforms/sampler/
 [docs.transforms.split]: /docs/reference/transforms/split/
-[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.route]: /docs/reference/transforms/route/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [docs.transforms.wasm]: /docs/reference/transforms/wasm/
