@@ -193,8 +193,8 @@ vectorSource:
     # option: "value"
   # Raw TOML config to embed at the vector source (deprecated).
   rawConfig: null
-  # Specific node port to bind if `service.type` is set to `NodePort`.
-  nodePort: 0
+  # Specific node port to bind (useful if `service.type` is set to `NodePort`).
+  nodePort: null  # 9090 (must be a number)
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.

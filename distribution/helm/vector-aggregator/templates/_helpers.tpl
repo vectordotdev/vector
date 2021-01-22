@@ -9,7 +9,7 @@ either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePor
 {{- $values := index . 1 -}}
 {{- if $values.vectorSource.enabled }}
 - name: vector
-{{- if and $values.vectorSource.nodePort (not $headless) (eq "NodePort" $values.service.type) }}
+{{- if and $values.vectorSource.nodePort (not $headless) }}
   nodePort: {{ $values.vectorSource.nodePort }}
 {{- end }}
   port: {{ $values.vectorSource.listenPort }}
@@ -23,7 +23,7 @@ either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePor
 {{- if not $headless }}
   targetPort: {{ .targetPort }}
 {{- end }}
-{{- if and .nodePort (not $headless) (eq "NodePort" $values.service.type) }}
+{{- if and .nodePort (not $headless) }}
   nodePort: {{ .nodePort }}
 {{- end }}
 {{- with .name }}
@@ -39,14 +39,14 @@ either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePor
 {{- end -}}
 
 {{/*
-Resolve effective service ports to use.
+Generate effective service ports for normal (non-headless) service definition.
 */}}
 {{- define "vector-aggregator.servicePorts" -}}
 {{- tuple false .Values | include "vector-aggregator.internalServicePorts" -}}
 {{- end -}}
 
 {{/*
-Generate effective service ports omitting the 'nodePort' for headless definition.
+Generate effective service ports for headless service definition.
 */}}
 {{- define "vector-aggregator.headlessServicePorts" -}}
 {{- tuple true .Values | include "vector-aggregator.internalServicePorts" -}}
