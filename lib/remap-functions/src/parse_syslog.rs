@@ -1,6 +1,6 @@
-use remap::value::Kind;
 use chrono::{DateTime, Datelike, Utc};
 use remap::prelude::*;
+use remap::value::Kind;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId};
 

@@ -1,10 +1,9 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    path,
-    state,
+    path, state,
     value::Kind,
-    Expr, Expression, InnerTypeDef, Field, Object, Result, Segment, TypeDef, Value,
+    Expr, Expression, Field, InnerTypeDef, Object, Result, Segment, TypeDef, Value,
 };
 use std::fmt;
 use std::str::FromStr;

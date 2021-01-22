@@ -107,7 +107,7 @@ mod tests {
                                    ]),
                                ..Default::default()
                            }.boxed()),
-                           ..Default::default() },
+            },
         }
 
         value_optional {
@@ -126,7 +126,7 @@ mod tests {
                                    ]),
                                ..Default::default()
                            }.boxed()),
-                           ..Default::default() },
+            },
         }
     ];
 
