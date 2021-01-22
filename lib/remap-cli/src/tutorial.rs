@@ -54,6 +54,7 @@ Some example operations:
 "#;
 
 struct Tutorial {
+    number: &'static str, // Making this a string allows for 1.1, 2.5, etc.
     title: &'static str,
     help_text: &'static str,
     object: Value,
@@ -67,6 +68,7 @@ pub fn tutorial() -> Result<(), Error> {
     rl.set_helper(Some(Repl::new()));
 
     let syslog_tut = Tutorial {
+        number: "1",
         title: "Syslog messages",
         help_text: SYSLOG_HELP_TEXT,
         object: Value::from(map![
@@ -76,6 +78,7 @@ pub fn tutorial() -> Result<(), Error> {
     };
 
     let json_tut = Tutorial {
+        number: "2",
         title: "JSON logs",
         help_text: JSON_HELP_TEXT,
         object: Value::from(map![
@@ -85,6 +88,7 @@ pub fn tutorial() -> Result<(), Error> {
     };
 
     let grok_tut = Tutorial {
+        number: "3",
         title: "Grok patterns",
         help_text: GROK_HELP_TEXT,
         object: Value::from(map![
@@ -160,7 +164,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial], include_toplin
 
     println!(
         "\nTutorial {}: {}\n{}\nEvent:\n{}\n",
-        index + 1,
+        tut.number,
         tut.title,
         tut.help_text,
         tut.object
