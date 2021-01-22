@@ -1,3 +1,4 @@
+use remap::value::Kind;
 use chrono::{DateTime, Datelike, Utc};
 use remap::prelude::*;
 use std::collections::BTreeMap;
@@ -113,42 +114,37 @@ impl Expression for ParseSyslogFn {
         self.value
             .type_def(state)
             .into_fallible(true)
-            .with_constraint(value::Kind::Map)
+            .with_constraint(Kind::Map)
             .with_inner_type(InnerTypeDef::Map({
                 let mut map = BTreeMap::new();
-                map.insert(
-                    "message".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes),
-                );
+                map.insert("message".to_string(), TypeDef::new_with_kind(Kind::Bytes));
                 map.insert(
                     "hostname".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
                 );
                 map.insert(
                     "severity".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
                 );
                 map.insert(
                     "facility".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
                 );
                 map.insert(
                     "appname".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
                 );
                 map.insert(
                     "msgid".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
                 );
                 map.insert(
                     "timestamp".to_string(),
-                    TypeDef::new_with_kind(value::Kind::Timestamp | value::Kind::Null),
+                    TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
                 );
                 map.insert(
                     "procid".to_string(),
-                    TypeDef::new_with_kind(
-                        value::Kind::Bytes | value::Kind::Integer | value::Kind::Null,
-                    ),
+                    TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null),
                 );
 
                 map
@@ -168,14 +164,14 @@ mod tests {
             def: TypeDef { kind: value::Kind::Map,
                            fallible: true,
                            inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(value::Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(value::Kind::Timestamp | value::Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Integer | value::Kind::Null)
+                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
+                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
                                ]
                            ),
                            ..Default::default() },
@@ -184,16 +180,16 @@ mod tests {
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
             def: TypeDef { fallible: true,
-                           kind: value::Kind::Map,
+                           kind: Kind::Map,
                            inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(value::Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(value::Kind::Timestamp | value::Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Integer | value::Kind::Null)
+                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
+                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
                                ]
                            ),
             },
@@ -202,16 +198,16 @@ mod tests {
         value_optional {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
             def: TypeDef { fallible: true,
-                           kind: value::Kind::Map,
+                           kind: Kind::Map,
                            inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(value::Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(value::Kind::Timestamp | value::Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(value::Kind::Bytes | value::Kind::Integer | value::Kind::Null)
+                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
+                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
+                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
                                ]
                            ),
             },

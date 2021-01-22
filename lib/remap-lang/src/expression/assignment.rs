@@ -1,9 +1,9 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    state,
+    path, state,
     value::Kind,
-    Expr, Expression, Object, Result, TypeDef, Value,
+    Expr, Expression, Field, InnerTypeDef, Object, Result, Segment, TypeDef, Value,
 };
 use std::fmt;
 use std::str::FromStr;
@@ -43,7 +43,7 @@ pub struct Assignment {
 
 /// Add the type def for this path to the compiler state.
 /// We recurse down any inner typedefs and add those paths to the state too.
-fn path_type_def(state: &mut state::Compiler, path: &crate::path::Path, type_def: TypeDef) {
+fn path_type_def(state: &mut state::Compiler, path: &path::Path, type_def: TypeDef) {
     let query_types = state.path_query_types_mut();
 
     // Remove any current typedefs that start with this path.
@@ -53,11 +53,11 @@ fn path_type_def(state: &mut state::Compiler, path: &crate::path::Path, type_def
     query_types.insert(path.clone(), type_def.clone());
 
     // Recursively insert new ones from the inner type def.
-    if let crate::InnerTypeDef::Map(map) = type_def.inner_type_def {
+    if let InnerTypeDef::Map(map) = type_def.inner_type_def {
         for (field, type_def) in map {
-            if let Ok(field) = crate::Field::from_str(&field) {
+            if let Ok(field) = Field::from_str(&field) {
                 let mut path = path.clone();
-                path.append(crate::Segment::Field(field));
+                path.append(Segment::Field(field));
                 path_type_def(state, &path, type_def);
             }
         }
@@ -222,7 +222,7 @@ mod tests {
     use super::*;
     use crate::{
         expression::{Arithmetic, Literal},
-        lit, path, test_type_def, InnerTypeDef, Operator,
+        lit, path, test_type_def, Operator,
     };
     use std::collections::BTreeMap;
 
