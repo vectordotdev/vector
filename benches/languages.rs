@@ -72,7 +72,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
             "wasm",
             r#"
 [transforms.last]
-  type = "lua"
+  type = "wasm"
   inputs = ["in"]
   module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
   artifact_cache = "target/artifacts/"
