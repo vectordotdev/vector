@@ -35,10 +35,10 @@ cargo-clean-when-in-ci() {
 }
 
 echo "Checking that Vector and tests can be built without default features..."
-cargo check --tests --no-default-features --features "${FORCED_FEATURES[@]}"
+cargo check --tests --no-default-features --features "${FORCED_FEATURES[*]}"
 
 echo "Checking that all components have corresponding features in Cargo.toml..."
-COMPONENTS="$(cargo run --no-default-features -- list)"
+COMPONENTS="$(cargo run --no-default-features --features "${FORCED_FEATURES[*]}" -- list)"
 if (echo "$COMPONENTS" | grep -E -v "(Log level|^(Sources:|Transforms:|Sinks:|)$)" >/dev/null); then
   echo "Some of the components do not have a corresponding feature flag in Cargo.toml:"
   # shellcheck disable=SC2001
