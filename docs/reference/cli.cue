@@ -368,7 +368,6 @@ cli: {
 						Starts up an interactive shell that guides you through a number of tutorials
 						that help you learn VRL.
 						"""
-
 				}
 			}
 
