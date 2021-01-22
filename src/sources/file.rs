@@ -1069,8 +1069,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ignore_checkpoints: Some(true),
-            read_from: Some(ReadFromConfig::Beginning),
             ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
@@ -1347,8 +1345,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ignore_checkpoints: Some(true),
-            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             oldest_first: false,
             ..test_default_file_config(&dir)
@@ -1412,8 +1408,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ignore_checkpoints: Some(true),
-            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             oldest_first: true,
             ..test_default_file_config(&dir)
@@ -1477,8 +1471,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ignore_checkpoints: Some(true),
-            read_from: Some(ReadFromConfig::Beginning),
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
         };
