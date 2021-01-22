@@ -88,6 +88,14 @@ components: sources: docker_logs: {
 				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
 				drivers.
 				""",
+			"""
+				To avoid collecting logs from itself when deployed as a container,
+				the Docker source uses current hostname to find out which container
+				it is inside. If a container's ID matches the hostname, that container
+				will be excluded.
+				If you change container's hostname, consider manually excluding Vector
+				container using [`exclude_containers`](#exclude_containers).
+				""",
 		]
 		notices: []
 	}
@@ -202,7 +210,7 @@ components: sources: docker_logs: {
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
-				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
+				described label's syntax in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
 			required:    false
 			type: array: {
