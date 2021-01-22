@@ -556,6 +556,8 @@ mod integration_tests {
         let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
         let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
 
+        assert_eq!(outputs1.len() + outputs2.len(), lines.len());
+
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
             assert_eq!(output, &lines[index]);
@@ -614,6 +616,8 @@ mod integration_tests {
 
         let (_, outputs1) = fetch_stream(stream.to_string(), "tenant1").await;
         let (_, outputs2) = fetch_stream(stream.to_string(), "tenant2").await;
+
+        assert_eq!(outputs1.len() + outputs2.len(), lines.len());
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
