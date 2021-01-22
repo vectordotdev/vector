@@ -1,6 +1,9 @@
-use super::{repl::Repl, Error};
-use remap::{state, Formatter, Program, Runtime, Value};
-use remap_functions::{all as funcs, map};
+use super::{
+    repl::{resolve, Repl},
+    Error,
+};
+use remap::{state, Runtime, Value};
+use remap_functions::map;
 use rustyline::{error::ReadlineError, Editor};
 
 const HELP_TEXT: &str = r#"
@@ -10,6 +13,31 @@ Tutorial commands:
   exit     Exit the VRL interactive tutorial
 "#;
 
+const SYSLOG_HELP_TEXT: &str = r#"
+First, parse the message to named Syslog fields using the parse_syslog function:
+
+. = parse_syslog!(.message)
+
+Then, you can modify the event however you like. Some example operations:
+
+.timestamp = to_unix_timestamp!(.timestamp)
+.msgid = uuid_v4()
+"#;
+
+const JSON_HELP_TEXT: &str = r#"First, parse the message string as JSON using the parse_json function:
+
+. = parse_json!(.message)
+
+Then, you can modify the event however you like. Some example operations:
+
+del(.method); del(.host)
+url = parse_url!(.referer)
+del(.referer)
+.referer_host = url.host
+"#;
+
+const GROK_HELP_TEXT: &str = "";
+
 struct Tutorial {
     title: &'static str,
     help_text: &'static str,
@@ -17,6 +45,7 @@ struct Tutorial {
 }
 
 pub fn tutorial() -> Result<(), Error> {
+    let mut index = 0;
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
@@ -24,18 +53,7 @@ pub fn tutorial() -> Result<(), Error> {
 
     let syslog_tut = Tutorial {
         title: "Syslog messages",
-        help_text: r#"First, parse the message to named Syslog fields using the parse_syslog function:
-
-. = parse_syslog!(.message)
-
-Then, you can modify the event however you like. For example, you can convert the timestamp to a Unix timestamp:
-
-.timestamp = to_unix_timestamp!(.timestamp)
-
-You can overwrite the msgid field with a unique ID:
-
-.msgid = uuid_v4()
-"#,
+        help_text: SYSLOG_HELP_TEXT,
         object: Value::from(map![
             "timestamp": "2021-01-21T18:46:59.991Z",
             "message": "<31>2 2021-01-21T18:46:59.991Z acmecorp.org auth 7726 ID312 - Uh oh, Spaghetti-o's"
@@ -44,30 +62,22 @@ You can overwrite the msgid field with a unique ID:
 
     let json_tut = Tutorial {
         title: "JSON logs",
-        help_text: r#"First, parse the message string as JSON using the parse_json function:
-
-. = parse_json!(.message)
-
-Then, you can modify the event however you like. For example, you can delete some fields:
-
-del(.method); del(.host)
-
-You can parse the referer URL:
-
-url = parse_url!(.referer)
-.host = url.host
-"#,
+        help_text: JSON_HELP_TEXT,
         object: Value::from(map![
             "timestamp": "2021-01-21T18:46:59.991Z",
             "message": "{\"host\":\"75.58.250.157\",\"user-identifier\":\"adalovelace1337\",\"datetime\":\"21/Jan/2021:18:46:59 -0700\",\"method\":\"PATCH\",\"request\":\"/wp-admin\",\"protocol\":\"HTTP/2.0\",\"status\":401,\"bytes\":20320,\"referer\":\"http://www.evilcorp.org/sql-injection\"}",
         ]),
     };
 
-    let mut tutorials = vec![syslog_tut, json_tut];
+    let grok_tut = Tutorial {
+        title: "Grok patterns",
+        help_text: GROK_HELP_TEXT,
+        object: Value::from(map![]),
+    };
+
+    let mut tutorials = vec![syslog_tut, json_tut, grok_tut];
 
     println!("Welcome to the Vector Remap Language interactive tutorial!\n");
-
-    let mut index: usize = 0;
 
     print_tutorial_help_text(index, &tutorials);
 
@@ -99,7 +109,7 @@ url = parse_url!(.referer)
                     "" => continue,
                     command => {
                         let object = &mut tutorials[index].object;
-                        let value = resolve(object, &mut rt, command, &mut compiler_state);
+                        let value = resolve(Some(object), &mut rt, command, &mut compiler_state);
                         println!("{}\n", value);
                     }
                 };
@@ -123,27 +133,10 @@ fn help() {
 fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>) {
     let tut = &tutorials[index];
     println!(
-        "Tutorial {}: {}\n\n{}\nEvent:\n{}\n",
+        "\nTutorial {}: {}\n\n{}\nEvent:\n{}\n",
         index + 1,
         tut.title,
         tut.help_text,
         tut.object
     );
-}
-
-fn resolve(
-    object: &mut Value,
-    runtime: &mut Runtime,
-    program: &str,
-    state: &mut state::Compiler,
-) -> String {
-    let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
-        Ok((program, _)) => program,
-        Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
-    };
-
-    match runtime.run(object, &program) {
-        Ok(value) => value.to_string(),
-        Err(err) => err.to_string(),
-    }
 }
