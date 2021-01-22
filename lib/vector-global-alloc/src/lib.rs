@@ -5,7 +5,7 @@
 //!
 //! 1. Add to the dependencies.
 //! 2. Add `extern crate vector_global_alloc` to your crate's main entrypoint (`src/lib.rs` or `src/main.rs`).
-//! 3. Optionally tweak the features passed to this crate as a dependencly to pick the allocator.
+//! 3. Tweak the features passed to this crate as a dependencly to pick the allocator.
 
 #![deny(
     missing_docs,
@@ -27,6 +27,9 @@ cfg_if::cfg_if! {
         static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
     } else {
         // No allocator was picked, fail fast to alert the user about it.
+        // If you want to test this code, use the `test.sh` at the crate root.
+        // If you're usin this crate, and get this error, make sure you always
+        // specify the allocator you want to use by passing a feature.
         compile_error!("You have to excplicitly pass a feature to force a particular allocator.");
     }
 }
