@@ -104,6 +104,10 @@ impl LokiBuffer {
             out_of_order_action,
         }
     }
+
+    fn is_full(&self) -> bool {
+        self.num_bytes >= self.settings.bytes || self.num_items >= self.settings.events
+    }
 }
 
 impl Batch for LokiBuffer {
@@ -143,7 +147,7 @@ impl Batch for LokiBuffer {
                         msg = "Received out-of-order event; dropping event.",
                         internal_log_rate_secs = 30
                     );
-                    return PushResult::Ok(false);
+                    return PushResult::Ok(self.is_full());
                 }
                 OutOfOrderAction::RewriteTimestamp => {
                     warn!(
@@ -191,9 +195,7 @@ impl Batch for LokiBuffer {
             };
             self.num_bytes += new_bytes;
             self.num_items += 1;
-            PushResult::Ok(
-                self.num_bytes >= self.settings.bytes || self.num_items >= self.settings.events,
-            )
+            PushResult::Ok(self.is_full())
         }
     }
 
