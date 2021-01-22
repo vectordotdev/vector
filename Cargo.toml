@@ -579,12 +579,12 @@ disable-resolv-conf = []
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches-common = ["alloc-jemalloc"]
-benches = ["benches-common", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-wasm-benches = ["benches-common", "transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
-remap-benches = ["benches-common", "transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+benches-default = ["alloc-jemalloc"]
+benches = ["benches-default", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+wasm-benches = ["benches-default", "transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+remap-benches = ["benches-default", "transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
-metrics-benches = ["benches-common", "sources-socket", "sinks-socket"]
+metrics-benches = ["benches-default", "sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
