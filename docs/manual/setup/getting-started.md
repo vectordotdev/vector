@@ -78,7 +78,7 @@ which will, in turn, echo it back to the console:
 Hello World!
 ```
 
-> Hey, if you want to see something cool, try setting `encoding.codec = "json"` in the sink config.
+> If you want to see something cool, try setting `encoding.codec = "json"` in the sink config.
 
 ## Hello World Mark II
 
