@@ -29,7 +29,7 @@ components: transforms: concat: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [transforms.add_fields.support.warnings[0]]
+		warnings: []
 		notices: []
 	}
 

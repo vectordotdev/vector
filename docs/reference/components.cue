@@ -119,10 +119,14 @@ components: {
 		}
 
 		if Kind == "transform" {
-			deprecation_notice?: !=""
-			vrl_examples?: [#VRLExample, ...#VRLExample]
+			#VRLReplacement: {
+				replacement: string | remap.#Function // Either a reference to a function or a description
+				examples: [string, ...string]
+			}
 
-			if vrl_examples != _|_ {
+			vrl_replacement?: #VRLReplacement
+
+			if vrl_replacement != _|_ {
 				deprecation_notice: """
 					This transform has been deprecated in favor of the [`remap`](\(urls.vector_remap_transform))
 					transform, which enables you to use [Vector Remap Language](\(urls.vrl_intro)) (VRL for short) to
@@ -484,10 +488,6 @@ components: {
 		// For example, the `lua` transform offers a Lua version notice that
 		// communicate which version of Lua is embedded.
 		notices: [...string] | null // Allow for empty list
-	}
-
-	#VRLExample: {
-
 	}
 
 	sources:    #Components
