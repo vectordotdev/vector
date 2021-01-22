@@ -259,29 +259,32 @@ rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
-default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "alloc-system", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-plain"]
+default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
-# TODO: Enable leveldb here for armv7-unknown-linux-musleabihf
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "rdkafka-cmake"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
+# TODO: Enable leveldb and alloc-jemalloc  here for armv7-unknown-linux-musleabihf
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "alloc-system", "rdkafka-cmake"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "alloc-jemalloc", "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = []
+# Allocator choices.
+alloc-jemalloc = ["vector-global-alloc/jemalloc"]
+alloc-system = ["vector-global-alloc/system"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-sasl", "vendor-openssl", "vendor-libz"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
@@ -577,11 +580,12 @@ disable-resolv-conf = []
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
-remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+benches-common = ["alloc-jemalloc"]
+benches = ["benches-common", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+wasm-benches = ["benches-common", "transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+remap-benches = ["benches-common", "transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
-metrics-benches = ["sources-socket", "sinks-socket"]
+metrics-benches = ["benches-common", "sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
