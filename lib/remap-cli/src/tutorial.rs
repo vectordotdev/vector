@@ -99,7 +99,7 @@ url = parse_url!(.referer)
                     "" => continue,
                     command => {
                         let object = &mut tutorials[index].object;
-                        let value = run_tutorial(object, &mut rt, command, &mut compiler_state);
+                        let value = resolve(object, &mut rt, command, &mut compiler_state);
                         println!("{}\n", value);
                     }
                 };
@@ -131,7 +131,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>) {
     );
 }
 
-fn run_tutorial(
+fn resolve(
     object: &mut Value,
     runtime: &mut Runtime,
     program: &str,
