@@ -120,6 +120,32 @@ impl Batch for LokiBuffer {
     }
 
     fn push(&mut self, mut item: Self::Input) -> PushResult<Self::Input> {
+        // We must sort the stream labels to ensure they hash to
+        // the same stream if the label set matches.
+        item.labels.sort_unstable();
+
+        let partition = &item.partition;
+        if self.latest_timestamps.is_none() {
+            self.partition = Some(item.partition.clone());
+            self.latest_timestamps = Some(self.global_timestamps.take(&partition));
+        }
+        let latest_timestamp = self
+            .latest_timestamps
+            .as_ref()
+            .unwrap()
+            .get(&item.labels)
+            .cloned()
+            .unwrap_or(item.event.timestamp);
+        if item.event.timestamp < latest_timestamp {
+            warn!(msg = "Received out-of-order event.", rate_limit = 30);
+            match self.out_of_order_action {
+                OutOfOrderAction::Drop => return PushResult::Ok(false),
+                OutOfOrderAction::RewriteTimestamp => {
+                    item.event.timestamp = latest_timestamp;
+                }
+            }
+        }
+
         let labels_len = item
             .labels
             .iter()
@@ -136,32 +162,6 @@ impl Batch for LokiBuffer {
         {
             PushResult::Overflow(item)
         } else {
-            // We must sort the stream labels here to ensure they hash to
-            // the same stream if the label set matches.
-            item.labels.sort_unstable();
-
-            let partition = &item.partition;
-            if self.latest_timestamps.is_none() {
-                self.partition = Some(item.partition.clone());
-                self.latest_timestamps = Some(self.global_timestamps.take(&partition));
-            }
-            let latest_timestamp = self
-                .latest_timestamps
-                .as_ref()
-                .unwrap()
-                .get(&item.labels)
-                .cloned()
-                .unwrap_or(item.event.timestamp);
-            if item.event.timestamp < latest_timestamp {
-                warn!(msg = "Received out-of-order event.", rate_limit = 30);
-                match self.out_of_order_action {
-                    OutOfOrderAction::Drop => return PushResult::Ok(false),
-                    OutOfOrderAction::RewriteTimestamp => {
-                        item.event.timestamp = latest_timestamp;
-                    }
-                }
-            }
-
             let new_bytes = match self.streams.get_mut(&item.labels) {
                 // Label exists, and we checked the size, just add it
                 Some(stream) => {
