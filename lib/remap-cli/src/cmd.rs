@@ -29,7 +29,7 @@ pub struct Opts {
     print_object: bool,
 
     /// Run an interactive tutorial to learn VRL.
-    #[structopt(short = "t", long)]
+    #[structopt(long)]
     tutorial: bool,
 }
 

@@ -94,7 +94,7 @@ pub fn tutorial() -> Result<(), Error> {
 
     let mut tutorials = vec![syslog_tut, json_tut, grok_tut];
 
-    println!("Welcome to the Vector Remap Language interactive tutorial!\n");
+    println!("\nWelcome to the Vector Remap Language interactive tutorial!\n~~~~~~~~~~~~~~~~~~~\n");
 
     print_tutorial_help_text(index, &tutorials, false);
 
@@ -116,7 +116,7 @@ pub fn tutorial() -> Result<(), Error> {
                             print_tutorial_help_text(index, &tutorials, true);
                         } else {
                             index = index.saturating_add(1);
-                            print_tutorial_help_text(index, &tutorials, true,);
+                            print_tutorial_help_text(index, &tutorials, true);
                         }
                     }
                     "prev" => {
@@ -159,7 +159,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &Vec<Tutorial>, include_top
     }
 
     println!(
-        "\nTutorial {}: {}\n\n{}\nEvent:\n{}\n",
+        "\nTutorial {}: {}\n{}\nEvent:\n{}\n",
         index + 1,
         tut.title,
         tut.help_text,
