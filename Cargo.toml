@@ -9,6 +9,7 @@ license = "MPL-2.0"
 readme = "README.md"
 publish = false
 default-run = "vector"
+autobenches = false # our benchmarks are not runnable on their own either way
 
 [[bin]]
 name = "graphql-schema"
@@ -115,8 +116,8 @@ goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.4.3", optional = true }
-async-graphql-warp = { version = "2.4.3", optional = true }
+async-graphql = { version = "2.4.10", optional = true }
+async-graphql-warp = { version = "2.4.10", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
@@ -149,7 +150,7 @@ http = "0.2"
 typetag = "0.1.6"
 toml = "0.5.8"
 syslog = "5"
-syslog_loose = "0.7.0"
+syslog_loose = "0.8.0"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
@@ -207,6 +208,13 @@ indoc = "1.0.3"
 avro-rs = { version = "0.12.0", optional = true }
 dirs-next = { version = "2.0.0", optional = true }
 fakedata_generator = "0.2.4"
+postgres-openssl = { version = "0.3.0", optional = true }
+tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "with-chrono-0_4"] }
+# Indirect dependency; pinning until
+# https://github.com/timberio/vector/issues/6005 is resolved
+thread_local = "= 1.0.1"
+dashmap = "3"
+encoding_rs = { version = "0.8", features = ["serde"] }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -250,14 +258,15 @@ rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
-default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -330,6 +339,7 @@ sources = [
   "sources-heroku_logs",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
+  "sources-postgresql_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -355,6 +365,7 @@ sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_p
 sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
+sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
@@ -490,7 +501,7 @@ sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
 sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
-sinks-prometheus = ["snap"]
+sinks-prometheus = ["snap", "sources-utils-tls"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
@@ -518,6 +529,7 @@ all-integration-tests = [
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -554,6 +566,7 @@ loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
@@ -566,6 +579,8 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+# Separate benching process for metrics due to the nature of the bootstrap procedures.
+metrics-benches = ["sources-socket", "sinks-socket"]
 
 [[bench]]
 name = "default"
@@ -582,6 +597,21 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "metrics_on"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_no_tracing_integration"
+harness = false
+required-features = ["metrics-benches"]
+
+[[bench]]
+name = "metrics_off"
+harness = false
+required-features = ["metrics-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"

@@ -5,9 +5,13 @@ use crate::{
     event::{self, Event},
     transforms::{TaskTransform, Transform},
 };
-use futures01::Stream as Stream01;
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap};
+use std::{
+    collections::{hash_map, HashMap},
+    future::ready,
+    pin::Pin,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -144,13 +148,13 @@ impl From<MergeConfig> for Merge {
 impl TaskTransform for Merge {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
     }
 }
 

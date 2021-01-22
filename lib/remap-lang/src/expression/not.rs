@@ -1,11 +1,5 @@
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("invalid value kind")]
-    Value(#[from] value::Error),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Not {
     expression: Box<Expr>,

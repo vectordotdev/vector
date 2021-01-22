@@ -20,14 +20,15 @@ components: transforms: metric_to_log: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -73,8 +74,10 @@ components: transforms: metric_to_log: {
 					code: "200"
 				}
 				histogram: {
-					buckets: [1.0, 2.0]
-					counts: [10, 20]
+					buckets: [
+						{upper_limit: 1.0, count: 10},
+						{upper_limit: 2.0, count: 20},
+					]
 					count: 30
 					sum:   50.0
 				}
@@ -88,8 +91,16 @@ components: transforms: metric_to_log: {
 				}
 				kind: "absolute"
 				histogram: {
-					buckets: [1.0, 2.0]
-					counts: [10, 20]
+					buckets: [
+						{
+							"count":       10
+							"upper_limit": 1.0
+						},
+						{
+							"count":       20
+							"upper_limit": 2.0
+						},
+					]
 					count: 30
 					sum:   50.0
 				}

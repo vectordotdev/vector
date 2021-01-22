@@ -34,6 +34,7 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+mod encoding_transcode;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-generator")]
@@ -73,6 +74,8 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "sources-postgresql_metrics")]
+mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
@@ -147,6 +150,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
+pub use self::encoding_transcode::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",
@@ -190,6 +194,8 @@ pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
+#[cfg(feature = "sources-postgresql_metrics")]
+pub(crate) use self::postgresql_metrics::*;
 pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;

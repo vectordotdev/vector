@@ -186,17 +186,19 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
                 MetricKind::Absolute => push_event(&mut buf, &metric, value, "g", None),
             };
         }
-        MetricValue::Distribution {
-            values,
-            sample_rates,
-            statistic,
-        } => {
+        MetricValue::Distribution { samples, statistic } => {
             let metric_type = match statistic {
                 StatisticKind::Histogram => "h",
                 StatisticKind::Summary => "d",
             };
-            for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                push_event(&mut buf, &metric, val, metric_type, Some(*sample_rate));
+            for sample in samples {
+                push_event(
+                    &mut buf,
+                    &metric,
+                    sample.value,
+                    metric_type,
+                    Some(sample.rate),
+                );
             }
         }
         MetricValue::Set { values } => {
@@ -374,8 +376,7 @@ mod test {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Distribution {
-                values: vec![1.5],
-                sample_rates: vec![1],
+                samples: crate::samples![1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         };
@@ -443,8 +444,7 @@ mod test {
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
-                    values: vec![2.0],
-                    sample_rates: vec![100],
+                    samples: crate::samples![2.0 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             }),

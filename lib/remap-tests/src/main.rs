@@ -1,16 +1,25 @@
 use ansi_term::Colour;
-use remap::{prelude::*, Program, Runtime};
+use glob::glob;
+use remap::{diagnostic::Formatter, prelude::*, Program, Runtime};
 use std::fs;
 use std::path::PathBuf;
 
 fn main() {
+    let verbose = std::env::args()
+        .nth(1)
+        .map(|s| s == "--verbose")
+        .unwrap_or_default();
+
     let mut failed_count = 0;
-    let tests = fs::read_dir("tests").expect("dir exists");
+    for entry in glob("tests/**/*.vrl").expect("valid pattern") {
+        let path = match entry {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
 
-    for file in tests {
-        let mut test = Test::new(file.expect("file").path());
+        let mut test = Test::new(path);
 
-        print!("{:.<30}", test.name);
+        print!("{:.<70}", test.name);
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
@@ -18,50 +27,83 @@ fn main() {
 
         let state = state::Program::default();
         let mut runtime = Runtime::new(state);
-        let program = Program::new(&test.source, &remap_functions::all(), None, true);
+        let program = Program::new(test.source.clone(), &remap_functions::all(), None, true);
         let want = test.result.to_string();
 
         match program {
-            Ok(program) => {
-                let result = runtime.execute(&mut test.object, &program);
+            Ok((program, diagnostics)) => {
+                let mut formatter = Formatter::new(&test.source, diagnostics);
+                let result = runtime.run(&mut test.object, &program);
 
                 match result {
                     Ok(value) => {
                         let got = value.to_string();
 
                         if got == want {
-                            println!("{}", Colour::Green.bold().paint("OK"));
+                            if !test.skip {
+                                println!("{}", Colour::Green.bold().paint("OK"));
+                            }
                         } else {
-                            println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                            if !test.skip {
+                                println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
+                                failed_count += 1;
+                            }
 
                             let diff =
-                                prettydiff::diff_chars(&got, &want).set_highlight_whitespace(true);
+                                prettydiff::diff_chars(&want, &got).set_highlight_whitespace(true);
                             println!("  {}", diff);
+                        }
 
-                            failed_count += 1;
+                        if verbose {
+                            formatter.enable_colors(true);
+                            println!("{}", formatter);
+                            println!("{}", value);
                         }
                     }
                     Err(err) => {
-                        let got = err.to_string();
+                        let got = err.to_string().trim().to_owned();
+                        let want = want.trim().to_owned();
+
                         if got == want {
-                            println!("{}", Colour::Green.bold().paint("OK"));
+                            if !test.skip {
+                                println!("{}", Colour::Green.bold().paint("OK"));
+                            }
                         } else {
-                            println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
-                            println!("{}", err);
+                            if !test.skip {
+                                println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
+                                failed_count += 1;
+                            }
+
+                            let diff = prettydiff::diff_lines(&want, &got);
+                            println!("{}", diff);
+                        }
+
+                        if verbose {
+                            println!("{:#}", err);
                         }
                     }
                 }
             }
-            Err(err) => {
-                let got = err.to_string().trim().to_owned();
+            Err(diagnostics) => {
+                let mut formatter = Formatter::new(&test.source, diagnostics);
+                let got = formatter.to_string().trim().to_owned();
                 let want = want.trim().to_owned();
+
                 if got == want {
                     println!("{}", Colour::Green.bold().paint("OK"));
                 } else {
-                    println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
+                    if !test.skip {
+                        println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
+                        failed_count += 1;
+                    }
 
-                    let diff = prettydiff::diff_chars(&got, &want).set_highlight_whitespace(true);
+                    let diff = prettydiff::diff_lines(&want, &got);
                     println!("{}", diff);
+                }
+
+                if verbose {
+                    formatter.enable_colors(true);
+                    println!("{:#}", formatter);
                 }
             }
         }

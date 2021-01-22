@@ -5,9 +5,10 @@ use crate::{
     internal_events::{LuaGcTriggered, LuaScriptError},
     transforms::Transform,
 };
-use futures01::Stream as Stream01;
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::{future::ready, pin::Pin};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -154,25 +155,25 @@ impl Lua {
 impl TaskTransform for Lua {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::new(
+        Box::pin(
             task.filter_map(move |event| {
                 let mut output = Vec::with_capacity(1);
-                match inner.process(event) {
+                ready(match inner.process(event) {
                     Ok(event) => {
                         output.extend(event.into_iter());
-                        Some(futures01::stream::iter_ok(output))
+                        Some(stream::iter(output))
                     }
                     Err(error) => {
                         emit!(LuaScriptError { error });
                         None
                     }
-                }
+                })
             })
             .flatten(),
         )

@@ -66,11 +66,11 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Uploaded archives"
 
   echo "Redirecting old artifact names"
-  find "$td_nightly" -maxdepth 1 -type f -print 0 | while read -r -d $'\0' file  ; do
+  find "$td_nightly" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file  ; do
     file=$(basename "$file")
     # vector-nightly-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly//}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/latest/${file/-nightly//}" --website-redirect "/vector/nightly/latest/$file" --acl public-read
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/latest/${file/-nightly/}" --website-redirect "/vector/nightly/latest/$file" --acl public-read
   done
   echo "Redirected old artifact names"
 
@@ -111,11 +111,11 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   echo "Uploaded latest archives"
 
   echo "Redirecting old artifact names"
-  find "$td" -maxdepth 1 -type f -print 0 | while read -r -d $'\0' file  ; do
+  find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file  ; do
     file=$(basename "$file")
     # vector-$version-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$i//}" --website-redirect "/vector/$i/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$i//}" --website-redirect "/vector/latest/$file" --acl public-read
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$i/}" --website-redirect "/vector/$i/$file" --acl public-read
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$i/}" --website-redirect "/vector/latest/$file" --acl public-read
   done
   echo "Redirected old artifact names"
 
