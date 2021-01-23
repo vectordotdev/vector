@@ -1,7 +1,7 @@
 package metadata
 
-components: transforms: sampler: {
-	title: "Sampler"
+components: transforms: sample: {
+	title: "Sample"
 
 	description: """
 		Samples events at a configurable rate.
