@@ -162,7 +162,7 @@ impl Hinter for Repl {
             .iter()
             .filter_map(|hint| {
                 if pos > 0 && hint.starts_with(&line[..pos]) {
-                    Some(String::from(str_suffix(hint, pos)))
+                    Some(suffix(hint, pos))
                 } else {
                     None
                 }
@@ -171,8 +171,8 @@ impl Hinter for Repl {
     }
 }
 
-fn str_suffix(s: &str, pos: usize) -> &str {
-    &s[pos..]
+fn suffix(s: &str, pos: usize) -> String {
+    String::from(&s[pos..])
 }
 
 impl Highlighter for Repl {
