@@ -117,14 +117,21 @@ components: sinks: loki: {
 			}
 		}
 		out_of_order_action: {
-			common:      false
-			description: "Some sources may generate events with timestamps that are not strictly in chronological order. The Loki service cannot accept a stream of such events. This option specifies what vector should do with out-of-order events."
-			required:    false
+			common: false
+			description: """
+				Some sources may generate events with timestamps that are
+				not strictly in chronological order. The Loki service cannot
+				accept a stream of such events. Vector will sort events before
+				sending it to Loki. However, some late events might arrive after
+				a batch has been sent. This option specifies what Vector should do
+				with those events.
+				"""
+			required: false
 			warnings: []
 			type: string: {
 				default: "drop"
 				enum: {
-					"drop":              "Drop the event."
+					"drop":              "Drop the event, with a warning."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
