@@ -120,7 +120,7 @@ struct Repl {
     validator: MatchingBracketValidator,
     history_hinter: HistoryHinter,
     colored_prompt: String,
-    hints: Vec<String>,
+    func_names: Vec<String>,
 }
 
 impl Repl {
@@ -135,7 +135,7 @@ impl Repl {
             history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
             validator: MatchingBracketValidator::new(),
-            hints: func_names,
+            func_names,
         }
     }
 }
@@ -168,7 +168,8 @@ impl Hinter for Repl {
             return Some(hist);
         }
 
-        self.hints
+        // Then check the function names
+        self.func_names
             .iter()
             .filter_map(|hint| {
                 if pos > 0 && hint.starts_with(&line[..pos]) {
