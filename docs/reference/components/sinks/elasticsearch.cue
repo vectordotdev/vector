@@ -95,17 +95,7 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: object: {
 				examples: []
-				options: {
-					assume_role: {
-						common:      false
-						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["arn:aws:iam::123456789098:role/my_role"]
-						}
-					}
+				options: components._aws.configuration.auth.type.object.options & {
 					password: {
 						description: "The basic authentication password."
 						required:    true
@@ -263,6 +253,8 @@ components: sinks: elasticsearch: {
 					[`ignore_malformed` setting](\(urls.elasticsearch_ignore_malformed)).
 					"""
 		}
+
+		aws_authentication: components._aws.how_it_works.aws_authentication
 	}
 
 	telemetry: metrics: {

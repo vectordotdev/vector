@@ -158,18 +158,19 @@ mod test {
             //     Ok(()),
             // ),
             (
-                Event::Metric(Metric {
-                    name: "zork".into(),
-                    namespace: Some("zerk".into()),
-                    timestamp: None,
-                    tags: Some({
+                Event::Metric(
+                    Metric::new(
+                        "zork".into(),
+                        MetricKind::Incremental,
+                        MetricValue::Counter { value: 1.0 },
+                    )
+                    .with_namespace(Some("zerk".into()))
+                    .with_tags(Some({
                         let mut tags = BTreeMap::new();
                         tags.insert("host".into(), "zoobub".into());
                         tags
-                    }),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                }),
+                    })),
+                ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
                 Ok(()),
