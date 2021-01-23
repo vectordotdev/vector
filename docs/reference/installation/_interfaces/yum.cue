@@ -16,8 +16,8 @@ installation: _interfaces: yum: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
-		commands: roles._systemd_commands & {
+	role_implementations: [Name=string]: {
+		commands: role_implementations._systemd_commands & {
 			_config_path: paths.config
 			add_repo: #"""
 				curl -1sLf \
@@ -51,8 +51,8 @@ installation: _interfaces: yum: {
 		}
 	}
 
-	roles: {
-		agent:      roles._journald_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._journald_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

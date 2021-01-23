@@ -17,8 +17,8 @@ installation: _interfaces: dpkg: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
-		commands: roles._systemd_commands & {
+	role_implementations: [Name=string]: {
+		commands: role_implementations._systemd_commands & {
 			_config_path: paths.config
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{version}-{arch}.deb && \
@@ -50,8 +50,8 @@ installation: _interfaces: dpkg: {
 		}
 	}
 
-	roles: {
-		agent:      roles._journald_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._journald_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }
