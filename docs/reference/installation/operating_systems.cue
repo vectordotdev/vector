@@ -12,7 +12,7 @@ installation: {
 	}
 
 	#OperatingSystems: [Name=string]: #OperatingSystem & {
-		name:                      Name
+		name: Name
 	}
 
 	operating_systems: #OperatingSystems
