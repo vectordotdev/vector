@@ -628,6 +628,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn out_of_order_drop() {
+        crate::test_util::trace_init();
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
