@@ -66,7 +66,7 @@ impl FunctionTransform for Lane {
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
     // Deprecated name
-    #[serde(alias="lanes")]
+    #[serde(alias = "lanes")]
     route: IndexMap<String, Box<dyn ConditionConfig>>,
 }
 
@@ -160,9 +160,8 @@ mod test {
         crate::test_util::test_generate_config::<super::RouteConfig>();
     }
 
-
     #[test]
-    fn alias_works(){
+    fn alias_works() {
         toml::from_str::<RouteConfig>(
             r#"
             lanes.first.type = "check_fields"
