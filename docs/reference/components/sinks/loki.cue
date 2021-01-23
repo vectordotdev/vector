@@ -118,7 +118,7 @@ components: sinks: loki: {
 		}
 		out_of_order_action: {
 			common:      false
-			description: "Configure what to do with out-of-order events."
+			description: "Some sources may generate events with timestamps that are not strictly in chronological order. The Loki service cannot accept a stream of such events. This option specifies what vector should do with out-of-order events."
 			required:    false
 			warnings: []
 			type: string: {
