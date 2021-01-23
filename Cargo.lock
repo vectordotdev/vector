@@ -3685,17 +3685,18 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.4.0-alpha.10"
+version = "0.4.0-alpha.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee65f4f3f55b356086562ebfe47e76b61de5ed305ae86f1b65fb7f068f8b1546"
+checksum = "c1ccd71aa5aa1d592a1ae5555e26f75d0f5711968defee1bc58ea7f02d48631b"
 dependencies = [
  "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch 0.9.1",
  "crossbeam-utils 0.8.1",
- "dashmap 3.11.10",
+ "dashmap 4.0.2",
  "indexmap",
  "metrics",
+ "ordered-float",
  "parking_lot 0.11.1",
  "quanta",
  "sketches-ddsketch",
@@ -4885,9 +4886,9 @@ dependencies = [
 
 [[package]]
 name = "quanta"
-version = "0.6.5"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b9a7776952c6405aab84c51621523a5e053aa6fd63c8f8e8eeaaed79ad6d2dc"
+checksum = "c00baf85b8a6ab6c823ac90f428643d6ef3ff847e4e2700b08706b608db7ea89"
 dependencies = [
  "atomic-shim",
  "ctor",
