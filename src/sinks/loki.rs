@@ -58,17 +58,13 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum OutOfOrderAction {
+    #[derivative(Default)]
     Drop,
     RewriteTimestamp,
-}
-
-impl Default for OutOfOrderAction {
-    fn default() -> OutOfOrderAction {
-        OutOfOrderAction::Drop
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
