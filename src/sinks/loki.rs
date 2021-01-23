@@ -628,30 +628,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn out_of_order_drop() {
-        crate::test_util::trace_init();
-        let stream = uuid::Uuid::new_v4();
-
-        let (mut config, cx) = load_sink::<LokiConfig>(
-            r#"
-            endpoint = "http://localhost:3100"
-            labels = {test_name = "placeholder"}
-            encoding = "text"
-            tenant_id = "default"
-            batch.max_events = 5
-            out_of_order_action = "drop"
-        "#,
-        )
-        .unwrap();
-
-        let test_name = config.labels.get_mut("test_name").unwrap();
-        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
-
-        *test_name = Template::try_from(stream.to_string()).unwrap();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
-        let mut lines = random_lines(100).take(10).collect::<Vec<_>>();
-
+        let batch_size = 5;
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = lines
             .clone()
             .into_iter()
@@ -666,55 +644,21 @@ mod integration_tests {
                 base + Duration::seconds(i as i64),
             );
         }
-        events[5]
+        // first event of the second batch is out-of-order.
+        events[batch_size]
             .as_mut_log()
             .insert(log_schema().timestamp_key(), base);
 
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events.clone()).map(Ok))
-            .await
-            .unwrap();
+        let mut expected = events.clone();
+        expected.remove(batch_size);
 
-        lines.remove(5);
-        events.remove(5);
-
-        let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
-        assert_eq!(lines.len(), outputs.len());
-        for (i, output) in outputs.iter().enumerate() {
-            assert_eq!(output, &lines[i]);
-        }
-        for (i, ts) in timestamps.iter().enumerate() {
-            assert_eq!(get_timestamp(&events[i]).timestamp_nanos(), *ts,);
-        }
+        test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events, expected).await;
     }
 
     #[tokio::test]
     async fn out_of_order_rewrite() {
-        crate::test_util::trace_init();
-        let stream = uuid::Uuid::new_v4();
-
-        let (mut config, cx) = load_sink::<LokiConfig>(
-            r#"
-            endpoint = "http://localhost:3100"
-            labels = {test_name = "placeholder"}
-            encoding = "text"
-            tenant_id = "default"
-            batch.max_events = 5
-            out_of_order_action = "rewrite_timestamp"
-        "#,
-        )
-        .unwrap();
-
-        let test_name = config.labels.get_mut("test_name").unwrap();
-        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
-
-        *test_name = Template::try_from(stream.to_string()).unwrap();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
+        let batch_size = 5;
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
-
         let mut events = lines
             .clone()
             .into_iter()
@@ -729,28 +673,73 @@ mod integration_tests {
                 base + Duration::seconds(i as i64),
             );
         }
-        events[5]
+        // first event of the second batch is out-of-order.
+        events[batch_size]
             .as_mut_log()
             .insert(log_schema().timestamp_key(), base);
 
-        let _ = sink
-            .into_sink()
+        let mut expected = events.clone();
+        let time = get_timestamp(&expected[batch_size - 1]);
+        // timestamp is rewriten with latest timestamp of the first batch
+        expected[batch_size]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), time);
+
+        test_out_of_order_events(
+            OutOfOrderAction::RewriteTimestamp,
+            batch_size,
+            events,
+            expected,
+        )
+        .await;
+    }
+
+    async fn test_out_of_order_events(
+        action: OutOfOrderAction,
+        batch_size: usize,
+        events: Vec<Event>,
+        expected: Vec<Event>,
+    ) {
+        crate::test_util::trace_init();
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "text"
+            tenant_id = "default"
+        "#,
+        )
+        .unwrap();
+        config.out_of_order_action = action;
+        config.labels.insert(
+            "test_name".to_owned(),
+            Template::try_from(stream.to_string()).unwrap(),
+        );
+        config.batch.max_events = Some(batch_size);
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        sink.into_sink()
             .send_all(&mut stream::iter(events.clone()).map(Ok))
             .await
             .unwrap();
 
-        let time = get_timestamp(&events[4]);
-        events[5]
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), time);
-
         let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
-        assert_eq!(lines.len(), outputs.len());
+        assert_eq!(expected.len(), outputs.len());
+        assert_eq!(expected.len(), timestamps.len());
         for (i, output) in outputs.iter().enumerate() {
-            assert_eq!(output, &lines[i]);
+            assert_eq!(
+                &expected[i]
+                    .as_log()
+                    .get(log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy(),
+                output,
+            )
         }
         for (i, ts) in timestamps.iter().enumerate() {
-            assert_eq!(get_timestamp(&events[i]).timestamp_nanos(), *ts,);
+            assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
         }
     }
 
