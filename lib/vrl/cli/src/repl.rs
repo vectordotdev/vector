@@ -120,24 +120,46 @@ struct Repl {
     validator: MatchingBracketValidator,
     history_hinter: HistoryHinter,
     colored_prompt: String,
-    func_names: Vec<String>,
+    hints: Vec<String>,
 }
 
 impl Repl {
     fn new() -> Self {
-        let func_names = stdlib::all()
-            .iter()
-            .map(|f| f.identifier().into())
-            .collect::<Vec<String>>();
-
         Self {
             highlighter: MatchingBracketHighlighter::new(),
             history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
             validator: MatchingBracketValidator::new(),
-            func_names,
+            hints: initial_hints(),
         }
     }
+}
+
+fn initial_hints() -> Vec<String> {
+    let mut hints: Vec<String> = Vec::new();
+
+    let mut func_names = stdlib::all()
+        .iter()
+        .map(|f| f.identifier().into())
+        .collect::<Vec<String>>();
+
+    hints.append(&mut func_names);
+
+    for s in &[
+        "next",
+        "prev",
+        "exit",
+        "quit",
+        "help",
+        "help functions",
+        "help funcs",
+        "help fs",
+        "help docs",
+    ] {
+        hints.push(s.to_string());
+    }
+
+    hints
 }
 
 impl Helper for Repl {}
@@ -168,8 +190,8 @@ impl Hinter for Repl {
             return Some(hist);
         }
 
-        // Then check the function names
-        self.func_names
+        // Then check the other built-in hints
+        self.hints
             .iter()
             .filter_map(|hint| {
                 if pos > 0 && hint.starts_with(&line[..pos]) {
