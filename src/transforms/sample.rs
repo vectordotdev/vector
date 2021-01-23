@@ -77,7 +77,7 @@ impl TransformConfig for SampleCompatConfig {
     }
 
     fn output_type(&self) -> DataType {
-       self.0.output_type()
+        self.0.output_type()
     }
 
     fn transform_type(&self) -> &'static str {
