@@ -88,7 +88,7 @@ metrics-tracing-context = "0.1.0-alpha.7"
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
-rusoto_es = { version = "0.45.0", optional = true }
+rusoto_es = { version = "0.46.0", optional = true }
 rusoto_s3 = { version = "0.45.0", optional = true }
 rusoto_logs = { version = "0.45.0", optional = true }
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
