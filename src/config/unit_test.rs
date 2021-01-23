@@ -9,10 +9,9 @@ use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
-    path: PathBuf,
-    format: config::FormatHint,
+    paths: &[(PathBuf, config::FormatHint)],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
+    let config = super::loading::load_builder_from_paths(paths, false)?;
 
     // Ignore failures on calls other than the first
     crate::config::LOG_SCHEMA
