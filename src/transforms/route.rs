@@ -65,7 +65,9 @@ impl FunctionTransform for Lane {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
-    lanes: IndexMap<String, Box<dyn ConditionConfig>>,
+    // Deprecated name
+    #[serde(alias="lanes")]
+    route: IndexMap<String, Box<dyn ConditionConfig>>,
 }
 
 inventory::submit! {
@@ -79,7 +81,7 @@ inventory::submit! {
 impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            lanes: IndexMap::new(),
+            route: IndexMap::new(),
         })
         .unwrap()
     }
@@ -95,7 +97,7 @@ impl TransformConfig for RouteConfig {
     fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
-        while let Some((k, v)) = self.lanes.pop() {
+        while let Some((k, v)) = self.route.pop() {
             map.insert(k.clone(), Box::new(LaneConfig { condition: v }));
         }
 
@@ -151,8 +153,22 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
+    use super::RouteConfig;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::RouteConfig>();
+    }
+
+
+    #[test]
+    fn alias_works(){
+        toml::from_str::<RouteConfig>(
+            r#"
+            lanes.first.type = "check_fields"
+            lanes.first."message.eq" = "foo"
+        "#,
+        )
+        .unwrap();
     }
 }

@@ -35,8 +35,8 @@ components: transforms: route: {
 	}
 
 	configuration: {
-		lanes: {
-			description: "A table of lane identifiers to logical conditions representing the filter of the lane. Each lane can then be referenced as an input by other components with the name `<transform_name>.<lane_id>`."
+		route: {
+			description: "A table of route identifiers to logical conditions representing the filter of the route. Each route can then be referenced as an input by other components with the name `<transform_name>.<route_id>`."
 			required:    true
 			warnings: []
 			type: object: {
@@ -61,7 +61,7 @@ components: transforms: route: {
 		{
 			title: "Split by log level"
 			configuration: {
-				lanes: {
+				route: {
 					debug: "level.eq": "debug"
 					info: "level.eq":  "info"
 					warn: "level.eq":  "warn"

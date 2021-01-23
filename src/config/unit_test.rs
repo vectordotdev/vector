@@ -988,10 +988,10 @@ mod tests {
 [transforms.foo]
   inputs = ["ignored"]
   type = "route"
-  [transforms.foo.lanes.first]
+  [transforms.foo.route.first]
     type = "check_fields"
     "message.eq" = "test swimlane 1"
-  [transforms.foo.lanes.second]
+  [transforms.foo.route.second]
     type = "check_fields"
     "message.eq" = "test swimlane 2"
 

@@ -761,11 +761,11 @@ async fn route() {
         type = "route"
         inputs = ["in"]
 
-        [transforms.splitting_gerrys.lanes.only_gerrys]
+        [transforms.splitting_gerrys.route.only_gerrys]
         type = "check_fields"
         "host.eq" = "gerry"
 
-        [transforms.splitting_gerrys.lanes.no_gerrys]
+        [transforms.splitting_gerrys.route.no_gerrys]
         type = "check_fields"
         "host.neq" = "gerry"
 
