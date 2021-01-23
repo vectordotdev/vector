@@ -100,7 +100,7 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        if !self.request.concurrency.is_none() {
+        if self.request.concurrency.is_some() {
             warn!("Option `request.concurrency` is not supported.");
         }
         let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
