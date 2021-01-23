@@ -199,7 +199,7 @@ sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
 heim = { version = "0.1.0-rc.1", optional = true, features = ["full"] }
-rust_decimal = "1.8.1"
+rust_decimal = "1.10.1"
 mongodb = { version = "1.1.1", optional = true }
 anyhow = "1.0.37"
 snap = { version = "1.0.3", optional = true }
@@ -412,7 +412,7 @@ transforms-logs = [
   "transforms-remap",
   "transforms-remove_fields",
   "transforms-rename_fields",
-  "transforms-sampler",
+  "transforms-sample",
   "transforms-split",
   "transforms-swimlanes",
   "transforms-tokenizer",
@@ -451,7 +451,7 @@ transforms-remap = []
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []
-transforms-sampler = ["seahash"]
+transforms-sample = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
