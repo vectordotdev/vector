@@ -55,8 +55,8 @@ pub mod remove_fields;
 pub mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 pub mod rename_fields;
-#[cfg(feature = "transforms-sampler")]
-pub mod sampler;
+#[cfg(feature = "transforms-sample")]
+pub mod sample;
 #[cfg(feature = "transforms-split")]
 pub mod split;
 #[cfg(feature = "transforms-swimlanes")]

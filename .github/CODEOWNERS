@@ -59,7 +59,7 @@
 /docs/reference/components/transforms/regex_parser.cue @lukesteensen
 /docs/reference/components/transforms/remap.cue @JeanMertz @FungusHumungus
 /docs/reference/components/transforms/remove_tags.cue @lukesteensen
-/docs/reference/components/transforms/sampler.cue @lukesteensen
+/docs/reference/components/transforms/sample.cue @lukesteensen
 /docs/reference/components/transforms/split.cue @lukesteensen
 /docs/reference/components/transforms/tokenzier.cue @lukesteensen
 
@@ -215,7 +215,7 @@
 /src/transforms/regex_parser.rs @lukesteensen
 /src/transforms/remap.rs @JeanMertz @FungusHumungus
 /src/transforms/remove_tags.rs @lukesteensen
-/src/transforms/sampler.rs @lukesteensen
+/src/transforms/sample.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 

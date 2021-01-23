@@ -89,7 +89,7 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-mod sampler;
+mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
@@ -209,7 +209,7 @@ pub use self::remap::*;
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
-pub use self::sampler::*;
+pub use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
 pub(crate) use self::socket::*;

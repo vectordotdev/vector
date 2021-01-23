@@ -412,7 +412,7 @@ transforms-logs = [
   "transforms-remap",
   "transforms-remove_fields",
   "transforms-rename_fields",
-  "transforms-sampler",
+  "transforms-sample",
   "transforms-split",
   "transforms-swimlanes",
   "transforms-tokenizer",
@@ -451,7 +451,7 @@ transforms-remap = []
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []
-transforms-sampler = ["seahash"]
+transforms-sample = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []

@@ -421,7 +421,7 @@ features one has to pass a comma-separated list of component features.
 | `transforms-remove_fields`                           | Enables building of [`remove_fields` transform][docs.transforms.remove_fields].                                                            |
 | `transforms-remove_tags`                             | Enables building of [`remove_tags` transform][docs.transforms.remove_tags].                                                                |
 | `transforms-rename_fields`                           | Enables building of [`rename_fields` transform][docs.transforms.rename_fields].                                                            |
-| `transforms-sampler`                                 | Enables building of [`sampler` transform][docs.transforms.sampler].                                                                        |
+| `transforms-sample`                                  | Enables building of [`sample` transform][docs.transforms.sample].                                                                        |
 | `transforms-split`                                   | Enables building of [`split` transform][docs.transforms.split].                                                                            |
 | `transforms-swimlanes`                               | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].                                                                    |
 | `transforms-tag_cardinality_limit`                   | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].                                            |
@@ -548,7 +548,7 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
 [docs.transforms.remove_tags]: /docs/reference/transforms/remove_tags/
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
-[docs.transforms.sampler]: /docs/reference/transforms/sampler/
+[docs.transforms.sample]: /docs/reference/transforms/sample/
 [docs.transforms.split]: /docs/reference/transforms/split/
 [docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
