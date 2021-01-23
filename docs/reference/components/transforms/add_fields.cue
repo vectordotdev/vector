@@ -129,15 +129,6 @@ components: transforms: add_fields: {
 				},
 			]
 		}
-		types: {
-			title: "Types"
-			body: """
-				All supported [configuration value types][docs.setup.configuration#types] are
-				accepted. This includes primitive types (`string`, `int`, `float`, `boolean`)
-				and special types, such as [arrays](#arrays) and
-				[nested fields](#nested-fields).
-				"""
-		}
 	}
 
 	telemetry: metrics: {

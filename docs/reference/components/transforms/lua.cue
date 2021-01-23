@@ -476,9 +476,7 @@ components: transforms: lua: {
 				Vector provides a `search_dirs` option that allows you to specify
 				absolute paths that will be searched when using the
 				[Lua `require` function](\(urls.lua_require)). If this option is not
-				set, the directories of the
-				[configuration files][docs.setup.configuration] will be used
-				instead.
+				set, the directories of the configuration files will be used instead.
 				"""
 		}
 	}
