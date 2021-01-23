@@ -58,7 +58,7 @@ components: transforms: add_fields: {
 				]
 				options: {
 					"*": {
-						description: "The name of the field to add. Accepts all [supported types][docs.setup.configuration#types]. Use `.` for adding nested fields."
+						description: "The name of the field to add. Accepts all supported configuration types. Use `.` for adding nested fields."
 						required:    true
 						warnings: []
 						type: "*": {}
@@ -128,15 +128,6 @@ components: transforms: add_fields: {
 						"""
 				},
 			]
-		}
-		types: {
-			title: "Types"
-			body: """
-				All supported [configuration value types][docs.setup.configuration#types] are
-				accepted. This includes primitive types (`string`, `int`, `float`, `boolean`)
-				and special types, such as [arrays](#arrays) and
-				[nested fields](#nested-fields).
-				"""
 		}
 	}
 

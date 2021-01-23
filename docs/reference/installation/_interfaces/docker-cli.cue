@@ -18,7 +18,7 @@ installation: _interfaces: "docker-cli": {
 
 	platform_name: "docker"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		_api_port:         8383
 		_config_path:      paths.config
 		_docker_sock_path: "/var/run/docker.sock"
@@ -73,7 +73,7 @@ installation: _interfaces: "docker-cli": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -90,7 +90,7 @@ installation: _interfaces: "docker-cli": {
 
 			variables: config: sources: logs: type: "docker_logs"
 		}
-		sidecar:    roles._file_sidecar
-		aggregator: roles._vector_aggregator
+		sidecar:    role_implementations._file_sidecar
+		aggregator: role_implementations._vector_aggregator
 	}
 }

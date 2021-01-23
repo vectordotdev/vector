@@ -1,6 +1,6 @@
 #![cfg(all(
     feature = "sinks-socket",
-    feature = "transforms-sampler",
+    feature = "transforms-sample",
     feature = "sources-socket",
 ))]
 
@@ -66,9 +66,9 @@ async fn sample() {
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_transform(
-        "sampler",
+        "sample",
         &["in"],
-        transforms::sampler::SamplerConfig {
+        transforms::sample::SampleConfig {
             rate: 10,
             key_field: Some(config::log_schema().message_key().into()),
             exclude: None,
@@ -76,7 +76,7 @@ async fn sample() {
     );
     config.add_sink(
         "out",
-        &["sampler"],
+        &["sample"],
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
