@@ -163,7 +163,7 @@ scopes:
   - rename_fields transform # Anything `rename_fields` transform related
   - sample transform # Anything `sample` transform related
   - split transform # Anything `split` transform related
-  - swimlanes transform # Anything `swimlanes` transform related
+  - route transform # Anything `route` transform related
   - tag_cardinality_limit transform # Anything `tag_cardinality_limit` transform related
   - tokenizer transform # Anything `tokenizer` transform related
   - wasm transform # Anything `wasm` transform related

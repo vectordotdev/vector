@@ -414,7 +414,7 @@ transforms-logs = [
   "transforms-rename_fields",
   "transforms-sample",
   "transforms-split",
-  "transforms-swimlanes",
+  "transforms-route",
   "transforms-tokenizer",
 ]
 transforms-metrics = [
@@ -453,7 +453,7 @@ transforms-remove_tags = []
 transforms-rename_fields = []
 transforms-sample = ["seahash"]
 transforms-split = []
-transforms-swimlanes = []
+transforms-route = []
 transforms-tag_cardinality_limit = []
 transforms-tokenizer = []
 transforms-wasm = ["wasm"]
