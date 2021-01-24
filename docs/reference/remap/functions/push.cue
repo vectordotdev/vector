@@ -16,7 +16,12 @@ remap: functions: push: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array"]
+	return: {
+		types: ["array"]
+		rules: [
+			"A new array is returned, the `value` is not modified in place.",
+		]
+	}
 	category: "Array"
 	description: """
 		Adds the provided `item` to the end of the `value` array.

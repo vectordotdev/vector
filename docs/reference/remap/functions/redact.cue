@@ -37,7 +37,7 @@ remap: functions: redact: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: """
 		Redacts sensitive data in the provided `value` via the specified `patterns`.

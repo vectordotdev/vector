@@ -17,7 +17,12 @@ remap: functions: round: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["timestamp"]
+	return: {
+		types: ["integer", "float"]
+		rules: [
+			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
+		]
+	}
 	category: "Number"
 	description: #"""
 		Rounds the provided `value` to number to the specified `precision`.

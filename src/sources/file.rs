@@ -1,6 +1,7 @@
-use super::util::MultilineConfig;
+use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    encoding_transcode::{Decoder, Encoder},
     event::Event,
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
@@ -79,6 +80,8 @@ pub struct FileConfig {
     pub max_read_bytes: usize,
     pub oldest_first: bool,
     pub remove_after: Option<u64>,
+    pub line_delimiter: String,
+    pub encoding: Option<EncodingConfig>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -136,6 +139,8 @@ impl Default for FileConfig {
             max_read_bytes: 2048,
             oldest_first: false,
             remove_after: None,
+            line_delimiter: "\n".to_string(),
+            encoding: None,
         }
     }
 }
@@ -201,12 +206,22 @@ pub fn file_source(
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
         .expect("invalid glob patterns");
 
+    let encoding_charset = config.encoding.clone().map(|e| e.charset);
+
+    // if file encoding is specified, need to convert the line delimiter (present as utf8)
+    // to the specified encoding, so that delimiter-based line splitting can work properly
+    let line_delimiter_as_bytes = match encoding_charset {
+        Some(e) => Encoder::new(e).encode_from_utf8(&config.line_delimiter),
+        None => Bytes::from(config.line_delimiter.clone()),
+    };
+
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
+        line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter {
@@ -236,9 +251,20 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
+        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
-        let rx = rx.map(futures::stream::iter).flatten();
+        let rx = rx
+            .map(futures::stream::iter)
+            .flatten()
+            .map(move |(line, src)| {
+                // transcode each line from the file's encoding charset to utf8
+                match encoding_decoder.as_mut() {
+                    Some(d) => (d.decode_to_utf8(line), src),
+                    None => (line, src),
+                }
+            });
 
         let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
@@ -330,6 +356,7 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
+    use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
@@ -415,6 +442,15 @@ mod tests {
                 ignored_header_bytes: 512,
             }
         );
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        [encoding]
+        charset = "utf-16le"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
     }
 
     #[test]
@@ -1057,7 +1093,7 @@ mod tests {
         writeln!(&mut file, "short").unwrap();
         writeln!(&mut file, "this is too long").unwrap();
         writeln!(&mut file, "11 eleven11").unwrap();
-        let super_long = std::iter::repeat("This line is super long and will take up more space that BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
+        let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
         writeln!(&mut file, "{}", super_long).unwrap();
         writeln!(&mut file, "exactly 10").unwrap();
         writeln!(&mut file, "it can end on a line that's too long").unwrap();
@@ -1465,6 +1501,101 @@ mod tests {
                 "in order to make me smaller".into(),
                 "but you can still read me".into(),
                 "hooray".into(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_non_utf8_encoded_file() {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![PathBuf::from("tests/data/utf-16le.log")],
+            encoding: Some(EncodingConfig { charset: UTF_16LE }),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source);
+
+        sleep_500_millis().await;
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .await;
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am a file".into(),
+                "i can unicode".into(),
+                "but i do so in 16 bits".into(),
+                "and when i byte".into(),
+                "i become little-endian".into(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_non_default_line_delimiter() {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            line_delimiter: "\r\n".to_string(),
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source);
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+        write!(&mut file, "hello i am a line\r\n").unwrap();
+        write!(&mut file, "and i am too\r\n").unwrap();
+        write!(&mut file, "CRLF is how we end\r\n").unwrap();
+        write!(&mut file, "please treat us well\r\n").unwrap();
+
+        sleep_500_millis().await;
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .await;
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am a line".into(),
+                "and i am too".into(),
+                "CRLF is how we end".into(),
+                "please treat us well".into()
             ]
         );
     }

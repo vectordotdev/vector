@@ -3,7 +3,7 @@ package metadata
 remap: functions: now: {
 	arguments: []
 	internal_failure_reasons: []
-	return: ["timestamp"]
+	return: types: ["timestamp"]
 	category: "Timestamp"
 	description: #"""
 		Returns the current timestamp in the UTC timezone with nanosecond precision.

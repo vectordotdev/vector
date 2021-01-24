@@ -12,7 +12,7 @@ remap: functions: parse_url: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted URL",
 	]
-	return: ["map"]
+	return: types: ["map"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` in URL format.

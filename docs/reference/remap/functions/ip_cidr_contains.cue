@@ -19,7 +19,7 @@ remap: functions: ip_cidr_contains: {
 		"`cidr` is not a valid CIDR",
 		"`ip` is not a valid IP address",
 	]
-	return: ["boolean"]
+	return: types: ["boolean"]
 	category: "IP"
 	description: #"""
 		Returns `true` if the given `ip` is contained within the block referenced by the `cidr`.

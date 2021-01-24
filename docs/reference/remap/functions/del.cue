@@ -10,7 +10,12 @@ remap: functions: del: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["any"]
+	return: {
+		types: ["any"]
+		rules: [
+			"The return is the value of the field being deleted.",
+		]
+	}
 	category: "Event"
 	description: #"""
 		Removes the field specified by the given path from the event object.

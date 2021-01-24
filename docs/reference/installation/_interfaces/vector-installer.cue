@@ -16,7 +16,7 @@ installation: _interfaces: "vector-installer": {
 		config:      "./vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_config_path: paths.config
 			install:      "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
@@ -47,9 +47,9 @@ installation: _interfaces: "vector-installer": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {}
-		sidecar:    roles._file_sidecar
-		aggregator: roles._vector_aggregator
+		sidecar:    role_implementations._file_sidecar
+		aggregator: role_implementations._vector_aggregator
 	}
 }

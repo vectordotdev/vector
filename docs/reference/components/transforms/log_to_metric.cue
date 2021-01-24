@@ -301,8 +301,7 @@ components: transforms: log_to_metric: {
 					host:   "10.22.11.222"
 				}
 				distribution: {
-					values: [54.2]
-					sample_rates: [1]
+					samples: [{value: 54.2, rate: 1}]
 					statistic: "histogram"
 				}
 			}}]
@@ -337,8 +336,7 @@ components: transforms: log_to_metric: {
 					host:   "10.22.11.222"
 				}
 				distribution: {
-					values: [54.2]
-					sample_rates: [1]
+					samples: [{value: 54.2, rate: 1}]
 					statistic: "summary"
 				}
 			}}]

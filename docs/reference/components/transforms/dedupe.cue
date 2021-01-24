@@ -72,7 +72,7 @@ components: transforms: dedupe: {
 					}
 					match: {
 						common:      true
-						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.global-options#log_schema]. Incompatible with the `fields.ignore` option."
+						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.configuration.global-options#log_schema]. Incompatible with the `fields.ignore` option."
 						required:    false
 						warnings: []
 						type: array: {
