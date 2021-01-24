@@ -1,18 +1,18 @@
-[transforms.add_fields_nested]
+[transforms.add_fields_nested_1]
   inputs = []
   type = "add_fields"
-  [transforms.add_fields_nested.fields]
+  [transforms.add_fields_nested_1.fields]
     "a.b" = 123
     x.y = 456
     "x.z" = 789
 [[tests]]
-  name = "add_fields_nested"
+  name = "add_fields_nested_1"
   [tests.input]
-    insert_at = "add_fields_nested"
+    insert_at = "add_fields_nested_1"
     type = "raw"
     value = ""
   [[tests.outputs]]
-    extract_from = "add_fields_nested"
+    extract_from = "add_fields_nested_1"
     [[tests.outputs.conditions]]
         type = "remap"
         source = '''
