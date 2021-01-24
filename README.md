@@ -55,7 +55,7 @@ or [**install Vector**][docs.installation].
 
 * [**Concepts**][docs.about.concepts]
 * [**Under the hood**][docs.about.under-the-hood]
-  * [**Architecture**][docs.under-the-hood.architecture] - [data model][docs.architecture.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [topology model][docs.architecture.topology-model], [concurrency model][docs.architecture.concurrency-model], [runtime model][docs.architecture.runtime-model]
+  * [**Architecture**][docs.under-the-hood.architecture] - [data model][docs.architecture.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [pipeline model][docs.architecture.pipeline-model], [concurrency model][docs.architecture.concurrency-model], [runtime model][docs.architecture.runtime-model]
   * [**Networking**][docs.under-the-hood.networking] - [ARC][docs.networking.adaptive-request-concurrency]
   * [**Guarantees**][docs.under-the-hood.guarantees]
 
@@ -161,8 +161,8 @@ Vector is an end-to-end, unified, open data platform.
 [docs.administration.validating]: /docs/administration/validating/
 [docs.architecture.concurrency-model]: /docs/about/under-the-hood/architecture/concurrency-model/
 [docs.architecture.data-model]: /docs/about/under-the-hood/architecture/data-model/
+[docs.architecture.pipeline-model]: /docs/about/under-the-hood/architecture/pipeline-model/
 [docs.architecture.runtime-model]: /docs/about/under-the-hood/architecture/runtime-model/
-[docs.architecture.topology-model]: /docs/about/under-the-hood/architecture/topology-model/
 [docs.configuration.sinks]: /docs/reference/configuration/sinks/
 [docs.configuration.sources]: /docs/reference/configuration/sources/
 [docs.configuration.tests]: /docs/reference/configuration/tests/
