@@ -1923,7 +1923,7 @@
   inputs = []
   type = "remap"
   source = """
-    .a = get_hostname()
+    .a = get_hostname!()
   """
 [[tests]]
   name = "remap_function_get_hostname"
