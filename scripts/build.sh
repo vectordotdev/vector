@@ -58,6 +58,20 @@ if [ -f "$BINARY_PATH" ] && [ "$OVERWRITE" == "false" ]; then
 fi
 
 #
+# CFLAGS
+#
+
+export CFLAGS="$CFLAGS -g0 -O3"
+
+#
+# Strip the output binary through RUSTFLAGS
+#
+
+if [ "$KEEP_SYMBOLS" != "false" ]; then
+  export RUSTFLAGS="$RUSTFLAGS -C link-arg=-s"
+fi
+
+#
 # Header
 #
 
@@ -83,12 +97,4 @@ if [ "$FEATURES" == "default" ]; then
   cargo build "${BUILD_FLAGS[@]}"
 else
   cargo build "${BUILD_FLAGS[@]}" --no-default-features --features "$FEATURES"
-fi
-
-#
-# Strip the output binary
-#
-
-if [ "$KEEP_SYMBOLS" == "false" ]; then
-  strip "$BINARY_PATH"
 fi

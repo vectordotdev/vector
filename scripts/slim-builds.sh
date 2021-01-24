@@ -33,17 +33,4 @@ panic = 'unwind'
 # incremental = true
 codegen-units = 256
 rpath = false
-
-[profile.release]
-# See defaults https://doc.rust-lang.org/cargo/reference/profiles.html#release
-opt-level = 3
-debug = false
-debug-assertions = false
-overflow-checks = false
-lto = false
-panic = 'unwind'
-# Disabled, see build.incremental
-# incremental = false
-codegen-units = 1
-rpath = false
 EOF
