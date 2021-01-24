@@ -40,7 +40,7 @@
 /docs/reference/components/sinks/**/aws* @timberio/vector-aws
 /docs/reference/components/sinks/**/datadog* @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sinks/**/gcp* @timberio/vector-gcp
-/docs/reference/components/sinks/**/kubernetes* @timberio/vector-gcp
+/docs/reference/components/sinks/**/kubernetes* @timberio/vector-kubernetes
 /docs/reference/components/sinks/http.cue @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sinks/socket.cue @timberio/vector-core @timberio/vector-integrations
 /docs/reference/components/sinks/vector.cue @timberio/vector-core @timberio/vector-integrations
