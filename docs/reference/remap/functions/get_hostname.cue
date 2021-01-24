@@ -3,7 +3,7 @@ package metadata
 remap: functions: get_hostname: {
 	arguments: []
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "System"
 	description: #"""
 		Get system's hostname.
@@ -13,7 +13,7 @@ remap: functions: get_hostname: {
 			title: "Get hostname"
 			input: log: {}
 			source: #"""
-				.hostname = get_hostname()
+				.hostname = get_hostname!()
 				"""#
 			output: log: hostname: "localhost.localdomain"
 		},
