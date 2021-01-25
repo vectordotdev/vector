@@ -478,8 +478,8 @@ fn partition_encode(
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("DescribeLogStreams failed: {}", source))]
-    DescribeLogStreamsFailed {
+    #[snafu(display("DescribeLogGroups failed: {}", source))]
+    DescribeLogGroupsFailed {
         source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
     },
     #[snafu(display("No log group found"))]
@@ -529,7 +529,7 @@ async fn healthcheck(
             }
             None => Err(HealthcheckError::NoLogGroup.into()),
         },
-        Err(source) => Err(HealthcheckError::DescribeLogStreamsFailed { source }.into()),
+        Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }
 }
 

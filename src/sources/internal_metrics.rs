@@ -105,29 +105,32 @@ mod tests {
         let output = capture_metrics(&controller)
             .map(|event| {
                 let m = event.into_metric();
-                (m.name.clone(), m)
+                (m.name().to_string(), m)
             })
             .collect::<BTreeMap<String, Metric>>();
 
-        assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].value);
-        assert_eq!(MetricValue::Counter { value: 7.0 }, output["bar"].value);
+        assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].data.value);
+        assert_eq!(
+            MetricValue::Counter { value: 7.0 },
+            output["bar"].data.value
+        );
         assert_eq!(
             MetricValue::Distribution {
                 samples: crate::samples![5.0 => 1, 6.0 => 1],
                 statistic: StatisticKind::Histogram
             },
-            output["baz"].value
+            output["baz"].data.value
         );
         assert_eq!(
             MetricValue::Distribution {
                 samples: crate::samples![7.0 => 1, 8.0 => 1],
                 statistic: StatisticKind::Histogram
             },
-            output["quux"].value
+            output["quux"].data.value
         );
 
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));
-        assert_eq!(Some(labels), output["quux"].tags);
+        assert_eq!(Some(&labels), output["quux"].tags());
     }
 }

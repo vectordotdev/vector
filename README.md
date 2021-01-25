@@ -213,7 +213,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
 [docs.transforms.regex_parser#types]: https://vector.dev/docs/reference/transforms/regex_parser/#types
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
-[docs.transforms.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
+[docs.transforms.route]: https://vector.dev/docs/reference/transforms/route/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.unit-tests]: https://vector.dev/docs/reference/tests/
 [docs.updating]: https://vector.dev/docs/administration/updating/

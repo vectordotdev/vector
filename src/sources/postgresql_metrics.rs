@@ -734,14 +734,10 @@ impl PostgresqlMetrics {
         value: MetricValue,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(tags),
-            kind: MetricKind::Absolute,
-            value,
-        }
+        Metric::new(name.into(), MetricKind::Absolute, value)
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(Utc::now()))
     }
 }
 
@@ -918,8 +914,9 @@ mod integration_tests {
             events
                 .iter()
                 .map(|e| e.as_metric())
-                .find(|e| e.name == "up")
+                .find(|e| e.name() == "up")
                 .unwrap()
+                .data
                 .value,
             gauge!(1)
         );
@@ -928,15 +925,12 @@ mod integration_tests {
         for event in &events {
             let metric = event.as_metric();
 
-            assert_eq!(metric.namespace, Some("postgresql".to_owned()));
+            assert_eq!(metric.namespace(), Some("postgresql"));
             assert_eq!(
-                metric.tags.as_ref().unwrap().get("endpoint").unwrap(),
+                metric.tags().unwrap().get("endpoint").unwrap(),
                 &tags_endpoint
             );
-            assert_eq!(
-                metric.tags.as_ref().unwrap().get("host").unwrap(),
-                &tags_host
-            );
+            assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
         }
 
         // test metrics from different queries
@@ -946,7 +940,7 @@ mod integration_tests {
             "pg_stat_bgwriter_checkpoints_timed_total",
         ];
         for name in names {
-            assert!(events.iter().any(|e| e.as_metric().name == name));
+            assert!(events.iter().any(|e| e.as_metric().name() == name));
         }
 
         events
@@ -1000,7 +994,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db == "vector" || db == "postgres");
             }
         }
@@ -1019,7 +1013,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db != "vector" && db != "postgres");
             }
         }
@@ -1049,7 +1043,7 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
 
-            if let Some(db) = metric.tags.unwrap().get("db") {
+            if let Some(db) = metric.tags().unwrap().get("db") {
                 assert!(db == "template1");
             }
         }

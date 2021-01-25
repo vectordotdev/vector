@@ -1,7 +1,7 @@
 package metadata
 
-components: transforms: swimlanes: {
-	title: "Swimlanes"
+components: transforms: route: {
+	title: "Route"
 
 	description: """
 		Splits a stream of events into multiple sub-streams based on a set of
@@ -35,8 +35,8 @@ components: transforms: swimlanes: {
 	}
 
 	configuration: {
-		lanes: {
-			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
+		route: {
+			description: "A table of route identifiers to logical conditions representing the filter of the route. Each route can then be referenced as an input by other components with the name `<transform_name>.<route_id>`."
 			required:    true
 			warnings: []
 			type: object: {
@@ -61,7 +61,7 @@ components: transforms: swimlanes: {
 		{
 			title: "Split by log level"
 			configuration: {
-				lanes: {
+				route: {
 					debug: "level.eq": "debug"
 					info: "level.eq":  "info"
 					warn: "level.eq":  "warn"
