@@ -139,47 +139,47 @@ components: transforms: reduce: {
 			input: [
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:21.223543Z",
-						message: "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
 				},
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:21.223543Z",
-						message: "    from foobar.rb:6:in `bar'",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:6:in `bar'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
 				},
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:21.223543Z",
-						message: "    from foobar.rb:2:in `foo'",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:2:in `foo'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
 				},
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:21.223543Z",
-						message: "    from foobar.rb:9:in `<main>'",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:9:in `<main>'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
 				},
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:22.123528Z",
-						message: "Hello world, I am a new log",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:22.123528Z"
+						message:   "Hello world, I am a new log"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
 				},
 			]
@@ -187,34 +187,34 @@ components: transforms: reduce: {
 				group_by: ["host", "pid", "tid"]
 				marge_strategies: message: "concat_newline"
 				starts_when: {
-					type: "remap"
-					source: 'match(.message, /^[^\s]/)'
+					type:   "remap"
+					source: #"match(.message, /^[^\s]/)"#
 				}
 			}
 			output: [
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:21.223543Z",
-						message:	"""
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message: """
 							foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
 							    from foobar.rb:6:in `bar'
 							    from foobar.rb:2:in `foo'
 							    from foobar.rb:9:in `<main>'
 							"""
 						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						pid:  1234
+						tid:  5678
 					}
 				},
 				{
 					log: {
-						timestamp: "2020-10-07T12:33:22.123528Z",
-						message: "Hello world, I am a new log",
-						host: "host-1.hostname.com"
-						pid: 1234
-						tid: 5678
+						timestamp: "2020-10-07T12:33:22.123528Z"
+						message:   "Hello world, I am a new log"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
 					}
-				}
+				},
 			]
 		},
 		{

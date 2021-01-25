@@ -63,19 +63,19 @@ components: transforms: route: {
 			configuration: {
 				route: {
 					debug: {
-						type: "remap"
+						type:   "remap"
 						source: #".level == "debug""#
 					}
 					info: {
-						type: "remap"
+						type:   "remap"
 						source: #".level == "info""#
 					}
 					warn: {
-						type: "remap"
+						type:   "remap"
 						source: #".level == "warn""#
 					}
 					error: {
-						type: "remap"
+						type:   "remap"
 						source: #".level == "error""#
 					}
 				}
