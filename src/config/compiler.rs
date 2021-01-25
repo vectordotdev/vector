@@ -1,43 +1,41 @@
 use super::{builder::ConfigBuilder, handle_warnings, validation, Config, TransformOuter};
 use indexmap::IndexMap;
 
-pub fn compile(raw: ConfigBuilder, deny_warnings: bool) -> Result<Config, Vec<String>> {
-    let mut config = Config {
-        global: raw.global,
-        #[cfg(feature = "api")]
-        api: raw.api,
-        healthchecks: raw.healthchecks,
-        sources: raw.sources,
-        sinks: raw.sinks,
-        transforms: raw.transforms,
-        tests: raw.tests,
-        expansions: Default::default(),
-    };
-
+pub fn compile(mut builder: ConfigBuilder, deny_warnings: bool) -> Result<Config, Vec<String>> {
     let mut errors = Vec::new();
 
-    expand_wildcards(&mut config);
+    expand_wildcards(&mut builder);
 
-    expand_macros(&mut config)?;
+    let expansions = expand_macros(&mut builder)?;
 
-    if let Err(warn) = handle_warnings(validation::warnings(&config), deny_warnings) {
+    if let Err(warn) = handle_warnings(validation::warnings(&builder), deny_warnings) {
         errors.extend(warn);
     }
 
-    if let Err(type_errors) = validation::check_shape(&config) {
+    if let Err(type_errors) = validation::check_shape(&builder) {
         errors.extend(type_errors);
     }
 
-    if let Err(type_errors) = validation::typecheck(&config) {
+    if let Err(type_errors) = validation::typecheck(&builder) {
         errors.extend(type_errors);
     }
 
-    if let Err(type_errors) = validation::check_resources(&config) {
+    if let Err(type_errors) = validation::check_resources(&builder) {
         errors.extend(type_errors);
     }
 
     if errors.is_empty() {
-        Ok(config)
+        Ok(Config {
+            global: builder.global,
+            #[cfg(feature = "api")]
+            api: builder.api,
+            healthchecks: builder.healthchecks,
+            sources: builder.sources,
+            sinks: builder.sinks,
+            transforms: builder.transforms,
+            tests: builder.tests,
+            expansions,
+        })
     } else {
         Err(errors)
     }
@@ -45,7 +43,9 @@ pub fn compile(raw: ConfigBuilder, deny_warnings: bool) -> Result<Config, Vec<St
 
 /// Some component configs can act like macros and expand themselves into multiple replacement
 /// configs. Performs those expansions and records the relevant metadata.
-pub(super) fn expand_macros(config: &mut Config) -> Result<(), Vec<String>> {
+pub(super) fn expand_macros(
+    config: &mut ConfigBuilder,
+) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
@@ -80,13 +80,12 @@ pub(super) fn expand_macros(config: &mut Config) -> Result<(), Vec<String>> {
     if !errors.is_empty() {
         Err(errors)
     } else {
-        config.expansions = expansions;
-        Ok(())
+        Ok(expansions)
     }
 }
 
 /// Expand trailing `*` wildcards in input lists
-fn expand_wildcards(config: &mut Config) {
+fn expand_wildcards(config: &mut ConfigBuilder) {
     let candidates = config
         .sources
         .keys()
@@ -95,15 +94,15 @@ fn expand_wildcards(config: &mut Config) {
         .collect::<Vec<String>>();
 
     for (name, transform) in config.transforms.iter_mut() {
-        expand_inner(&mut transform.inputs, name, &candidates);
+        expand_wildcards_inner(&mut transform.inputs, name, &candidates);
     }
 
     for (name, sink) in config.sinks.iter_mut() {
-        expand_inner(&mut sink.inputs, name, &candidates);
+        expand_wildcards_inner(&mut sink.inputs, name, &candidates);
     }
 }
 
-fn expand_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
+fn expand_wildcards_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
     let raw_inputs = inputs.drain(..).collect::<Vec<_>>();
     for raw_input in raw_inputs {
         if raw_input.ends_with('*') {
