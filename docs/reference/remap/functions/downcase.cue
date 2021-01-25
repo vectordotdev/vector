@@ -10,7 +10,7 @@ remap: functions: downcase: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Returns a copy of `value` that is entirely lowercase.
@@ -20,11 +20,10 @@ remap: functions: downcase: {
 	examples: [
 		{
 			title: "Downcase a string"
-			input: log: message: #"Here Is A Message"#
 			source: #"""
-				.message = downcase(.message)
+				downcase("Hello, World!")
 				"""#
-			output: log: message: "here is a message"
+			return: "hello, world!"
 		},
 	]
 }

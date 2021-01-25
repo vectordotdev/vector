@@ -257,11 +257,13 @@ impl Source {
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
             // be other, more sound ways for users considering the use of this
-            // option to solvce their use case, so take consideration.
+            // option to solve their use case, so take consideration.
             ignore_before: None,
             // Max line length to expect during regular log reads, see the
             // explanation above.
             max_line_bytes,
+            // Delimiter bytes that is used to read the file line-by-line
+            line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
             data_dir,
             // This value specifies not exactly the globbing, but interval

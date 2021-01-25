@@ -10,7 +10,7 @@ remap: functions: encode_json: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "Codec"
 	description: """
 		Encodes the provided `value` into JSON.
@@ -18,11 +18,10 @@ remap: functions: encode_json: {
 	examples: [
 		{
 			title: "Encode to JSON"
-			input: log: payload: age: 42
 			source: #"""
-				.payload = encode_json(.payload)
+				.payload = encode_json({"hello": "world"})
 				"""#
-			output: log: payload: #"{"age": 42}"#
+			return: #"{"hello": "world"}"#
 		},
 	]
 }

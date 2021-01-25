@@ -10,7 +10,7 @@ remap: functions: strip_whitespace: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Strips the whitespace from the start and end of the provided `value`.
@@ -20,11 +20,10 @@ remap: functions: strip_whitespace: {
 	examples: [
 		{
 			title: "Strip whitespace"
-			input: log: text: "  A sentence.  "
 			source: #"""
-				.text = strip_whitespace(.text)
+				strip_whitespace("  A sentence.  ")
 				"""#
-			output: log: text: "A sentence."
+			return: "A sentence."
 		},
 	]
 }

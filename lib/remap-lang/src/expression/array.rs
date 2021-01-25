@@ -15,10 +15,6 @@ impl Array {
         Self { expressions }
     }
 
-    pub(crate) fn expressions(&self) -> &[Expr] {
-        &self.expressions
-    }
-
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
     }

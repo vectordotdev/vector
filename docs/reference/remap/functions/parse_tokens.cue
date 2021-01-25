@@ -12,7 +12,7 @@ remap: functions: parse_tokens: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted tokenized string",
 	]
-	return: ["array"]
+	return: types: ["array"]
 	category: "Parse"
 	description: #"""
 		Parses the provided `value` in token format.
@@ -26,15 +26,12 @@ remap: functions: parse_tokens: {
 	examples: [
 		{
 			title: "Parse tokens"
-			input: log: text: #"""
-				A sentence "with \"a\" sentence inside" and [some brackets]
-				"""#
 			source: #"""
-				.tokens = parse_tokens(.text)
+				parse_tokens(
+					"A sentence \"with \\"a\\" sentence inside\" and [some brackets]"
+				)
 				"""#
-			output: input & {log: {
-				slice: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
-			}}
+			return: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
 		},
 	]
 }

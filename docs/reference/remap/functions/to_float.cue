@@ -10,17 +10,24 @@ remap: functions: to_float: {
 	internal_failure_reasons: [
 		"`value` is not a supported float representation",
 	]
-	return: ["float"]
+	return: {
+		types: ["float"]
+		rules: [
+			"If `value` is a string, it must be the string representation of an float or else an error is raised.",
+			"If `value` is a boolean, `0.0` will be returned for `false` and `1.0` will be returned for `true`.",
+		]
+	}
 	category: "Coerce"
 	description: #"""
-		Coerces the provided `values` into a `float`.
+		Coerces the provided `value` into a `float`.
 		"""#
 	examples: [
 		{
 			title: "Coerce to a float"
-			input: log: string: "3.14"
-			source: ".string = to_float(.string)"
-			output: log: string: 3.14
+			source: """
+				to_float("3.145")
+				"""
+			return: 3.145
 		},
 	]
 }

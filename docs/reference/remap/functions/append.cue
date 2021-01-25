@@ -16,7 +16,7 @@ remap: functions: append: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array"]
+	return: types: ["array"]
 	category: "Array"
 	description: """
 		Adds each item from an array to the end of another array.
@@ -24,11 +24,10 @@ remap: functions: append: {
 	examples: [
 		{
 			title: "Append to an array"
-			input: log: array: [1, 2]
 			source: """
-				.array = append(.array, [3, 4])
+				 append([1, 2], [3, 4])
 				"""
-			output: log: array: [1, 2, 3, 4]
+			return: [1, 2, 3, 4]
 		},
 	]
 }

@@ -49,7 +49,7 @@ pub struct Remap {
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig) -> crate::Result<Remap> {
+    pub fn new(config: RemapConfig) -> crate::Result<Self> {
         let accepts = TypeConstraint {
             allow_any: true,
             type_def: TypeDef {
@@ -59,12 +59,17 @@ impl Remap {
             },
         };
 
-        let program = Program::new(
-            &config.source,
+        let (program, _) = Program::new(
+            config.source.clone(),
             &remap_functions::all(),
             Some(accepts),
             false,
-        )?;
+        )
+        .map_err(|diagnostics| {
+            remap::Formatter::new(&config.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Remap {
             program,
@@ -77,8 +82,8 @@ impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let mut runtime = Runtime::default();
         let result = match event {
-            Event::Log(ref mut event) => runtime.execute(event, &self.program),
-            Event::Metric(ref mut event) => runtime.execute(event, &self.program),
+            Event::Log(ref mut event) => runtime.run(event, &self.program),
+            Event::Metric(ref mut event) => runtime.run(event, &self.program),
         };
 
         if let Err(error) = result {
@@ -142,14 +147,11 @@ mod tests {
 
     #[test]
     fn check_remap_metric() {
-        let metric = Event::Metric(Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        });
+        let metric = Event::Metric(Metric::new(
+            "counter".into(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
 
         let conf = RemapConfig {
             source: r#".tags.host = "zoobub"
@@ -164,18 +166,19 @@ mod tests {
         let result = tform.transform_one(metric).unwrap();
         assert_eq!(
             result,
-            Event::Metric(Metric {
-                name: "zork".into(),
-                namespace: Some("zerk".into()),
-                timestamp: None,
-                tags: Some({
+            Event::Metric(
+                Metric::new(
+                    "zork".into(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(Some("zerk".into()))
+                .with_tags(Some({
                     let mut tags = BTreeMap::new();
                     tags.insert("host".into(), "zoobub".into());
                     tags
-                }),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            })
+                }))
+            )
         );
     }
 }

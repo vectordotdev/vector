@@ -10,9 +10,9 @@ remap: functions: to_syslog_facility: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a valid Syslog facility code",
+		"`value` is not a valid Syslog [facility code](\(urls.syslog_facility)).",
 	]
-	return: ["string"]
+	return: types: ["string"]
 	category:    "Coerce"
 	description: """
 		Coerces the provided `value`, a Syslog [facility code](\(urls.syslog_facility)), into its corresponding
@@ -21,9 +21,10 @@ remap: functions: to_syslog_facility: {
 	examples: [
 		{
 			title: "Coerce to a Syslog facility"
-			input: log: syslog_facility: "4"
-			source: ".syslog_facility = to_syslog_facility(.syslog_facility)"
-			output: log: syslog_facility: "auth"
+			source: """
+				to_syslog_facility("4")
+				"""
+			return: "auth"
 		},
 	]
 }

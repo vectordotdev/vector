@@ -4,12 +4,20 @@ pub mod state;
 pub mod transform;
 
 use crate::{
-    api::schema::{components::state::component_by_name, relay},
+    api::schema::{
+        components::state::component_by_name,
+        filter::{self, filter_items},
+        relay, sort,
+    },
     config::Config,
+    filter_check,
 };
-use async_graphql::{Interface, Object, Subscription};
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use lazy_static::lazy_static;
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+};
 use tokio::stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
@@ -21,6 +29,73 @@ pub enum Component {
     Source(source::Source),
     Transform(transform::Transform),
     Sink(sink::Sink),
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum ComponentKind {
+    Source,
+    Transform,
+    Sink,
+}
+
+impl Component {
+    fn get_name(&self) -> &str {
+        match self {
+            Component::Source(c) => c.0.name.as_str(),
+            Component::Transform(c) => c.0.name.as_str(),
+            Component::Sink(c) => c.0.name.as_str(),
+        }
+    }
+
+    fn get_component_kind(&self) -> ComponentKind {
+        match self {
+            Component::Source(_) => ComponentKind::Source,
+            Component::Transform(_) => ComponentKind::Transform,
+            Component::Sink(_) => ComponentKind::Sink,
+        }
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct ComponentsFilter {
+    name: Option<Vec<filter::StringFilter>>,
+    component_kind: Option<Vec<filter::EqualityFilter<ComponentKind>>>,
+    or: Option<Vec<Self>>,
+}
+
+impl filter::CustomFilter<Component> for ComponentsFilter {
+    fn matches(&self, component: &Component) -> bool {
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(component.get_name()))),
+            self.component_kind.as_ref().map(|f| f
+                .iter()
+                .all(|f| f.filter_value(component.get_component_kind())))
+        );
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
+    }
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum ComponentsSortFieldName {
+    Name,
+    ComponentKind,
+}
+
+impl sort::SortableByField<ComponentsSortFieldName> for Component {
+    fn sort(&self, rhs: &Self, field: &ComponentsSortFieldName) -> cmp::Ordering {
+        match field {
+            ComponentsSortFieldName::Name => Ord::cmp(self.get_name(), rhs.get_name()),
+            ComponentsSortFieldName::ComponentKind => {
+                Ord::cmp(&self.get_component_kind(), &rhs.get_component_kind())
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -35,9 +110,18 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<ComponentsFilter>,
+        sort: Option<Vec<sort::SortField<ComponentsSortFieldName>>>,
     ) -> relay::ConnectionResult<Component> {
+        let filter = filter.unwrap_or_else(ComponentsFilter::default);
+        let mut components = filter_items(state::get_components().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut components, &sort_fields);
+        }
+
         relay::query(
-            state::get_components().into_iter(),
+            components.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -51,9 +135,18 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<source::SourcesFilter>,
+        sort: Option<Vec<sort::SortField<source::SourcesSortFieldName>>>,
     ) -> relay::ConnectionResult<source::Source> {
+        let filter = filter.unwrap_or_else(source::SourcesFilter::default);
+        let mut sources = filter_items(state::get_sources().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut sources, &sort_fields);
+        }
+
         relay::query(
-            state::get_sources().into_iter(),
+            sources.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -67,9 +160,18 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<transform::TransformsFilter>,
+        sort: Option<Vec<sort::SortField<transform::TransformsSortFieldName>>>,
     ) -> relay::ConnectionResult<transform::Transform> {
+        let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
+        let mut transforms = filter_items(state::get_transforms().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut transforms, &sort_fields);
+        }
+
         relay::query(
-            state::get_transforms().into_iter(),
+            transforms.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -83,9 +185,18 @@ impl ComponentsQuery {
         before: Option<String>,
         first: Option<i32>,
         last: Option<i32>,
+        filter: Option<sink::SinksFilter>,
+        sort: Option<Vec<sort::SortField<sink::SinksSortFieldName>>>,
     ) -> relay::ConnectionResult<sink::Sink> {
+        let filter = filter.unwrap_or_else(sink::SinksFilter::default);
+        let mut sinks = filter_items(state::get_sinks().into_iter(), &filter);
+
+        if let Some(sort_fields) = sort {
+            sort::by_fields(&mut sinks, &sort_fields);
+        }
+
         relay::query(
-            state::get_sinks().into_iter(),
+            sinks.into_iter(),
             relay::Params::new(after, before, first, last),
             10,
         )
@@ -206,4 +317,212 @@ pub fn update_config(config: &Config) {
 
     // Override the old component state
     state::update(new_components);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{api::schema::sort, config::DataType};
+
+    /// Generate component fixes for use with tests
+    fn component_fixtures() -> Vec<Component> {
+        vec![
+            Component::Source(source::Source(source::Data {
+                name: "gen1".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen2".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "gen3".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Transform(transform::Transform(transform::Data {
+                name: "parse_json".to_string(),
+                component_type: "json".to_string(),
+                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+            })),
+            Component::Sink(sink::Sink(sink::Data {
+                name: "devnull".to_string(),
+                component_type: "blackhole".to_string(),
+                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+            })),
+        ]
+    }
+
+    #[test]
+    fn components_filter_contains() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                contains: Some("gen".to_string()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 3);
+    }
+
+    #[test]
+    fn components_filter_equals_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            or: Some(vec![ComponentsFilter {
+                name: Some(vec![filter::StringFilter {
+                    equals: Some("devnull".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn components_filter_and() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_kind: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentKind::Source),
+                not_equals: None,
+            }]),
+            ..Default::default()
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 1);
+    }
+
+    #[test]
+    fn components_filter_and_or() {
+        let filter = ComponentsFilter {
+            name: Some(vec![filter::StringFilter {
+                equals: Some("gen1".to_string()),
+                ..Default::default()
+            }]),
+            component_kind: Some(vec![filter::EqualityFilter {
+                equals: Some(ComponentKind::Source),
+                not_equals: None,
+            }]),
+            or: Some(vec![ComponentsFilter {
+                component_kind: Some(vec![filter::EqualityFilter {
+                    equals: Some(ComponentKind::Sink),
+                    not_equals: None,
+                }]),
+                ..Default::default()
+            }]),
+        };
+
+        let components = filter_items(component_fixtures().into_iter(), &filter);
+
+        assert_eq!(components.len(), 2);
+    }
+
+    #[test]
+    fn components_sort_asc() {
+        let mut components = component_fixtures();
+        let fields = vec![sort::SortField::<ComponentsSortFieldName> {
+            field: ComponentsSortFieldName::Name,
+            direction: sort::Direction::Asc,
+        }];
+        sort::by_fields(&mut components, &fields);
+
+        let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
+
+        for (i, name) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_name(), *name);
+        }
+    }
+
+    #[test]
+    fn components_sort_desc() {
+        let mut components = component_fixtures();
+        let fields = vec![sort::SortField::<ComponentsSortFieldName> {
+            field: ComponentsSortFieldName::Name,
+            direction: sort::Direction::Desc,
+        }];
+        sort::by_fields(&mut components, &fields);
+
+        let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
+
+        for (i, name) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_name(), *name);
+        }
+    }
+
+    #[test]
+    fn components_sort_multi() {
+        let mut components = vec![
+            Component::Sink(sink::Sink(sink::Data {
+                name: "a".to_string(),
+                component_type: "blackhole".to_string(),
+                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+            })),
+            Component::Sink(sink::Sink(sink::Data {
+                name: "b".to_string(),
+                component_type: "blackhole".to_string(),
+                inputs: vec!["gen3".to_string(), "parse_json".to_string()],
+            })),
+            Component::Transform(transform::Transform(transform::Data {
+                name: "c".to_string(),
+                component_type: "json".to_string(),
+                inputs: vec!["gen1".to_string(), "gen2".to_string()],
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "e".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "d".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "g".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+            Component::Source(source::Source(source::Data {
+                name: "f".to_string(),
+                component_type: "generator".to_string(),
+                output_type: DataType::Metric,
+            })),
+        ];
+
+        let fields = vec![
+            sort::SortField::<ComponentsSortFieldName> {
+                field: ComponentsSortFieldName::ComponentKind,
+                direction: sort::Direction::Asc,
+            },
+            sort::SortField::<ComponentsSortFieldName> {
+                field: ComponentsSortFieldName::Name,
+                direction: sort::Direction::Asc,
+            },
+        ];
+        sort::by_fields(&mut components, &fields);
+
+        let expectations = ["d", "e", "f", "g", "c", "a", "b"];
+        for (i, name) in expectations.iter().enumerate() {
+            assert_eq!(components[i].get_name(), *name);
+        }
+    }
 }

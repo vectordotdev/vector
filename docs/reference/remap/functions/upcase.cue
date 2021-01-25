@@ -10,7 +10,7 @@ remap: functions: upcase: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
 	description: #"""
 		Returns a copy of `value` that is entirely uppercase.
@@ -20,11 +20,10 @@ remap: functions: upcase: {
 	examples: [
 		{
 			title: "Upcase a string"
-			input: log: message: #"Here Is A Message"#
 			source: #"""
-				.message = upcase(.message)
+				upcase("Hello, World!")
 				"""#
-			output: log: message: "HERE IS A MESSAGE"
+			output: log: message: "HELLO, WORLD!"
 		},
 	]
 }

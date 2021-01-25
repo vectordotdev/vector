@@ -22,29 +22,30 @@ remap: functions: split: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: {
+		types: ["string"]
+		rules: [
+			"If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.",
+		]
+	}
 	category: "String"
 	description: #"""
 		Splits the given `value` via the provided `pattern`.
-
-		If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.
 		"""#
 	examples: [
 		{
 			title: "Split a string (no limit)"
-			input: log: text: "apples and pears and bananas"
 			source: #"""
-				.text = split(.text, " and ")
+				split("apples and pears and bananas", " and ")
 				"""#
-			output: log: text: ["apples", "pears", "bananas"]
+			return: ["apples", "pears", "bananas"]
 		},
 		{
 			title: "Split a string (with a limit)"
-			input: log: text: "apples and pears and bananas"
 			source: #"""
-				.text = split(.text, " and ", limit: 1)
+				split("apples and pears and bananas", " and ", limit: 1)
 				"""#
-			output: log: text: ["apples", "pears and bananas"]
+			return: ["apples", "pears and bananas"]
 		},
 	]
 }

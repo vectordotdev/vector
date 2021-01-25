@@ -5,10 +5,10 @@ use std::fmt;
 mod argument;
 mod arithmetic;
 mod array;
-mod assignment;
+pub(crate) mod assignment;
 mod block;
 pub(crate) mod function;
-mod if_statement;
+pub(crate) mod if_statement;
 mod literal;
 mod map;
 mod noop;
@@ -40,15 +40,6 @@ pub enum Error {
 
     #[error("assignment error")]
     Assignment(#[from] assignment::Error),
-
-    #[error(r#"error for variable "{0}""#)]
-    Variable(String, #[source] variable::Error),
-
-    #[error("path error")]
-    Path(#[from] path::Error),
-
-    #[error("not operation error")]
-    Not(#[from] not::Error),
 
     #[error("if-statement error")]
     IfStatement(#[from] if_statement::Error),
@@ -83,6 +74,7 @@ macro_rules! expression_dispatch {
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
         #[derive(Clone, PartialEq)]
+        #[allow(clippy::large_enum_variant)] // TODO: investigate
         pub enum Expr {
             $($expr($expr)),+
         }

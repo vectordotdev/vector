@@ -14,12 +14,12 @@ impl ProcessedEventsTotal {
 impl ProcessedEventsTotal {
     /// Metric timestamp
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.timestamp
+        self.0.data.timestamp
     }
 
     /// Total number of events processed
     pub async fn processed_events_total(&self) -> f64 {
-        match self.0.value {
+        match self.0.data.value {
             MetricValue::Counter { value } => value,
             _ => 0.00,
         }

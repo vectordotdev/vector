@@ -29,6 +29,12 @@ impl Kind {
     pub fn scalar(self) -> Self {
         self & !(Kind::Array | Kind::Map)
     }
+
+    /// Returns `true` if the [`value::Kind`] is a scalar and `false` if it's
+    /// map or array.
+    pub fn is_scalar(self) -> bool {
+        self == self.scalar()
+    }
 }
 
 macro_rules! impl_kind {
@@ -142,6 +148,37 @@ impl From<&Value> for Kind {
             Value::Timestamp(_) => Kind::Timestamp,
             Value::Regex(_) => Kind::Regex,
             Value::Null => Kind::Null,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Kind;
+
+    #[test]
+    fn kind_is_scalar() {
+        let scalars = vec![
+            Kind::Integer,
+            Kind::Bytes,
+            Kind::Null | Kind::Regex,
+            Kind::Timestamp | Kind::Float | Kind::Null,
+        ];
+
+        let non_scalars = vec![
+            Kind::Array,
+            Kind::Map,
+            Kind::Array | Kind::Integer,
+            Kind::Map | Kind::Bytes,
+            Kind::Boolean | Kind::Null | Kind::Array,
+        ];
+
+        for kind in scalars {
+            assert!(kind.is_scalar());
+        }
+
+        for kind in non_scalars {
+            assert!(!kind.is_scalar());
         }
     }
 }

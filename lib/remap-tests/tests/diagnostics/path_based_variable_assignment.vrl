@@ -1,0 +1,14 @@
+# object: { "bar": "bar" }
+# result: 
+#
+# error: path-based variable assignment
+#   ┌─ :2:4
+#   │
+# 2 │ foo.bar = "baz"
+#   │ ---^^^^ assignment to variable path currently unsupported
+#   │ │   
+#   │ assign to "foo" instead
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+foo.bar = "baz"

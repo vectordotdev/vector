@@ -18,21 +18,24 @@ remap: functions: parse_regex_all: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `pattern`",
 	]
-	return: ["array"]
+	return: {
+		types: ["array"]
+		rules: [
+			"Matches will return all capture groups corresponding to the leftmost matches in the text.",
+			"If no match is found an empty map is returned.",
+		]
+	}
 	category: "Parse"
 	description: """
 		Parses the provided `value` via the provided Regex `pattern`.
-
-		* Capture groups are supported.
-		* Returns all capture groups corresponding to the leftmost matches in the text.
-		* If no match is found an empty map is returned.
 		"""
 	examples: [
 		{
 			title: "Parse via Regex (all matches)"
-			input: log: message: "first group and second group."
-			source: ".matches = parse_regex_all(.message, /(?P<number>.*?) group/)"
-			output: input & {log: matches: [
+			source: """
+				parse_regex_all("first group and second group.", /(?P<number>.*?) group/)
+				"""
+			return: [
 				{
 					number: "first"
 					"0":    "first group"
@@ -43,7 +46,7 @@ remap: functions: parse_regex_all: {
 					"0":    "second group"
 					"1":    "second"
 				},
-			]}
+			]
 		},
 	]
 }

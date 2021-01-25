@@ -1,0 +1,18 @@
+# object: { "bar": "bar" }
+# result: 
+#
+# error: invalid if-condition type
+#   ┌─ :2:4
+#   │
+# 2 │ if "nope" {
+#   │    ^^^^^^
+#   │    │
+#   │    got: string
+#   │    expected: boolean
+#   │
+#   = hint: coerce the value using one of the coercion functions
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+if "nope" {
+    true
+}

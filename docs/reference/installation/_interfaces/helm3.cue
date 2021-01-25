@@ -19,7 +19,7 @@ installation: _interfaces: "helm3": {
 	package_manager_name: installation.package_managers.helm.name
 	platform_name:        "kubernetes"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_repo_name:                string | *"timberio"
 			_chart_name:               string
@@ -41,9 +41,8 @@ installation: _interfaces: "helm3": {
 				  stdout:
 				    type: console
 				    inputs: ["kubernetes_logs"]
-				    rawConfig: |
-				      target = "stdout"
-				      encoding = "json"
+				    target: "stdout"
+				    encoding: "json"
 				VALUES
 				"""#
 			install:   #"helm install --namespace \#(_namespace) --create-namespace \#(_release_name) \#(_repo_name)/\#(_chart_name) --values values.yaml"#
@@ -58,7 +57,7 @@ installation: _interfaces: "helm3": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""

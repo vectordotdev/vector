@@ -17,7 +17,12 @@ remap: functions: floor: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["timestamp"]
+	return: {
+		types: ["integer", "float"]
+		rules: [
+			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
+		]
+	}
 	category: "Number"
 	description: #"""
 		Rounds the given `value` down to the specified `precision`.
@@ -25,19 +30,17 @@ remap: functions: floor: {
 	examples: [
 		{
 			title: "Round a number down (without precision)"
-			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision: 2)
+				floor(4.345)
 				"""#
-			output: log: number: 4
+			return: 4
 		},
 		{
 			title: "Round a number down (with precision)"
-			input: log: number: 4.345
 			source: #"""
-				.floor = floor(.number, precision: 2)
+				floor(4.345, precision: 2)
 				"""#
-			output: log: number: 4.34
+			return: 4.34
 		},
 	]
 }

@@ -445,6 +445,7 @@ test-integration-postgresql_metrics: ## Runs postgresql_metrics integration test
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh postgresql_metrics stop
 	@scripts/setup_integration_env.sh postgresql_metrics start
+	sleep 5 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -545,10 +546,15 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-metrics
+bench-metrics: ## Run metrics benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "metrics-benches" ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-all
 bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches" ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
