@@ -65,10 +65,11 @@ components: {
 
 		// `examples` demonstrates various ways to use the component using an
 		// input, output, and example configuration.
-		#ExampleConfig: close({
+		#ExampleConfig: {
 			title:    string
 			context?: string
 			"configuration": {
+				...
 				for k, v in configuration {
 					"\( k )"?: _ | *null
 				}
@@ -91,7 +92,7 @@ components: {
 			}
 
 			notes?: string
-		})
+		}
 
 		examples?: [#ExampleConfig, ...#ExampleConfig]
 
@@ -183,14 +184,14 @@ components: {
 
 		if Args.kind == "sink" {
 			// `buffer` describes how the component buffers data.
-			buffer: close({
+			buffer: {
 				enabled: bool | string
-			})
+			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.
-			healthcheck: close({
+			healthcheck: {
 				enabled: bool
-			})
+			}
 
 			exposes?: #FeaturesExpose
 			send?:    #FeaturesSend & {_args: Args}
@@ -200,9 +201,9 @@ components: {
 	}
 
 	#FeaturesCollect: {
-		checkpoint: close({
+		checkpoint: {
 			enabled: bool
-		})
+		}
 
 		from?: {
 			service:    #Service
@@ -216,11 +217,11 @@ components: {
 	}
 
 	#FeaturesEnrich: {
-		from: service: close({
+		from: service: {
 			name:     string
 			url:      string
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesExpose: {
@@ -251,11 +252,11 @@ components: {
 	}
 
 	#FeaturesParse: {
-		format: close({
+		format: {
 			name:     string
 			url:      string | null
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesProgram: {
@@ -295,13 +296,13 @@ components: {
 		if Args.egress_method == "batch" || Args.egress_method == "dynamic" {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
-			batch: close({
+			batch: {
 				enabled:      bool
 				common:       bool
 				max_bytes:    uint | null
 				max_events:   uint | null
 				timeout_secs: uint16 | null
-			})
+			}
 		}
 
 		// `compression` describes how the component compresses data.
@@ -382,11 +383,11 @@ components: {
 		metrics: #MetricInput | null
 	}
 
-	#LogOutput: [Name=string]: close({
+	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
 		fields:      #Schema
-	})
+	}
 
 	#MetricInput: {
 		counter:      *false | bool
@@ -397,14 +398,14 @@ components: {
 		summary:      *false | bool
 	}
 
-	#MetricOutput: [Name=string]: close({
+	#MetricOutput: [Name=string]: {
 		description:       string
 		relevant_when?:    string
 		tags:              #MetricTags
 		name:              Name
 		type:              #MetricType
 		default_namespace: string
-	})
+	}
 
 	#Output: {
 		logs?:    #LogOutput
