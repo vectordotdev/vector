@@ -603,8 +603,9 @@ disable-resolv-conf = []
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 metrics-benches = ["sources-socket", "sinks-socket"]
 
@@ -623,6 +624,11 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "languages"
+harness = false
+required-features = ["language-benches"]
 
 [[bench]]
 name = "metrics_on"
