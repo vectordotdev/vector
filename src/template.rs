@@ -33,6 +33,12 @@ pub enum TemplateParseError {
     StrftimeError,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateRenderError {
+    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
+    MissingKeys { missing_keys: Vec<String> },
+}
+
 impl TryFrom<&str> for Template {
     type Error = TemplateParseError;
 
@@ -92,11 +98,11 @@ fn is_dynamic(item: &Item) -> bool {
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderError> {
         self.render_string(event).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
+    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderError> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -132,8 +138,8 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
-    let mut missing_fields = Vec::new();
+fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderError> {
+    let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
             let key = caps
@@ -146,15 +152,15 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
             }
             .map(|val| val.to_string_lossy())
             .unwrap_or_else(|| {
-                missing_fields.push(key.to_owned());
+                missing_keys.push(key.to_owned());
                 String::new()
             })
         })
         .into_owned();
-    if missing_fields.is_empty() {
+    if missing_keys.is_empty() {
         Ok(out)
     } else {
-        Err(missing_fields)
+        Err(TemplateRenderError::MissingKeys { missing_keys })
     }
 }
 
@@ -298,7 +304,9 @@ mod tests {
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(vec!["log_stream".to_string(), "foo".to_string()]),
+            Err(TemplateRenderError::MissingKeys {
+                missing_keys: vec!["log_stream".to_string(), "foo".to_string()]
+            }),
             template.render(&event)
         );
     }
