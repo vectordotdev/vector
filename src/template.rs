@@ -28,13 +28,13 @@ pub struct Template {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateError {
+pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
     StrftimeError,
 }
 
 impl TryFrom<&str> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Borrowed(src))
@@ -42,7 +42,7 @@ impl TryFrom<&str> for Template {
 }
 
 impl TryFrom<String> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Owned(src))
@@ -50,7 +50,7 @@ impl TryFrom<String> for Template {
 }
 
 impl TryFrom<PathBuf> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
         Template::try_from(p.to_string_lossy().into_owned())
@@ -58,7 +58,7 @@ impl TryFrom<PathBuf> for Template {
 }
 
 impl TryFrom<Cow<'_, str>> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
         let (has_error, is_dynamic) = StrftimeItems::new(&src)
@@ -66,7 +66,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 (error || is_error(&item), dynamic || is_dynamic(&item))
             });
         if has_error {
-            Err(TemplateError::StrftimeError)
+            Err(TemplateParseError::StrftimeError)
         } else {
             Ok(Template {
                 has_fields: RE.is_match(&src),
@@ -408,7 +408,7 @@ mod tests {
     fn strftime_error() {
         assert_eq!(
             Template::try_from("%E").unwrap_err(),
-            TemplateError::StrftimeError
+            TemplateParseError::StrftimeError
         );
     }
 }

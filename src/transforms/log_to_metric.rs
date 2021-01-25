@@ -7,7 +7,7 @@ use crate::{
         LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
         LogToMetricTemplateRenderError,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -133,7 +133,7 @@ enum TransformError {
     FieldNotFound {
         field: String,
     },
-    TemplateParseError(TemplateError),
+    TemplateParseError(TemplateParseError),
     TemplateRenderError {
         missing_keys: Vec<String>,
     },

@@ -8,7 +8,7 @@ use crate::{
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
@@ -34,7 +34,7 @@ enum BuildError {
     #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]

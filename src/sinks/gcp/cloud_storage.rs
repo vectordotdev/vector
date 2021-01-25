@@ -12,7 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
     Event,
 };
@@ -182,7 +182,7 @@ enum HealthcheckError {
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
     #[snafu(display("key_prefix template parse error: {}", source))]
-    KeyPrefixTemplate { source: TemplateError },
+    KeyPrefixTemplate { source: TemplateParseError },
 }
 
 impl GcsSink {

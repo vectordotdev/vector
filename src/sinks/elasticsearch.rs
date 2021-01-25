@@ -11,7 +11,7 @@ use crate::{
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
@@ -187,7 +187,7 @@ enum ParseError {
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
-    IndexTemplate { source: TemplateError },
+    IndexTemplate { source: TemplateParseError },
 }
 
 #[async_trait::async_trait]

@@ -18,7 +18,7 @@ impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
 
 #[derive(Debug)]
 pub struct AddFieldsTemplateInvalid<'a> {
-    pub error: crate::template::TemplateError,
+    pub error: crate::template::TemplateParseError,
     pub field: &'a str,
 }
 

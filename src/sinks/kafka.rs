@@ -7,7 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{
@@ -39,7 +39,7 @@ enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

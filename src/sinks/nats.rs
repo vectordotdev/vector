@@ -7,7 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use std::convert::TryFrom;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("invalid subject template: {}", source))]
-    SubjectTemplate { source: TemplateError },
+    SubjectTemplate { source: TemplateParseError },
 }
 
 /**

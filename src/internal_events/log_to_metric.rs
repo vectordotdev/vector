@@ -66,7 +66,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
 }
 
 pub(crate) struct LogToMetricTemplateParseError {
-    pub error: crate::template::TemplateError,
+    pub error: crate::template::TemplateParseError,
 }
 
 impl InternalEvent for LogToMetricTemplateParseError {
