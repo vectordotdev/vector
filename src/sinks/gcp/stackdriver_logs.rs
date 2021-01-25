@@ -56,7 +56,7 @@ impl VecMap<Template> {
     }
 }
 
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, Debug)]
 struct PartitionKey {
     r#type: String,
     resource_values: Vec<String>,
@@ -155,10 +155,7 @@ impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
-        let batch = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch_settings()?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
@@ -360,6 +357,14 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
 }
 
 impl StackdriverConfig {
+    fn batch_settings(&self) -> crate::Result<BatchSettings<JsonArrayBuffer>> {
+        BatchSettings::default()
+            .bytes(bytesize::kib(5000u64))
+            .timeout(1)
+            .parse_config(self.batch)
+            .map_err(Into::into)
+    }
+
     fn log_name(&self) -> String {
         use StackdriverLogName::*;
         match &self.log_name {
@@ -375,8 +380,8 @@ impl StackdriverConfig {
 mod tests {
     use super::*;
     use crate::event::{LogEvent, Value};
+    use crate::sinks::util::{Batch, Partition, PushResult};
     use chrono::{TimeZone, Utc};
-    use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
     #[test]
@@ -494,7 +499,7 @@ mod tests {
 
         let sink = StackdriverSink {
             resource: config.resource.labels.clone().into(),
-            config,
+            config: config.clone(),
             creds: None,
             severity_key: None,
         };
@@ -503,15 +508,14 @@ mod tests {
         let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
         let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        assert_eq!(event1.partition(), event2.partition());
+        let mut buffer =
+            PartitionBuffer::new(JsonArrayBuffer::new(config.batch_settings().unwrap().size));
+        assert!(matches!(buffer.push(event1), PushResult::Ok(_)));
+        assert!(matches!(buffer.push(event2), PushResult::Ok(_)));
+        let output = buffer.finish();
 
-        let json1 = serde_json::to_string(&event1).unwrap();
-        let json2 = serde_json::to_string(&event2).unwrap();
-        let raw1 = RawValue::from_string(json1).unwrap();
-        let raw2 = RawValue::from_string(json2).unwrap();
-
-        let events = vec![raw1, raw2];
-
-        let request = sink.build_request(events).await.unwrap();
+        let request = sink.build_request(output).await.unwrap();
 
         let (parts, body) = request.into_parts();
 
