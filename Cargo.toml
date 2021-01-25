@@ -51,6 +51,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/standalone-benches",
 ]
 
 [dependencies]

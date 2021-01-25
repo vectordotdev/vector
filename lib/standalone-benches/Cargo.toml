@@ -1,0 +1,24 @@
+[package]
+name = "standalone-benches"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+license = "MPL-2.0"
+autobenches = false
+
+[lib]
+bench = false
+
+[[bench]]
+name = "channels"
+harness = false
+
+[dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.3.4", features = ["async_futures"] }
+tokio02 = { package = "tokio", version = "0.2", features = ["sync"] }
+tokio11 = { package = "tokio", version = "1.1", features = ["sync"] }
+futures03 = { package = "futures", version = "0.3" }
+async-std19 = { package = "async-std", version = "1.9" }
