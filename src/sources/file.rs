@@ -345,7 +345,7 @@ fn reconcile_position_options(
     read_from: Option<ReadFromConfig>,
 ) -> (bool, ReadFrom) {
     if start_at_beginning.is_some() {
-        warn!(message = "Use of deprecated option `start_at_beginning`. Replace with `ignore_checkpoints` and `read_from`.")
+        warn!(message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead.")
     }
 
     match start_at_beginning {
