@@ -150,7 +150,6 @@ mod tests {
             fallible: true,
             kind: Kind::Map,
             inner_type_def: inner_type_def(),
-            ..Default::default()
         },
     }];
 }

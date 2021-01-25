@@ -2,6 +2,7 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use url::Url;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;
@@ -52,8 +53,23 @@ impl Expression for ParseUrlFn {
         self.value
             .type_def(state)
             .into_fallible(true) // URL parsing error
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> InnerTypeDef {
+    InnerTypeDef::Map(remap::type_def_map![
+        "scheme": TypeDef::new_with_kind(Kind::Bytes),
+        "username": TypeDef::new_with_kind(Kind::Bytes),
+        "password": TypeDef::new_with_kind(Kind::Bytes),
+        "path": TypeDef::new_with_kind(Kind::Bytes),
+        "host": TypeDef::new_with_kind(Kind::Bytes),
+        "port": TypeDef::new_with_kind(Kind::Bytes),
+        "fragment": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
+        "query": TypeDef::new_with_kind(Kind::Map),
+    ])
 }
 
 fn url_to_value(url: Url) -> Value {
@@ -92,12 +108,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_optional {
             expr: |_| ParseUrlFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 

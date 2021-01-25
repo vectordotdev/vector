@@ -1,5 +1,6 @@
 use remap::prelude::*;
 use std::collections::BTreeMap;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -62,9 +63,40 @@ impl Expression for ParseAwsVpcFlowLogFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .into_fallible(true) // Log parsing error
+            .into_fallible(true) // Log parsin_ error
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> InnerTypeDef {
+    InnerTypeDef::Map(remap::type_def_map![
+        "version": TypeDef::new_with_kind(Kind::Integer),
+        "account_id": TypeDef::new_with_kind(Kind::Integer),
+        "interface_id": TypeDef::new_with_kind(Kind::Bytes),
+        "srcaddr": TypeDef::new_with_kind(Kind::Bytes),
+        "dstaddr": TypeDef::new_with_kind(Kind::Bytes),
+        "srcport": TypeDef::new_with_kind(Kind::Integer),
+        "dstport": TypeDef::new_with_kind(Kind::Integer),
+        "protocol": TypeDef::new_with_kind(Kind::Integer),
+        "packets": TypeDef::new_with_kind(Kind::Integer),
+        "bytes": TypeDef::new_with_kind(Kind::Integer),
+        "start": TypeDef::new_with_kind(Kind::Integer),
+        "end": TypeDef::new_with_kind(Kind::Integer),
+        "action": TypeDef::new_with_kind(Kind::Bytes),
+        "log_status": TypeDef::new_with_kind(Kind::Bytes),
+        "vpc_id": TypeDef::new_with_kind(Kind::Bytes),
+        "subnet_id": TypeDef::new_with_kind(Kind::Bytes),
+        "instance_id": TypeDef::new_with_kind(Kind::Bytes),
+        "tcp_flags": TypeDef::new_with_kind(Kind::Integer),
+        "type": TypeDef::new_with_kind(Kind::Bytes),
+        "pkt_srcaddr": TypeDef::new_with_kind(Kind::Bytes),
+        "pkt_dstaddr": TypeDef::new_with_kind(Kind::Bytes),
+        "region": TypeDef::new_with_kind(Kind::Bytes),
+        "az_id": TypeDef::new_with_kind(Kind::Bytes),
+        "sublocation_type": TypeDef::new_with_kind(Kind::Bytes),
+    ])
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -153,22 +185,22 @@ mod tests {
     remap::test_type_def![
         value_noop {
             expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from(1).boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         format_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 
