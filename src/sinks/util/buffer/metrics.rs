@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::{Metric, MetricData, MetricKind, MetricValue, Sample},
+    event::metric::{Metric, MetricKind, MetricValue, Sample},
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
@@ -13,8 +13,6 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct MetricEntry(pub Metric);
-
-type MetricSet = HashSet<MetricEntry>;
 
 impl Eq for MetricEntry {}
 
@@ -106,14 +104,10 @@ pub type MetricBuffer = MetricsBuffer<StdMetricsState>;
 /// Batching mostly means that we will aggregate away timestamp
 /// information, and apply metric-specific compression to improve the
 /// performance of the pipeline.  In particular, only the latest in a
-/// series of absolute metrics are output, and incremental metrics are
-/// summed together. Further, distribution metrics have their their
-/// samples compressed with `compress_distribution` below.
-///
-/// Some sinks have requirements on the types of the metrics in the
-/// batch. For instance, Datadog requires gauges to be absolute values,
-/// but the Statsd source produces relative gauges. Normalization of
-/// metrics is handled by the `State` type parameter before batching.
+/// series of metrics are output.  Any aggregation or conversion of
+/// metrics is handled by the `State` type.  Further, distribution
+/// metrics have their their samples compressed with
+/// `compress_distribution` below.
 pub struct MetricsBuffer<State> {
     state: State,
     metrics: MetricSet,
@@ -128,7 +122,7 @@ impl<State: MetricsState> MetricsBuffer<State> {
     fn new_with_state(max_events: usize, state: State) -> Self {
         Self {
             state,
-            metrics: HashSet::with_capacity(max_events),
+            metrics: MetricSet::with_capacity(max_events),
             max_events,
         }
     }
@@ -152,29 +146,9 @@ impl<State: MetricsState> Batch for MetricsBuffer<State> {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            let item = item.into_metric();
-            let item = match self.state.apply_state(item) {
-                Some(item) => item,
-                None => return PushResult::Ok(self.num_items() >= self.max_events),
-            };
-
-            let new_entry = match item.data.kind {
-                // Absolute metrics simply overwrite older metrics in the buffer.
-                MetricKind::Absolute => MetricEntry(item),
-                MetricKind::Incremental => {
-                    // Incremental metrics update existing entries, if present.
-                    let entry = MetricEntry(item);
-                    match self.metrics.take(&entry) {
-                        Some(mut existing) => {
-                            existing.data.update(&entry.data);
-                            existing
-                        }
-                        None => entry,
-                    }
-                }
-            };
-            self.metrics.replace(new_entry);
-
+            if let Some(item) = self.state.apply_state(item.into_metric()) {
+                self.metrics.replace(MetricEntry(item));
+            }
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -189,6 +163,7 @@ impl<State: MetricsState> Batch for MetricsBuffer<State> {
 
     fn finish(self) -> Self::Output {
         self.metrics
+            .0
             .into_iter()
             .map(|e| {
                 let mut metric = e.0;
@@ -243,62 +218,22 @@ pub struct StdMetricsState {
 impl MetricsState for StdMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
         match (metric.data.kind, &metric.data.value) {
-            (MetricKind::Absolute, MetricValue::Counter { value }) => {
-                let new_value = *value;
-                let entry = MetricEntry(metric);
-                let result = match self.state.get(&entry) {
-                    Some(MetricEntry(Metric {
-                        data:
-                            MetricData {
-                                value: MetricValue::Counter { value: old_value },
-                                ..
-                            },
-                        ..
-                    })) => {
-                        // Counters are disaggregated. We take the previous value from the state
-                        // and emit the difference between previous and current as a Counter
-                        Some(Metric {
-                            series: entry.series.clone(),
-                            data: MetricData {
-                                timestamp: entry.data.timestamp,
-                                kind: MetricKind::Incremental,
-                                value: MetricValue::Counter {
-                                    value: new_value - old_value,
-                                },
-                            },
-                        })
-                    }
-                    _ => None,
-                };
-                self.state.replace(entry);
-                result
+            // Counters are disaggregated. We take the previous value from the state
+            // and emit the difference between previous and current as a Counter
+            (MetricKind::Absolute, MetricValue::Counter { .. }) => {
+                self.state.absolute_to_incremental(metric)
             }
+            // Convert incremental gauges into absolute ones
             (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
-                // Convert incremental gauges into absolute ones, using
-                // the state buffer to keep track of its value
-                // throughout the entire application uptime.
-                let mut entry = MetricEntry(metric.into_absolute());
-                let mut existing = self.state.take(&entry).unwrap_or_else(|| {
-                    // Start from zero value if the entry is not found.
-                    MetricEntry(entry.zero())
-                });
-                existing.data.update(&entry.data);
-                entry.data.value = existing.data.value.clone();
-                self.state.insert(existing);
-                Some(entry.0)
+                self.state.incremental_to_absolute(metric)
             }
+            (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
             _ => Some(metric),
         }
     }
 
     fn fresh(&self, metrics: &MetricSet) -> Self {
-        let mut state = self.state.clone();
-        for entry in metrics {
-            let data = &entry.data;
-            if (data.value.is_gauge() || data.value.is_counter()) && data.kind.is_absolute() {
-                state.replace(entry.clone());
-            }
-        }
+        let state = self.state.fresh(metrics);
         Self { state }
     }
 }
@@ -315,21 +250,12 @@ impl MetricsState for AbsoluteMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
             MetricKind::Absolute => Some(metric),
-            MetricKind::Incremental => {
-                let mut entry = MetricEntry(metric.into_absolute());
-                let mut existing = self
-                    .state
-                    .take(&entry)
-                    .unwrap_or_else(|| MetricEntry(entry.zero()));
-                existing.data.update(&entry.data);
-                entry.data.value = existing.data.value.clone();
-                self.state.insert(existing);
-                Some(entry.0)
-            }
+            MetricKind::Incremental => self.state.incremental_to_absolute(metric),
         }
     }
 
     fn fresh(&self, _metrics: &MetricSet) -> Self {
+        // This state only stores and outputs absolute metrics, so nothing complicated to do here.
         let state = self.state.clone();
         Self { state }
     }
@@ -347,25 +273,107 @@ pub struct IncrementalMetricsState {
 impl MetricsState for IncrementalMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
-            MetricKind::Incremental => Some(metric),
-            MetricKind::Absolute => {
-                // Save the value here to avoid cloning the whole metric later.
-                let mut saved_value = metric.data.value.clone();
-                let entry = MetricEntry(metric);
-                let result = self.state.take(&entry).map(|mut increment| {
-                    std::mem::swap(&mut saved_value, &mut increment.data.value);
-                    increment.data.value.subtract(&saved_value);
-                    increment.0.into_incremental()
-                });
-                self.state.replace(entry);
-                result
+            // Aggregate incremental metrics together
+            MetricKind::Incremental => self.state.aggregate_incremental(metric),
+            MetricKind::Absolute => self.state.absolute_to_incremental(metric),
+        }
+    }
+
+    fn fresh(&self, metrics: &MetricSet) -> Self {
+        let state = self.state.fresh(metrics);
+        Self { state }
+    }
+}
+
+/// This is a convenience newtype wrapper for HashSet<MetricEntry> that
+/// provides some extra functionality.
+#[derive(Clone, Default)]
+pub struct MetricSet(HashSet<MetricEntry>);
+
+impl Deref for MetricSet {
+    type Target = HashSet<MetricEntry>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricSet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl MetricSet {
+    fn with_capacity(capacity: usize) -> Self {
+        Self(HashSet::with_capacity(capacity))
+    }
+
+    /// Convert the incremental metric into an absolute one, using the
+    /// state buffer to keep track of the value throughout the entire
+    /// application uptime.
+    fn incremental_to_absolute(&mut self, metric: Metric) -> Option<Metric> {
+        let mut entry = MetricEntry(metric.into_absolute());
+        let mut existing = self.0.take(&entry).unwrap_or_else(|| {
+            // Start from zero value if the entry is not found.
+            MetricEntry(entry.zero())
+        });
+        existing.data.value.add(&entry.data.value);
+        entry.data.value = existing.data.value.clone();
+        self.0.insert(existing);
+        Some(entry.0)
+    }
+
+    /// Convert the absolute metric into an incremental by calculating
+    /// the increment from the last saved absolute state.
+    fn absolute_to_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        let mut entry = MetricEntry(metric);
+        match self.0.get(&entry) {
+            Some(reference) => {
+                // From the stored reference value, emit an increment
+                entry.data.value.subtract(&reference.data.value);
+                Some(entry.0.into_incremental())
+            }
+            None => {
+                // No reference so store this and emit nothing
+                self.0.insert(entry);
+                None
             }
         }
     }
 
-    fn fresh(&self, _metrics: &MetricSet) -> Self {
-        let state = self.state.clone();
-        Self { state }
+    /// Add the saved state to this incremental metric, saving it as a
+    /// starting point if no previous state is present.
+    fn aggregate_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        let mut entry = MetricEntry(metric);
+        let new_entry = match self.0.take(&entry) {
+            Some(mut previous) => {
+                previous.data.add(&entry.data);
+                entry.data = previous.data.clone();
+                previous
+            }
+            None => entry.clone(),
+        };
+        self.0.replace(new_entry);
+        Some(entry.0)
+    }
+
+    /// Produce a fresh state by cloning all the absolute references and
+    /// updating them with any increment previously emitted in this batch.
+    fn fresh(&self, metrics: &Self) -> Self {
+        Self(
+            self.0
+                .iter()
+                .filter(|entry| entry.data.kind.is_absolute())
+                .cloned()
+                .map(|entry| {
+                    let mut entry = MetricEntry(entry.0.into_incremental());
+                    if let Some(increment) = metrics.get(&entry) {
+                        entry.data.value.add(&increment.data.value);
+                    }
+                    MetricEntry(entry.0.into_absolute())
+                })
+                .collect(),
+        )
     }
 }
 
