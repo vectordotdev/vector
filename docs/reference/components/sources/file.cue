@@ -209,12 +209,6 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		start_at_beginning: {
-			common:      false
-			description: "For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint. This setting is deprecated in favor of `read_from` and `ignore_checkpoints`."
-			required:    false
-			type: bool: default: false
-		}
 	}
 
 	output: logs: line: {
@@ -524,13 +518,15 @@ components: sources: file: {
 		read_position: {
 			title: "Read Position"
 			body: """
-				By default, Vector will read new data only for newly discovered
-				files, similar to the `tail` command. You can read from the
-				beginning of the file by setting the `start_at_beginning` option to
-				`true`.
+				By default, Vector will read from the beginning of newly discovered
+				files. You can change this behavior by setting the `read_from` option to
+				`"end"`.
 
-				Previously discovered files will be checkpointed](#checkpointing),
-				and the read position will resume from the last checkpoint.
+				Previously discovered files will be [checkpointed](#checkpointing), and
+				the read position will resume from the last checkpoint. To disable this
+				behavior, you can set the `ignore_checkpoints` option to `true`.  This
+				will cause Vector to disregard existing checkpoints when determining the
+				starting read position of a file.
 				"""
 		}
 	}
