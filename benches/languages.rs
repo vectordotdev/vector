@@ -10,9 +10,69 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_parse_syslog
+    targets = benchmark_parse_syslog, benchmark_parse_json
 );
 criterion_main!(benches);
+
+fn benchmark_parse_json(c: &mut Criterion) {
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            r#"
+[transforms.last]
+  type = "remap"
+  inputs = ["in"]
+  source = """
+    . = parse_json!(.message)
+  """
+            "#,
+        ),
+        (
+            "native",
+            r#"
+[transforms.last]
+  type = "json_parser"
+  inputs = ["in"]
+  field = "message"
+            "#,
+        ),
+        (
+            "lua",
+            r#"
+[transforms.last]
+  type = "lua"
+  inputs = ["in"]
+  version = "2"
+  source = """
+  local function parse_json(message)
+    json.decode(message)
+  end
+
+  function process(event, emit)
+    event.log = parse_json(event.log.message)
+    emit(event)
+  end
+  """
+  hooks.process = "process"
+        "#,
+        ),
+        (
+            "wasm",
+            r#"
+[transforms.last]
+  type = "wasm"
+  inputs = ["in"]
+  module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+  artifact_cache = "target/artifacts/"
+        "#,
+        ),
+    ];
+
+    let input = r#"{"string":"bar","array":[1,2,3],"boolean":true,"number":47.5,"object":{"key":"value"}}"#;
+    let output = serde_json::from_str(r#"{ "array": [1, 2, 3], "boolean": true, "number": 47.5, "object": { "key": "value" }, "string": "bar" }"#).unwrap();
+
+    benchmark_configs(c, "parse_json", configs, "in", "last", input, output);
+}
 
 fn benchmark_parse_syslog(c: &mut Criterion) {
     let configs: Vec<(&str, &str)> = vec![
