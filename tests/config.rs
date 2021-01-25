@@ -8,8 +8,9 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
     match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
+            let c2 = config::load_from_str(config, format).unwrap();
             match (
-                config::warnings(&c),
+                config::warnings(&c2.into()),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
