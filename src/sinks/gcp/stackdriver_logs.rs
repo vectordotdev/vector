@@ -544,9 +544,10 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).await.is_ok() {
-            panic!("config.build failed to error");
-        }
+        config
+            .build(SinkContext::new_test())
+            .await
+            .expect_err("config.build failed to error")
     }
 
     #[test]
