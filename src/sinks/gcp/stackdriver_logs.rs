@@ -560,10 +560,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        config
-            .build(SinkContext::new_test())
-            .await
-            .expect_err("config.build failed to error")
+        assert!(config.build(SinkContext::new_test()).await.is_err())
     }
 
     #[test]
