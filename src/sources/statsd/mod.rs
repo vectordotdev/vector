@@ -5,15 +5,13 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Event, Pipeline,
+    udp, Event, Pipeline,
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
@@ -166,29 +164,16 @@ async fn statsd_udp(
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> Result<(), ()> {
-    let socket = UdpSocket::bind(&config.address)
+    let mut socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     #[cfg(unix)]
-    {
-        // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
-        let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
-
-        if let Some(send_buffer_bytes) = config.send_buffer_bytes {
-            if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
-                warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
-            }
-        }
-
-        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-            if let Err(error) = socket.set_recv_buffer_size(receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
-        }
-
-        socket.into_raw_fd();
-    }
+    udp::set_buffer_sizes(
+        &mut socket,
+        config.send_buffer_bytes,
+        config.receive_buffer_bytes,
+    );
 
     info!(
         message = "Listening.",

@@ -3,7 +3,7 @@ use crate::{
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
-    Pipeline,
+    udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
@@ -11,8 +11,6 @@ use futures::SinkExt;
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-#[cfg(unix)]
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
 
@@ -71,24 +69,7 @@ pub fn udp(
         info!(message = "Listening.", address = %address);
 
         #[cfg(unix)]
-        {
-            // SAFETY: We temporarily take ownership of the socket and return it by the end of this block scope.
-            let socket = unsafe { socket2::Socket::from_raw_fd(socket.as_raw_fd()) };
-
-            if let Some(send_buffer_bytes) = send_buffer_bytes {
-                if let Err(error) = socket.set_send_buffer_size(send_buffer_bytes) {
-                    warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
-                }
-            }
-
-            if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-                if let Err(error) = socket.set_recv_buffer_size(receive_buffer_bytes) {
-                    warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-                }
-            }
-
-            socket.into_raw_fd();
-        }
+        udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
 
         #[cfg(unix)]
         let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
