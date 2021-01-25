@@ -22,7 +22,7 @@ static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
     [SharedString::const_str(&CARDINALITY_KEY_NAME)];
 static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
 static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
+    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
 fn metrics_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
@@ -149,7 +149,7 @@ impl VectorRecorder {
 
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
+        let ckey = CompositeKey::new(MetricKind::Counter, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -157,7 +157,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
+        let ckey = CompositeKey::new(MetricKind::Gauge, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -170,7 +170,7 @@ impl Recorder for VectorRecorder {
         _unit: Option<Unit>,
         _description: Option<&'static str>,
     ) {
-        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
+        let ckey = CompositeKey::new(MetricKind::Histogram, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -179,7 +179,7 @@ impl Recorder for VectorRecorder {
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
-        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
+        let ckey = CompositeKey::new(MetricKind::Counter, key);
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
@@ -187,7 +187,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn update_gauge(&self, key: Key, value: GaugeValue) {
-        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
+        let ckey = CompositeKey::new(MetricKind::Gauge, key);
         self.registry.op(
             ckey,
             |handle| handle.update_gauge(value),
@@ -195,7 +195,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn record_histogram(&self, key: Key, value: f64) {
-        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
+        let ckey = CompositeKey::new(MetricKind::Histogram, key);
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),

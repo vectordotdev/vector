@@ -52,7 +52,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .finish()
             .with(Limit::default());
         if metrics_layer_enabled {
-            let formatter = formatter.with(MetricsLayer::new());
+            let formatter = formatter.with(MetricsLayer::all());
             Dispatch::new(BroadcastSubscriber { formatter })
         } else {
             Dispatch::new(BroadcastSubscriber { formatter })
@@ -64,7 +64,7 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .finish()
             .with(Limit::default());
         if metrics_layer_enabled {
-            let formatter = formatter.with(MetricsLayer::new());
+            let formatter = formatter.with(MetricsLayer::all());
             Dispatch::new(BroadcastSubscriber { formatter })
         } else {
             Dispatch::new(BroadcastSubscriber { formatter })
