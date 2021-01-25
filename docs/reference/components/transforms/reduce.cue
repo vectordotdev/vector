@@ -218,7 +218,7 @@ components: transforms: reduce: {
 			]
 		},
 		{
-			title: "Reduce Rails logs into a signle transaction"
+			title: "Reduce Rails logs into a single transaction"
 			configuration: {}
 			input: [
 				{log: {timestamp: "2020-10-07T12:33:21.223543Z", message: "Received GET /path", request_id:                     "abcd1234", request_path:    "/path", request_params: {"key":          "val"}}},
