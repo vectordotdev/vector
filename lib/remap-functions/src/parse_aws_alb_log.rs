@@ -8,6 +8,7 @@ use nom::{
 };
 use remap::prelude::*;
 use std::collections::BTreeMap;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
@@ -51,130 +52,49 @@ impl Expression for ParseAwsAlbLogFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
         self.value
             .type_def(state)
             .into_fallible(true) // Log parsing error
-            .with_inner_type(InnerTypeDef::Map({
-                let mut map = BTreeMap::new();
-                map.insert("type".to_string(), TypeDef::new_with_kind(Kind::Bytes));
-                map.insert("timestamp".to_string(), TypeDef::new_with_kind(Kind::Bytes));
-                map.insert("elb".to_string(), TypeDef::new_with_kind(Kind::Bytes));
-                map.insert(
-                    "client_host".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "target_host".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "request_processing_time".to_string(),
-                    TypeDef::new_with_kind(Kind::Float),
-                );
-                map.insert(
-                    "target_processing_time".to_string(),
-                    TypeDef::new_with_kind(Kind::Float),
-                );
-                map.insert(
-                    "response_processing_time".to_string(),
-                    TypeDef::new_with_kind(Kind::Float),
-                );
-                map.insert(
-                    "elb_status_code".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "target_status_code".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "received_bytes".to_string(),
-                    TypeDef::new_with_kind(Kind::Integer),
-                );
-                map.insert(
-                    "sent_bytes".to_string(),
-                    TypeDef::new_with_kind(Kind::Integer),
-                );
-                map.insert(
-                    "request_method".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "request_protocol".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "request_url".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "user_agent".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "ssl_cipher".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "ssl_protocol".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "target_group_arn".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert("trace_id".to_string(), TypeDef::new_with_kind(Kind::Bytes));
-                map.insert(
-                    "domain_name".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "chosen_cert_arn".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "matched_rule_priority".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "request_creation_time".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "actions_executed".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "redirect_url".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "error_reason".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "target_port_list".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "target_status_code_list".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "classification".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-                map.insert(
-                    "classification_reason".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes),
-                );
-
-                map
-            }))
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> InnerTypeDef {
+    InnerTypeDef::Map(remap::type_def_map![
+        "type": TypeDef::new_with_kind(Kind::Bytes),
+        "timestamp": TypeDef::new_with_kind(Kind::Bytes),
+        "elb": TypeDef::new_with_kind(Kind::Bytes),
+        "client_host": TypeDef::new_with_kind(Kind::Bytes),
+        "target_host": TypeDef::new_with_kind(Kind::Bytes),
+        "request_processing_time": TypeDef::new_with_kind(Kind::Float),
+        "target_processing_time": TypeDef::new_with_kind(Kind::Float),
+        "response_processing_time": TypeDef::new_with_kind(Kind::Float),
+        "elb_status_code": TypeDef::new_with_kind(Kind::Bytes),
+        "target_status_code": TypeDef::new_with_kind(Kind::Bytes),
+        "received_bytes": TypeDef::new_with_kind(Kind::Integer),
+        "sent_bytes": TypeDef::new_with_kind(Kind::Integer),
+        "request_method": TypeDef::new_with_kind(Kind::Bytes),
+        "request_protocol": TypeDef::new_with_kind(Kind::Bytes),
+        "request_url": TypeDef::new_with_kind(Kind::Bytes),
+        "user_agent": TypeDef::new_with_kind(Kind::Bytes),
+        "ssl_cipher": TypeDef::new_with_kind(Kind::Bytes),
+        "ssl_protocol": TypeDef::new_with_kind(Kind::Bytes),
+        "target_group_arn": TypeDef::new_with_kind(Kind::Bytes),
+        "trace_id": TypeDef::new_with_kind(Kind::Bytes),
+        "domain_name": TypeDef::new_with_kind(Kind::Bytes),
+        "chosen_cert_arn": TypeDef::new_with_kind(Kind::Bytes),
+        "matched_rule_priority": TypeDef::new_with_kind(Kind::Bytes),
+        "request_creation_time": TypeDef::new_with_kind(Kind::Bytes),
+        "actions_executed": TypeDef::new_with_kind(Kind::Bytes),
+        "redirect_url": TypeDef::new_with_kind(Kind::Bytes),
+        "error_reason": TypeDef::new_with_kind(Kind::Bytes),
+        "target_port_list": TypeDef::new_with_kind(Kind::Bytes),
+        "target_status_code_list": TypeDef::new_with_kind(Kind::Bytes),
+        "classification": TypeDef::new_with_kind(Kind::Bytes),
+        "classification_reason": TypeDef::new_with_kind(Kind::Bytes)
+    ])
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {
@@ -316,43 +236,6 @@ fn take_list(cond: impl Fn(char) -> bool) -> impl FnOnce(&str) -> SResult<Vec<&s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
-    fn inner_type_def() -> InnerTypeDef {
-        InnerTypeDef::Map(remap::type_def_map![
-            "type": TypeDef::new_with_kind(Kind::Bytes),
-            "timestamp": TypeDef::new_with_kind(Kind::Bytes),
-            "elb": TypeDef::new_with_kind(Kind::Bytes),
-            "client_host": TypeDef::new_with_kind(Kind::Bytes),
-            "target_host": TypeDef::new_with_kind(Kind::Bytes),
-            "request_processing_time": TypeDef::new_with_kind(Kind::Float),
-            "target_processing_time": TypeDef::new_with_kind(Kind::Float),
-            "response_processing_time": TypeDef::new_with_kind(Kind::Float),
-            "elb_status_code": TypeDef::new_with_kind(Kind::Bytes),
-            "target_status_code": TypeDef::new_with_kind(Kind::Bytes),
-            "received_bytes": TypeDef::new_with_kind(Kind::Integer),
-            "sent_bytes": TypeDef::new_with_kind(Kind::Integer),
-            "request_method": TypeDef::new_with_kind(Kind::Bytes),
-            "request_protocol": TypeDef::new_with_kind(Kind::Bytes),
-            "request_url": TypeDef::new_with_kind(Kind::Bytes),
-            "user_agent": TypeDef::new_with_kind(Kind::Bytes),
-            "ssl_cipher": TypeDef::new_with_kind(Kind::Bytes),
-            "ssl_protocol": TypeDef::new_with_kind(Kind::Bytes),
-            "target_group_arn": TypeDef::new_with_kind(Kind::Bytes),
-            "trace_id": TypeDef::new_with_kind(Kind::Bytes),
-            "domain_name": TypeDef::new_with_kind(Kind::Bytes),
-            "chosen_cert_arn": TypeDef::new_with_kind(Kind::Bytes),
-            "matched_rule_priority": TypeDef::new_with_kind(Kind::Bytes),
-            "request_creation_time": TypeDef::new_with_kind(Kind::Bytes),
-            "actions_executed": TypeDef::new_with_kind(Kind::Bytes),
-            "redirect_url": TypeDef::new_with_kind(Kind::Bytes),
-            "error_reason": TypeDef::new_with_kind(Kind::Bytes),
-            "target_port_list": TypeDef::new_with_kind(Kind::Bytes),
-            "target_status_code_list": TypeDef::new_with_kind(Kind::Bytes),
-            "classification": TypeDef::new_with_kind(Kind::Bytes),
-            "classification_reason": TypeDef::new_with_kind(Kind::Bytes)
-        ])
-    }
 
     remap::test_type_def![
         value_string {

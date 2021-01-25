@@ -312,6 +312,19 @@ impl BitAnd for InnerTypeDef {
     }
 }
 
+/// Utility macro to make defining inner type def maps easier.
+#[macro_export]
+macro_rules! type_def_map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.to_owned(), $v)),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

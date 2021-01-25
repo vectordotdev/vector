@@ -150,15 +150,3 @@ macro_rules! __prep_bench_or_test {
         ($func.compile(arguments).unwrap(), $want)
     }};
 }
-
-#[macro_export]
-macro_rules! type_def_map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.to_owned(), $v)),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
-}
