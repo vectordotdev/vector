@@ -319,14 +319,15 @@ pub fn udp(
         let mut socket = UdpSocket::bind(&addr)
             .await
             .expect("Failed to bind to UDP listener socket");
+
+        #[cfg(unix)]
+        udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
+
         info!(
             message = "Listening.",
             addr = %addr,
             r#type = "udp"
         );
-
-        #[cfg(unix)]
-        udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
 
         let _ = UdpFramed::new(socket, BytesCodec::new())
             .take_until(shutdown)

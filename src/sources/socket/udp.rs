@@ -66,7 +66,6 @@ pub fn udp(
         let mut socket = UdpSocket::bind(&address)
             .await
             .expect("Failed to bind to udp listener socket");
-        info!(message = "Listening.", address = %address);
 
         #[cfg(unix)]
         udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
@@ -77,6 +76,8 @@ pub fn udp(
         } else {
             max_length
         };
+
+        info!(message = "Listening.", address = %address);
 
         let mut buf = BytesMut::with_capacity(max_length);
         loop {
