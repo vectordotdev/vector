@@ -5,10 +5,9 @@
 //!
 //! # Usage
 //!
-//! To run these benches, use the following commands:
+//! To run these benches, use the following command:
 //!
-//!     cargo bench --no-default-features --features "metrics-benches" --bench metrics_on
-//!     cargo bench --no-default-features --features "metrics-benches" --bench metrics_off
+//!     cargo bench --no-default-features --features "metrics-benches"
 //!
 //! These will run benches with metrics core system on and off respectively.
 
