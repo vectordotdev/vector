@@ -19,7 +19,7 @@ lazy_static! {
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
 const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
-const RESERVED_TERMS: &[&'static str; 9] = &[
+const RESERVED_TERMS: &[&str; 9] = &[
     "next",
     "prev",
     "exit",
