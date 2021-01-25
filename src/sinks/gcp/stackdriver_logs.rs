@@ -409,7 +409,7 @@ mod tests {
                 .iter()
                 .copied(),
         );
-        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().1;
+        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().0;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
@@ -444,7 +444,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().1;
+        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().0;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
