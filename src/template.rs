@@ -10,9 +10,9 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -27,19 +27,10 @@ pub struct Template {
     has_fields: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
 pub enum TemplateError {
+    #[snafu(display("Invalid strftime item"))]
     StrftimeError,
-}
-
-impl Error for TemplateError {}
-
-impl fmt::Display for TemplateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StrftimeError => write!(f, "Invalid strftime item"),
-        }
-    }
 }
 
 impl TryFrom<&str> for Template {
@@ -71,8 +62,8 @@ impl TryFrom<Cow<'_, str>> for Template {
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
         let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |pair, item| {
-                (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+            .fold((false, false), |(error, dynamic), item| {
+                (error || is_error(&item), dynamic || is_dynamic(&item))
             });
         if has_error {
             Err(TemplateError::StrftimeError)
@@ -92,9 +83,9 @@ fn is_error(item: &Item) -> bool {
 
 fn is_dynamic(item: &Item) -> bool {
     match item {
-        Item::Error => false,
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
+        Item::Error => false,
         Item::Space(_) | Item::OwnedSpace(_) => false,
         Item::Literal(_) | Item::OwnedLiteral(_) => false,
     }
