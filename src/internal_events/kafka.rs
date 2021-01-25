@@ -59,17 +59,11 @@ impl InternalEvent for KafkaKeyExtractionFailed<'_> {
 }
 
 #[derive(Debug)]
-pub struct KafkaStatisticsReceived {
-    statistics: rdkafka::Statistics,
+pub struct KafkaStatisticsReceived<'a> {
+    pub statistics: &'a rdkafka::Statistics,
 }
 
-impl<'a> KafkaStatisticsReceived {
-    pub(crate) fn new(statistics: rdkafka::Statistics) -> Self {
-        Self { statistics }
-    }
-}
-
-impl InternalEvent for KafkaStatisticsReceived {
+impl InternalEvent for KafkaStatisticsReceived<'_> {
     fn emit_metrics(&self) {
         gauge!("kafka_queue_messages", self.statistics.msg_cnt as f64);
         gauge!(

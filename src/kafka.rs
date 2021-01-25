@@ -99,7 +99,9 @@ pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
-        emit!(KafkaStatisticsReceived::new(statistics));
+        emit!(KafkaStatisticsReceived {
+            statistics: &statistics
+        });
     }
 }
 
