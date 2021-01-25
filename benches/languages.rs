@@ -68,7 +68,8 @@ fn benchmark_parse_json(c: &mut Criterion) {
         ),
     ];
 
-    let input = r#"{"string":"bar","array":[1,2,3],"boolean":true,"number":47.5,"object":{"key":"value"}}"#;
+    let input =
+        r#"{"string":"bar","array":[1,2,3],"boolean":true,"number":47.5,"object":{"key":"value"}}"#;
     let output = serde_json::from_str(r#"{ "array": [1, 2, 3], "boolean": true, "number": 47.5, "object": { "key": "value" }, "string": "bar" }"#).unwrap();
 
     benchmark_configs(c, "parse_json", configs, "in", "last", input, output);
