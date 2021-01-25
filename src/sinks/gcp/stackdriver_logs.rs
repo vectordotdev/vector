@@ -17,7 +17,6 @@ use crate::{
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
-use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
@@ -262,7 +261,7 @@ impl HttpSink for StackdriverSink {
 
         let mut request = Request::post(URI.clone())
             .header("Content-Type", "application/json")
-            .body(body)
+            .body(body.into())
             .unwrap();
 
         if let Some(creds) = &self.creds {
@@ -334,13 +333,30 @@ fn remap_severity(severity: Value) -> Value {
 }
 
 async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
-    /*
-    let request = sink.build_request(vec![]).await?.map(Body::from);
+    let body = serde_json::json!({
+        "log_name": sink.config.log_name(),
+        "entries": [],
+        "resource": {
+            "type": "generic_node",
+            "labels": {
+                "namespace": "test",
+            },
+        }
+    });
 
-    let response = client.send(request).await?;
+    let body = serde_json::to_vec(&body).unwrap();
+
+    let mut request = Request::post(URI.clone())
+        .header("Content-Type", "application/json")
+        .body(body)
+        .unwrap();
+
+    if let Some(creds) = &sink.creds {
+        creds.apply(&mut request);
+    }
+
+    let response = client.send(request.map(Into::into)).await?;
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
-    */
-    Ok(())
 }
 
 impl StackdriverConfig {
