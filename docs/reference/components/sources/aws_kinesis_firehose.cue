@@ -11,6 +11,7 @@ components: sources: aws_kinesis_firehose: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

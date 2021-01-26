@@ -10,6 +10,7 @@ components: sources: internal_logs: {
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

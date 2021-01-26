@@ -10,6 +10,7 @@ components: sources: prometheus_scrape: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

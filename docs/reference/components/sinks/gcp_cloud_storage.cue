@@ -9,6 +9,7 @@ components: sinks: gcp_cloud_storage: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {

@@ -11,6 +11,7 @@ components: transforms: split: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

@@ -15,6 +15,7 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

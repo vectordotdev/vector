@@ -11,6 +11,7 @@ components: transforms: sample: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

@@ -12,6 +12,7 @@ components: sinks: prometheus_exporter: {
 		development:   "stable"
 		egress_method: "expose"
 		service_providers: []
+		stateful: true
 	}
 
 	features: {

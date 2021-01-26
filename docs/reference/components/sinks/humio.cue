@@ -7,6 +7,7 @@ components: sinks: _humio: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Humio"]
+		stateful: false
 	}
 
 	support: {

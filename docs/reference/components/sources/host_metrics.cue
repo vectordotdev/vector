@@ -15,6 +15,7 @@ components: sources: host_metrics: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

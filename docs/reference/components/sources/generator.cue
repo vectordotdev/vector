@@ -13,6 +13,7 @@ components: sources: generator: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

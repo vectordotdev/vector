@@ -9,6 +9,7 @@ components: sinks: gcp_pubsub: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {

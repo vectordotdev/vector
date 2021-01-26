@@ -17,6 +17,7 @@ components: sources: heroku_logs: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

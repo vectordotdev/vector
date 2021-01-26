@@ -10,6 +10,7 @@ components: sources: docker_logs: {
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	env_vars: {

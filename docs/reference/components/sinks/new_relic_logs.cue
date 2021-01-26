@@ -9,6 +9,7 @@ components: sinks: new_relic_logs: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
+		stateful: false
 	}
 
 	features: {

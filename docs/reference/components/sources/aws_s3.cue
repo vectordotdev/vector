@@ -18,6 +18,7 @@ components: sources: aws_s3: components._aws & {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	support: {

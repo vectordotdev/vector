@@ -11,6 +11,7 @@ components: sources: splunk_hec: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

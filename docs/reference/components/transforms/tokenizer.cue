@@ -11,6 +11,7 @@ components: transforms: tokenizer: {
 		commonly_used: true
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

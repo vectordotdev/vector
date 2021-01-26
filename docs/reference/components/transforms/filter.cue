@@ -11,6 +11,7 @@ components: transforms: filter: {
 		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

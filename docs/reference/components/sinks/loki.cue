@@ -9,6 +9,7 @@ components: sinks: loki: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
+		stateful: false
 	}
 
 	features: {

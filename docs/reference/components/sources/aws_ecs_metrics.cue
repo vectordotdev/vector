@@ -14,6 +14,7 @@ components: sources: aws_ecs_metrics: {
 		deployment_roles: ["sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
