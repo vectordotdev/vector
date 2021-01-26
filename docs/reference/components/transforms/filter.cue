@@ -64,20 +64,26 @@ components: transforms: filter: {
 				}
 			}
 			input: [
-				{log: {
-					level:   "debug"
-					message: "I'm a noisy debug log"
-				}},
-				{log: {
-					level:   "info"
-					message: "I'm a normal info log"
-				}},
+				{
+					log: {
+						level:   "debug"
+						message: "I'm a noisy debug log"
+					}
+				},
+				{
+					log: {
+						level:   "info"
+						message: "I'm a normal info log"
+					}
+				},
 			]
 			output: [
-				{log: {
-					level:   "info"
-					message: "I'm a normal info log"
-				}},
+				{
+					log: {
+						level:   "info"
+						message: "I'm a normal info log"
+					}
+				},
 			]
 		},
 	]

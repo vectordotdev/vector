@@ -76,6 +76,20 @@ end
             ),
         ),
         (
+            "remap",
+            Transform::function(
+                vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
+                    source: r#"
+.test_key = "test_value"
+.test_key2 = "test_value2"
+"#
+                    .to_string(),
+                    drop_on_err: false,
+                })
+                .unwrap(),
+            ),
+        ),
+        (
             "wasm",
             Transform::task(
                 Wasm::new(
