@@ -9,6 +9,7 @@ components: sinks: prometheus_remote_write: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {

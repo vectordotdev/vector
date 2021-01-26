@@ -9,6 +9,7 @@ components: sinks: kafka: {
 		development:   "stable"
 		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
+		stateful: false
 	}
 
 	features: {

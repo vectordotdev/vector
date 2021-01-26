@@ -12,6 +12,7 @@ components: transforms: wasm: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {

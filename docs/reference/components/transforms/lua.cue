@@ -11,6 +11,7 @@ components: transforms: lua: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {

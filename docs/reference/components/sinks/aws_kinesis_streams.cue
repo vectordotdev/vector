@@ -9,6 +9,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {

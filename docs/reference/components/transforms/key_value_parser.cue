@@ -11,6 +11,7 @@ components: transforms: key_value_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

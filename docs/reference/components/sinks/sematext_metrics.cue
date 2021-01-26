@@ -9,6 +9,7 @@ components: sinks: sematext_metrics: {
 		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

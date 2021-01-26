@@ -9,6 +9,7 @@ components: sinks: elasticsearch: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS", "Azure", "Elastic", "GCP"]
+		stateful: false
 	}
 
 	features: {

@@ -9,6 +9,7 @@ components: sinks: logdna: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["LogDNA"]
+		stateful: false
 	}
 
 	features: {

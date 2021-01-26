@@ -12,6 +12,7 @@ components: transforms: metric_to_log: {
 		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

@@ -9,6 +9,7 @@ components: sinks: http: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

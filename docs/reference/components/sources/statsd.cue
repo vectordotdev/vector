@@ -11,6 +11,7 @@ components: sources: statsd: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

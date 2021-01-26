@@ -9,6 +9,7 @@ components: sinks: splunk_hec: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
+		stateful: false
 	}
 
 	features: {

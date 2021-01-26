@@ -9,6 +9,7 @@ components: sinks: aws_s3: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {

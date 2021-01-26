@@ -9,6 +9,7 @@ components: sinks: honeycomb: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Honeycomb"]
+		stateful: false
 	}
 
 	features: {

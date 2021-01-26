@@ -34,6 +34,8 @@ components: {
 			// components.
 			service_providers: [string, ...string] | *[]
 		}
+
+		stateful: bool
 	}
 
 	#Component: {

@@ -24,6 +24,7 @@ components: sources: kafka: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	support: components._kafka.support

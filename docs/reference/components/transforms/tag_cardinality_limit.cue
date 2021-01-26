@@ -13,6 +13,7 @@ components: transforms: tag_cardinality_limit: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {

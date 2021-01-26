@@ -9,6 +9,7 @@ components: sinks: papertrail: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: ["Papertrail"]
+		stateful: false
 	}
 
 	features: {

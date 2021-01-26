@@ -15,6 +15,7 @@ components: transforms: "remap": {
 		commonly_used: true
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

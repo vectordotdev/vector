@@ -9,6 +9,7 @@ components: sinks: aws_sqs: components._aws & {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {

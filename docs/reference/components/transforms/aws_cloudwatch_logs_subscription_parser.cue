@@ -12,6 +12,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

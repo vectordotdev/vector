@@ -11,6 +11,7 @@ components: transforms: log_to_metric: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

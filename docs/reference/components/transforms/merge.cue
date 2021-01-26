@@ -11,6 +11,7 @@ components: transforms: merge: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {

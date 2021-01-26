@@ -12,6 +12,7 @@ components: transforms: reduce: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {

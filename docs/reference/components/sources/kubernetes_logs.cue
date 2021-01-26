@@ -16,6 +16,7 @@ components: sources: kubernetes_logs: {
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

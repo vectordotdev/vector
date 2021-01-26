@@ -9,6 +9,7 @@ components: sources: journald: {
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

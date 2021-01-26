@@ -7,6 +7,7 @@ components: sinks: _datadog: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Datadog"]
+		stateful: false
 	}
 
 	support: {

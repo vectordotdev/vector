@@ -9,6 +9,7 @@ components: sources: prometheus_remote_write: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {

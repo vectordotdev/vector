@@ -9,6 +9,7 @@ components: sinks: azure_monitor_logs: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Azure"]
+		stateful: false
 	}
 
 	features: {

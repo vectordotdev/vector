@@ -9,6 +9,7 @@ components: sinks: nats: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {

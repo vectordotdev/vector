@@ -12,6 +12,7 @@ components: transforms: route: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

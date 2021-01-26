@@ -9,6 +9,7 @@ components: sinks: clickhouse: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Yandex"]
+		stateful: false
 	}
 
 	features: {
