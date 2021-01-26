@@ -8,7 +8,7 @@ use crate::{
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
-    template::Template,
+    template::{Template, TemplateRenderError},
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
@@ -124,10 +124,10 @@ impl HttpSink for LogdnaConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let key = self
             .render_key(&event)
-            .map_err(|missing| {
-                error!(
-                    message = "Error rendering template.",
-                    ?missing,
+            .map_err(|error| {
+                warn!(
+                    message = "Failed to render template; dropping event.",
+                    %error,
                     internal_log_rate_secs = 30
                 );
             })
@@ -248,12 +248,12 @@ impl LogdnaConfig {
             .expect("This should be a valid uri")
     }
 
-    fn render_key(&self, event: &Event) -> Result<PartitionKey, Vec<String>> {
+    fn render_key(&self, event: &Event) -> Result<PartitionKey, TemplateRenderError> {
         let hostname = self.hostname.render_string(&event)?;
         let tags = self
             .tags
             .as_ref()
-            .map(|tags| -> Result<Option<Vec<String>>, Vec<String>> {
+            .map(|tags| {
                 let mut vec = Vec::with_capacity(tags.len());
                 for tag in tags {
                     vec.push(tag.render_string(event)?);
