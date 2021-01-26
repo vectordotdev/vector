@@ -91,9 +91,9 @@ components: sinks: nats: {
 	}
 
 	telemetry: metrics: {
-		template_rendering_errors_total:     components.sources.internal_metrics.output.metrics.template_rendering_errors_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
+		template_rendering_errors_total: components.sources.internal_metrics.output.metrics.template_rendering_errors_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		send_errors_total:               components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }
