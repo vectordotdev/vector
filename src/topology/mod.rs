@@ -151,18 +151,10 @@ impl RunningTopology {
         let timeout = async move {
             delay_until(deadline).await;
             // Remove all tasks that have shutdown.
-            let to_check = check_handles2.drain().collect::<Vec<(String, Vec<_>)>>();
-            for (name, handles) in to_check {
-                let mut active_handles = Vec::new();
-                for handle in handles {
-                    if handle.peek().is_some() {
-                        active_handles.push(handle)
-                    }
-                }
-                if !active_handles.is_empty() {
-                    check_handles2.insert(name, active_handles);
-                }
-            }
+            check_handles2.retain(|_name, handles| {
+                retain(handles, |handle| handle.peek().is_some());
+                !handles.is_empty()
+            });
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
@@ -177,18 +169,10 @@ impl RunningTopology {
             loop {
                 interval.tick().await;
                 // Remove all tasks that have shutdown.
-                let to_check = check_handles.drain().collect::<Vec<(String, Vec<_>)>>();
-                for (name, handles) in to_check {
-                    let mut active_handles = Vec::new();
-                    for handle in handles {
-                        if handle.peek().is_some() {
-                            active_handles.push(handle)
-                        }
-                    }
-                    if !active_handles.is_empty() {
-                        check_handles.insert(name, active_handles);
-                    }
-                }
+                check_handles.retain(|_name, handles| {
+                    retain(handles, |handle| handle.peek().is_some());
+                    !handles.is_empty()
+                });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
                 // TODO: replace with checked_duration_since once it's stable
@@ -752,6 +736,18 @@ async fn handle_errors(
             Err(())
         }
         Ok(result) => result,
+    }
+}
+
+/// If the closure returns false, then the element is removed
+fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
+    let mut i = 0;
+    while let Some(data) = vec.get_mut(i) {
+        if retain_filter(data) {
+            i += 1;
+        } else {
+            let _ = vec.remove(i);
+        }
     }
 }
 
