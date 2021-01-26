@@ -12,7 +12,6 @@ const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 const NO_ERROR: u32 = 0;
-const ERROR_FAIL_SHUTDOWN: u32 = 351;
 
 pub mod service_control {
     use windows_service::service::{
