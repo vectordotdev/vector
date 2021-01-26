@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, ElasticSearchTemplateRenderError},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -199,10 +199,8 @@ impl HttpSink for ElasticSearchCommon {
         let index = self
             .index
             .render_string(&event)
-            .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys {
-                    keys: &missing_keys
-                });
+            .map_err(|error| {
+                emit!(ElasticSearchTemplateRenderError { error });
             })
             .ok()?;
 

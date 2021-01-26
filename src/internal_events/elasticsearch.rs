@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::template::TemplateRenderError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -19,15 +20,15 @@ impl InternalEvent for ElasticSearchEventEncoded {
 }
 
 #[derive(Debug)]
-pub struct ElasticSearchMissingKeys<'a> {
-    pub keys: &'a [String],
+pub struct ElasticSearchTemplateRenderError {
+    pub error: TemplateRenderError,
 }
 
-impl<'a> InternalEvent for ElasticSearchMissingKeys<'a> {
+impl InternalEvent for ElasticSearchTemplateRenderError {
     fn emit_logs(&self) {
         warn!(
-            message = "Keys do not exist on the event; dropping event.",
-            missing_keys = ?self.keys,
+            message = "Failed to render template; dropping event.",
+            error = %self.error,
             internal_log_rate_secs = 30,
         )
     }
