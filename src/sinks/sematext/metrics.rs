@@ -3,10 +3,10 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     http::HttpClient,
-    internal_events::SematextMetricsEncodeEventFailed,
+    internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
-        buffer::metrics::{MetricsBuffer, SematextMetricNormalize},
+        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
         BatchConfig, BatchSettings, TowerRequestConfig,
     },
@@ -174,6 +174,21 @@ impl Service<Vec<Metric>> for SematextMetricsService {
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
+    }
+}
+
+struct SematextMetricNormalize;
+
+impl MetricNormalize for SematextMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            MetricValue::Counter { .. } => state.make_incremental(metric),
+            _ => {
+                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                None
+            }
+        }
     }
 }
 

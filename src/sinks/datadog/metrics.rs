@@ -4,7 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            buffer::metrics::{DatadogMetricNormalize, MetricsBuffer},
+            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
@@ -336,6 +336,17 @@ fn stats(source: &[Sample]) -> Option<DatadogStats> {
         count: length,
         quantiles: vec![(0.95, p95)],
     })
+}
+
+struct DatadogMetricNormalize;
+
+impl MetricNormalize for DatadogMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            _ => state.make_incremental(metric),
+        }
+    }
 }
 
 fn encode_events(

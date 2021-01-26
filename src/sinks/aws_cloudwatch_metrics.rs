@@ -6,7 +6,7 @@ use crate::{
     },
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
-        buffer::metrics::{AwsCloudwatchMetricNormalize, MetricsBuffer},
+        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
         retries::RetryLogic,
         BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig,
@@ -208,6 +208,17 @@ impl CloudWatchMetricsSvc {
                 }
             })
             .collect()
+    }
+}
+
+struct AwsCloudwatchMetricNormalize;
+
+impl MetricNormalize for AwsCloudwatchMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            _ => state.make_incremental(metric),
+        }
     }
 }
 

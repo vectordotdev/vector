@@ -1,6 +1,5 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, Sample},
-    internal_events::SematextMetricsInvalidMetricReceived,
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
@@ -230,61 +229,6 @@ impl MetricNormalize for StdMetricNormalize {
     }
 }
 
-/// This normalization state converts all metrics into absolute metrics
-/// by using the state buffer to keep track of the value throughout the
-/// entire application uptime. New metrics start with a zero state.
-pub struct AbsoluteMetricNormalize;
-
-impl MetricNormalize for AbsoluteMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        state.make_absolute(metric)
-    }
-}
-
-/// This normalization state converts all metrics into incremental
-/// metrics by using the state buffer to keep track of the previous
-/// absolute value and then generating incremental values for all
-/// subsequent metrics.
-pub struct IncrementalMetricNormalize;
-
-impl MetricNormalize for IncrementalMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        state.make_incremental(metric)
-    }
-}
-
-/// A metric state handler specialized for the types of metrics that
-/// AWS Cloudwatch and Datadog expect. In particular, they can want
-/// absolute gauges but everything else should be incremental.
-pub struct DatadogMetricNormalize;
-pub type AwsCloudwatchMetricNormalize = DatadogMetricNormalize;
-
-impl MetricNormalize for DatadogMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
-            MetricValue::Gauge { .. } => state.make_absolute(metric),
-            _ => state.make_incremental(metric),
-        }
-    }
-}
-
-/// A metric state handler specialized for Sematext, which can only
-/// handle absolute gauges and incremental counters.
-pub struct SematextMetricNormalize;
-
-impl MetricNormalize for SematextMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
-            MetricValue::Gauge { .. } => state.make_absolute(metric),
-            MetricValue::Counter { .. } => state.make_incremental(metric),
-            _ => {
-                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
-                None
-            }
-        }
-    }
-}
-
 /// This is a convenience newtype wrapper for HashSet<MetricEntry> that
 /// provides some extra functionality.
 #[derive(Clone, Default)]
@@ -308,14 +252,18 @@ impl MetricSet {
         Self(HashSet::with_capacity(capacity))
     }
 
-    fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
+    /// Either pass the metric through as-is if absolute, or convert it
+    /// to absolute if incremental.
+    pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => self.incremental_to_absolute(metric),
         }
     }
 
-    fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
+    /// Either convert the metric to incremental if absolute, or
+    /// aggregate it with any previous value if already incremental.
+    pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
             MetricKind::Incremental => self.aggregate_incremental(metric),
@@ -425,6 +373,22 @@ mod test {
     use std::collections::BTreeMap;
 
     type Buffer = Vec<Vec<Metric>>;
+
+    struct AbsoluteMetricNormalize;
+
+    impl MetricNormalize for AbsoluteMetricNormalize {
+        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+            state.make_absolute(metric)
+        }
+    }
+
+    struct IncrementalMetricNormalize;
+
+    impl MetricNormalize for IncrementalMetricNormalize {
+        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+            state.make_incremental(metric)
+        }
+    }
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
