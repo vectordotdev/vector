@@ -1,5 +1,6 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, Sample},
+    internal_events::SematextMetricsInvalidMetricReceived,
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
@@ -290,6 +291,31 @@ impl MetricsState for DatadogMetricsState {
         match &metric.data.value {
             MetricValue::Gauge { .. } => self.state.make_absolute(metric),
             _ => self.state.make_incremental(metric),
+        }
+    }
+
+    fn fresh(&self, metrics: &MetricSet) -> Self {
+        let state = self.state.fresh(metrics);
+        Self { state }
+    }
+}
+
+/// A metric state handler specialized for Sematext, which can only
+/// handle absolute gauges and incremental counters.
+#[derive(Default)]
+pub struct SematextMetricsState {
+    state: MetricSet,
+}
+
+impl MetricsState for SematextMetricsState {
+    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => self.state.make_absolute(metric),
+            MetricValue::Counter { .. } => self.state.make_incremental(metric),
+            _ => {
+                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                None
+            }
         }
     }
 
