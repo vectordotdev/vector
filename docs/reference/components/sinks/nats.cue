@@ -71,7 +71,7 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		name: {

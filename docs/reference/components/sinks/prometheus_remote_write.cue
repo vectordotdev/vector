@@ -135,7 +135,7 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["my-domain"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

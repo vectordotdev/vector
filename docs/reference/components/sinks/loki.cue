@@ -110,7 +110,7 @@ components: sinks: loki: {
 						type: string: {
 							default: null
 							examples: ["vector", "{{ event_field }}"]
-							templateable: true
+							syntax: "template"
 						}
 					}
 				}
@@ -138,7 +138,7 @@ components: sinks: loki: {
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

@@ -70,7 +70,7 @@ components: transforms: log_to_metric: {
 						type: string: {
 							examples: ["duration_total"]
 							default:      null
-							templateable: true
+							syntax: "template"
 						}
 					}
 					namespace: {
@@ -81,7 +81,7 @@ components: transforms: log_to_metric: {
 						type: string: {
 							examples: ["service"]
 							default:      null
-							templateable: true
+							syntax: "template"
 						}
 					}
 					tags: {

@@ -68,7 +68,7 @@ components: sinks: file: {
 			warnings: []
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

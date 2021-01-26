@@ -162,7 +162,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		metadata: {
