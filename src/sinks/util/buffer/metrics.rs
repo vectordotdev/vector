@@ -228,7 +228,7 @@ impl MetricsState for StdMetricsState {
                 self.state.incremental_to_absolute(metric)
             }
             (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
-            _ => Some(metric),
+            (MetricKind::Absolute, _) => Some(metric),
         }
     }
 
@@ -276,6 +276,34 @@ impl MetricsState for IncrementalMetricsState {
             // Aggregate incremental metrics together
             MetricKind::Incremental => self.state.aggregate_incremental(metric),
             MetricKind::Absolute => self.state.absolute_to_incremental(metric),
+        }
+    }
+
+    fn fresh(&self, metrics: &MetricSet) -> Self {
+        let state = self.state.fresh(metrics);
+        Self { state }
+    }
+}
+
+/// A metric state handler specialized for the types of metrics that
+/// Datadog expects. In particular, it can handle absolute gauges but
+/// everything else should be incremental.
+#[derive(Default)]
+pub struct DatadogMetricsState {
+    state: MetricSet,
+}
+
+impl MetricsState for DatadogMetricsState {
+    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+        match (metric.data.kind, &metric.data.value) {
+            // Datadog only accepts gauges as absolute values
+            (MetricKind::Absolute, MetricValue::Gauge { .. }) => Some(metric),
+            (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
+                self.state.incremental_to_absolute(metric)
+            }
+            // But all others must be incremental
+            (MetricKind::Absolute, _) => self.state.absolute_to_incremental(metric),
+            (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
         }
     }
 
