@@ -276,12 +276,14 @@ impl MetricsState for IncrementalMetricsState {
 }
 
 /// A metric state handler specialized for the types of metrics that
-/// Datadog expects. In particular, it can handle absolute gauges but
-/// everything else should be incremental.
+/// AWS Cloudwatch and Datadog expect. In particular, they can want
+/// absolute gauges but everything else should be incremental.
 #[derive(Default)]
 pub struct DatadogMetricsState {
     state: MetricSet,
 }
+
+pub type AwsCloudwatchMetricsState = DatadogMetricsState;
 
 impl MetricsState for DatadogMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
