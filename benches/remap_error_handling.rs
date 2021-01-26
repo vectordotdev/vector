@@ -6,7 +6,7 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_parse_syslog
+    targets = benchmark_remap_error_handling
 );
 
 criterion_main!(benches);
