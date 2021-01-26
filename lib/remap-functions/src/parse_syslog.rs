@@ -120,8 +120,8 @@ impl Expression for ParseSyslogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::prelude::*;
+    use collnew::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -144,53 +144,51 @@ mod tests {
     fn parses() {
         let cases = vec![
             (
-                map![],
-                Ok(map![
-                        "severity": "notice",
-                        "facility": "user",
-                        "timestamp": chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
-                        "hostname": "dynamicwireless.name",
-                        "appname": "non",
-                        "procid": 2426,
-                        "msgid": "ID931",
-                        "exampleSDID@32473.iut": "3",
-                        "exampleSDID@32473.eventSource": "Application",
-                        "exampleSDID@32473.eventID": "1011",
-                        "message": "Try to override the THX port, maybe it will reboot the neural interface!",
-                ]),
+                btreemap! {},
+                Ok(btreemap! {
+                        "severity" => "notice",
+                        "facility" => "user",
+                        "timestamp" => chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
+                        "hostname" => "dynamicwireless.name",
+                        "appname" => "non",
+                        "procid" => 2426,
+                        "msgid" => "ID931",
+                        "exampleSDID@32473.iut" => "3",
+                        "exampleSDID@32473.eventSource" => "Application",
+                        "exampleSDID@32473.eventID" => "1011",
+                        "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
+                }),
                 ParseSyslogFn::new(Box::new(Literal::from(
                     r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#,
                 ))),
             ),
             (
-                map![],
-                Ok(map![
-                        "message": "not much of a syslog message",
-                ]),
+                btreemap! {},
+                Ok(btreemap! { "message" => "not much of a syslog message" }),
                 ParseSyslogFn::new(Box::new(Literal::from(r#"not much of a syslog message"#))),
             ),
             (
-                map![],
-                Ok(map![
-                        "facility": "local0",
-                        "severity": "notice",
-                        "message": "Proxy sticky-servers started.",
-                        "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-                        "appname": "haproxy",
-                        "procid": 73411
-                ]),
+                btreemap! {},
+                Ok(btreemap! {
+                        "facility" => "local0",
+                        "severity" => "notice",
+                        "message" => "Proxy sticky-servers started.",
+                        "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                        "appname" => "haproxy",
+                        "procid" => 73411
+                }),
                 ParseSyslogFn::new(Box::new(Literal::from(
                     r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
                 ))),
             ),
             (
-                map![],
-                Ok(map![
-                        "message": "I am missing a pri.",
-                        "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-                        "appname": "haproxy",
-                        "procid": 73411
-                ]),
+                btreemap! {},
+                Ok(btreemap! {
+                        "message" => "I am missing a pri.",
+                        "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                        "appname" => "haproxy",
+                        "procid" => 73411
+                }),
                 ParseSyslogFn::new(Box::new(Literal::from(
                     r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#,
                 ))),
@@ -221,7 +219,7 @@ mod tests {
         }
 
         let mut state = state::Program::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = btreemap! {}.into();
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,

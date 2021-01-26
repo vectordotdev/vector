@@ -119,70 +119,88 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use collnew::btreemap;
 
     #[test]
     fn merge() {
         let cases = vec![
             (
-                map!["foo": Value::Boolean(true),
-                     "bar": map!["key2": "val2"]],
-                map!["foo": Value::Boolean(true),
-                     "bar": map!["key2": "val2"]],
+                btreemap! {
+                    "foo" => Value::Boolean(true),
+                    "bar" => btreemap! { "key2" => "val2" },
+                },
+                btreemap! {
+                    "foo" => Value::Boolean(true),
+                    "bar" => btreemap! { "key2" => "val2" },
+                },
                 MergeFn::new(Path::from("foo"), Box::new(Path::from("bar")), None),
                 Err("function call error: parameters passed to merge are non-map values".into()),
             ),
             (
-                map!["foo": map![ "key1": "val1" ], "bar": map![ "key2": "val2" ]],
-                map![
-                    "foo":
-                        map![ "key1": "val1",
-                              "key2": "val2" ],
-                    "bar": map![ "key2": "val2" ]
-                ],
+                btreemap! {
+                    "foo" => btreemap! { "key1" => "val1" },
+                    "bar" => btreemap! { "key2" => "val2" },
+                },
+                btreemap! {
+                    "foo" => btreemap! {
+                        "key1" => "val1",
+                        "key2" => "val2",
+                    },
+                    "bar" => btreemap! { "key2" => "val2" }
+                },
                 MergeFn::new(Path::from("foo"), Box::new(Path::from("bar")), None),
                 Ok(Value::Null),
             ),
             (
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                                       "child": map! [ "grandchild1": "val1" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                                       "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                                      "key2": "val2",
-                                      "child": map! [ "grandchild2": "val2" ] ],
-                    "parent2":
-                        map! [ "key2": "val2",
-                                       "child": map! [ "grandchild2": "val2" ] ]
-                ],
+                btreemap! {
+                    "parent1" => btreemap! {
+                        "key1" => "val1",
+                        "child" => btreemap! { "grandchild1" => "val1" },
+                    },
+                    "parent2" => btreemap!{
+                        "key2" => "val2",
+                        "child" => btreemap! { "grandchild2" => "val2" },
+                    },
+                },
+                btreemap! {
+                    "parent1" => btreemap! {
+                        "key1" => "val1",
+                        "key2" => "val2",
+                        "child" => btreemap! { "grandchild2" => "val2" },
+                    },
+                    "parent2" => btreemap! {
+                        "key2" => "val2",
+                        "child" => btreemap! { "grandchild2" => "val2" },
+                    },
+                },
                 MergeFn::new(Path::from("parent1"), Box::new(Path::from("parent2")), None),
                 Ok(Value::Null),
             ),
             (
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                              "child": map! [ "grandchild1": "val1" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                              "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                              "key2": "val2",
-                              "child": map! [ "grandchild1": "val1",
-                                              "grandchild2": "val2" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                              "child": map! [ "grandchild2": "val2" ] ]
-                ],
+                btreemap! {
+                    "parent1" => btreemap!{
+                        "key1" => "val1",
+                        "child" => btreemap! { "grandchild1" => "val1" },
+                    },
+                    "parent2" => btreemap!{
+                        "key2" => "val2",
+                        "child" => btreemap! { "grandchild2" => "val2" },
+                    },
+                },
+                btreemap! {
+                    "parent1" => btreemap! {
+                        "key1" => "val1",
+                        "key2" => "val2",
+                        "child" => btreemap! {
+                            "grandchild1" => "val1",
+                            "grandchild2" => "val2",
+                        },
+                    },
+                    "parent2" => btreemap! {
+                        "key2" => "val2",
+                        "child" => btreemap! { "grandchild2" => "val2" },
+                    },
+                },
                 MergeFn::new(
                     Path::from("parent1"),
                     Box::new(Path::from("parent2")),

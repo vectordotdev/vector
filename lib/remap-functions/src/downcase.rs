@@ -56,12 +56,12 @@ impl Expression for DowncaseFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use collnew::btreemap;
 
     #[test]
     fn downcase() {
         let cases = vec![(
-            map!["foo": "FOO 2 bar"],
+            btreemap! { "foo" => "FOO 2 bar" },
             Ok(Value::from("foo 2 bar")),
             DowncaseFn::new(Box::new(Path::from("foo"))),
         )];
