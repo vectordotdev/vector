@@ -13,7 +13,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use vector_wasm::{hostcall, Registration, Role};
-use once_cell::sync::OnceCell;
 
 #[no_mangle]
 pub extern "C" fn init() {
