@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::template::TemplateRenderError;
+use crate::template::TemplateRenderingError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -20,11 +20,11 @@ impl InternalEvent for AwsSqsEventSent<'_> {
 }
 
 #[derive(Debug)]
-pub struct AwsSqsTemplateRenderError {
-    pub error: TemplateRenderError,
+pub struct AwsSqsTemplateRenderingError {
+    pub error: TemplateRenderingError,
 }
 
-impl<'a> InternalEvent for AwsSqsTemplateRenderError {
+impl<'a> InternalEvent for AwsSqsTemplateRenderingError {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template; dropping event.",

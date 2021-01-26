@@ -5,9 +5,9 @@ use crate::{
     event::Value,
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        LogToMetricTemplateRenderError,
+        LogToMetricTemplateRenderingError,
     },
-    template::{Template, TemplateParseError, TemplateRenderError},
+    template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -134,7 +134,7 @@ enum TransformError {
         field: String,
     },
     TemplateParseError(TemplateParseError),
-    TemplateRenderError(TemplateRenderError),
+    TemplateRenderingError(TemplateRenderingError),
     ParseFloatError {
         field: String,
         error: ParseFloatError,
@@ -145,7 +145,7 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template
         .render_string(&event)
-        .map_err(TransformError::TemplateRenderError)
+        .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
@@ -161,8 +161,8 @@ fn render_tags(
                     Ok(tag) => {
                         map.insert(name.to_string(), tag);
                     }
-                    Err(TransformError::TemplateRenderError(error)) => {
-                        emit!(LogToMetricTemplateRenderError { error });
+                    Err(TransformError::TemplateRenderingError(error)) => {
+                        emit!(LogToMetricTemplateRenderingError { error });
                     }
                     Err(other) => return Err(other),
                 }
@@ -354,8 +354,8 @@ impl FunctionTransform for LogToMetric {
                         error
                     })
                 }
-                Err(TransformError::TemplateRenderError(error)) => {
-                    emit!(LogToMetricTemplateRenderError { error })
+                Err(TransformError::TemplateRenderingError(error)) => {
+                    emit!(LogToMetricTemplateRenderingError { error })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
                     emit!(LogToMetricTemplateParseError { error })

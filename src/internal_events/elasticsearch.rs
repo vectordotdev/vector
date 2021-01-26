@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::template::TemplateRenderError;
+use crate::template::TemplateRenderingError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -20,11 +20,11 @@ impl InternalEvent for ElasticSearchEventEncoded {
 }
 
 #[derive(Debug)]
-pub struct ElasticSearchTemplateRenderError {
-    pub error: TemplateRenderError,
+pub struct ElasticSearchTemplateRenderingError {
+    pub error: TemplateRenderingError,
 }
 
-impl InternalEvent for ElasticSearchTemplateRenderError {
+impl InternalEvent for ElasticSearchTemplateRenderingError {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template; dropping event.",

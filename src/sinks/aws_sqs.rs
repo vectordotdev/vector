@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::{AwsSqsEventSent, AwsSqsTemplateRenderError},
+    internal_events::{AwsSqsEventSent, AwsSqsTemplateRenderingError},
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -259,7 +259,7 @@ fn encode_event(
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(AwsSqsTemplateRenderError { error });
+                emit!(AwsSqsTemplateRenderingError { error });
                 return None;
             }
         },

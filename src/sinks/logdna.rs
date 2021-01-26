@@ -8,7 +8,7 @@ use crate::{
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
-    template::{Template, TemplateRenderError},
+    template::{Template, TemplateRenderingError},
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
@@ -248,7 +248,7 @@ impl LogdnaConfig {
             .expect("This should be a valid uri")
     }
 
-    fn render_key(&self, event: &Event) -> Result<PartitionKey, TemplateRenderError> {
+    fn render_key(&self, event: &Event) -> Result<PartitionKey, TemplateRenderingError> {
         let hostname = self.hostname.render_string(&event)?;
         let tags = self
             .tags

@@ -34,7 +34,7 @@ pub enum TemplateParseError {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
-pub enum TemplateRenderError {
+pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
     MissingKeys { missing_keys: Vec<String> },
 }
@@ -98,11 +98,11 @@ fn is_dynamic(item: &Item) -> bool {
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderError> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderingError> {
         self.render_string(event).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderError> {
+    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderingError> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -138,7 +138,7 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderError> {
+fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
@@ -160,7 +160,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderError
     if missing_keys.is_empty() {
         Ok(out)
     } else {
-        Err(TemplateRenderError::MissingKeys { missing_keys })
+        Err(TemplateRenderingError::MissingKeys { missing_keys })
     }
 }
 
@@ -304,7 +304,7 @@ mod tests {
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(TemplateRenderError::MissingKeys {
+            Err(TemplateRenderingError::MissingKeys {
                 missing_keys: vec!["log_stream".to_string(), "foo".to_string()]
             }),
             template.render(&event)

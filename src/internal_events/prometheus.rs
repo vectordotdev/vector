@@ -1,7 +1,7 @@
 use super::InternalEvent;
 #[cfg(feature = "sources-prometheus")]
 use crate::sources::prometheus::parser::ParserError;
-use crate::template::TemplateRenderError;
+use crate::template::TemplateRenderingError;
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -162,7 +162,7 @@ impl InternalEvent for PrometheusServerRequestComplete {
 
 #[derive(Debug)]
 pub struct PrometheusTemplateRenderingError {
-    pub error: TemplateRenderError,
+    pub error: TemplateRenderingError,
 }
 
 impl InternalEvent for PrometheusTemplateRenderingError {

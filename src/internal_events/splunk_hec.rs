@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::template::TemplateRenderError;
+use crate::template::TemplateRenderingError;
 use metrics::counter;
 use serde_json::Error;
 
@@ -38,12 +38,12 @@ impl InternalEvent for SplunkEventEncodeError {
 }
 
 #[derive(Debug)]
-pub struct SplunkTemplateRenderError {
+pub struct SplunkTemplateRenderingError {
     pub field: &'static str,
-    pub error: TemplateRenderError,
+    pub error: TemplateRenderingError,
 }
 
-impl InternalEvent for SplunkTemplateRenderError {
+impl InternalEvent for SplunkTemplateRenderingError {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template for {}, leaving empty.",

@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::template::{TemplateParseError, TemplateRenderError};
+use crate::template::{TemplateParseError, TemplateRenderingError};
 use metrics::counter;
 use std::num::ParseFloatError;
 
@@ -45,11 +45,11 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     }
 }
 
-pub(crate) struct LogToMetricTemplateRenderError {
-    pub error: TemplateRenderError,
+pub(crate) struct LogToMetricTemplateRenderingError {
+    pub error: TemplateRenderingError,
 }
 
-impl InternalEvent for LogToMetricTemplateRenderError {
+impl InternalEvent for LogToMetricTemplateRenderingError {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template.",
