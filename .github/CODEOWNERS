@@ -108,7 +108,6 @@
 #
 
 /skaffold/ @timberio/vector-kubernetes
-/skaffold.yaml @timberio/vector-kubernetes
 
 #
 # scripts
