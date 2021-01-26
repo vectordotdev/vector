@@ -15,7 +15,7 @@ endif
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
-export CARGO_BENCH_FLAGS ?= ""
+export CARGO_BENCH_FLAGS ?=
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -214,6 +214,7 @@ cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
 cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
+cross-%: export EXTRA_ARGS ?=
 cross-%: export RUSTFLAGS += -C link-arg=-s
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
@@ -221,7 +222,8 @@ cross-%: cargo-install-cross
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
 		--no-default-features \
-		--features target-${TRIPLE}
+		--features target-${TRIPLE} \
+		${EXTRA_ARGS}
 
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
@@ -561,6 +563,14 @@ bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS)
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+# We can't run wasm benches under the cross-builds, so we have to leave benches using them out.
+.PHONY: bench-all-cross-%
+bench-all-cross-%: export TRIPLE = $($(strip @):bench-all-cross-%=%)
+bench-all-cross-%: export PROFILE ?= bench
+bench-all-cross-%: export EXTRA_ARGS ?= --features "metrics-benches" ${CARGO_BENCH_FLAGS}
+bench-all-cross-%:
+	$(MAKE) -k cross-bench-${TRIPLE}
 
 ##@ Checking
 
