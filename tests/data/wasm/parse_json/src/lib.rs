@@ -15,14 +15,10 @@ use std::convert::TryInto;
 use vector_wasm::{hostcall, Registration, Role};
 use once_cell::sync::OnceCell;
 
-static FIELDS: OnceCell<HashMap<String, Value>> = OnceCell::new();
-
 #[no_mangle]
 pub extern "C" fn init() {
     let config = hostcall::config().unwrap();
     assert_eq!(config.role, Role::Transform);
-
-    FIELDS.set(config.options.into()).unwrap();
 
     Registration::transform().register().unwrap();
 }
