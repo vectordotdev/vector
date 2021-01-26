@@ -220,13 +220,10 @@ impl MetricsState for StdMetricsState {
         match (metric.data.kind, &metric.data.value) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
-            (MetricKind::Absolute, MetricValue::Counter { .. }) => {
-                self.state.absolute_to_incremental(metric)
-            }
+            (_, MetricValue::Counter { .. }) => self.state.make_incremental(metric),
             // Convert incremental gauges into absolute ones
-            (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
-                self.state.incremental_to_absolute(metric)
-            }
+            (_, MetricValue::Gauge { .. }) => self.state.make_absolute(metric),
+            // All others are left as-is but aggregated
             (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
             (MetricKind::Absolute, _) => Some(metric),
         }
@@ -248,10 +245,7 @@ pub struct AbsoluteMetricsState {
 
 impl MetricsState for AbsoluteMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.data.kind {
-            MetricKind::Absolute => Some(metric),
-            MetricKind::Incremental => self.state.incremental_to_absolute(metric),
-        }
+        self.state.make_absolute(metric)
     }
 
     fn fresh(&self, _metrics: &MetricSet) -> Self {
@@ -272,11 +266,7 @@ pub struct IncrementalMetricsState {
 
 impl MetricsState for IncrementalMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
-        match metric.data.kind {
-            // Aggregate incremental metrics together
-            MetricKind::Incremental => self.state.aggregate_incremental(metric),
-            MetricKind::Absolute => self.state.absolute_to_incremental(metric),
-        }
+        self.state.make_incremental(metric)
     }
 
     fn fresh(&self, metrics: &MetricSet) -> Self {
@@ -295,15 +285,9 @@ pub struct DatadogMetricsState {
 
 impl MetricsState for DatadogMetricsState {
     fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
-        match (metric.data.kind, &metric.data.value) {
-            // Datadog only accepts gauges as absolute values
-            (MetricKind::Absolute, MetricValue::Gauge { .. }) => Some(metric),
-            (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
-                self.state.incremental_to_absolute(metric)
-            }
-            // But all others must be incremental
-            (MetricKind::Absolute, _) => self.state.absolute_to_incremental(metric),
-            (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => self.state.make_absolute(metric),
+            _ => self.state.make_incremental(metric),
         }
     }
 
@@ -334,6 +318,20 @@ impl DerefMut for MetricSet {
 impl MetricSet {
     fn with_capacity(capacity: usize) -> Self {
         Self(HashSet::with_capacity(capacity))
+    }
+
+    fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
+        match metric.data.kind {
+            MetricKind::Absolute => Some(metric),
+            MetricKind::Incremental => self.incremental_to_absolute(metric),
+        }
+    }
+
+    fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        match metric.data.kind {
+            MetricKind::Absolute => self.absolute_to_incremental(metric),
+            MetricKind::Incremental => self.aggregate_incremental(metric),
+        }
     }
 
     /// Convert the incremental metric into an absolute one, using the
