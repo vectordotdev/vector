@@ -41,7 +41,7 @@ impl<V> From<HashMap<String, V>> for VecMap<V> {
 }
 
 impl<V> VecMap<V> {
-    fn keys<'a>(&'a self) -> &[String] {
+    fn keys(&self) -> &[String] {
         &self.keys
     }
 }
@@ -262,7 +262,7 @@ impl HttpSink for StackdriverSink {
 
         let mut request = Request::post(URI.clone())
             .header("Content-Type", "application/json")
-            .body(body.into())
+            .body(body)
             .unwrap();
 
         if let Some(creds) = &self.creds {
