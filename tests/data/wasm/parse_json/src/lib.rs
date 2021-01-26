@@ -59,7 +59,7 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     // **Please note that WASM support is still unstable!**
     //
     // We expect to alter this format in the future after some event data model improvements.
-    let mut event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
+    let event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
 
     // As with all data, it returns to bytes in the end.
     let output_buffer = serde_json::to_vec(&event).unwrap();
