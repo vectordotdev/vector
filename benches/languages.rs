@@ -43,7 +43,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
   type = "lua"
   inputs = ["in"]
   version = "2"
-  search_dirs = ["/etc/vector/lua_deps"]
+  search_dirs = ["benches/lua_deps"]
   source = """
   local json = require "json"
 
