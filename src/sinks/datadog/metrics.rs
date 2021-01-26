@@ -4,7 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            buffer::metrics::{DatadogMetricsState, MetricsBuffer},
+            buffer::metrics::{DatadogMetricNormalize, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
@@ -187,7 +187,7 @@ impl SinkConfig for DatadogConfig {
             HttpBatchService::new(client, move |request| ready(sink.build_request(request))),
         );
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::<DatadogMetricsState>::new(batch.size));
+        let buffer = PartitionBuffer::new(MetricsBuffer::<DatadogMetricNormalize>::new(batch.size));
 
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
@@ -351,7 +351,7 @@ fn encode_events(
                 encode_namespace(event.namespace().or(default_namespace), '.', event.name());
             let ts = encode_timestamp(event.data.timestamp);
             let tags = event.tags().map(encode_tags);
-            // DatadogMetricsState converts these to the right MetricKind
+            // DatadogMetricNormalize converts these to the right MetricKind
             match event.data.value {
                 MetricValue::Counter { value } => Some(vec![DatadogMetric {
                     metric: fullname,

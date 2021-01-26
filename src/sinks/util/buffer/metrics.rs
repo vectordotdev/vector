@@ -8,6 +8,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     hash::{Hash, Hasher},
+    marker::PhantomData,
     mem::discriminant,
     ops::{Deref, DerefMut},
 };
@@ -97,7 +98,7 @@ impl DerefMut for MetricEntry {
     }
 }
 
-pub type MetricBuffer = MetricsBuffer<StdMetricsState>;
+pub type MetricBuffer = MetricsBuffer<StdMetricNormalize>;
 
 /// The metrics buffer is a data structure for collecting a flow of data
 /// points into a batch.
@@ -109,27 +110,29 @@ pub type MetricBuffer = MetricsBuffer<StdMetricsState>;
 /// metrics is handled by the `State` type.  Further, distribution
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
-pub struct MetricsBuffer<State> {
-    state: State,
+pub struct MetricsBuffer<N> {
+    state: MetricSet,
     metrics: MetricSet,
     max_events: usize,
+    _normalize: PhantomData<N>,
 }
 
-impl<State: MetricsState> MetricsBuffer<State> {
+impl<N> MetricsBuffer<N> {
     pub fn new(settings: BatchSize<Self>) -> Self {
-        Self::new_with_state(settings.events, State::default())
+        Self::new_with_state(settings.events, MetricSet::default())
     }
 
-    fn new_with_state(max_events: usize, state: State) -> Self {
+    fn new_with_state(max_events: usize, state: MetricSet) -> Self {
         Self {
             state,
             metrics: MetricSet::with_capacity(max_events),
             max_events,
+            _normalize: PhantomData::default(),
         }
     }
 }
 
-impl<State: MetricsState> Batch for MetricsBuffer<State> {
+impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
     type Input = Event;
     type Output = Vec<Metric>;
 
@@ -147,7 +150,7 @@ impl<State: MetricsState> Batch for MetricsBuffer<State> {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            if let Some(item) = self.state.apply_state(item.into_metric()) {
+            if let Some(item) = N::apply_state(&mut self.state, item.into_metric()) {
                 self.metrics.replace(MetricEntry(item));
             }
             PushResult::Ok(self.num_items() >= self.max_events)
@@ -196,9 +199,8 @@ impl<State: MetricsState> Batch for MetricsBuffer<State> {
 /// exception. If the counter comes already aggregated inside the
 /// source, the buffer will compare it's values with the previous known
 /// and calculate the delta.
-pub trait MetricsState: Default {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric>;
-    fn fresh(&self, metrics: &MetricSet) -> Self;
+pub trait MetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric>;
 }
 
 /// This is the "standard" metrics normalization handler. It handles two cases:
@@ -211,48 +213,31 @@ pub trait MetricsState: Default {
 /// as an absolute gauge.
 ///
 /// All other metrics are left unchanged.
-#[derive(Default)]
-pub struct StdMetricsState {
-    state: MetricSet,
-}
+pub struct StdMetricNormalize;
 
-impl MetricsState for StdMetricsState {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+impl MetricNormalize for StdMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.data.kind, &metric.data.value) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
-            (_, MetricValue::Counter { .. }) => self.state.make_incremental(metric),
+            (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
             // Convert incremental gauges into absolute ones
-            (_, MetricValue::Gauge { .. }) => self.state.make_absolute(metric),
+            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
             // All others are left as-is but aggregated
-            (MetricKind::Incremental, _) => self.state.aggregate_incremental(metric),
+            (MetricKind::Incremental, _) => state.aggregate_incremental(metric),
             (MetricKind::Absolute, _) => Some(metric),
         }
-    }
-
-    fn fresh(&self, metrics: &MetricSet) -> Self {
-        let state = self.state.fresh(metrics);
-        Self { state }
     }
 }
 
 /// This normalization state converts all metrics into absolute metrics
 /// by using the state buffer to keep track of the value throughout the
 /// entire application uptime. New metrics start with a zero state.
-#[derive(Default)]
-pub struct AbsoluteMetricsState {
-    state: MetricSet,
-}
+pub struct AbsoluteMetricNormalize;
 
-impl MetricsState for AbsoluteMetricsState {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
-        self.state.make_absolute(metric)
-    }
-
-    fn fresh(&self, _metrics: &MetricSet) -> Self {
-        // This state only stores and outputs absolute metrics, so nothing complicated to do here.
-        let state = self.state.clone();
-        Self { state }
+impl MetricNormalize for AbsoluteMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        state.make_absolute(metric)
     }
 }
 
@@ -260,68 +245,43 @@ impl MetricsState for AbsoluteMetricsState {
 /// metrics by using the state buffer to keep track of the previous
 /// absolute value and then generating incremental values for all
 /// subsequent metrics.
-#[derive(Default)]
-pub struct IncrementalMetricsState {
-    state: MetricSet,
-}
+pub struct IncrementalMetricNormalize;
 
-impl MetricsState for IncrementalMetricsState {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
-        self.state.make_incremental(metric)
-    }
-
-    fn fresh(&self, metrics: &MetricSet) -> Self {
-        let state = self.state.fresh(metrics);
-        Self { state }
+impl MetricNormalize for IncrementalMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        state.make_incremental(metric)
     }
 }
 
 /// A metric state handler specialized for the types of metrics that
 /// AWS Cloudwatch and Datadog expect. In particular, they can want
 /// absolute gauges but everything else should be incremental.
-#[derive(Default)]
-pub struct DatadogMetricsState {
-    state: MetricSet,
-}
+pub struct DatadogMetricNormalize;
+pub type AwsCloudwatchMetricNormalize = DatadogMetricNormalize;
 
-pub type AwsCloudwatchMetricsState = DatadogMetricsState;
-
-impl MetricsState for DatadogMetricsState {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+impl MetricNormalize for DatadogMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.data.value {
-            MetricValue::Gauge { .. } => self.state.make_absolute(metric),
-            _ => self.state.make_incremental(metric),
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            _ => state.make_incremental(metric),
         }
-    }
-
-    fn fresh(&self, metrics: &MetricSet) -> Self {
-        let state = self.state.fresh(metrics);
-        Self { state }
     }
 }
 
 /// A metric state handler specialized for Sematext, which can only
 /// handle absolute gauges and incremental counters.
-#[derive(Default)]
-pub struct SematextMetricsState {
-    state: MetricSet,
-}
+pub struct SematextMetricNormalize;
 
-impl MetricsState for SematextMetricsState {
-    fn apply_state(&mut self, metric: Metric) -> Option<Metric> {
+impl MetricNormalize for SematextMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.data.value {
-            MetricValue::Gauge { .. } => self.state.make_absolute(metric),
-            MetricValue::Counter { .. } => self.state.make_incremental(metric),
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
                 emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
                 None
             }
         }
-    }
-
-    fn fresh(&self, metrics: &MetricSet) -> Self {
-        let state = self.state.fresh(metrics);
-        Self { state }
     }
 }
 
@@ -472,7 +432,7 @@ mod test {
             .collect()
     }
 
-    fn rebuffer<State: MetricsState>(events: Vec<Metric>) -> Buffer {
+    fn rebuffer<State: MetricNormalize>(events: Vec<Metric>) -> Buffer {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let mut buffer = MetricsBuffer::<State>::new(batch_size);
         let mut result = vec![];
@@ -501,7 +461,7 @@ mod test {
             .collect()
     }
 
-    fn rebuffer_incremental_counters<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_counters<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         for i in 0..4 {
             // counter-0 is repeated 5 times
@@ -523,7 +483,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_counters() {
-        let buffer = rebuffer_incremental_counters::<AbsoluteMetricsState>();
+        let buffer = rebuffer_incremental_counters::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -550,7 +510,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_counters() {
-        let buffer = rebuffer_incremental_counters::<IncrementalMetricsState>();
+        let buffer = rebuffer_incremental_counters::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -577,7 +537,7 @@ mod test {
 
     #[test]
     fn std_buffer_incremental_counters() {
-        let buffer = rebuffer_incremental_counters::<StdMetricsState>();
+        let buffer = rebuffer_incremental_counters::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -602,7 +562,7 @@ mod test {
         assert_eq!(buffer.len(), 2);
     }
 
-    fn rebuffer_absolute_counters<State: MetricsState>() -> Buffer {
+    fn rebuffer_absolute_counters<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         // counter-0 and -1 only emitted once
         // counter-2 and -3 emitted twice
@@ -620,7 +580,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_counters() {
-        let buffer = rebuffer_absolute_counters::<AbsoluteMetricsState>();
+        let buffer = rebuffer_absolute_counters::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -639,7 +599,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_counters() {
-        let buffer = rebuffer_absolute_counters::<IncrementalMetricsState>();
+        let buffer = rebuffer_absolute_counters::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -654,7 +614,7 @@ mod test {
 
     #[test]
     fn std_buffer_absolute_counters() {
-        let buffer = rebuffer_absolute_counters::<StdMetricsState>();
+        let buffer = rebuffer_absolute_counters::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -667,7 +627,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_gauges<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_gauges<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         // gauge-1 emitted once
         // gauge-2 through -4 are emitted twice
@@ -685,7 +645,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_gauges() {
-        let buffer = rebuffer_incremental_gauges::<AbsoluteMetricsState>();
+        let buffer = rebuffer_incremental_gauges::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -703,7 +663,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_gauges() {
-        let buffer = rebuffer_incremental_gauges::<IncrementalMetricsState>();
+        let buffer = rebuffer_incremental_gauges::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -721,7 +681,7 @@ mod test {
 
     #[test]
     fn std_buffer_incremental_gauges() {
-        let buffer = rebuffer_incremental_gauges::<StdMetricsState>();
+        let buffer = rebuffer_incremental_gauges::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -737,7 +697,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_absolute_gauges<State: MetricsState>() -> Buffer {
+    fn rebuffer_absolute_gauges<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         // gauge-2 emitted once
         // gauge-3 and -4 emitted twice
@@ -755,7 +715,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_gauges() {
-        let buffer = rebuffer_absolute_gauges::<AbsoluteMetricsState>();
+        let buffer = rebuffer_absolute_gauges::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -772,7 +732,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_gauges() {
-        let buffer = rebuffer_absolute_gauges::<IncrementalMetricsState>();
+        let buffer = rebuffer_absolute_gauges::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -787,7 +747,7 @@ mod test {
 
     #[test]
     fn std_buffer_absolute_gauges() {
-        let buffer = rebuffer_absolute_gauges::<StdMetricsState>();
+        let buffer = rebuffer_absolute_gauges::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -802,7 +762,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_sets<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_sets<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         // set-0 emitted 8 times with 4 different values
         // set-1 emitted once with 4 values
@@ -821,7 +781,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_sets() {
-        let buffer = rebuffer_incremental_sets::<AbsoluteMetricsState>();
+        let buffer = rebuffer_incremental_sets::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -836,7 +796,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_sets() {
-        let buffer = rebuffer_incremental_sets::<IncrementalMetricsState>();
+        let buffer = rebuffer_incremental_sets::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -851,7 +811,7 @@ mod test {
 
     #[test]
     fn std_buffer_incremental_sets() {
-        let buffer = rebuffer_incremental_sets::<StdMetricsState>();
+        let buffer = rebuffer_incremental_sets::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -864,7 +824,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_distributions<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_distributions<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         for _ in 2..6 {
             events.push(sample_distribution_histogram(2, Incremental, 10));
@@ -879,7 +839,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_distributions() {
-        let buffer = rebuffer_incremental_distributions::<AbsoluteMetricsState>();
+        let buffer = rebuffer_incremental_distributions::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -896,7 +856,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_distributions() {
-        let buffer = rebuffer_incremental_distributions::<IncrementalMetricsState>();
+        let buffer = rebuffer_incremental_distributions::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -913,7 +873,7 @@ mod test {
 
     #[test]
     fn std_buffer_incremental_distributions() {
-        let buffer = rebuffer_incremental_distributions::<StdMetricsState>();
+        let buffer = rebuffer_incremental_distributions::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -946,7 +906,7 @@ mod test {
         );
     }
 
-    fn rebuffer_absolute_aggregated_histograms<State: MetricsState>() -> Buffer {
+    fn rebuffer_absolute_aggregated_histograms<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         for _ in 2..5 {
             events.push(sample_aggregated_histogram(2, Absolute, 1.0, 1, 10.0));
@@ -967,7 +927,7 @@ mod test {
 
     #[test]
     fn abs_buffer_absolute_aggregated_histograms() {
-        let buffer = rebuffer_absolute_aggregated_histograms::<AbsoluteMetricsState>();
+        let buffer = rebuffer_absolute_aggregated_histograms::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -983,7 +943,7 @@ mod test {
 
     #[test]
     fn inc_buffer_absolute_aggregated_histograms() {
-        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricsState>();
+        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -995,7 +955,7 @@ mod test {
 
     #[test]
     fn std_buffer_absolute_aggregated_histograms() {
-        let buffer = rebuffer_absolute_aggregated_histograms::<StdMetricsState>();
+        let buffer = rebuffer_absolute_aggregated_histograms::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1009,7 +969,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_incremental_aggregated_histograms<State: MetricsState>() -> Buffer {
+    fn rebuffer_incremental_aggregated_histograms<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         for _ in 0..3 {
             events.push(sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0));
@@ -1024,7 +984,7 @@ mod test {
 
     #[test]
     fn abs_buffer_incremental_aggregated_histograms() {
-        let buffer = rebuffer_incremental_aggregated_histograms::<AbsoluteMetricsState>();
+        let buffer = rebuffer_incremental_aggregated_histograms::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1039,7 +999,7 @@ mod test {
 
     #[test]
     fn inc_buffer_incremental_aggregated_histograms() {
-        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricsState>();
+        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1054,7 +1014,7 @@ mod test {
 
     #[test]
     fn std_buffer_incremental_aggregated_histograms() {
-        let buffer = rebuffer_incremental_aggregated_histograms::<StdMetricsState>();
+        let buffer = rebuffer_incremental_aggregated_histograms::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1067,7 +1027,7 @@ mod test {
         assert_eq!(buffer.len(), 1);
     }
 
-    fn rebuffer_aggregated_summaries<State: MetricsState>() -> Buffer {
+    fn rebuffer_aggregated_summaries<State: MetricNormalize>() -> Buffer {
         let mut events = Vec::new();
         for factor in 0..10 {
             for num in 2..5 {
@@ -1084,7 +1044,7 @@ mod test {
 
     #[test]
     fn abs_buffer_aggregated_summaries() {
-        let buffer = rebuffer_aggregated_summaries::<AbsoluteMetricsState>();
+        let buffer = rebuffer_aggregated_summaries::<AbsoluteMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1100,7 +1060,7 @@ mod test {
 
     #[test]
     fn inc_buffer_aggregated_summaries() {
-        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricsState>();
+        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalize>();
 
         assert_eq!(
             buffer[0],
@@ -1116,7 +1076,7 @@ mod test {
 
     #[test]
     fn std_buffer_aggregated_summaries() {
-        let buffer = rebuffer_aggregated_summaries::<StdMetricsState>();
+        let buffer = rebuffer_aggregated_summaries::<StdMetricNormalize>();
 
         assert_eq!(
             buffer[0],

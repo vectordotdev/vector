@@ -6,7 +6,7 @@ use crate::{
     },
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
-        buffer::metrics::{AwsCloudwatchMetricsState, MetricsBuffer},
+        buffer::metrics::{AwsCloudwatchMetricNormalize, MetricsBuffer},
         retries::RetryLogic,
         BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig,
@@ -143,8 +143,9 @@ impl CloudWatchMetricsSvc {
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
-        let buffer =
-            PartitionBuffer::new(MetricsBuffer::<AwsCloudwatchMetricsState>::new(batch.size));
+        let buffer = PartitionBuffer::new(MetricsBuffer::<AwsCloudwatchMetricNormalize>::new(
+            batch.size,
+        ));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
@@ -169,7 +170,7 @@ impl CloudWatchMetricsSvc {
                 let metric_name = event.name().to_string();
                 let timestamp = event.data.timestamp.map(timestamp_to_string);
                 let dimensions = event.series.tags.clone().map(tags_to_dimensions);
-                // AwsCloudwatchMetricsState converts these to the right MetricKind
+                // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.data.value {
                     MetricValue::Counter { value } => Some(MetricDatum {
                         metric_name,

@@ -7,7 +7,7 @@ use crate::{
     sinks::{
         self,
         util::{
-            buffer::metrics::{AbsoluteMetricsState, MetricsBuffer},
+            buffer::metrics::{AbsoluteMetricNormalize, MetricsBuffer},
             http::HttpRetryLogic,
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
@@ -97,7 +97,7 @@ impl SinkConfig for RemoteWriteConfig {
             let service = request.service(HttpRetryLogic, service);
             let service = ServiceBuilder::new().service(service);
             let buffer =
-                PartitionBuffer::new(MetricsBuffer::<AbsoluteMetricsState>::new(batch.size));
+                PartitionBuffer::new(MetricsBuffer::<AbsoluteMetricNormalize>::new(batch.size));
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {

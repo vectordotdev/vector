@@ -6,7 +6,7 @@ use crate::{
     internal_events::SematextMetricsEncodeEventFailed,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
-        buffer::metrics::{MetricsBuffer, SematextMetricsState},
+        buffer::metrics::{MetricsBuffer, SematextMetricNormalize},
         http::{HttpBatchService, HttpRetryLogic},
         BatchConfig, BatchSettings, TowerRequestConfig,
     },
@@ -147,7 +147,7 @@ impl SematextMetricsService {
             .batch_sink(
                 HttpRetryLogic,
                 sematext_service,
-                MetricsBuffer::<SematextMetricsState>::new(batch.size),
+                MetricsBuffer::<SematextMetricNormalize>::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
@@ -208,7 +208,7 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
         let (metric_type, fields) = match event.data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
-            _ => unreachable!(), // handled by SematextMetricsState
+            _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
         if let Err(error) = influx_line_protocol(
