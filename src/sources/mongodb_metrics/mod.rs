@@ -61,14 +61,6 @@ enum BuildError {
     InvalidEndpoint { source: MongoError },
     #[snafu(display("invalid client options: {}", source))]
     InvalidClientOptions { source: MongoError },
-    #[snafu(display("failed to execute `isMaster` command: {}", source))]
-    CommandIsMasterMongoError { source: MongoError },
-    #[snafu(display("failed to parse `isMaster` response: {}", source))]
-    CommandIsMasterParseError { source: bson::de::Error },
-    #[snafu(display("failed to execute `buildInfo` command: {}", source))]
-    CommandBuildInfoMongoError { source: MongoError },
-    #[snafu(display("failed to parse `buildInfo` response: {}", source))]
-    CommandBuildInfoParseError { source: bson::de::Error },
 }
 
 #[derive(Debug)]
@@ -174,16 +166,8 @@ impl MongoDBMetrics {
         tags.insert("endpoint".into(), endpoint.clone());
         tags.insert("host".into(), client_options.hosts[0].to_string());
 
-        let client = Client::with_options(client_options).context(InvalidClientOptions)?;
-
-        let node_type = Self::get_node_type(&client).await?;
-        let build_info = Self::get_build_info(&client).await?;
-        debug!(
-            message = "Connected to server.", endpoint = %endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
-        );
-
         Ok(Self {
-            client,
+            client: Client::with_options(client_options).context(InvalidClientOptions)?,
             endpoint,
             namespace,
             tags,
@@ -191,13 +175,14 @@ impl MongoDBMetrics {
     }
 
     /// Finding node type for client with `isMaster` command.
-    async fn get_node_type(client: &Client) -> Result<NodeType, BuildError> {
-        let doc = client
+    async fn get_node_type(&self) -> Result<NodeType, CollectError> {
+        let doc = self
+            .client
             .database("admin")
             .run_command(doc! { "isMaster": 1 }, None)
             .await
-            .context(CommandIsMasterMongoError)?;
-        let msg: CommandIsMaster = from_document(doc).context(CommandIsMasterParseError)?;
+            .map_err(CollectError::Mongo)?;
+        let msg: CommandIsMaster = from_document(doc).map_err(CollectError::Bson)?;
 
         Ok(if msg.set_name.is_some() || msg.hosts.is_some() {
             NodeType::Replset
@@ -211,13 +196,23 @@ impl MongoDBMetrics {
         })
     }
 
-    async fn get_build_info(client: &Client) -> Result<CommandBuildInfo, BuildError> {
-        let doc = client
+    async fn get_build_info(&self) -> Result<CommandBuildInfo, CollectError> {
+        let doc = self
+            .client
             .database("admin")
             .run_command(doc! { "buildInfo": 1 }, None)
             .await
-            .context(CommandBuildInfoMongoError)?;
-        from_document(doc).context(CommandBuildInfoParseError)
+            .map_err(CollectError::Mongo)?;
+        from_document(doc).map_err(CollectError::Bson)
+    }
+
+    async fn print_version(&self) -> Result<(), CollectError> {
+        let node_type = self.get_node_type().await?;
+        let build_info = self.get_build_info().await?;
+        debug!(
+            message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
+        );
+        Ok(())
     }
 
     fn create_metric(
@@ -264,6 +259,8 @@ impl MongoDBMetrics {
     /// Collect metrics from `serverStatus` command.
     /// https://docs.mongodb.com/manual/reference/command/serverStatus/
     async fn collect_server_status(&self) -> Result<Vec<Metric>, CollectError> {
+        self.print_version().await?;
+
         let mut metrics = vec![];
 
         let command = doc! { "serverStatus": 1, "opLatencies": { "histograms": true }};
