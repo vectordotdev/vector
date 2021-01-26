@@ -43,9 +43,12 @@ fn benchmark_parse_json(c: &mut Criterion) {
   type = "lua"
   inputs = ["in"]
   version = "2"
+  search_dirs = ["/etc/vector/lua_deps"]
   source = """
+  local json = require "json"
+
   local function parse_json(message)
-    json.decode(message)
+    return json.decode(message)
   end
 
   function process(event, emit)
