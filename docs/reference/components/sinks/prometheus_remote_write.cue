@@ -91,6 +91,7 @@ components: sinks: prometheus_remote_write: {
 			warnings: []
 			type: string: {
 				examples: ["https://localhost:8087/"]
+				syntax: "literal"
 			}
 		}
 		default_namespace: {
@@ -105,6 +106,7 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 		buckets: {
@@ -135,7 +137,7 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["my-domain"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

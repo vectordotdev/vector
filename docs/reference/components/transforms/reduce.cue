@@ -36,11 +36,20 @@ components: transforms: reduce: {
 
 	configuration: {
 		ends_when: {
-			common:      false
-			description: "A condition used to distinguish the final event of a transaction. If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event."
-			required:    false
+			common: false
+			description: """
+				A condition used to distinguish the final event of a transaction. If this condition resolves to `true`
+				for an event, the current transaction is immediately flushed with this event.
+				"""
+			required: false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "literal"
+			}
 		}
 		expire_after_ms: {
 			common:      false
@@ -69,7 +78,10 @@ components: transforms: reduce: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["request_id", "user_id", "transaction_id"]
+				items: type: string: {
+					examples: ["request_id", "user_id", "transaction_id"]
+					syntax: "literal"
+				}
 			}
 		}
 		merge_strategies: {
@@ -114,17 +126,27 @@ components: transforms: reduce: {
 								max:            "The maximum of all numeric values."
 								min:            "The minimum of all numeric values."
 							}
+							syntax: "literal"
 						}
 					}
 				}
 			}
 		}
 		starts_when: {
-			common:      false
-			description: "A condition used to distinguish the first event of a transaction. If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started."
-			required:    false
+			common: false
+			description: """
+				A condition used to distinguish the first event of a transaction. If this condition resolves to `true`
+				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
+				"""
+			required: false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "literal"
+			}
 		}
 	}
 
@@ -186,10 +208,7 @@ components: transforms: reduce: {
 			configuration: {
 				group_by: ["host", "pid", "tid"]
 				marge_strategies: message: "concat_newline"
-				starts_when: {
-					type:   "remap"
-					source: #"match(.message, /^[^\s]/)"#
-				}
+				starts_when: #"match(.message, /^[^\s]/)"#
 			}
 			output: [
 				{

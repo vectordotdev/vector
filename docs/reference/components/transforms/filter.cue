@@ -35,10 +35,18 @@ components: transforms: filter: {
 
 	configuration: {
 		condition: {
-			description: "The condition to be matched against every input event. Only messages that pass the condition will be forwarded."
-			required:    true
+			description: """
+				The condition to be matched against every input event. Only messages that pass the condition will
+				be forwarded.
+				"""
+			required: true
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "remap"
+			}
 		}
 	}
 
@@ -58,10 +66,7 @@ components: transforms: filter: {
 		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: {
-					type:   "remap"
-					source: '.level == "debug"'
-				}
+				condition: '.level == "debug"'
 			}
 			input: [
 				{

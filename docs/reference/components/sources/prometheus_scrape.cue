@@ -65,7 +65,10 @@ components: sources: prometheus_scrape: {
 			required:    true
 			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
 			type: array: {
-				items: type: string: examples: ["http://localhost:9090/metrics"]
+				items: type: string: {
+					examples: ["http://localhost:9090/metrics"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {

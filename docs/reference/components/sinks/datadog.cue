@@ -32,6 +32,7 @@ components: sinks: _datadog: {
 			warnings: []
 			type: string: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -42,6 +43,7 @@ components: sinks: _datadog: {
 			type: string: {
 				default: null
 				examples: ["127.0.0.1:8080", "example.com:12345"]
+				syntax: "literal"
 			}
 		}
 		region: {
@@ -54,6 +56,7 @@ components: sinks: _datadog: {
 					us: "United States"
 					eu: "Europe"
 				}
+				syntax: "literal"
 			}
 		}
 	}

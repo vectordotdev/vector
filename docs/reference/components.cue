@@ -481,46 +481,6 @@ components: {
 		let Kind = kind
 
 		configuration: {
-			_conditions: {
-				examples: [
-					{
-						type:   "remap"
-						source: #".status_code != 200 && !includes(["info", "debug"], .severity)"#
-					},
-				]
-				options: {
-					type: {
-						description: "The type of the condition to execute."
-						required:    true
-						warnings: []
-						type: string: {
-							enum: {
-								remap:     "Allows you to write VRL conditionals via boolean expressions."
-								is_log:    "Returns true if the event is a log."
-								is_metric: "Returns true if the event is a metric."
-							}
-						}
-					}
-					source: {
-						description:   """
-							The [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_ to execute
-							for each event. This expression _MUST_ return a boolean.
-
-							Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
-							expressions and functions.
-							"""
-						relevant_when: #"`type` is `"remap"`"#
-						required:      true
-						warnings: []
-						type: string: {
-							examples: [
-								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-							]
-						}
-					}
-				}
-			}
-
 			_tls_accept: {
 				_args: {
 					can_enable:             bool
@@ -549,6 +509,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -558,6 +519,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -567,6 +529,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -576,6 +539,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -619,6 +583,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -628,6 +593,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -637,6 +603,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -646,6 +613,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -686,6 +654,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
+							syntax: "literal"
 						}
 					}
 					strategy: {
@@ -697,6 +666,7 @@ components: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
+							syntax: "literal"
 						}
 					}
 					token: {
@@ -705,6 +675,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
+							syntax: "literal"
 						}
 					}
 					user: {
@@ -713,6 +684,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -732,6 +704,7 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
+								syntax: "literal"
 							}
 						}
 						password: {
@@ -740,6 +713,7 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
+								syntax: "literal"
 							}
 						}
 					}
@@ -814,7 +788,10 @@ components: {
 					description: "A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms)) IDs. See [configuration](\(urls.vector_configuration)) for more info."
 					required:    true
 					sort:        -1
-					type: array: items: type: string: examples: ["my-source-or-transform-id"]
+					type: array: items: type: string: {
+						examples: ["my-source-or-transform-id"]
+						syntax: "literal"
+					}
 				}
 			}
 
@@ -822,8 +799,11 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum: #Enum | *{
-					"\(Name)": "The type of this component."
+				"type": string: {
+					enum: #Enum | *{
+						"\(Name)": "The type of this component."
+					}
+					syntax: "literal"
 				}
 			}
 		}

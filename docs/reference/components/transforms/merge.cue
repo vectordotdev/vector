@@ -54,7 +54,10 @@ components: transforms: merge: {
 			warnings: []
 			type: array: {
 				default: ["message"]
-				items: type: string: examples: ["message", "parent.child"]
+				items: type: string: {
+					examples: ["message", "parent.child"]
+					syntax: "literal"
+				}
 			}
 		}
 		partial_event_marker_field: {
@@ -68,6 +71,7 @@ components: transforms: merge: {
 			type: string: {
 				default: "_partial"
 				examples: ["_partial", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		stream_discriminant_fields: {
@@ -81,7 +85,10 @@ components: transforms: merge: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["host", "parent.child"]
+				items: type: string: {
+					examples: ["host", "parent.child"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

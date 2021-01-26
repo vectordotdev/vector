@@ -55,13 +55,17 @@ components: transforms: split: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["timestamp", "level", "message", "parent.child"]
+				syntax: "literal"
+			}
 		}
 		separator: {
 			common:      true
@@ -71,6 +75,7 @@ components: transforms: split: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
+				syntax: "literal"
 			}
 		}
 		types: configuration._types

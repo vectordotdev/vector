@@ -73,6 +73,7 @@ components: sinks: papertrail: {
 			required:    true
 			type: string: {
 				examples: ["logs.papertrailapp.com:12345"]
+				syntax: "literal"
 			}
 		}
 	}
