@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::template::{TemplateParseError, TemplateRenderError};
 use metrics::counter;
 use std::num::ParseFloatError;
 
@@ -32,7 +33,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
         warn!(
             message = "Failed to parse field as float.",
             field = %self.field,
-            error = ?self.error,
+            error = %self.error,
             internal_log_rate_secs = 30
         );
     }
@@ -45,15 +46,14 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
 }
 
 pub(crate) struct LogToMetricTemplateRenderError {
-    pub missing_keys: Vec<String>,
+    pub error: TemplateRenderError,
 }
 
 impl InternalEvent for LogToMetricTemplateRenderError {
     fn emit_logs(&self) {
-        let error = format!("Keys {:?} do not exist on the event.", self.missing_keys);
         warn!(
             message = "Failed to render template.",
-            %error,
+            error = %self.error,
             internal_log_rate_secs = 30
         );
     }
@@ -66,7 +66,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
 }
 
 pub(crate) struct LogToMetricTemplateParseError {
-    pub error: crate::template::TemplateParseError,
+    pub error: TemplateParseError,
 }
 
 impl InternalEvent for LogToMetricTemplateParseError {
