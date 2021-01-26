@@ -32,7 +32,7 @@ fn benchmark_remap_error_handling(c: &mut Criterion) {
   inputs = ["in"]
   source = """
   log, err = parse_syslog(.message)
-  if err != null {
+  if err == null {
       . = log
   }
   """
