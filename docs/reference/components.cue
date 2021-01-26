@@ -482,6 +482,8 @@ components: {
 		kind: string
 		let Kind = kind
 
+		classes: #Classes & {_args: kind: Kind}
+
 		configuration: {
 			_tls_accept: {
 				_args: {
@@ -965,6 +967,26 @@ components: {
 				// Default metrics for each transform
 				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+			}
+		}
+
+		how_it_works: {
+			state: {
+				title: "State"
+
+				if classes.stateful == true {
+					body: """
+						This component is stateful, meaning its behavior changes based on previous inputs (events).
+						State is not preserved across restarts, therefore state-dependent behavior will reset between
+						restarts and depend on the inputs (events) received since the most recent restart.
+						"""
+				}
+
+				if classes.stateful == false {
+					body: """
+						This component is stateless, meaning its behavior is consistent across each input.
+						"""
+				}
 			}
 		}
 	}}
