@@ -67,6 +67,10 @@ enum BuildError {
     HostMissing,
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
+}
+
+#[derive(Debug, Snafu)]
+enum ConnectError {
     #[snafu(display("failed to create tls connector: {}", source))]
     TlsFailed { source: ErrorStack },
     #[snafu(display("failed to connect ({}): {}", endpoint, source))]
@@ -348,7 +352,7 @@ impl PostgresqlMetrics {
         tags.insert("endpoint".into(), config_to_endpoint(&config));
         tags.insert("host".into(), host);
 
-        let mut this = Self {
+        Ok(Self {
             config,
             tls_config,
             client: None,
@@ -356,12 +360,10 @@ impl PostgresqlMetrics {
             namespace,
             tags,
             datname_filter,
-        };
-        this.build_client().await?;
-        Ok(this)
+        })
     }
 
-    async fn build_client(&mut self) -> Result<(), BuildError> {
+    async fn build_client(&mut self) -> Result<(), ConnectError> {
         let client = match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
@@ -413,7 +415,7 @@ impl PostgresqlMetrics {
         Ok(())
     }
 
-    async fn verify_version(&mut self) -> Result<(), BuildError> {
+    async fn verify_version(&mut self) -> Result<(), ConnectError> {
         let row = self
             .client
             .as_ref()
@@ -433,7 +435,7 @@ impl PostgresqlMetrics {
         self.version = Some(match version.parse::<usize>() {
             Ok(version) if version >= 90600 => version,
             Ok(_) | Err(_) => {
-                return Err(BuildError::InvalidVersion {
+                return Err(ConnectError::InvalidVersion {
                     version: version.to_string(),
                 })
             }
