@@ -37,6 +37,7 @@ depends = ""
 members = [
   ".",
   "lib/codec",
+  "lib/collnew",
   "lib/derive_is_enum_variant",
   "lib/file-source",
   "lib/k8s-e2e-tests",
