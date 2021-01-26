@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkMissingKeys},
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkTemplateRenderError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
@@ -143,10 +143,10 @@ impl HttpSink for HecSinkConfig {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
+                .map_err(|error| {
+                    emit!(SplunkTemplateRenderError {
                         field: "sourcetype",
-                        keys: &missing_keys
+                        error,
                     });
                 })
                 .ok()
@@ -155,10 +155,10 @@ impl HttpSink for HecSinkConfig {
         let source = self.source.as_ref().and_then(|source| {
             source
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
+                .map_err(|error| {
+                    emit!(SplunkTemplateRenderError {
                         field: "source",
-                        keys: &missing_keys
+                        error,
                     });
                 })
                 .ok()
@@ -167,10 +167,10 @@ impl HttpSink for HecSinkConfig {
         let index = self.index.as_ref().and_then(|index| {
             index
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
+                .map_err(|error| {
+                    emit!(SplunkTemplateRenderError {
                         field: "index",
-                        keys: &missing_keys
+                        error,
                     });
                 })
                 .ok()
