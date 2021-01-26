@@ -194,7 +194,10 @@ pub mod stream {
 
 #[cfg(test)]
 mod tests {
-    use crate::{kubernetes::client, tls::TlsOptions};
+    use crate::{
+        kubernetes::{api_watcher, client},
+        tls::TlsOptions,
+    };
 
     use super::*;
     use futures::StreamExt;
@@ -370,7 +373,9 @@ mod tests {
                     // panic! on pass is err is what we expected
                     let error = item.unwrap_err();
                     match error {
-                        watcher::stream::Error::Desync { .. } => {}
+                        watcher::stream::Error::Desync {
+                            source: stream::Error::Desync,
+                        } => {}
                         _ => panic!("expected a desync error"),
                     }
                 })],
@@ -423,7 +428,9 @@ mod tests {
                         // panic! on pass is err is what we expected
                         let error = item.unwrap_err();
                         match error {
-                            watcher::stream::Error::Desync { .. } => {}
+                            watcher::stream::Error::Desync {
+                                source: stream::Error::Desync,
+                            } => {}
                             _ => panic!("expected a desync error"),
                         }
                     }),
@@ -464,7 +471,9 @@ mod tests {
                         // panic! on pass is err is what we expected
                         let error = item.unwrap_err();
                         match error {
-                            watcher::stream::Error::Desync { .. } => {}
+                            watcher::stream::Error::Desync {
+                                source: stream::Error::Desync,
+                            } => {}
                             _ => panic!("expected a desync error"),
                         }
                     }),
@@ -516,30 +525,89 @@ mod tests {
                     );
                 })],
             ),
+            // No body in response
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(200).header("Content-Type", "application/json");
+                }),
+                vec![],
+            ),
             // Bad JSON from API
             (
                 Box::new(|when, then| {
                     when.method(GET).path("/api/v1/pods");
                     then.status(200)
                         .header("Content-Type", "application/json")
+                        .body(r#"not valid json"#);
+                }),
+                vec![Box::new(|item| {
+                    let error = item.unwrap_err();
+                    match error {
+                        watcher::stream::Error::Other {
+                            source:
+                                api_watcher::stream::Error::K8sStream {
+                                    source: crate::kubernetes::stream::Error::Parsing { source },
+                                },
+                        } if format!("{:?}", source)
+                            == r#"Json(Error("expected ident", line: 1, column: 2))"# => {}
+                        err => panic!("Expect an 'other' error: {:?}", err),
+                    }
+                })],
+            ),
+            // Valid JSON of Invalid Response API
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(200)
+                        .header("Content-Type", "application/json")
+                        .body(r#"{"a":"b"}"#);
+                }),
+                vec![Box::new(|item| {
+                    let error = item.unwrap_err();
+                    match error {
+                        watcher::stream::Error::Other {
+                            source:
+                                api_watcher::stream::Error::K8sStream {
+                                    source: crate::kubernetes::stream::Error::Parsing { source },
+                                },
+                        } if format!("{:?}", source)
+                            == r#"Json(Error("missing field `type`", line: 1, column: 9))"# => {}
+                        err => panic!("Expect an 'other' error: {:?}", err),
+                    }
+                })],
+            ),
+            // Non-standard object type
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(200)
+                        .header("Content-Type", "application/json")
                         .body(
-                            r#"
-                            "type": "ADDED",
-                            "object":
-                                "kind": "Pod",
-                                "apiVersion": "v1",
-                                "metadata": {
-                                    "uid": "uid0"
+                            r#"{
+                                "type": "nonstandard_type",
+                                "object": {
+                                    "kind": "Status",
+                                    "apiVersion": "v1",
+                                    "metadata": {
+                                        "uid": "uid0"
+                                    }
                                 }
-                            }
-                         }"#,
+                            }"#,
                         );
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     match error {
-                        watcher::stream::Error::Other { .. } => {}
-                        _ => panic!("Expect an 'other' error"),
+                        watcher::stream::Error::Other {
+                            source:
+                                api_watcher::stream::Error::K8sStream {
+                                    source: crate::kubernetes::stream::Error::Parsing { source },
+                                },
+                        } if format!("{:?}", source)
+                            == r#"Json(Error("unknown variant `nonstandard_type`, expected one of `ADDED`, `DELETED`, `MODIFIED`, `BOOKMARK`, `ERROR`", line: 2, column: 58))"# =>
+                            {}
+                        err => panic!("Expect an 'other' error: {:?}", err),
                     }
                 })],
             ),
@@ -550,23 +618,30 @@ mod tests {
                     then.status(200)
                         .header("Content-Type", "application/json")
                         .body(
-                            r#"
-                            "type": "MODIFIED",
-                            "object": {
-                                "kind": "StatefulSet",
-                                "apiVersion": "v1",
-                                "metadata": {
-                                    "uid": "uid0"
+                            r#"{
+                                "type": "MODIFIED",
+                                "object": {
+                                    "kind": "StatefulSet",
+                                    "apiVersion": "v1",
+                                    "metadata": {
+                                        "uid": "uid0"
+                                    }
                                 }
-                            }
-                         }"#,
+                            }"#,
                         );
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
                     match error {
-                        watcher::stream::Error::Other { .. } => {}
-                        _ => panic!("Expect an 'other' error"),
+                        watcher::stream::Error::Other {
+                            source:
+                                api_watcher::stream::Error::K8sStream {
+                                    source: crate::kubernetes::stream::Error::Parsing { source },
+                                },
+                        } if format!("{:?}", source)
+                            == r#"Json(Error("invalid value: string \"StatefulSet\", expected Pod", line: 10, column: 29))"# =>
+                            {}
+                        err => panic!("Expect an 'other' error: {:?}", err),
                     }
                 })],
             ),
@@ -599,7 +674,7 @@ mod tests {
                 let item = stream
                     .next()
                     .await
-                    .expect("we have an assertion, but an item wasn't avaialble");
+                    .expect("we have an assertion, but an item wasn't available");
                 assertion(item);
             }
             assert!(stream.next().await.is_none(), "expected to cover the whole stream with assertion, but got some items after all assertions passed");
@@ -616,5 +691,15 @@ mod tests {
             _ => panic!("unexpected response"),
         };
         assert_eq!(val, expected_val);
+    }
+
+    #[macro_export]
+    macro_rules! assert_matches {
+        ($expression:expr, $($pattern:tt)+) => {
+            match $expression {
+                $($pattern)+ => (),
+                ref e => panic!("assertion failed: `{:?}` does not match `{}`", e, stringify!($($pattern)+)),
+            }
+        }
     }
 }
