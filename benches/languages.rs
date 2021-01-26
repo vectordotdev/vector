@@ -10,7 +10,7 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_add_fields, benchmark_parse_syslog, benchmark_parse_json
+    targets = benchmark_add_fields, benchmark_parse_json, benchmark_parse_syslog
 );
 criterion_main!(benches);
 
@@ -73,7 +73,7 @@ fn benchmark_add_fields(c: &mut Criterion) {
         serde_json::from_str(r#"{ "one": 1, "two": 2, "three": 3, "four": 4, "five": 5 }"#)
             .unwrap();
 
-    benchmark_configs(c, "parse_syslog", configs, "in", "last", input, output);
+    benchmark_configs(c, "add_fields", configs, "in", "last", input, output);
 }
 
 fn benchmark_parse_json(c: &mut Criterion) {
