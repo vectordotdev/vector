@@ -108,8 +108,8 @@ impl FunctionTransform for AddFields {
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
-                    Err(_) => {
-                        emit!(AddFieldsTemplateRenderingError { field: &key });
+                    Err(error) => {
+                        emit!(AddFieldsTemplateRenderingError { field: &key, error });
                         continue;
                     }
                 }
