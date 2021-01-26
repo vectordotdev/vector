@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
+    internal_events::{AwsSqsEventSent, AwsSqsTemplateRenderError},
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -258,10 +258,8 @@ fn encode_event(
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
-            Err(missing_keys) => {
-                emit!(AwsSqsMessageGroupIdMissingKeys {
-                    keys: &missing_keys
-                });
+            Err(error) => {
+                emit!(AwsSqsTemplateRenderError { error });
                 return None;
             }
         },

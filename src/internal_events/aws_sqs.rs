@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::template::TemplateRenderError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -19,15 +20,15 @@ impl InternalEvent for AwsSqsEventSent<'_> {
 }
 
 #[derive(Debug)]
-pub struct AwsSqsMessageGroupIdMissingKeys<'a> {
-    pub keys: &'a [String],
+pub struct AwsSqsTemplateRenderError {
+    pub error: TemplateRenderError,
 }
 
-impl<'a> InternalEvent for AwsSqsMessageGroupIdMissingKeys<'a> {
+impl<'a> InternalEvent for AwsSqsTemplateRenderError {
     fn emit_logs(&self) {
         warn!(
-            message = "Keys do not exist on the event; dropping event.",
-            missing_keys = ?self.keys,
+            message = "Failed to render template; dropping event.",
+            error = %self.error,
             internal_log_rate_secs = 30,
         )
     }
