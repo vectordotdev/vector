@@ -612,14 +612,6 @@ mod tests {
             .with_namespace(Some("ns".into()))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
-            Metric::new(
-                "unsupported".into(),
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 1.0 },
-            )
-            .with_namespace(Some("ns".into()))
-            .with_tags(Some(tags()))
-            .with_timestamp(Some(ts())),
         ];
         let input = encode_events(events, None, interval);
         let json = serde_json::to_string(&input).unwrap();
@@ -632,20 +624,12 @@ mod tests {
 
     #[test]
     fn encode_gauge() {
-        let events = vec![
-            Metric::new(
-                "unsupported".into(),
-                MetricKind::Incremental,
-                MetricValue::Gauge { value: 0.1 },
-            )
-            .with_timestamp(Some(ts())),
-            Metric::new(
-                "volume".into(),
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: -1.1 },
-            )
-            .with_timestamp(Some(ts())),
-        ];
+        let events = vec![Metric::new(
+            "volume".into(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: -1.1 },
+        )
+        .with_timestamp(Some(ts()))];
         let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
