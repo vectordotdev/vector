@@ -1,9 +1,11 @@
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
-    udp, Pipeline,
+    Pipeline,
 };
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;

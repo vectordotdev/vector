@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -5,7 +7,7 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Event, Pipeline,
+    Event, Pipeline,
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
@@ -167,6 +169,9 @@ async fn statsd_udp(
     let mut socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
+
+    #[cfg(not(unix))]
+    let socket = socket;
 
     #[cfg(unix)]
     udp::set_buffer_sizes(

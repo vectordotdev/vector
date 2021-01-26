@@ -1,6 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
@@ -11,7 +13,7 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    Pipeline,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
@@ -319,6 +321,9 @@ pub fn udp(
         let mut socket = UdpSocket::bind(&addr)
             .await
             .expect("Failed to bind to UDP listener socket");
+
+        #[cfg(not(unix))]
+        let socket = socket;
 
         #[cfg(unix)]
         udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
