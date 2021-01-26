@@ -12,7 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    template::{Template, TemplateError},
+    template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use futures::{FutureExt, SinkExt};
@@ -47,7 +47,7 @@ impl<V> VecMap<V> {
 }
 
 impl VecMap<Template> {
-    fn render_string(&self, event: &Event) -> Result<Vec<String>, TemplateError> {
+    fn render_values(&self, event: &Event) -> Result<Vec<String>, Vec<String>> {
         let mut result = Vec::with_capacity(self.values.len());
         for v in &self.values {
             result.push(v.render_string(event)?);
@@ -192,10 +192,10 @@ impl SinkConfig for StackdriverConfig {
 }
 
 impl StackdriverSink {
-    fn render_partition_key(&self, event: &Event) -> Result<PartitionKey, TemplateError> {
+    fn render_partition_key(&self, event: &Event) -> Result<PartitionKey, Vec<String>> {
         Ok(PartitionKey {
             r#type: self.config.resource.type_.render_string(&event)?,
-            resource_values: self.resource.render_string(&event)?,
+            resource_values: self.resource.render_values(&event)?,
         })
     }
 }
@@ -207,8 +207,12 @@ impl HttpSink for StackdriverSink {
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let key = match self.render_partition_key(&event) {
-            Err(error) => {
-                error!(msg = "Error rendering template.", error = %error, rate_limit = 30);
+            Err(missing_keys) => {
+                warn!(
+                    msg = "Keys do not exist on the event; dropping event.",
+                    ?missing_keys,
+                    internal_log_rate_secs = 30
+                );
                 return None;
             }
             Ok(key) => key,
