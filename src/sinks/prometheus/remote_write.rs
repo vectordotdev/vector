@@ -100,7 +100,7 @@ impl SinkConfig for RemoteWriteConfig {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {
                         template
                             .render_string(&event)
-                            .map_err(|fields| emit!(PrometheusTemplateRenderingError { fields }))
+                            .map_err(|error| emit!(PrometheusTemplateRenderingError { error }))
                             .ok()
                     });
                     let key = PartitionKey { tenant_id };
