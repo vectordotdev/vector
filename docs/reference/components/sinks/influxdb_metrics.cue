@@ -23,10 +23,7 @@ components: sinks: influxdb_metrics: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: {
-				enabled: true
-				codec: enabled: false
-			}
+			encoding: enabled:    false
 			request: {
 				enabled:                    true
 				concurrency:                5
@@ -92,8 +89,13 @@ components: sinks: influxdb_metrics: {
 			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
-			configuration: {
+			"configuration": {
+				bucket:            configuration.bucket.type.string.examples[0]
+				database:          configuration.database.type.string.examples[0]
 				default_namespace: "service"
+				endpoint:          configuration.endpoint.type.string.examples[0]
+				org:               configuration.org.type.string.examples[0]
+				token:             configuration.token.type.string.examples[0]
 			}
 			input: metric: {
 				kind: "incremental"
@@ -112,7 +114,13 @@ components: sinks: influxdb_metrics: {
 			_name: "sparse_stats"
 			title: "Distribution"
 			notes: "For distributions with histogram, summary is computed."
-			configuration: {}
+			"configuration": {
+				bucket:   configuration.bucket.type.string.examples[0]
+				database: configuration.database.type.string.examples[0]
+				endpoint: configuration.endpoint.type.string.examples[0]
+				org:      configuration.org.type.string.examples[0]
+				token:    configuration.token.type.string.examples[0]
+			}
 			input: metric: {
 				kind:      "incremental"
 				name:      _name
@@ -136,8 +144,13 @@ components: sinks: influxdb_metrics: {
 			_name:  "memory_rss"
 			_value: 1.5
 			title:  "Gauge"
-			configuration: {
+			"configuration": {
+				bucket:            configuration.bucket.type.string.examples[0]
+				database:          configuration.database.type.string.examples[0]
 				default_namespace: "service"
+				endpoint:          configuration.endpoint.type.string.examples[0]
+				org:               configuration.org.type.string.examples[0]
+				token:             configuration.token.type.string.examples[0]
 			}
 			input: metric: {
 				kind:      "absolute"
@@ -156,7 +169,14 @@ components: sinks: influxdb_metrics: {
 			_host: _values.local_host
 			_name: "requests"
 			title: "Histogram"
-			configuration: {}
+			"configuration": {
+				bucket:            configuration.bucket.type.string.examples[0]
+				database:          configuration.database.type.string.examples[0]
+				default_namespace: "service"
+				endpoint:          configuration.endpoint.type.string.examples[0]
+				org:               configuration.org.type.string.examples[0]
+				token:             configuration.token.type.string.examples[0]
+			}
 			input: metric: {
 				kind: "absolute"
 				name: _name
@@ -180,7 +200,14 @@ components: sinks: influxdb_metrics: {
 			_name:  "users"
 			_value: 1.5
 			title:  "Set"
-			configuration: {}
+			"configuration": {
+				bucket:            configuration.bucket.type.string.examples[0]
+				database:          configuration.database.type.string.examples[0]
+				default_namespace: "service"
+				endpoint:          configuration.endpoint.type.string.examples[0]
+				org:               configuration.org.type.string.examples[0]
+				token:             configuration.token.type.string.examples[0]
+			}
 			input: metric: {
 				kind: "incremental"
 				name: _name
@@ -197,7 +224,14 @@ components: sinks: influxdb_metrics: {
 			_host: _values.local_host
 			_name: "requests"
 			title: "Summary"
-			configuration: {}
+			"configuration": {
+				bucket:            configuration.bucket.type.string.examples[0]
+				database:          configuration.database.type.string.examples[0]
+				default_namespace: "service"
+				endpoint:          configuration.endpoint.type.string.examples[0]
+				org:               configuration.org.type.string.examples[0]
+				token:             configuration.token.type.string.examples[0]
+			}
 			input: metric: {
 				kind: "absolute"
 				name: _name

@@ -109,6 +109,7 @@ components: transforms: tag_cardinality_limit: {
 					value_limit:           1
 					limit_exceeded_action: "drop_tag"
 				}
+				mode: "probablistic"
 			}
 			input: [
 				{metric: {

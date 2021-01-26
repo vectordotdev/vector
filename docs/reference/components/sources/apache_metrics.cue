@@ -85,6 +85,23 @@ components: sources: apache_metrics: {
 		}
 	}
 
+	examples: [
+		{
+			title: "Collect Apache server metrics (default)"
+			"configuration": {
+				endpoints: [configuration.endpoints.type.array.items.type.string.examples[0]]
+			}
+		},
+		{
+			title: "Collect Apache server metrics (explicit)"
+			"configuration": {
+				endpoints: [configuration.endpoints.type.array.items.type.string.examples[0]]
+				scrape_interval_secs: configuration.scrape_interval_secs.type.uint.default
+				namespace:            configuration.namespace.type.string.default
+			}
+		},
+	]
+
 	output: metrics: {
 		// Default Apache metrics tags
 		_apache_metrics_tags: {

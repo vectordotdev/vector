@@ -143,7 +143,8 @@ components: sinks: prometheus_exporter: {
 			_namespace: "service"
 			_value:     1.5
 			title:      "Counter"
-			configuration: {
+			"configuration": {
+				address:           configuration.address.type.string.examples[0]
 				default_namespace: _namespace
 			}
 			input: metric: {
@@ -168,7 +169,9 @@ components: sinks: prometheus_exporter: {
 			_namespace: "app"
 			_value:     1.5
 			title:      "Gauge"
-			configuration: {}
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
+			}
 			input: metric: {
 				kind:      "absolute"
 				name:      _name
@@ -190,7 +193,8 @@ components: sinks: prometheus_exporter: {
 			_host: _values.local_host
 			_name: "response_time_s"
 			title: "Histogram"
-			configuration: {
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
 			}
 			input: metric: {
 				kind: "absolute"
@@ -237,7 +241,8 @@ components: sinks: prometheus_exporter: {
 			_name: "request_retries"
 			title: "Distribution to histogram"
 			notes: "Histogram will be computed out of values and then passed to prometheus."
-			configuration: {
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
 				buckets: [0.0, 1.0, 3.0]
 			}
 			input: metric: {
@@ -271,7 +276,8 @@ components: sinks: prometheus_exporter: {
 			_name: "request_retries"
 			title: "Distribution to summary"
 			notes: "Summary will be computed out of values and then passed to prometheus."
-			configuration: {
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
 				quantiles: [0.5, 0.75, 0.95]
 			}
 			input: metric: {
@@ -303,7 +309,9 @@ components: sinks: prometheus_exporter: {
 			_host: _values.local_host
 			_name: "requests"
 			title: "Summary"
-			configuration: {}
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
+			}
 			input: metric: {
 				name: _name
 				kind: "absolute"

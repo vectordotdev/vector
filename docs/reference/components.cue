@@ -70,24 +70,36 @@ components: {
 			context?: string
 			"configuration": {
 				for k, v in configuration {
-					"\( k )"?: _ | *null
+					if v.required {
+						"\( k )": _
+					}
+
+					if !v.required {
+						"\( k )"?: _ | *null
+					}
+				}
+
+				"type": type
+
+				if configuration.inputs != _|_ {
+					inputs: ["component_id"]
 				}
 			}
 
 			if Kind == "source" {
-				input: string
+				input?: string
 			}
 
 			if Kind != "source" {
-				input: #Event | [#Event, ...#Event]
+				input?: #Event | [#Event, ...#Event]
 			}
 
 			if Kind == "sink" {
-				output: string
+				output?: string
 			}
 
 			if Kind != "sink" {
-				output: #Event | [#Event, ...#Event] | null
+				output?: #Event | [#Event, ...#Event] | null
 			}
 
 			notes?: string

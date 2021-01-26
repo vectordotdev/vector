@@ -60,11 +60,13 @@ components: sources: socket: {
 
 	configuration: {
 		address: {
+			common:        true
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
-			required:      true
+			required:      false
 			warnings: []
 			type: string: {
+				default: null
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
@@ -102,11 +104,13 @@ components: sources: socket: {
 			}
 		}
 		path: {
+			common:        true
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
-			required:      true
+			required:      false
 			warnings: []
 			type: string: {
+				default: null
 				examples: ["/path/to/socket"]
 			}
 		}
@@ -138,7 +142,10 @@ components: sources: socket: {
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
 				"""
 			title: "Socket line"
-			configuration: {}
+			"configuration": {
+				address: configuration.address.type.string.examples[0]
+				mode:    "tcp"
+			}
 			input: """
 				```text
 				\( _line )
