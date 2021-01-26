@@ -52,10 +52,21 @@ components: transforms: sample: {
 		}
 		exclude: {
 			common:      true
-			description: "The set of logical conditions to exclude events from sampling."
+			description: """
+				The set of logical conditions to exclude events from sampling.
+
+				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
+				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
+				expressions and functions.
+				"""
 			required:    false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+			}
 		}
 		rate: {
 			description: """

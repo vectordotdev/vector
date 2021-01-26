@@ -481,46 +481,6 @@ components: {
 		let Kind = kind
 
 		configuration: {
-			_conditions: {
-				examples: [
-					{
-						type:   "remap"
-						source: #".status_code != 200 && !includes(["info", "debug"], .severity)"#
-					},
-				]
-				options: {
-					type: {
-						description: "The type of the condition to execute."
-						required:    true
-						warnings: []
-						type: string: {
-							enum: {
-								remap:     "Allows you to write VRL conditionals via boolean expressions."
-								is_log:    "Returns true if the event is a log."
-								is_metric: "Returns true if the event is a metric."
-							}
-						}
-					}
-					source: {
-						description:   """
-							The [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_ to execute
-							for each event. This expression _MUST_ return a boolean.
-
-							Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
-							expressions and functions.
-							"""
-						relevant_when: #"`type` is `"remap"`"#
-						required:      true
-						warnings: []
-						type: string: {
-							examples: [
-								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-							]
-						}
-					}
-				}
-			}
-
 			_tls_accept: {
 				_args: {
 					can_enable:             bool

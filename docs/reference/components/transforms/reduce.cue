@@ -37,10 +37,22 @@ components: transforms: reduce: {
 	configuration: {
 		ends_when: {
 			common:      false
-			description: "A condition used to distinguish the final event of a transaction. If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event."
+			description: """
+				A condition used to distinguish the final event of a transaction. If this condition resolves to `true`
+				for an event, the current transaction is immediately flushed with this event.
+
+				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
+				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
+				expressions and functions.
+				"""
 			required:    false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+			}
 		}
 		expire_after_ms: {
 			common:      false
@@ -121,10 +133,22 @@ components: transforms: reduce: {
 		}
 		starts_when: {
 			common:      false
-			description: "A condition used to distinguish the first event of a transaction. If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started."
+			description: """
+				A condition used to distinguish the first event of a transaction. If this condition resolves to `true`
+				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
+
+				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
+				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
+				expressions and functions.
+				"""
 			required:    false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+			}
 		}
 	}
 
@@ -186,10 +210,7 @@ components: transforms: reduce: {
 			configuration: {
 				group_by: ["host", "pid", "tid"]
 				marge_strategies: message: "concat_newline"
-				starts_when: {
-					type:   "remap"
-					source: #"match(.message, /^[^\s]/)"#
-				}
+				starts_when: #"match(.message, /^[^\s]/)"#
 			}
 			output: [
 				{
