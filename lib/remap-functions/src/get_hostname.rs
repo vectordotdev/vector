@@ -1,17 +1,4 @@
 use remap::prelude::*;
-use std::cell::RefCell;
-use std::time::{Duration, Instant};
-
-thread_local! {
-    static HOSTNAME: RefCell<(Instant, Result<Value>)> = RefCell::new((Instant::now(), get_hostname_inner()));
-}
-
-fn get_hostname_inner() -> Result<Value> {
-    Ok(hostname::get()
-        .map_err(|error| format!("failed to get hostname: {}", error))?
-        .to_string_lossy()
-        .into())
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostname;
@@ -31,16 +18,10 @@ struct GetHostnameFn;
 
 impl Expression for GetHostnameFn {
     fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
-        HOSTNAME.with(|pair| {
-            let mut pair = pair.borrow_mut();
-            let now = Instant::now();
-            if pair.0 < now {
-                pair.0 = now + Duration::from_millis(10);
-                pair.1 = get_hostname_inner();
-            }
-
-            pair.1.clone()
-        })
+        Ok(hostname::get()
+            .map_err(|error| format!("failed to get hostname: {}", error))?
+            .to_string_lossy()
+            .into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
