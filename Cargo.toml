@@ -215,6 +215,7 @@ tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "w
 thread_local = "= 1.0.1"
 dashmap = "3"
 encoding_rs = { version = "0.8", features = ["serde"] }
+criterion = "0.3"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -606,6 +607,7 @@ benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "r
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
+remap-error-handling-benches = ["transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 metrics-benches = ["sources-socket", "sinks-socket"]
 
@@ -624,6 +626,12 @@ required-features = ["wasm-benches"]
 name = "remap"
 harness = false
 required-features = ["remap-benches"]
+
+[[bench]]
+name = "remap-error-handling"
+path = "benches/remap_error_handling.rs"
+harness = false
+required-features = ["remap-error-handling-benches"]
 
 [[bench]]
 name = "languages"

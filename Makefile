@@ -541,6 +541,11 @@ bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-remap-error-handling
+bench-remap-error-handling: ## Run remap error handling benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-error-handling-benches" --bench remap-error-handling ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm ${CARGO_BENCH_FLAGS}
@@ -548,7 +553,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 
 .PHONY: bench-languages
 bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench language ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-metrics

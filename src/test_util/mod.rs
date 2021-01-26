@@ -1,12 +1,15 @@
 use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
+    config::{self, Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
+use criterion::{BatchSize, Criterion, SamplingMode, Throughput};
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
-    StreamExt, TryStreamExt,
+    compat::{Future01CompatExt, Stream01CompatExt},
+    ready, stream,
+    task::noop_waker_ref,
+    FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 use futures01::Stream as Stream01;
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -68,6 +71,112 @@ macro_rules! log_event {
             event
         }
     };
+}
+
+/// Benches a set of transform configs for comparison
+///
+/// # Arguments
+///
+/// * `criterion` - Criterion benchmark manager
+/// * `benchmark_name` - The name of the benchmark
+/// * `configs' - Vec of tuples of (config_name, config_snippet)
+/// * `input_name` - Name of the input to the first transform
+/// * `output_name` - Name of the last transform
+/// * `input` - Line to use as input
+/// * `output` - Expected transformed line as JSON value
+pub fn benchmark_configs(
+    criterion: &mut Criterion,
+    benchmark_name: &str,
+    configs: Vec<(&str, &str)>,
+    input_name: &str,
+    output_name: &str,
+    input: &str,
+    output: serde_json::Value,
+) {
+    trace_init();
+
+    // only used for debug assertions so assigned to supress unused warning
+    let _ = output;
+
+    let num_lines = 10_000;
+    let in_addr = next_addr();
+    let out_addr = next_addr();
+
+    let lines: Vec<_> = ::std::iter::repeat(input.to_string())
+        .take(num_lines)
+        .collect();
+
+    let mut group = criterion.benchmark_group(format!("language/{}", benchmark_name));
+    group.sampling_mode(SamplingMode::Flat);
+
+    let source_config = format!(
+        r#"
+[sources.{}]
+  type = "socket"
+  mode = "tcp"
+  address = "{}"
+"#,
+        input_name, in_addr
+    );
+    let sink_config = format!(
+        r#"
+[sinks.out]
+  inputs = ["{}"]
+  type = "socket"
+  mode = "tcp"
+  encoding.codec = "json"
+  address = "{}"
+"#,
+        output_name, out_addr
+    );
+
+    for (name, transform_config) in configs.into_iter() {
+        group.throughput(Throughput::Elements(num_lines as u64));
+        group.bench_function(name.clone(), |b| {
+            b.iter_batched(
+                || {
+                    let mut config = source_config.clone();
+                    config.push_str(&transform_config);
+                    config.push_str(&sink_config);
+
+                    let config = config::load_from_str(&config, Some(config::Format::TOML))
+                        .expect(&format!("invalid TOML configuration: {}", &config));
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
+                    let lines = lines.clone();
+                    (rt, lines, topology, output_lines)
+                },
+                |(mut rt, lines, topology, output_lines)| {
+                    rt.block_on(async move {
+                        send_lines(in_addr, lines).await.unwrap();
+
+                        topology.stop().compat().await.unwrap();
+
+                        let output_lines = output_lines.await;
+
+                        #[cfg(debug_assertions)]
+                        {
+                            assert_eq!(num_lines, output_lines.len());
+                            for output_line in output_lines {
+                                let actual = serde_json::from_str(output_line);
+                                assert_eq!(output, actual);
+                            }
+                        }
+
+                        output_lines
+                    });
+                },
+                BatchSize::PerIteration,
+            );
+        });
+    }
+
+    group.finish();
 }
 
 pub fn test_generate_config<T>()
