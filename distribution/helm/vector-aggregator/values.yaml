@@ -175,6 +175,16 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The "built-in" api , for healthchecks  and graphql requests.
+# Will be disabled by default.
+vectorApi:
+  # Disable to omit the vector api from being added.
+  enabled: false
+  # The address to listen at.
+  address: "127.0.0.1:8686"
+  # Disable to omit the vector api playground from being added.
+  playground: true
+
 # The "built-in" vector source, for accepting logs from the vector agents.
 # Will be added by default, unless explicitly disabled.
 vectorSource:

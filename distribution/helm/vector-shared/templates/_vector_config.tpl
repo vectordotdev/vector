@@ -14,7 +14,10 @@ Serialize the passed Vector component configuration bits as TOML.
 {{- $header := printf "[%s.%s]" $componentGroup $componentId -}}
 
 {{- /* Build the right hierarchy and evaluate the TOML. */ -}}
-{{- $toml := toToml (dict $componentGroup (dict $componentId $value)) -}}
+{{- /* if we have "nosuffix" value in the $componentId */ -}}
+{{- /* ternary operator makes one level hierarchy (i.e. `[api]`). */ -}}
+{{- $toml := ternary (dict $componentGroup $value) (dict $componentGroup (dict $componentId $value)) (eq $componentId "nosuffix")  -}}
+{{- $toml :=  toToml ($toml) -}}
 {{- /* Cut the root-level key containing the component kind name (i.e. `[sinks]`). */ -}}
 {{- $toml = $toml | trimPrefix (printf "[%s]\n" $componentGroup) -}}
 {{- /* Remove one level of indentation. */ -}}
@@ -23,7 +26,9 @@ Serialize the passed Vector component configuration bits as TOML.
 {{- $toml = $toml | trimSuffix "\n" -}}
 {{- /* Print the value. */ -}}
 {{- $toml -}}
-
+{{-/* Check if we have rawConfig */-}}
+{{- if $value.rawConfig -}}
+{{- $rawConfig := $value.rawConfig -}}
 {{- with $rawConfig -}}
 {{- /* Here is a poor attempt to ensure raw config section is put under the */ -}}
 {{- /* component-level section. What we're trying to do here is prohibited */ -}}
@@ -35,8 +40,17 @@ Serialize the passed Vector component configuration bits as TOML.
 {{- /* Print the raw config. */ -}}
   {{- $rawConfig | nindent 2 -}}
 {{- end }}
-
+{{- end -}}
 {{- printf "\n" -}}
+{{- end }}
+
+{{/*
+Serialize the passed Vector api configuration bits as TOML.
+*/}}
+{{- define "libvector.vectorApiConfig" -}}
+{{- $componentId := index . 0 -}}
+{{- $value := index . 1 -}}
+{{- tuple "api" "nosuffix" $value | include "libvector.vectorComponentConfig"  -}}
 {{- end }}
 
 {{/*
