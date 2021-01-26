@@ -62,10 +62,22 @@ components: transforms: route: {
 			title: "Split by log level"
 			configuration: {
 				route: {
-					debug: "level.eq": "debug"
-					info: "level.eq":  "info"
-					warn: "level.eq":  "warn"
-					error: "level.eq": "error"
+					debug: {
+						type:   "remap"
+						source: #".level == "debug""#
+					}
+					info: {
+						type:   "remap"
+						source: #".level == "info""#
+					}
+					warn: {
+						type:   "remap"
+						source: #".level == "warn""#
+					}
+					error: {
+						type:   "remap"
+						source: #".level == "error""#
+					}
 				}
 			}
 			input: log: {
