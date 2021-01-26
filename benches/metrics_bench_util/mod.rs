@@ -13,7 +13,7 @@
 //! These will run benches with metrics core system on and off respectively.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
-use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+use futures::{future, stream, StreamExt};
 use metrics::counter;
 use tracing::{span, Level};
 use vector::{
@@ -161,7 +161,7 @@ fn bench_topology(c: &mut Criterion, bench_name: &'static str) {
                                 .await;
                             future::try_join_all(sends).await.unwrap();
 
-                            topology.stop().compat().await.unwrap();
+                            topology.stop().await;
 
                             let output_lines = output_lines.await;
 

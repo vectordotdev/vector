@@ -1,6 +1,5 @@
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
-
-use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+use futures::{future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
@@ -64,7 +63,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                             .await;
                         future::try_join_all(sends).await.unwrap();
 
-                        topology.stop().compat().await.unwrap();
+                        topology.stop().await;
 
                         let output_lines = output_lines.await;
 
@@ -135,7 +134,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let lines2 = random_lines(line_size).take(num_lines);
                     send_lines(in_addr2, lines2).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines1 = output_lines1.await;
                     let output_lines2 = output_lines2.await;
@@ -213,7 +212,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         .take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines = output_lines.await;
 
@@ -392,7 +391,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         .take(num_lines);
                     send_lines(in_addr2, lines2).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines_all = output_lines_all.await.len();
                     let output_lines_sampled = output_lines_sampled.await.len();
