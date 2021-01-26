@@ -398,7 +398,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
             rt.block_on(async move {
                 shutdown_rx.recv().unwrap();
-                match topology.stop().await;
+                topology.stop().await;
                 ServiceExitCode::Win32(NO_ERROR)
             })
         }
