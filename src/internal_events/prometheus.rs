@@ -176,5 +176,6 @@ impl InternalEvent for PrometheusTemplateRenderingError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1);
+        counter!("template_rendering_errors_total", 1);
     }
 }
