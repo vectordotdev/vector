@@ -170,7 +170,7 @@ impl MongoDBMetrics {
             .context(InvalidEndpoint)?;
         client_options.direct_connection = Some(true);
 
-        let endpoint = Self::sanitize_endpoint(endpoint, &client_options);
+        let endpoint = sanitize_endpoint(endpoint, &client_options);
         tags.insert("endpoint".into(), endpoint.clone());
         tags.insert("host".into(), client_options.hosts[0].to_string());
 
@@ -188,68 +188,6 @@ impl MongoDBMetrics {
             namespace,
             tags,
         })
-    }
-
-    /// Remove credentials from endpoint.
-    /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
-    /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
-    /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
-    /// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
-    /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
-    /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
-    fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
-        let mut endpoint = endpoint.to_owned();
-        if options.credential.is_some() {
-            let start = endpoint.find("://").unwrap() + 3;
-
-            // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
-            let pre_slash = match endpoint[start..].find('/') {
-                Some(index) => {
-                    let mut segments = endpoint[start..].split_at(index);
-                    // If we have databases and options
-                    if segments.1.len() > 1 {
-                        let lstart = start + segments.0.len() + 1;
-                        let post_slash = &segments.1[1..];
-                        // Split `/defaultauthdb` and `?<options>`
-                        if let Some(index) = post_slash.find('?') {
-                            let segments = post_slash.split_at(index);
-                            // If we have options
-                            if segments.1.len() > 1 {
-                                // Remove authentication options
-                                let options = segments.1[1..]
-                                    .split('&')
-                                    .filter(|pair| {
-                                        let (key, _) = pair.split_at(pair.find('=').unwrap());
-                                        !matches!(
-                                            key.to_lowercase().as_str(),
-                                            "authsource"
-                                                | "authmechanism"
-                                                | "authmechanismproperties"
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join("&");
-
-                                // Update options in endpoint
-                                endpoint = format!(
-                                    "{}{}",
-                                    &endpoint[..lstart + segments.0.len() + 1],
-                                    &options
-                                );
-                            }
-                        }
-                        segments = endpoint[start..].split_at(index);
-                    }
-                    segments.0
-                }
-                None => &endpoint[start..],
-            };
-
-            // Remove `username:password@`
-            let end = pre_slash.rfind('@').unwrap() + 1;
-            endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
-        }
-        endpoint
     }
 
     /// Finding node type for client with `isMaster` command.
@@ -1014,6 +952,66 @@ impl MongoDBMetrics {
     }
 }
 
+/// Remove credentials from endpoint.
+/// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
+/// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
+/// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
+/// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+/// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
+/// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
+fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
+    let mut endpoint = endpoint.to_owned();
+    if options.credential.is_some() {
+        let start = endpoint.find("://").unwrap() + 3;
+
+        // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
+        let pre_slash = match endpoint[start..].find('/') {
+            Some(index) => {
+                let mut segments = endpoint[start..].split_at(index);
+                // If we have databases and options
+                if segments.1.len() > 1 {
+                    let lstart = start + segments.0.len() + 1;
+                    let post_slash = &segments.1[1..];
+                    // Split `/defaultauthdb` and `?<options>`
+                    if let Some(index) = post_slash.find('?') {
+                        let segments = post_slash.split_at(index);
+                        // If we have options
+                        if segments.1.len() > 1 {
+                            // Remove authentication options
+                            let options = segments.1[1..]
+                                .split('&')
+                                .filter(|pair| {
+                                    let (key, _) = pair.split_at(pair.find('=').unwrap());
+                                    !matches!(
+                                        key.to_lowercase().as_str(),
+                                        "authsource" | "authmechanism" | "authmechanismproperties"
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join("&");
+
+                            // Update options in endpoint
+                            endpoint = format!(
+                                "{}{}",
+                                &endpoint[..lstart + segments.0.len() + 1],
+                                &options
+                            );
+                        }
+                    }
+                    segments = endpoint[start..].split_at(index);
+                }
+                segments.0
+            }
+            None => &endpoint[start..],
+        };
+
+        // Remove `username:password@`
+        let end = pre_slash.rfind('@').unwrap() + 1;
+        endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
+    }
+    endpoint
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1024,10 +1022,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sanitize_endpoint() {
+    async fn sanitize_endpoint_test() {
         let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
         let client_options = ClientOptions::parse(endpoint).await.unwrap();
-        let endpoint = MongoDBMetrics::sanitize_endpoint(endpoint, &client_options);
+        let endpoint = sanitize_endpoint(endpoint, &client_options);
         assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");
     }
 }
