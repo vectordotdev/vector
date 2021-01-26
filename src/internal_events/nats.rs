@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::template::TemplateRenderError;
 use metrics::counter;
 use std::io::Error;
 
@@ -34,15 +35,15 @@ impl InternalEvent for NatsEventSendFail {
 }
 
 #[derive(Debug)]
-pub struct NatsEventMissingKeys<'a> {
-    pub keys: &'a [String],
+pub struct NatsTemplateRenderError {
+    pub error: TemplateRenderError,
 }
 
-impl<'a> InternalEvent for NatsEventMissingKeys<'a> {
+impl InternalEvent for NatsTemplateRenderError {
     fn emit_logs(&self) {
         warn!(
-            message = "Keys do not exist on the event; dropping event.",
-            missing_keys = ?self.keys,
+            message = "Failed to render template; dropping event.",
+            error = %self.error,
             internal_log_rate_secs = 30,
         )
     }

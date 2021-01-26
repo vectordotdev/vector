@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, NatsTemplateRenderError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -163,10 +163,8 @@ impl StreamSink for NatsSink {
             .map_err(|_| ())?;
 
         while let Some(event) = input.next().await {
-            let subject = self.subject.render_string(&event).map_err(|missing_keys| {
-                emit!(NatsEventMissingKeys {
-                    keys: &missing_keys
-                });
+            let subject = self.subject.render_string(&event).map_err(|error| {
+                emit!(NatsTemplateRenderError { error });
             })?;
 
             let log = encode_event(event, &self.encoding);
