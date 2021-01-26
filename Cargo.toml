@@ -607,7 +607,7 @@ benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "r
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
-remap-error-handling-benches = ["transforms-remap"]
+remap-error-handling-benches = ["sinks-socket", "sources-socket", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 metrics-benches = ["sources-socket", "sinks-socket"]
 
