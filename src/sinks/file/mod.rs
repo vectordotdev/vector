@@ -170,10 +170,11 @@ impl FileSink {
     fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
-            Err(missing_keys) => {
+            Err(error) => {
                 warn!(
-                    message = "Keys do not exist on the event; dropping event.",
-                    ?missing_keys
+                    message = "Failed to render template; dropping event.",
+                    %error,
+                    internal_log_rate_secs = 30,
                 );
                 return None;
             }

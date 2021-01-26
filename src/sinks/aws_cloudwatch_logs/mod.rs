@@ -442,10 +442,10 @@ fn partition_encode(
 ) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
-                message = "Keys in group template do not exist on the event; dropping event.",
-                ?missing_keys,
+                message = "Failed to render group template; dropping event.",
+                %error,
                 internal_log_rate_secs = 30
             );
             return None;
@@ -454,10 +454,10 @@ fn partition_encode(
 
     let stream = match stream.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
-                message = "Keys in stream template do not exist on the event; dropping event.",
-                ?missing_keys,
+                message = "Failed to render stream template; dropping event.",
+                %error,
                 internal_log_rate_secs = 30
             );
             return None;

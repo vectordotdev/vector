@@ -397,10 +397,10 @@ fn encode_event(
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
-        .map_err(|missing_keys| {
+        .map_err(|error| {
             warn!(
-                message = "Keys do not exist on the event; dropping event.",
-                ?missing_keys,
+                message = "Failed to render template; dropping event.",
+                %error,
                 internal_log_rate_secs = 30,
             );
         })

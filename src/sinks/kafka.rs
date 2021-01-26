@@ -277,8 +277,12 @@ impl Sink<Event> for KafkaSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
+        let topic = self.topic.render_string(&item).map_err(|error| {
+            warn!(
+                message = "Failed to render topic template; dropping event.",
+                %error,
+                internal_log_rate_secs = 30,
+            );
         })?;
 
         let timestamp_ms = match &item {
@@ -371,10 +375,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         .render_string(&Event::from(""))
     {
         Ok(topic) => Some(topic),
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
                 message = "Could not generate topic for healthcheck.",
-                ?missing_keys
+                %error,
             );
             None
         }
