@@ -464,7 +464,7 @@ _values: {
 		]
 	}
 
-	syntax?: "literal" | "template" | "remap"
+	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap" | "strftime"
 }
 
 #TypeTimestamp: {

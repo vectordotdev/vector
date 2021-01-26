@@ -68,6 +68,7 @@ components: transforms: grok_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		pattern: {
@@ -76,6 +77,7 @@ components: transforms: grok_parser: {
 			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
+				syntax: "literal"
 			}
 		}
 		types: configuration._types

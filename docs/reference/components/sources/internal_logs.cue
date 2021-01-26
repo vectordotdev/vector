@@ -54,7 +54,10 @@ components: sources: internal_logs: {
 			message: {
 				description: "The textual message for this log or trace."
 				required:    true
-				type: string: examples: ["Vector has started."]
+				type: string: {
+					examples: ["Vector has started."]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp & {
 				description: "The exact time the log or trace was generated."
@@ -78,6 +81,7 @@ components: sources: internal_logs: {
 									event: "The call site is an event."
 									span:  "The call site is a span."
 								}
+								syntax: "literal"
 							}
 						}
 						level: {
@@ -91,6 +95,7 @@ components: sources: internal_logs: {
 									WARN:  "Designates hazardous situations."
 									ERROR: "Designates very serious errors."
 								}
+								syntax: "literal"
 							}
 						}
 						module_path: {
@@ -98,6 +103,7 @@ components: sources: internal_logs: {
 							required:    true
 							type: string: {
 								examples: ["vector::internal_events::heartbeat"]
+								syntax: "literal"
 							}
 						}
 						target: {
@@ -105,6 +111,7 @@ components: sources: internal_logs: {
 							required:    true
 							type: string: {
 								examples: ["vector"]
+								syntax: "literal"
 							}
 						}
 					}

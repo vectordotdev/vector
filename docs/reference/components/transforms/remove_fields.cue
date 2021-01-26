@@ -51,7 +51,10 @@ components: transforms: remove_fields: {
 			description: "The log field names to drop."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["field1", "field2", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["field1", "field2", "parent.child"]
+				syntax: "literal"
+			}
 		}
 	}
 

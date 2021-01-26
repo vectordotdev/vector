@@ -51,6 +51,7 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/proc"]
+				syntax: "literal"
 			}
 		}
 
@@ -59,6 +60,7 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -70,13 +72,16 @@ components: sources: host_metrics: {
 			required:    false
 			type: array: {
 				default: ["cpu", "disk", "filesystem", "load", "memory", "network"]
-				items: type: string: enum: {
-					cpu:        "Metrics related to CPU utilization."
-					disk:       "Metrics related to disk I/O utilization."
-					filesystem: "Metrics related to filesystem space utilization."
-					load:       "Load average metrics (UNIX only)."
-					memory:     "Metrics related to memory utilization."
-					network:    "Metrics related to network utilization."
+				items: type: string: {
+					enum: {
+						cpu:        "Metrics related to CPU utilization."
+						disk:       "Metrics related to disk I/O utilization."
+						filesystem: "Metrics related to filesystem space utilization."
+						load:       "Load average metrics (UNIX only)."
+						memory:     "Metrics related to memory utilization."
+						network:    "Metrics related to network utilization."
+					}
+					syntax: "literal"
 				}
 			}
 		}
@@ -84,7 +89,10 @@ components: sources: host_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
@@ -115,7 +123,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -128,7 +139,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -155,7 +169,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -168,7 +185,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -188,7 +208,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -201,7 +224,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -221,7 +247,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -234,7 +263,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -261,7 +293,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -274,7 +309,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}

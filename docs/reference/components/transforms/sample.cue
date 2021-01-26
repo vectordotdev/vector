@@ -38,34 +38,32 @@ components: transforms: sample: {
 			common: false
 			description: """
 				The name of the log field whose value will be hashed to determine if the event should be passed.
-				Consistently samples the same events.
-				Actual rate of sampling may differ from the configured one if
-				values in the field are not uniformly distributed.
-				If left unspecified, or if the event doesn't have `key_field`, events will be count rated.
+
+				Consistently samples the same events. Actual rate of sampling may differ from the configured one if
+				values in the field are not uniformly distributed. If left unspecified, or if the event doesn't have
+				`key_field`, events will be count rated.
 				"""
 			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["message"]
+				syntax: "literal"
 			}
 		}
 		exclude: {
-			common:      true
+			common: true
 			description: """
 				The set of logical conditions to exclude events from sampling.
-
-				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
-				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
-				expressions and functions.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
+				syntax: "remap"
 			}
 		}
 		rate: {

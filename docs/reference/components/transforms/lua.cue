@@ -63,12 +63,13 @@ components: transforms: lua: {
 							default: null
 							examples: [
 								"""
-                function (emit)
-                  -- Custom Lua code here
-                end
-                """,
+				                function (emit)
+				                	-- Custom Lua code here
+				                end
+				                """,
 								"init",
 							]
+							syntax: "literal"
 						}
 					}
 					process: {
@@ -78,16 +79,17 @@ components: transforms: lua: {
 						type: string: {
 							examples: [
 								"""
-                function (event, emit)
-                  event.log.field = "value" -- set value of a field
-                  event.log.another_field = nil -- remove field
-                  event.log.first, event.log.second = nil, event.log.first -- rename field
-                  -- Very important! Emit the processed event.
-                  emit(event)
-                end
-                """,
+				                function (event, emit)
+				                	event.log.field = "value" -- set value of a field
+				                	event.log.another_field = nil -- remove field
+				                	event.log.first, event.log.second = nil, event.log.first -- rename field
+				                	-- Very important! Emit the processed event.
+				                	emit(event)
+				                end
+				                """,
 								"process",
 							]
+							syntax: "literal"
 						}
 					}
 					shutdown: {
@@ -99,12 +101,13 @@ components: transforms: lua: {
 							default: null
 							examples: [
 								"""
-                function (emit)
-                  -- Custom Lua code here
-                end
-                """,
+				                function (emit)
+				                	-- Custom Lua code here
+				                end
+				                """,
 								"shutdown",
 							]
+							syntax: "literal"
 						}
 					}
 				}
@@ -117,7 +120,10 @@ components: transforms: lua: {
 			warnings: []
 			type: array: {
 				default: null
-				items: type: string: examples: ["/etc/vector/lua"]
+				items: type: string: {
+					examples: ["/etc/vector/lua"]
+					syntax: "literal"
+				}
 			}
 		}
 		source: {
@@ -130,31 +136,32 @@ components: transforms: lua: {
 				examples: [
 					"""
 						function init()
-						  count = 0
+							count = 0
 						end
 
 						function process()
-						  count = count + 1
+							count = count + 1
 						end
 
 						function timer_handler(emit)
-						  emit(make_counter(counter))
-						  counter = 0
+							emit(make_counter(counter))
+							counter = 0
 						end
 
 						function shutdown(emit)
-						  emit(make_counter(counter))
+							emit(make_counter(counter))
 						end
 
 						function make_counter(value)
-						  return metric = {
-						    name = "event_counter",
-						    kind = "incremental",
-						    timestamp = os.date("!*t"),
-						    counter = {
-						      value = value
-						    }
-						  }
+							return metric = {
+								name = "event_counter",
+								kind = "incremental",
+								timestamp = os.date("!*t"),
+								counter = {
+									value = value
+									syntax: "literal"
+								}
+						 	}
 						end
 						""",
 					"""
@@ -162,6 +169,7 @@ components: transforms: lua: {
 						require('custom_module')
 						""",
 				]
+				syntax: "literal"
 			}
 		}
 		timers: {
@@ -179,6 +187,7 @@ components: transforms: lua: {
 							warnings: []
 							type: string: {
 								examples: ["timer_handler"]
+								syntax: "literal"
 							}
 						}
 						interval_seconds: {
@@ -202,6 +211,7 @@ components: transforms: lua: {
 				enum: {
 					"2": "Lua transform API version 2"
 				}
+				syntax: "literal"
 			}
 		}
 	}
@@ -224,20 +234,20 @@ components: transforms: lua: {
 			configuration: {
 				hooks: process: """
 					function (event, emit)
-					  -- Add root level field
-					  event.log.field = "new value"
+						-- Add root level field
+						event.log.field = "new value"
 
-					  -- Add nested field
-					  event.log.nested.field = "nested value"
+						-- Add nested field
+						event.log.nested.field = "nested value"
 
-					  -- Rename field
-					  event.log.renamed_field = event.log.field_to_rename
-					  event.log.field_to_rename = nil
+						-- Rename field
+						event.log.renamed_field = event.log.field_to_rename
+						event.log.field_to_rename = nil
 
-					  -- Remove fields
-					  event.log.field_to_remove = nil
+						-- Remove fields
+						event.log.field_to_remove = nil
 
-					  emit(event)
+						emit(event)
 					end
 					"""
 			}
@@ -256,17 +266,17 @@ components: transforms: lua: {
 			configuration: {
 				hooks: process: """
 					function (event, emit)
-					  -- Add tag
-					  event.metric.tags.tag = "new value"
+						-- Add tag
+						event.metric.tags.tag = "new value"
 
-					  -- Rename tag
-					  event.metric.tags.renamed_tag = event.log.tag_to_rename
-					  event.metric.tags.tag_to_rename = nil
+						-- Rename tag
+						event.metric.tags.renamed_tag = event.log.tag_to_rename
+						event.metric.tags.tag_to_rename = nil
 
-					  -- Remove tag
-					  event.metric.tags.tag_to_remove = nil
+						-- Remove tag
+						event.metric.tags.tag_to_remove = nil
 
-					  emit(event)
+						emit(event)
 					end
 					"""
 			}
@@ -298,7 +308,7 @@ components: transforms: lua: {
 			configuration: {
 				hooks: process: """
 					function (event, emit)
-					  -- Drop event entirely by not calling the `emit` function
+						-- Drop event entirely by not calling the `emit` function
 					end
 					"""
 			}
@@ -313,14 +323,14 @@ components: transforms: lua: {
 			configuration: {
 				hooks: process: """
 					function (event, emit)
-					  -- Remove all fields where the value is "-"
-					  for f, v in pairs(event) do
-					    if v == "-" then
-					      event[f] = nil
-					    end
-					  end
+						-- Remove all fields where the value is "-"
+						for f, v in pairs(event) do
+							if v == "-" then
+								event[f] = nil
+							end
+						end
 
-					  emit(event)
+						emit(event)
 					end
 					"""
 			}
@@ -341,20 +351,20 @@ components: transforms: lua: {
 						timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
 
 						function parse_timestamp(str)
-						  local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-						  local ms = 0
-						  if millis and millis ~= "" then
-						    ms = tonumber(millis)
-						  end
-						  return {
-						    year    = tonumber(year),
-						    month   = tonumber(month),
-						    day     = tonumber(day),
-						    hour    = tonumber(hour),
-						    min     = tonumber(min),
-						    sec     = tonumber(sec),
-						    nanosec = ms * 1000000
-						  }
+							local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+							local ms = 0
+							if millis and millis ~= "" then
+								ms = tonumber(millis)
+							end
+							return {
+								year    = tonumber(year),
+								month   = tonumber(month),
+								day     = tonumber(day),
+								hour    = tonumber(hour),
+								min     = tonumber(min),
+								sec     = tonumber(sec),
+								nanosec = ms * 1000000
+							}
 						end
 						"""
 					process: """
@@ -386,31 +396,31 @@ components: transforms: lua: {
 				]
 				source: """
 					function init()
-					  count = 0
+						count = 0
 					end
 
 					function process()
-					  count = count + 1
+						count = count + 1
 					end
 
 					function timer_handler(emit)
-					  emit(make_counter(count))
-					  count = 0
+						emit(make_counter(count))
+						count = 0
 					end
 
 					function shutdown(emit)
-					  emit(make_counter(count))
+						emit(make_counter(count))
 					end
 
 					function make_counter(value)
-					  return metric = {
-					    name = "event_counter",
-					    kind = "incremental",
-					    timestamp = os.date("!*t"),
-					    counter = {
-					      value = value
-					    }
-					  }
+						return metric = {
+							name = "event_counter",
+							kind = "incremental",
+							timestamp = os.date("!*t"),
+							counter = {
+								value = value
+							}
+						}
 					end
 					"""
 			}

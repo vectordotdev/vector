@@ -82,6 +82,7 @@ components: sinks: vector: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 	}

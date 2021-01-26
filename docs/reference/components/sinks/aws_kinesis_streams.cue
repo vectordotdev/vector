@@ -90,6 +90,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			type: string: {
 				default: null
 				examples: ["user_id"]
+				syntax: "literal"
 			}
 		}
 		stream_name: {
@@ -98,6 +99,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
+				syntax: "literal"
 			}
 		}
 	}

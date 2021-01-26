@@ -84,6 +84,7 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
+				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {

@@ -44,7 +44,10 @@ components: transforms: remove_tags: {
 			description: "The tag names to drop."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["tag1", "tag2"]
+			type: array: items: type: string: {
+				examples: ["tag1", "tag2"]
+				syntax: "literal"
+			}
 		}
 	}
 

@@ -67,6 +67,7 @@ components: transforms: json_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		overwrite_target: {
@@ -84,6 +85,7 @@ components: transforms: json_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -30,6 +30,7 @@ components: sinks: _influxdb: {
 			warnings: []
 			type: string: {
 				examples: ["vector-bucket", "4d2225e4d3d49f75"]
+				syntax: "literal"
 			}
 		}
 		consistency: {
@@ -42,6 +43,7 @@ components: sinks: _influxdb: {
 			type: string: {
 				default: null
 				examples: ["any", "one", "quorum", "all"]
+				syntax: "literal"
 			}
 		}
 		database: {
@@ -51,6 +53,7 @@ components: sinks: _influxdb: {
 			warnings: []
 			type: string: {
 				examples: ["vector-database", "iot-store"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -59,6 +62,7 @@ components: sinks: _influxdb: {
 			required: true
 			type: string: {
 				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
+				syntax: "literal"
 			}
 		}
 		org: {
@@ -69,6 +73,7 @@ components: sinks: _influxdb: {
 			warnings: []
 			type: string: {
 				examples: ["my-org", "33f2cff0a28e5b63"]
+				syntax: "literal"
 			}
 		}
 		password: {
@@ -81,6 +86,7 @@ components: sinks: _influxdb: {
 			type: string: {
 				default: null
 				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
+				syntax: "literal"
 			}
 		}
 		retention_policy_name: {
@@ -93,6 +99,7 @@ components: sinks: _influxdb: {
 			type: string: {
 				default: null
 				examples: ["autogen", "one_day_only"]
+				syntax: "literal"
 			}
 		}
 		tags: {
@@ -103,7 +110,10 @@ components: sinks: _influxdb: {
 			warnings: []
 			type: array: {
 				default: null
-				items: type: string: examples: ["field1", "parent.child_field"]
+				items: type: string: {
+					examples: ["field1", "parent.child_field"]
+					syntax: "field_path"
+				}
 			}
 		}
 		token: {
@@ -114,6 +124,7 @@ components: sinks: _influxdb: {
 			warnings: []
 			type: string: {
 				examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				syntax: "literal"
 			}
 		}
 		username: {
@@ -126,6 +137,7 @@ components: sinks: _influxdb: {
 			type: string: {
 				default: null
 				examples: ["todd", "vector-source"]
+				syntax: "literal"
 			}
 		}
 	}

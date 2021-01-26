@@ -36,22 +36,19 @@ components: transforms: reduce: {
 
 	configuration: {
 		ends_when: {
-			common:      false
+			common: false
 			description: """
 				A condition used to distinguish the final event of a transaction. If this condition resolves to `true`
 				for an event, the current transaction is immediately flushed with this event.
-
-				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
-				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
-				expressions and functions.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
+				syntax: "literal"
 			}
 		}
 		expire_after_ms: {
@@ -81,7 +78,10 @@ components: transforms: reduce: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["request_id", "user_id", "transaction_id"]
+				items: type: string: {
+					examples: ["request_id", "user_id", "transaction_id"]
+					syntax: "literal"
+				}
 			}
 		}
 		merge_strategies: {
@@ -126,28 +126,26 @@ components: transforms: reduce: {
 								max:            "The maximum of all numeric values."
 								min:            "The minimum of all numeric values."
 							}
+							syntax: "literal"
 						}
 					}
 				}
 			}
 		}
 		starts_when: {
-			common:      false
+			common: false
 			description: """
 				A condition used to distinguish the first event of a transaction. If this condition resolves to `true`
 				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
-
-				This field accepts a [Vector Remap Language](\(urls.vrl_reference)) (VRL) _boolean expression_.
-				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of
-				expressions and functions.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
+				syntax: "literal"
 			}
 		}
 	}

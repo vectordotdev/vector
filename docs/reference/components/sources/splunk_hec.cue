@@ -68,6 +68,7 @@ components: sources: splunk_hec: {
 			warnings: []
 			type: string: {
 				default: "0.0.0.0:\(_port)"
+				syntax:  "literal"
 			}
 		}
 		token: {
@@ -78,6 +79,7 @@ components: sources: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

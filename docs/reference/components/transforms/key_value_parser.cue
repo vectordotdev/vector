@@ -67,6 +67,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 
@@ -77,6 +78,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "="
 				examples: [":", "="]
+				syntax: "literal"
 			}
 		}
 
@@ -97,6 +99,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
+				syntax: "literal"
 			}
 		}
 
@@ -112,6 +115,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
 
@@ -125,6 +129,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 
@@ -138,6 +143,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 

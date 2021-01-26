@@ -66,6 +66,7 @@ components: sinks: influxdb_logs: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}
