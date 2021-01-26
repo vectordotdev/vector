@@ -116,6 +116,6 @@ components: sinks: aws_sqs: components._aws & {
 	telemetry: metrics: {
 		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+		template_rendering_errors_total:     components.sources.internal_metrics.output.metrics.template_rendering_errors_total
 	}
 }

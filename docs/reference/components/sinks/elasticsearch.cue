@@ -258,6 +258,6 @@ components: sinks: elasticsearch: {
 	}
 
 	telemetry: metrics: {
-		missing_keys_total: components.sources.internal_metrics.output.metrics.missing_keys_total
+		template_rendering_errors_total: components.sources.internal_metrics.output.metrics.template_rendering_errors_total
 	}
 }

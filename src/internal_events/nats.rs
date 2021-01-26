@@ -49,6 +49,6 @@ impl InternalEvent for NatsTemplateRenderingError {
     }
 
     fn emit_metrics(&self) {
-        counter!("missing_keys_total", 1);
+        counter!("template_rendering_errors_total", 1);
     }
 }

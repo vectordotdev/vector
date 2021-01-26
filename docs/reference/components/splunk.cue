@@ -11,13 +11,13 @@ components: _splunk: {
 			default_namespace: "vector"
 			tags:              telemetry.metrics._component_tags
 		}
-		source_missing_keys_total: {
+		source_template_rendering_errors_total: {
 			description:       "The total number of errors rendering the template for this source."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              telemetry.metrics._component_tags
 		}
-		sourcetype_missing_keys_total: {
+		sourcetype_template_rendering_errors_total: {
 			description:       "The total number of errors rendering the template for this sourcetype."
 			type:              "counter"
 			default_namespace: "vector"
