@@ -21,11 +21,9 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{compat::Future01CompatExt, future, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures01::Future;
+use futures::{future, Future, FutureExt, Stream};
 use std::{
     collections::{HashMap, HashSet},
-    future::ready,
     panic::AssertUnwindSafe,
     pin::Pin,
     sync::{Arc, Mutex},
@@ -36,7 +34,6 @@ use tokio::{
 };
 use tracing_futures::Instrument;
 
-// TODO: Result is only for compat, remove when not needed
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
@@ -129,7 +126,7 @@ impl RunningTopology {
     /// into the returned future and is used to poll for when the tasks have completed. One the
     /// returned future is dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    pub fn stop(self) -> impl Future<Item = (), Error = ()> {
+    pub async fn stop(self) {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for pump in self.tasks,
@@ -139,10 +136,7 @@ impl RunningTopology {
         // We need to give some time to the sources to gracefully shutdown, so we will merge
         // them with other tasks.
         for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
-            let task = futures::compat::Compat::new(task)
-                .map(|_result| ())
-                .or_else(|_| futures01::future::ok(())) // Consider an errored task to be shutdown
-                .shared();
+            let task = task.map(|_result| ()).shared();
 
             wait_handles.push(task.clone());
             check_handles.entry(name).or_default().push(task);
@@ -154,34 +148,47 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = delay_until(deadline).map(move |_| {
+        let timeout = async move {
+            delay_until(deadline).await;
             // Remove all tasks that have shutdown.
-            check_handles2.retain(|_name, handles| {
-                retain(handles, |handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                });
-                !handles.is_empty()
-            });
+            let to_check = check_handles2.drain().collect::<Vec<(String, Vec<_>)>>();
+            for (name, handles) in to_check {
+                let mut active_handles = Vec::new();
+                for handle in handles {
+                    if handle.peek().is_some() {
+                        active_handles.push(handle)
+                    }
+                }
+                if !active_handles.is_empty() {
+                    check_handles2.insert(name, active_handles);
+                }
+            }
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
               message = "Failed to gracefully shut down in time. Killing components.",
                 components = ?remaining_components.join(", ")
             );
-
-            Ok(())
-        });
+        };
 
         // Reports in intervals which components are still running.
-        let reporter = interval(Duration::from_secs(5))
-            .inspect(move |_| {
+        let mut interval = interval(Duration::from_secs(5));
+        let reporter = async move {
+            loop {
+                interval.tick().await;
                 // Remove all tasks that have shutdown.
-                check_handles.retain(|_name, handles| {
-                    retain(handles, |handle| {
-                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                    });
-                    !handles.is_empty()
-                });
+                let to_check = check_handles.drain().collect::<Vec<(String, Vec<_>)>>();
+                for (name, handles) in to_check {
+                    let mut active_handles = Vec::new();
+                    for handle in handles {
+                        if handle.peek().is_some() {
+                            active_handles.push(handle)
+                        }
+                    }
+                    if !active_handles.is_empty() {
+                        check_handles.insert(name, active_handles);
+                    }
+                }
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
 
                 // TODO: replace with checked_duration_since once it's stable
@@ -194,32 +201,25 @@ impl RunningTopology {
                 info!(
                     message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
-            })
-            .filter(|_| ready(false)) // Run indefinitely without emitting items
-            .into_future()
-            .map(|_| Ok(()));
+            }
+        };
 
         // Finishes once all tasks have shutdown.
-        let success = futures01::future::join_all(wait_handles)
-            .map(|_| ())
-            .map_err(|_: futures01::future::SharedError<()>| ())
-            .compat();
+        let success = futures::future::join_all(wait_handles).map(|_| ());
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
         let shutdown_complete_future = future::select_all(vec![
-            Box::pin(timeout) as future::BoxFuture<'static, Result<(), ()>>,
-            Box::pin(reporter) as future::BoxFuture<'static, Result<(), ()>>,
-            Box::pin(success) as future::BoxFuture<'static, Result<(), ()>>,
-        ])
-        .map(|(result, _, _)| result.map(|_| ()).map_err(|_| ()))
-        .compat();
+            Box::pin(timeout) as future::BoxFuture<'static, ()>,
+            Box::pin(reporter) as future::BoxFuture<'static, ()>,
+            Box::pin(success) as future::BoxFuture<'static, ()>,
+        ]);
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
 
-        source_shutdown_complete
-            .join(shutdown_complete_future)
+        futures::future::join(source_shutdown_complete, shutdown_complete_future)
             .map(|_| ())
+            .await;
     }
 
     /// On Error, topology is in invalid state.
@@ -359,10 +359,7 @@ impl RunningTopology {
             );
         }
 
-        futures01::future::join_all(source_shutdown_complete_futures)
-            .compat()
-            .await
-            .unwrap();
+        futures::future::join_all(source_shutdown_complete_futures).await;
 
         // Second pass now that all sources have shut down for final cleanup.
         for name in diff.sources.removed_and_changed() {
@@ -564,8 +561,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -579,8 +576,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -594,8 +591,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -604,10 +601,9 @@ impl RunningTopology {
             .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task =
-            handle_errors(source_task.compat(), self.abort_tx.clone()).instrument(span);
+        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
         self.source_tasks
-            .insert(name.to_string(), tokio::spawn(source_task.compat()));
+            .insert(name.to_string(), tokio::spawn(source_task));
     }
 
     fn remove_outputs(&mut self, name: &str) {
@@ -745,30 +741,17 @@ impl RunningTopology {
     }
 }
 
-fn handle_errors<T>(
-    task: impl Future<Item = T, Error = ()>,
+async fn handle_errors(
+    task: impl Future<Output = Result<TaskOutput, ()>>,
     abort_tx: mpsc::UnboundedSender<()>,
-) -> impl Future<Item = T, Error = ()> {
-    AssertUnwindSafe(task)
-        .catch_unwind()
-        .map_err(|_| ())
-        .flatten()
-        .or_else(move |()| {
+) -> Result<TaskOutput, ()> {
+    match AssertUnwindSafe(task).catch_unwind().await {
+        Err(_) => {
             error!("An error occurred that vector couldn't handle.");
             let _ = abort_tx.send(());
             Err(())
-        })
-}
-
-/// If the closure returns false, then the element is removed
-fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
-    let mut i = 0;
-    while let Some(data) = vec.get_mut(i) {
-        if retain_filter(data) {
-            i += 1;
-        } else {
-            let _ = vec.remove(i);
         }
+        Ok(result) => result,
     }
 }
 

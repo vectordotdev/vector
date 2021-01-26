@@ -190,7 +190,6 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::compat::Future01CompatExt;
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::io::AsyncWriteExt;
     use tokio::sync::mpsc;
@@ -396,6 +395,6 @@ mod test {
         }
 
         // Shut down server
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }

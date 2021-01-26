@@ -1,5 +1,4 @@
 use crate::app::Application;
-use futures::compat::Future01CompatExt;
 use std::{ffi::OsString, sync::mpsc, time::Duration};
 use windows_service::service::{
     ServiceControl, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
@@ -399,10 +398,8 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
             rt.block_on(async move {
                 shutdown_rx.recv().unwrap();
-                match topology.stop().compat().await {
-                    Ok(()) => ServiceExitCode::Win32(NO_ERROR),
-                    Err(_) => ServiceExitCode::Win32(ERROR_FAIL_SHUTDOWN),
-                }
+                match topology.stop().await;
+                ServiceExitCode::Win32(NO_ERROR)
             })
         }
         Err(e) => ServiceExitCode::ServiceSpecific(e as u32),
