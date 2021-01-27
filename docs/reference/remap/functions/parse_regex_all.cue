@@ -7,6 +7,7 @@ remap: functions: parse_regex_all: {
 
 		This function differs from the `parse_regex` function in that it returns _all_ matches, not just the first.
 		"""
+	notices:     remap.functions.parse_regex.notices
 
 	arguments: [
 		{

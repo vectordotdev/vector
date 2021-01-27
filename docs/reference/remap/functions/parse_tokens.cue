@@ -11,6 +11,11 @@ remap: functions: parse_tokens: {
 		* Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
 		* Text delimited by square brackets: `[..]`. Closing square brackets can be included in the token if they are escaped by a backslash (`\`).
 		"""#
+	notices: [
+		"""
+			All token values are returned as strings, it is recommended to manually coerce values as you see fit.
+			""",
+	]
 
 	arguments: [
 		{

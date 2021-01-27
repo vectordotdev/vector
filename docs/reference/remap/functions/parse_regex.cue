@@ -4,6 +4,8 @@ remap: functions: parse_regex: {
 	category:    "Parse"
 	description: """
 		Parses the `value` via the provided [Regex](\(urls.regex)) `pattern`.
+
+		This function differs from the `parse_regex_all` function in that it returns the first match only.
 		"""
 	notices: [
 		"""
@@ -12,6 +14,9 @@ remap: functions: parse_regex: {
 		already exists for your format. If not, please consider [opening an issue](\(urls.new_feature_request)) to
 		request support.
 		""",
+		"""
+			All values are returned as strings, it is recommended to manually coerce values as you see fit.
+			""",
 	]
 
 	arguments: [

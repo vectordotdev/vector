@@ -9,6 +9,9 @@ remap: functions: parse_syslog: {
 		[RFC 6587](\(urls.syslog_6587)), [RFC 5424](\(urls.syslog_5424)), [RFC 3164](\(urls.syslog_3164)), and other
 		common variations (such as the Nginx Syslog style).
 		""",
+		"""
+			All structured data values are returned as strings, it is recommended to manually coerce values as you see fit.
+			""",
 	]
 
 	arguments: [
