@@ -1,12 +1,8 @@
 use criterion::criterion_main;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    Stream, StreamExt,
-};
-use futures01::{Sink, Stream as Stream01};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use serde_json::Value;
-use std::{collections::HashMap, fs, io::Read, path::Path};
+use std::{collections::HashMap, fs, io::Read, path::Path, pin::Pin};
 use vector::{
     transforms::{wasm::Wasm, TaskTransform, Transform},
     Event,
@@ -34,7 +30,7 @@ pub fn protobuf(c: &mut Criterion) {
             Wasm::new(
                 toml::from_str(
                     r#"
-                module = "target/wasm32-wasi/release/protobuf.wasm"
+                module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
                 artifact_cache = "target/artifacts/"
                 "#,
                 )
@@ -43,13 +39,13 @@ pub fn protobuf(c: &mut Criterion) {
             .unwrap(),
         );
 
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
-        let mut rx = transform.transform(Box::new(rx)).compat();
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
+        let mut rx = transform.transform(Box::pin(rx));
 
         b.iter_batched(
             || (tx.clone(), input.clone()),
-            |(tx, input)| {
-                futures::executor::block_on(tx.send(input).compat()).unwrap();
+            |(mut tx, input)| {
+                futures::executor::block_on(tx.send(input)).unwrap();
                 futures::executor::block_on(rx.next())
             },
             BatchSize::SmallInput,
@@ -80,12 +76,26 @@ end
             ),
         ),
         (
+            "remap",
+            Transform::function(
+                vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
+                    source: r#"
+.test_key = "test_value"
+.test_key2 = "test_value2"
+"#
+                    .to_string(),
+                    drop_on_err: false,
+                })
+                .unwrap(),
+            ),
+        ),
+        (
             "wasm",
             Transform::task(
                 Wasm::new(
                     toml::from_str(
                         r#"
-module = "target/wasm32-wasi/release/add_fields.wasm"
+module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
 artifact_cache = "target/artifacts/"
 "#,
                     )
@@ -125,22 +135,18 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     let mut group = criterion.benchmark_group(group);
 
     for (name, transform) in transforms {
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
 
-        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+        let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
             Transform::Function(t) => {
                 let mut t = t.clone();
-                Box::new(
-                    rx.map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .compat(),
-                )
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter())
+                }))
             }
-            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+            Transform::Task(t) => t.transform(Box::pin(rx)),
         };
 
         for &parameter in &parameters {
@@ -156,8 +162,8 @@ fn bench_group_transforms_over_parameterized_event_sizes(
             group.bench_with_input(id, &input, |bencher, input| {
                 bencher.iter_batched(
                     || (tx.clone(), input.clone()),
-                    |(tx, input)| {
-                        futures::executor::block_on(tx.send(input).compat()).unwrap();
+                    |(mut tx, input)| {
+                        futures::executor::block_on(tx.send(input)).unwrap();
                         futures::executor::block_on(rx.next())
                     },
                     BatchSize::SmallInput,

@@ -17,7 +17,7 @@ _values: {
 }
 
 // `#Any` allows for any value.
-#Any: _ | {[_=string]: #Any}
+#Any: _ | {[_=string]: #Any} | [...#Any]
 
 #Arch: "ARM64" | "ARMv7" | "x86_64"
 
@@ -83,8 +83,8 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	close({log: #LogEvent}) |
-	close({metric: #MetricEvent})
+	log?:    #LogEvent
+	metric?: #MetricEvent
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -146,12 +146,7 @@ _values: {
 	sub_sections?: [#Subsection, ...#Subsection]
 })
 
-#LogEvent: {
-	host?:      string | null
-	message?:   string | null
-	timestamp?: string | null
-	#Any
-}
+#LogEvent: #Any | {}
 
 #Map: [string]: string
 
@@ -174,9 +169,13 @@ _values: {
 }
 
 #MetricEventDistribution: {
-	values: [float, ...float]
-	sample_rates: [uint, ...uint]
+	samples: [#DistributionSample, ...#DistributionSample]
 	statistic: "histogram" | "summary"
+}
+
+#DistributionSample: {
+	value: float
+	rate:  uint
 }
 
 #MetricEventGauge: {
@@ -184,10 +183,14 @@ _values: {
 }
 
 #MetricEventHistogram: {
-	buckets: [float, ...float]
-	counts: [int, ...int]
-	count: int
+	buckets: [#HistogramBucket, ...#HistogramBucket]
+	count: uint
 	sum:   float
+}
+
+#HistogramBucket: {
+	upper_limit: float
+	count:       uint
 }
 
 #MetricEventSet: {
@@ -195,10 +198,14 @@ _values: {
 }
 
 #MetricEventSummary: {
-	quantiles: [float, ...float]
-	values: [float, ...float]
+	quantiles: [#SummaryQuantile, ...#SummaryQuantile]
 	count: int
 	sum:   float
+}
+
+#SummaryQuantile: {
+	upper_limit: float
+	value:       float
 }
 
 #MetricTags: [Name=string]: close({
@@ -269,7 +276,9 @@ _values: {
 
 #SetupSteps: [#SetupStep, ...#SetupStep]
 
-#Schema: [Name=string]: {
+#Schema: [Name=string]: #SchemaField & {name: Name}
+
+#SchemaField: {
 	// `category` allows you to group options into categories.
 	//
 	// For example, all of the `*_key` options might be grouped under the
@@ -293,7 +302,7 @@ _values: {
 
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
-	name: Name
+	name: string
 
 	// `relevant_when` clarifies when an option is relevant.
 	//
@@ -330,12 +339,14 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
+	"aarch64-unknown-linux-gnu":      bool
+	"aarch64-unknown-linux-musl":     bool
+	"armv7-unknown-linux-gnueabihf":  bool
+	"armv7-unknown-linux-musleabihf": bool
+	"x86_64-apple-darwin":            bool
+	"x86_64-pc-windows-msv":          bool
+	"x86_64-unknown-linux-gnu":       bool
+	"x86_64-unknown-linux-musl":      bool
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -453,9 +464,7 @@ _values: {
 		]
 	}
 
-	// `templateable` means that the option supports dynamic templated
-	// values.
-	templateable?: bool
+	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap" | "strftime"
 }
 
 #TypeTimestamp: {

@@ -15,7 +15,8 @@
   [[tests.outputs]]
     extract_from = "concat_simple"
     [[tests.outputs.conditions]]
-      "concatenated.equals" = "on wo re"
+      type = "remap"
+      source = '.concatenated == "on wo re"'
 
 [transforms.concat_nested]
   inputs = []
@@ -34,4 +35,5 @@
   [[tests.outputs]]
     extract_from = "concat_nested"
     [[tests.outputs.conditions]]
-      "nested.concatenated.field.equals" = "ababab cdcdcd efe"
+      type = "remap"
+      source = '.nested.concatenated.field == "ababab cdcdcd efe"'

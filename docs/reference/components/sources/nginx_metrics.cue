@@ -9,6 +9,7 @@ components: sources: nginx_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -35,14 +36,15 @@ components: sources: nginx_metrics: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: [
 			"Module `ngx_http_stub_status_module` should be enabled.",
 		]
@@ -60,7 +62,10 @@ components: sources: nginx_metrics: {
 			description: "HTTP/HTTPS endpoint to Nginx server with enabled `ngx_http_stub_status_module` module."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["http://localhost:8000/basic_status"]
+				items: type: string: {
+					examples: ["http://localhost:8000/basic_status"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -76,7 +81,10 @@ components: sources: nginx_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "nginx"
+			type: string: {
+				default: "nginx"
+				syntax:  "literal"
+			}
 		}
 		tls: configuration._tls_connect & {_args: {
 			can_enable:             true
@@ -171,5 +179,12 @@ components: sources: nginx_metrics: {
 			default_namespace: "nginx"
 			tags:              _nginx_metrics_tags
 		}
+	}
+
+	telemetry: metrics: {
+		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 }

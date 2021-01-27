@@ -35,10 +35,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{
-    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
-};
-use futures01::Stream as Stream01;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
@@ -260,11 +257,13 @@ impl Source {
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
             // be other, more sound ways for users considering the use of this
-            // option to solvce their use case, so take consideration.
+            // option to solve their use case, so take consideration.
             ignore_before: None,
             // Max line length to expect during regular log reads, see the
             // explanation above.
             max_line_bytes,
+            // Delimiter bytes that is used to read the file line-by-line
+            line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
             data_dir,
             // This value specifies not exactly the globbing, but interval
@@ -322,9 +321,10 @@ impl Source {
             futures::stream::iter(buf)
         });
 
-        let event_processing_loop = partial_events_merger.transform(
-            Box::new(events.map(Ok).compat())
-        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
+        let event_processing_loop = partial_events_merger
+            .transform(Box::pin(events))
+            .map(Ok)
+            .forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

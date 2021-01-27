@@ -9,6 +9,7 @@ components: sources: apache_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -35,14 +36,15 @@ components: sources: apache_metrics: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: [
 			"""
 			The [Apache Status module](\(urls.apache_mod_status)) must be enabled.
@@ -61,7 +63,10 @@ components: sources: apache_metrics: {
 			description: "mod_status endpoints to scrape metrics from."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
+				items: type: string: {
+					examples: ["http://localhost:8080/server-status/?auto"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -80,6 +85,7 @@ components: sources: apache_metrics: {
 			warnings: []
 			type: string: {
 				default: "apache"
+				syntax:  "literal"
 			}
 		}
 	}
@@ -191,4 +197,14 @@ components: sources: apache_metrics: {
 	}
 
 	how_it_works: {}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
+	}
 }

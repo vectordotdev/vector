@@ -11,6 +11,7 @@ components: transforms: split: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -19,14 +20,15 @@ components: transforms: split: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -54,13 +56,17 @@ components: transforms: split: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["timestamp", "level", "message", "parent.child"]
+				syntax: "literal"
+			}
 		}
 		separator: {
 			common:      true
@@ -70,6 +76,7 @@ components: transforms: split: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
+				syntax: "literal"
 			}
 		}
 		types: configuration._types

@@ -1,5 +1,7 @@
 use remap::prelude::*;
 
+use crate::util;
+
 #[derive(Clone, Copy, Debug)]
 pub struct IsNullish;
 
@@ -30,21 +32,7 @@ struct IsNullishFn {
 
 impl Expression for IsNullishFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        match self.value.execute(state, object)? {
-            Value::Bytes(v) => {
-                let s = &String::from_utf8_lossy(&v)[..];
-
-                match s {
-                    "-" => Ok(true.into()),
-                    _ => {
-                        let has_whitespace = s.chars().all(char::is_whitespace);
-                        Ok(has_whitespace.into())
-                    }
-                }
-            }
-            Value::Null => Ok(true.into()),
-            _ => Ok(false.into()),
-        }
+        Ok(util::is_nullish(&self.value.execute(state, object)?).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -68,7 +56,7 @@ mod tests {
                 value: Literal::from("some string").boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -78,7 +66,7 @@ mod tests {
                 value: Literal::from(()).boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -89,7 +77,7 @@ mod tests {
                 value: lit!(42).boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -100,8 +88,7 @@ mod tests {
                 value: array!["foo"].boxed(),
             },
             def: TypeDef {
-                kind: value::Kind::Boolean,
-                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }

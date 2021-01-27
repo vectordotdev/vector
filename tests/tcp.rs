@@ -1,6 +1,6 @@
 #![cfg(all(
     feature = "sinks-socket",
-    feature = "transforms-sampler",
+    feature = "transforms-sample",
     feature = "sources-socket",
 ))]
 
@@ -66,9 +66,9 @@ async fn sample() {
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_transform(
-        "sampler",
+        "sample",
         &["in"],
-        transforms::sampler::SamplerConfig {
+        transforms::sample::SampleConfig {
             rate: 10,
             key_field: Some(config::log_schema().message_key().into()),
             exclude: None,
@@ -76,7 +76,7 @@ async fn sample() {
     );
     config.add_sink(
         "out",
-        &["sampler"],
+        &["sample"],
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
@@ -158,7 +158,11 @@ async fn fork() {
     assert_eq!(input_lines, output_lines2);
 }
 
-#[tokio::test]
+// In cpu constrained environments at least two threads
+// are needed to finish processing all the events before
+// sources are forcefully shutted down.
+// Although that's still not a guarantee.
+#[tokio::test(core_threads = 2)]
 async fn merge_and_fork() {
     trace_init();
 

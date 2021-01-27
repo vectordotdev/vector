@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{AnyCondition, Condition},
+    conditions::{Condition, ConditionConfig},
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
@@ -7,14 +7,14 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
-use futures::{
-    compat::{Compat, Compat01As03},
-    stream, StreamExt,
-};
+use futures::{stream, Stream, StreamExt};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map, HashMap};
-use std::time::{Duration, Instant};
+use std::{
+    collections::{hash_map, HashMap},
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
 mod merge_strategy;
 
@@ -39,8 +39,8 @@ pub struct ReduceConfig {
 
     /// An optional condition that determines when an event is the end of a
     /// reduce.
-    pub ends_when: Option<AnyCondition>,
-    pub starts_when: Option<AnyCondition>,
+    pub ends_when: Option<Box<dyn ConditionConfig>>,
+    pub starts_when: Option<Box<dyn ConditionConfig>>,
 }
 
 inventory::submit! {
@@ -244,8 +244,8 @@ impl Reduce {
 impl TaskTransform for Reduce {
     fn transform(
         self: Box<Self>,
-        input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
+        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
@@ -254,40 +254,35 @@ impl TaskTransform for Reduce {
         let poll_period = me.flush_period;
 
         let mut flush_stream = tokio::time::interval(poll_period);
-        let mut input_stream = Compat01As03::new(input_rx);
 
-        let stream = stream! {
-          loop {
-            let mut output = Vec::new();
-            let done = tokio::select! {
-                _ = flush_stream.next() => {
-                  me.flush_into(&mut output);
-                  false
-                }
-                maybe_event = input_stream.next() => {
-                  match maybe_event {
-                    None => {
-                      me.flush_all_into(&mut output);
-                      true
-                    }
-                    Some(Ok(event)) => {
-                      me.transform_one(&mut output, event);
+        Box::pin(
+            stream! {
+              loop {
+                let mut output = Vec::new();
+                let done = tokio::select! {
+                    _ = flush_stream.next() => {
+                      me.flush_into(&mut output);
                       false
                     }
-                    Some(Err(())) => panic!("Unexpected error reading channel"),
-                  }
-                }
-            };
-            yield stream::iter(output.into_iter());
-            if done { break }
-          }
-        }
-        .flatten();
-
-        // Needed for compat
-        let try_stream = Box::pin(stream.map::<Result<Event, ()>, _>(Ok));
-
-        Box::new(Compat::new(try_stream))
+                    maybe_event = input_rx.next() => {
+                      match maybe_event {
+                        None => {
+                          me.flush_all_into(&mut output);
+                          true
+                        }
+                        Some(event) => {
+                          me.transform_one(&mut output, event);
+                          false
+                        }
+                      }
+                    }
+                };
+                yield stream::iter(output.into_iter());
+                if done { break }
+              }
+            }
+            .flatten(),
+        )
     }
 }
 
@@ -295,7 +290,6 @@ impl TaskTransform for Reduce {
 mod test {
     use super::*;
     use crate::{config::TransformConfig, event::Value, Event};
-    use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
     #[test]
@@ -310,6 +304,7 @@ mod test {
 group_by = [ "request_id" ]
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -343,14 +338,14 @@ group_by = [ "request_id" ]
         e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
-        let in_stream = futures01::stream::iter_ok(inputs);
-        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         assert_eq!(output_1.as_log()["message"], "test message 1".into());
         assert_eq!(output_1.as_log()["counter"], Value::from(8));
 
-        let output_2 = out_stream.next().await.unwrap().unwrap();
+        let output_2 = out_stream.next().await.unwrap();
         assert_eq!(output_2.as_log()["message"], "test message 2".into());
         assert_eq!(output_2.as_log()["extra_field"], "value1".into());
         assert_eq!(output_2.as_log()["counter"], Value::from(7));
@@ -367,6 +362,7 @@ merge_strategies.bar = "array"
 merge_strategies.baz = "max"
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -396,10 +392,10 @@ merge_strategies.baz = "max"
         e_3.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3];
-        let in_stream = futures01::stream::iter_ok(inputs);
-        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         assert_eq!(output_1.as_log()["message"], "test message 1".into());
         assert_eq!(output_1.as_log()["foo"], "first foo second foo".into());
         assert_eq!(
@@ -416,6 +412,7 @@ merge_strategies.baz = "max"
 group_by = [ "request_id" ]
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -447,15 +444,15 @@ group_by = [ "request_id" ]
         e_5.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
-        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
-        let mut out_stream = reduce.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["message"], "test message 1".into());
         assert_eq!(output_1["counter"], Value::from(8));
 
-        let output_2 = out_stream.next().await.unwrap().unwrap();
+        let output_2 = out_stream.next().await.unwrap();
         let output_2 = output_2.as_log();
         assert_eq!(output_2["message"], "test message 2".into());
         assert_eq!(output_2["extra_field"], "value1".into());
@@ -472,6 +469,7 @@ merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
 
 [ends_when]
+  type = "check_fields"
   "test_end.exists" = true
 "#,
         )
@@ -514,16 +512,16 @@ merge_strategies.bar = "concat"
         e_6.as_mut_log().insert("test_end", "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5, e_6];
-        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
-        let mut out_stream = reduce.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(inputs));
+        let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
 
         assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         let output_1 = output_1.as_log();
         assert_eq!(output_1["foo"], json!([[2, 4], [6, 8], "done"]).into());
         assert_eq!(output_1["bar"], json!([2, 4, 6, 8, "done"]).into());

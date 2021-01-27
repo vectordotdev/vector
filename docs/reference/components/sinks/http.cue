@@ -9,6 +9,7 @@ components: sinks: http: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -74,14 +75,15 @@ components: sinks: http: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -101,6 +103,7 @@ components: sinks: http: {
 			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
+				syntax: "literal"
 			}
 		}
 		healthcheck: type: object: options: uri: {
@@ -114,6 +117,7 @@ components: sinks: http: {
 			type: string: {
 				default: null
 				examples: ["https://10.22.212.22:9000/health"]
+				syntax: "literal"
 			}
 		}
 	}

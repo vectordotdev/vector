@@ -17,6 +17,7 @@ components: sources: heroku_logs: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -48,14 +49,15 @@ components: sources: heroku_logs: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -77,18 +79,27 @@ components: sources: heroku_logs: {
 			app_name: {
 				description: "The app name field extracted from log message."
 				required:    true
-				type: string: examples: ["erlang"]
+				type: string: {
+					examples: ["erlang"]
+					syntax: "literal"
+				}
 			}
 			host: fields._local_host
 			message: {
 				description: "The message field, containing the plain text message."
 				required:    true
-				type: string: examples: ["Hi from erlang"]
+				type: string: {
+					examples: ["Hi from erlang"]
+					syntax: "literal"
+				}
 			}
 			proc_id: {
 				description: "The procid field extracted from log message."
 				required:    true
-				type: string: examples: ["console"]
+				type: string: {
+					examples: ["console"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp
 		}

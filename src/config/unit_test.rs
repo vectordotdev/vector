@@ -9,10 +9,9 @@ use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
-    path: PathBuf,
-    format: config::FormatHint,
+    paths: &[(PathBuf, config::FormatHint)],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
+    let config = super::loading::load_builder_from_paths(paths, false)?;
 
     // Ignore failures on calls other than the first
     crate::config::LOG_SCHEMA
@@ -127,19 +126,11 @@ fn walk(
             }
             Transform::Task(t) => {
                 error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
-                use futures::compat::Stream01CompatExt;
-                let in_stream = futures01::stream::iter_ok(inputs.clone());
-                let out_stream = t.transform(Box::new(in_stream)).compat();
+                let in_stream = futures::stream::iter(inputs.clone());
+                let out_stream = t.transform(Box::pin(in_stream));
                 // TODO(new-transform-enum): Handle Many
                 let out_iter = futures::executor::block_on_stream(out_stream);
-                let out_iter_mapped = out_iter.flat_map(|v| match v {
-                    Err(e) => {
-                        error!("Stream transform experienced error: {:?}", e);
-                        None
-                    }
-                    Ok(v) => Some(v),
-                });
-                results.extend(out_iter_mapped);
+                results.extend(out_iter);
                 targets = target.next.clone();
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
@@ -568,11 +559,7 @@ async fn build_unit_test(
     }
 }
 
-#[cfg(all(
-    test,
-    feature = "transforms-add_fields",
-    feature = "transforms-swimlanes"
-))]
+#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
@@ -994,16 +981,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_swimlanes() {
+    async fn test_route() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
-  type = "swimlanes"
-  [transforms.foo.lanes.first]
+  type = "route"
+  [transforms.foo.route.first]
     type = "check_fields"
     "message.eq" = "test swimlane 1"
-  [transforms.foo.lanes.second]
+  [transforms.foo.route.second]
     type = "check_fields"
     "message.eq" = "test swimlane 2"
 
@@ -1014,7 +1001,7 @@ mod tests {
     new_field = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 1"
+  name = "successful route test 1"
 
   [tests.input]
     insert_at = "foo"
@@ -1034,7 +1021,7 @@ mod tests {
       "new_field.equals" = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 2"
+  name = "successful route test 2"
 
   [tests.input]
     insert_at = "foo"

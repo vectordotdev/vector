@@ -71,12 +71,11 @@ impl Expression for Arithmetic {
             Greater | GreaterOrEqual | Less | LessOrEqual => type_def
                 .fallible_unless(Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Boolean),
-            Subtract | Divide | Remainder => type_def
+            Subtract | Remainder => type_def
                 .fallible_unless(Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Integer | Kind::Float),
-            IntegerDivide => type_def
-                .fallible_unless(Kind::Integer | Kind::Float)
-                .with_constraint(Kind::Integer),
+            Divide => type_def.into_fallible(true).with_constraint(Kind::Float),
+            IntegerDivide => type_def.into_fallible(true).with_constraint(Kind::Integer),
             Multiply | Add => type_def
                 .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Bytes | Kind::Integer | Kind::Float),
@@ -172,21 +171,21 @@ mod tests {
 
         divide {
             expr: |_| Arithmetic::new(
-                Box::new(Noop.into()),
-                Box::new(Noop.into()),
+                Box::new(10.into()),
+                Box::new(5.into()),
                 Operator::Divide,
             ),
             def: TypeDef {
                 fallible: true,
-                kind: Kind::Integer | Kind::Float,
+                kind: Kind::Float,
                 ..Default::default()
             },
         }
 
         integer_divide {
             expr: |_| Arithmetic::new(
-                Box::new(Noop.into()),
-                Box::new(Noop.into()),
+                Box::new(8.into()),
+                Box::new(4.into()),
                 Operator::IntegerDivide,
             ),
             def: TypeDef {
@@ -331,7 +330,7 @@ mod tests {
                 Operator::ErrorOr,
             ),
             def: TypeDef {
-                kind: Kind::Integer | Kind::Float,
+                kind: Kind::Float,
                 fallible: true,
                 ..Default::default()
             },

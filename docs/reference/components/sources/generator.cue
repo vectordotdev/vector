@@ -13,6 +13,7 @@ components: sources: generator: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -23,14 +24,15 @@ components: sources: generator: {
 	support: {
 
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -54,6 +56,7 @@ components: sources: generator: {
 					"bsd_syslog":    "Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164)))."
 					"json":          "Randomly generated HTTP server logs in [JSON](\(urls.json)) format."
 				}
+				syntax: "literal"
 			}
 		}
 		interval: {
@@ -86,6 +89,7 @@ components: sources: generator: {
 				default: null
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
+					syntax: "literal"
 				}
 			}
 		}
@@ -100,4 +104,8 @@ components: sources: generator: {
 	}
 
 	output: logs: {}
+
+	telemetry: metrics: {
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+	}
 }

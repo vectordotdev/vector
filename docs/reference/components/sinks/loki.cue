@@ -9,6 +9,7 @@ components: sinks: loki: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
+		stateful: false
 	}
 
 	features: {
@@ -64,14 +65,15 @@ components: sinks: loki: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -83,6 +85,7 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
+				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -109,7 +112,7 @@ components: sinks: loki: {
 						type: string: {
 							default: null
 							examples: ["vector", "{{ event_field }}"]
-							templateable: true
+							syntax: "template"
 						}
 					}
 				}
@@ -137,7 +140,7 @@ components: sinks: loki: {
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

@@ -1,3 +1,4 @@
+use crate::event::metric::Sample;
 use snafu::Snafu;
 use std::cmp::Ordering;
 
@@ -19,16 +20,11 @@ pub struct DistributionStatistic {
 }
 
 impl DistributionStatistic {
-    pub fn new(values: &[f64], counts: &[u32], quantiles: &[f64]) -> Option<Self> {
-        if values.len() != counts.len() {
-            return None;
-        }
-
-        let mut bins = values
+    pub fn from_samples(source: &[Sample], quantiles: &[f64]) -> Option<Self> {
+        let mut bins = source
             .iter()
-            .zip(counts.iter())
-            .filter(|(_, &c)| c > 0)
-            .map(|(v, c)| (*v, *c))
+            .filter(|sample| sample.rate > 0)
+            .cloned()
             .collect::<Vec<_>>();
 
         if bins.is_empty() {
@@ -36,8 +32,8 @@ impl DistributionStatistic {
         }
 
         if bins.len() == 1 {
-            let val = bins[0].0;
-            let count = bins[0].1;
+            let val = bins[0].value;
+            let count = bins[0].rate;
             return Some(Self {
                 min: val,
                 max: val,
@@ -49,16 +45,19 @@ impl DistributionStatistic {
             });
         }
 
-        bins.sort_unstable_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        bins.sort_unstable_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
 
-        let min = bins.first().unwrap().0;
-        let max = bins.last().unwrap().0;
-        let sum = bins.iter().map(|(v, c)| v * *c as f64).sum::<f64>();
-        let count = bins.iter().map(|(_, c)| *c).sum::<u32>();
+        let min = bins.first().unwrap().value;
+        let max = bins.last().unwrap().value;
+        let sum = bins
+            .iter()
+            .map(|sample| sample.value * sample.rate as f64)
+            .sum::<f64>();
+        let count = bins.iter().map(|sample| sample.rate).sum::<u32>();
         let avg = sum / count as f64;
 
         for i in 1..bins.len() {
-            bins[i].1 += bins[i - 1].1;
+            bins[i].rate += bins[i - 1].rate;
         }
 
         let median = find_sample(&bins, (0.50 * count as f64 - 1.0).round() as u32);
@@ -83,12 +82,12 @@ impl DistributionStatistic {
 }
 
 /// `bins` is a cumulative histogram
-fn find_sample(bins: &[(f64, u32)], index: u32) -> f64 {
-    let i = match bins.binary_search_by_key(&index, |(_, c)| *c) {
+fn find_sample(bins: &[Sample], index: u32) -> f64 {
+    let i = match bins.binary_search_by_key(&index, |sample| sample.rate) {
         Ok(i) => i,
         Err(i) => i,
     };
-    bins[i].0
+    bins[i].value
 }
 
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {

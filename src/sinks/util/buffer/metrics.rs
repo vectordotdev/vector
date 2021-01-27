@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricData, MetricKind, MetricValue, Sample},
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
@@ -19,28 +19,19 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        discriminant(&metric.value).hash(state);
-        metric.name.hash(state);
-        metric.namespace.hash(state);
-        metric.kind.hash(state);
+        metric.series.hash(state);
+        metric.data.kind.hash(state);
+        discriminant(&metric.data.value).hash(state);
 
-        if let Some(tags) = &metric.tags {
-            let mut tags: Vec<_> = tags.iter().collect();
-            tags.sort();
-            for tag in tags {
-                tag.hash(state);
-            }
-        }
-
-        match &metric.value {
+        match &metric.data.value {
             MetricValue::AggregatedHistogram { buckets, .. } => {
                 for bucket in buckets {
-                    bucket.to_bits().hash(state);
+                    bucket.upper_limit.to_bits().hash(state);
                 }
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.to_bits().hash(state);
+                    quantile.upper_limit.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -53,12 +44,10 @@ impl PartialEq for MetricEntry {
         // This differs from a straightforward implementation of `eq` by
         // comparing only the "shape" bits (name, tags, and type) while
         // allowing the contained values to be different.
-        self.name == other.name
-            && self.namespace == other.namespace
-            && self.kind == other.kind
-            && self.tags == other.tags
-            && discriminant(&self.value) == discriminant(&other.value)
-            && match (&self.value, &other.value) {
+        self.series == other.series
+            && self.data.kind == other.data.kind
+            && discriminant(&self.data.value) == discriminant(&other.data.value)
+            && match (&self.data.value, &other.data.value) {
                 (
                     MetricValue::AggregatedHistogram {
                         buckets: buckets1, ..
@@ -66,7 +55,13 @@ impl PartialEq for MetricEntry {
                     MetricValue::AggregatedHistogram {
                         buckets: buckets2, ..
                     },
-                ) => buckets1 == buckets2,
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
                 (
                     MetricValue::AggregatedSummary {
                         quantiles: quantiles1,
@@ -76,7 +71,13 @@ impl PartialEq for MetricEntry {
                         quantiles: quantiles2,
                         ..
                     },
-                ) => quantiles1 == quantiles2,
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
                 _ => true,
             }
     }
@@ -164,31 +165,35 @@ impl Batch for MetricBuffer {
         } else {
             let item = item.into_metric();
 
-            match (item.kind, &item.value) {
+            match (item.data.kind, &item.data.value) {
                 (MetricKind::Absolute, MetricValue::Counter { value }) => {
                     let value = *value;
                     let item = MetricEntry(item);
                     if let Some(MetricEntry(Metric {
-                        value: MetricValue::Counter { value: value0, .. },
+                        data:
+                            MetricData {
+                                value: MetricValue::Counter { value: value0, .. },
+                                ..
+                            },
                         ..
                     })) = self.state.get(&item)
                     {
                         // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
-                            name: item.name.clone(),
-                            namespace: item.namespace.clone(),
-                            timestamp: item.timestamp,
-                            tags: item.tags.clone(),
-                            kind: MetricKind::Incremental,
-                            value: MetricValue::Counter {
-                                value: value - value0,
+                            series: item.series.clone(),
+                            data: MetricData {
+                                timestamp: item.data.timestamp,
+                                kind: MetricKind::Incremental,
+                                value: MetricValue::Counter {
+                                    value: value - value0,
+                                },
                             },
                         });
 
                         // The resulting Counters could be added up normally
                         if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                            existing.add(&item);
+                            existing.data.add(&item.data);
                             self.metrics.insert(MetricEntry(existing));
                         } else {
                             self.metrics.insert(delta);
@@ -201,7 +206,7 @@ impl Batch for MetricBuffer {
                 (MetricKind::Incremental, MetricValue::Gauge { .. }) => {
                     let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
+                        existing.data.add(&item.data);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         // If the metric is not present in active batch,
@@ -212,15 +217,15 @@ impl Batch for MetricBuffer {
                         } else {
                             // Otherwise we start from zero value
                             Metric {
-                                name: item.name.to_string(),
-                                namespace: item.namespace.clone(),
-                                timestamp: item.timestamp,
-                                tags: item.tags.clone(),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Gauge { value: 0.0 },
+                                series: item.series.clone(),
+                                data: MetricData {
+                                    timestamp: item.data.timestamp,
+                                    kind: MetricKind::Absolute,
+                                    value: MetricValue::Gauge { value: 0.0 },
+                                },
                             }
                         };
-                        initial.add(&item);
+                        initial.data.add(&item.data);
                         self.metrics.insert(MetricEntry(initial));
                     }
                 }
@@ -230,7 +235,7 @@ impl Batch for MetricBuffer {
                 _ => {
                     let new = MetricEntry(item);
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&new);
+                        existing.data.add(&new.data);
                         self.metrics.insert(MetricEntry(existing));
                     } else {
                         self.metrics.insert(new);
@@ -248,9 +253,8 @@ impl Batch for MetricBuffer {
     fn fresh(&self) -> Self {
         let mut state = self.state.clone();
         for entry in self.metrics.iter() {
-            if (entry.0.value.is_gauge() || entry.0.value.is_counter())
-                && entry.0.kind.is_absolute()
-            {
+            let data = &entry.0.data;
+            if (data.value.is_gauge() || data.value.is_counter()) && data.kind.is_absolute() {
                 state.replace(entry.clone());
             }
         }
@@ -263,18 +267,9 @@ impl Batch for MetricBuffer {
             .into_iter()
             .map(|e| {
                 let mut metric = e.0;
-                if let MetricValue::Distribution {
-                    values,
-                    sample_rates,
-                    statistic,
-                } = metric.value
-                {
-                    let compressed = compress_distribution(values, sample_rates);
-                    metric.value = MetricValue::Distribution {
-                        values: compressed.0,
-                        sample_rates: compressed.1,
-                        statistic,
-                    };
+                if let MetricValue::Distribution { samples, statistic } = metric.data.value {
+                    let samples = compress_distribution(samples);
+                    metric.data.value = MetricValue::Distribution { samples, statistic };
                 };
                 metric
             })
@@ -286,33 +281,30 @@ impl Batch for MetricBuffer {
     }
 }
 
-fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>, Vec<u32>) {
-    if values.is_empty() || sample_rates.is_empty() {
-        return (Vec::new(), Vec::new());
+fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+    if samples.is_empty() {
+        return Vec::new();
     }
 
-    let mut pairs: Vec<_> = values.into_iter().zip(sample_rates.into_iter()).collect();
-    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+    samples.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
 
-    let mut prev_value = pairs[0].0;
-    let mut acc = 0;
-    let mut values = vec![];
-    let mut sample_rates = vec![];
+    let mut acc = Sample {
+        value: samples[0].value,
+        rate: 0,
+    };
+    let mut result = Vec::new();
 
-    for (v, c) in pairs {
-        if v == prev_value {
-            acc += c;
+    for sample in samples {
+        if acc.value == sample.value {
+            acc.rate += sample.rate;
         } else {
-            values.push(prev_value);
-            sample_rates.push(acc);
-            prev_value = v;
-            acc = c;
+            result.push(acc);
+            acc = sample;
         }
     }
-    values.push(prev_value);
-    sample_rates.push(acc);
+    result.push(acc);
 
-    (values, sample_rates)
+    result
 }
 
 #[cfg(test)]
@@ -526,12 +518,19 @@ mod test {
 
     #[test]
     fn metric_buffer_compress_distribution() {
-        let values = vec![2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0];
-        let sample_rates = vec![12, 12, 13, 11, 12, 12, 13];
+        let samples = crate::samples![
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13,
+            1.0 => 11,
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13
+        ];
 
         assert_eq!(
-            compress_distribution(values, sample_rates),
-            (vec![1.0, 2.0, 3.0], vec![11, 48, 26])
+            compress_distribution(samples),
+            crate::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 
@@ -610,53 +609,40 @@ mod test {
     }
 
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
-        Metric {
-            name: format!("counter-{}", num),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag(tagstr)),
+        Metric::new(
+            format!("counter-{}", num),
             kind,
-            value: MetricValue::Counter { value },
-        }
+            MetricValue::Counter { value },
+        )
+        .with_tags(Some(tag(tagstr)))
     }
 
     fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric {
-            name: format!("gauge-{}", num),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag("staging")),
-            kind,
-            value: MetricValue::Gauge { value },
-        }
+        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+            .with_tags(Some(tag("staging")))
     }
 
     fn sample_set<T: ToString>(num: usize, values: &[T]) -> Metric {
-        Metric {
-            name: format!("set-{}", num),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag("production")),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+        Metric::new(
+            format!("set-{}", num),
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
             },
-        }
+        )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_distribution_histogram(num: u32, rate: u32) -> Metric {
-        Metric {
-            name: format!("dist-{}", num),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag("production")),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
-                values: vec![num as f64],
-                sample_rates: vec![rate],
+        Metric::new(
+            format!("dist-{}", num),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: crate::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
-        }
+        )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_aggregated_histogram(
@@ -666,34 +652,36 @@ mod test {
         cfactor: u32,
         sum: f64,
     ) -> Metric {
-        Metric {
-            name: format!("buckets-{}", num),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag("production")),
+        Metric::new(
+            format!("buckets-{}", num),
             kind,
-            value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0f64.powf(bpower), 4.0f64.powf(bpower)],
-                counts: vec![cfactor, 2 * cfactor, 4 * cfactor],
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![
+                    1.0 => cfactor,
+                    2.0f64.powf(bpower) => cfactor * 2,
+                    4.0f64.powf(bpower) => cfactor * 4
+                ],
                 count: 6 * cfactor,
                 sum,
             },
-        }
+        )
+        .with_tags(Some(tag("production")))
     }
 
     fn sample_aggregated_summary(factor: u32) -> Metric {
-        Metric {
-            name: format!("quantiles-{}", factor),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tag("production")),
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.0, 0.5, 1.0],
-                values: vec![factor as f64, (2 * factor) as f64, (4 * factor) as f64],
+        Metric::new(
+            format!("quantiles-{}", factor),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![
+                    0.0 => factor as f64,
+                    0.5 => factor as f64 * 2.0,
+                    1.0 => factor as f64 * 4.0
+                ],
                 count: 6 * factor,
                 sum: 10.0,
             },
-        }
+        )
+        .with_tags(Some(tag("production")))
     }
 }

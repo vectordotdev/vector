@@ -8,6 +8,7 @@ components: transforms: add_fields: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -16,14 +17,15 @@ components: transforms: add_fields: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -57,7 +59,7 @@ components: transforms: add_fields: {
 				]
 				options: {
 					"*": {
-						description: "The name of the field to add. Accepts all [supported types][docs.setup.configuration#types]. Use `.` for adding nested fields."
+						description: "The name of the field to add. Accepts all supported configuration types. Use `.` for adding nested fields."
 						required:    true
 						warnings: []
 						type: "*": {}
@@ -128,14 +130,9 @@ components: transforms: add_fields: {
 				},
 			]
 		}
-		types: {
-			title: "Types"
-			body: """
-				All supported [configuration value types][docs.setup.configuration#types] are
-				accepted. This includes primitive types (`string`, `int`, `float`, `boolean`)
-				and special types, such as [arrays](#arrays) and
-				[nested fields](#nested-fields).
-				"""
-		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

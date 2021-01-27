@@ -11,6 +11,7 @@ components: transforms: dedupe: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -19,14 +20,15 @@ components: transforms: dedupe: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -66,17 +68,23 @@ components: transforms: dedupe: {
 						warnings: []
 						type: array: {
 							default: null
-							items: type: string: examples: ["field1", "parent.child_field"]
+							items: type: string: {
+								examples: ["field1", "parent.child_field"]
+								syntax: "literal"
+							}
 						}
 					}
 					match: {
 						common:      true
-						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.global-options#log_schema]. Incompatible with the `fields.ignore` option."
+						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.configuration.global-options#log_schema]. Incompatible with the `fields.ignore` option."
 						required:    false
 						warnings: []
 						type: array: {
 							default: ["timestamp", "host", "message"]
-							items: type: string: examples: ["field1", "parent.child_field", "host", "message"]
+							items: type: string: {
+								examples: ["field1", "parent.child_field", "host", "message"]
+								syntax: "literal"
+							}
 						}
 					}
 				}

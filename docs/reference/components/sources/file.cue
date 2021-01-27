@@ -11,6 +11,7 @@ components: sources: file: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -25,18 +26,20 @@ components: sources: file: {
 			}
 		}
 		multiline: enabled: true
+		encoding: enabled:  true
 	}
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -53,7 +56,10 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["\(_directory)/binary-file.log"]
+				items: type: string: {
+					examples: ["\(_directory)/binary-file.log"]
+					syntax: "literal"
+				}
 			}
 		}
 		file_key: {
@@ -64,6 +70,7 @@ components: sources: file: {
 			type: string: {
 				default: "file"
 				examples: ["file"]
+				syntax: "literal"
 			}
 		}
 		fingerprint: {
@@ -81,6 +88,7 @@ components: sources: file: {
 							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
+						syntax: "literal"
 					}
 				}
 				bytes: {
@@ -117,9 +125,12 @@ components: sources: file: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		ignore_not_found: {
 			common:      false
@@ -140,7 +151,20 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
+			type: array: items: type: string: {
+				examples: ["\(_directory)/**/*.log"]
+				syntax: "literal"
+			}
+		}
+		line_delimiter: {
+			common:      false
+			description: "String sequence used to separate one file line from another"
+			required:    false
+			type: string: {
+				default: "\n"
+				examples: ["\r\n"]
+				syntax: "literal"
+			}
 		}
 		max_line_bytes: {
 			common:      false
@@ -194,13 +218,19 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["\(_directory)/apache/access.log"]
+				type: string: {
+					examples: ["\(_directory)/apache/access.log"]
+					syntax: "literal"
+				}
 			}
 			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp
 		}
@@ -363,8 +393,9 @@ components: sources: file: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
-				is found.
+				Each line is read until a new line delimiter (by default, `\n` i.e.
+				the `0xA` byte) or `EOF` is found. If needed, the default line
+				delimiter can be overriden via the `line_delimiter` option.
 				"""
 		}
 

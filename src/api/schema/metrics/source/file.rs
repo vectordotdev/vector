@@ -1,10 +1,16 @@
 use crate::{
-    api::schema::metrics::{self, MetricsFilter},
+    api::schema::{
+        filter::{filter_items, CustomFilter, StringFilter},
+        metrics::{self, MetricsFilter},
+        relay,
+    },
     event::Metric,
+    filter_check,
 };
-use async_graphql::Object;
+use async_graphql::{InputObject, Object};
 use std::collections::BTreeMap;
 
+#[derive(Clone)]
 pub struct FileSourceMetricFile<'a> {
     name: String,
     metrics: Vec<&'a Metric>,
@@ -15,10 +21,14 @@ impl<'a> FileSourceMetricFile<'a> {
     fn from_tuple((name, metrics): (String, Vec<&'a Metric>)) -> Self {
         Self { name, metrics }
     }
+
+    pub fn get_name(&self) -> &str {
+        self.name.as_str()
+    }
 }
 
 #[Object]
-impl FileSourceMetricFile<'_> {
+impl<'a> FileSourceMetricFile<'a> {
     /// File name
     async fn name(&self) -> &str {
         &*self.name
@@ -42,12 +52,8 @@ impl FileSourceMetrics {
     pub fn new(metrics: Vec<Metric>) -> Self {
         Self(metrics)
     }
-}
 
-#[Object]
-impl FileSourceMetrics {
-    /// File metrics
-    pub async fn files(&self) -> Vec<FileSourceMetricFile<'_>> {
+    pub fn get_files(&self) -> Vec<FileSourceMetricFile<'_>> {
         self.0
             .iter()
             .filter_map(|m| match m.tag_value("file") {
@@ -62,6 +68,29 @@ impl FileSourceMetrics {
             .map(FileSourceMetricFile::from_tuple)
             .collect()
     }
+}
+
+#[Object]
+impl FileSourceMetrics {
+    /// File metrics
+    pub async fn files(
+        &self,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+        filter: Option<FileSourceMetricsFilesFilter>,
+    ) -> relay::ConnectionResult<FileSourceMetricFile<'_>> {
+        let filter = filter.unwrap_or_else(FileSourceMetricsFilesFilter::default);
+        let files = filter_items(self.get_files().into_iter(), &filter);
+
+        relay::query(
+            files.into_iter(),
+            relay::Params::new(after, before, first, last),
+            10,
+        )
+        .await
+    }
 
     /// Events processed for the current file source
     pub async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
@@ -71,5 +100,25 @@ impl FileSourceMetrics {
     /// Bytes processed for the current file source
     pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
         self.0.processed_bytes_total()
+    }
+}
+
+#[derive(Default, InputObject)]
+pub struct FileSourceMetricsFilesFilter {
+    name: Option<Vec<StringFilter>>,
+    or: Option<Vec<Self>>,
+}
+
+impl CustomFilter<FileSourceMetricFile<'_>> for FileSourceMetricsFilesFilter {
+    fn matches(&self, file: &FileSourceMetricFile<'_>) -> bool {
+        filter_check!(self
+            .name
+            .as_ref()
+            .map(|f| f.iter().all(|f| f.filter_value(file.get_name()))));
+        true
+    }
+
+    fn or(&self) -> Option<&Vec<Self>> {
+        self.or.as_ref()
     }
 }

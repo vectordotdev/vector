@@ -7,18 +7,20 @@ components: sinks: _humio: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Humio"]
+		stateful: false
 	}
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -92,6 +94,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: "https://cloud.humio.com"
 				examples: ["http://127.0.0.1", "http://example.com"]
+				syntax: "literal"
 			}
 		}
 		event_type: {
@@ -102,17 +105,18 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["json", "none"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["hostname"]
+				syntax: "literal"
 			}
 		}
 		source: {
@@ -123,7 +127,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		token: {
@@ -132,6 +136,7 @@ components: sinks: _humio: {
 			warnings: []
 			type: string: {
 				examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

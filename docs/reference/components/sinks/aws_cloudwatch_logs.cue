@@ -9,6 +9,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -68,14 +69,15 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -99,7 +101,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		stream_name: {
@@ -107,7 +109,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}
