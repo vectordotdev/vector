@@ -11,7 +11,7 @@ use crate::{
     template::{Template, TemplateError},
     Event,
 };
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
@@ -210,10 +210,13 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         Box::pin(async move {
             client
                 .send_message(request)
-                .inspect_ok(|result| {
+                .inspect(|result| {
                     emit!(AwsSqsEventSent {
                         byte_size,
-                        message_id: result.message_id.as_ref()
+                        message_id: result
+                            .as_ref()
+                            .map(|result| result.message_id.as_ref())
+                            .unwrap_or(None)
                     })
                 })
                 .instrument(info_span!("request"))
