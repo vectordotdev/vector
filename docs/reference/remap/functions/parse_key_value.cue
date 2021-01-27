@@ -1,6 +1,14 @@
 package metadata
 
 remap: functions: parse_key_value: {
+	category:    "Parse"
+	description: #"""
+		Parses the `value` in key/value format. Also known as [logfmt](\#(urls.logfmt)).
+
+		* Keys and values can be wrapped with `"`.
+		* `"` characters can be escaped by `\`.
+		"""#
+
 	arguments: [
 		{
 			name:        "value"
@@ -27,13 +35,7 @@ remap: functions: parse_key_value: {
 		"`value` is not a properly formatted key/value string",
 	]
 	return: types: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` in key value format. Also known as [logfmt](\(urls.logfmt)).
 
-		* Keys and values can be wrapped with `"`.
-		* `"` characters can be escaped by `\`.
-		"""#
 	examples: [
 		{
 			title: "Parse logfmt log"

@@ -1,6 +1,13 @@
 package metadata
 
 remap: functions: parse_regex_all: {
+	category:    "Parse"
+	description: """
+		Parses the `value` via the provided [Regex](\(urls.regex)) `pattern`.
+
+		This function differs from the `parse_regex` function in that it returns _all_ matches, not just the first.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -25,10 +32,7 @@ remap: functions: parse_regex_all: {
 			"If no match is found an empty map is returned.",
 		]
 	}
-	category: "Parse"
-	description: """
-		Parses the provided `value` via the provided Regex `pattern`.
-		"""
+
 	examples: [
 		{
 			title: "Parse via Regex (all matches)"

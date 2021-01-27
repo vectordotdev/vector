@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: to_string: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a string.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -21,10 +26,7 @@ remap: functions: to_string: {
 			#"If `value` is a list then it is encoded into JSON."#,
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `string`.
-		"""#
+
 	examples: [
 		{
 			title: "Coerce to a string (boolean)"

@@ -1,6 +1,19 @@
 package metadata
 
 remap: functions: parse_regex: {
+	category:    "Parse"
+	description: """
+		Parses the `value` via the provided [Regex](\(urls.regex)) `pattern`.
+		"""
+	notices: [
+		"""
+		VRL aims to provide purpose-specific [parsing functions](\(urls.vrl_parsing_functions)) for common log formats.
+		Before reaching for the `parse_regex` function, see if a Remap [`parse_*` function](\(urls.vrl_parsing_functions))
+		already exists for your format. If not, please consider [opening an issue](\(urls.new_feature_request)) to
+		request support.
+		""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -25,18 +38,7 @@ remap: functions: parse_regex: {
 			"If no match is found an empty map is returned.",
 		]
 	}
-	category: "Parse"
-	description: """
-		Parses the provided `value` via the provided Regex `pattern`.
-		"""
-	notices: [
-		"""
-		VRL aims to provide purpose-specific [parsing functions](\(urls.vrl_parsing_functions)) for common log formats.
-		Before reaching for the `parse_regex` function, see if a Remap [`parse_*` function](\(urls.vrl_parsing_functions))
-		already exists for your format. If not, please consider [opening an issue](\(urls.new_feature_request)) to
-		request support.
-		""",
-	]
+
 	examples: [
 		{
 			title: "Parse via Regex (with capture groups)"

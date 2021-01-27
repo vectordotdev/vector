@@ -1,4 +1,9 @@
 remap: functions: to_bool: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a boolean.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -21,10 +26,7 @@ remap: functions: to_bool: {
 			#"If `value` is a boolean then it is passed through."#,
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `boolean`.
-		"""#
+
 	examples: [
 		{
 			title: "Coerce to a boolean (string)"

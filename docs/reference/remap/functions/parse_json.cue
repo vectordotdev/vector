@@ -1,6 +1,17 @@
 package metadata
 
 remap: functions: parse_json: {
+	category: "Parse"
+	description: """
+		Parses the `value` as JSON.
+		"""
+	notices: [
+		"""
+			Only JSON types are returned. If you need to convert a `string` into a `timestamp`, consider the
+			`parse_timestamp` function.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -13,13 +24,7 @@ remap: functions: parse_json: {
 		"`value` is not a valid JSON formatted payload",
 	]
 	return: types: ["boolean", "integer", "float", "string", "map", "array", "null"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` as JSON.
 
-		Only JSON types are returned. If you need to convert a `string` into a `timestamp`, consider the
-		`parse_timestamp` function.
-		"""#
 	examples: [
 		{
 			title: "Parse JSON"
