@@ -104,7 +104,6 @@ data_dir = "{{ .Values.globalOptions.dataDir }}"
   message_key = "{{ .messageKey }}"
   source_type_key = "{{ .sourceTypeKey }}"
   timestamp_key = "{{ .timestampKey }}"
-
   {{- printf "\n" -}}
 {{- end }}
 {{- end }}
