@@ -70,7 +70,7 @@ fn inner_type_def() -> InnerTypeDef {
         "message_type": TypeDef::new_with_kind(Kind::Bytes),
         "log_group": TypeDef::new_with_kind(Kind::Bytes),
         "log_stream": TypeDef::new_with_kind(Kind::Bytes),
-        "subscription_filters": TypeDef::new_with_kind(Kind::Bytes),
+        "subscription_filters": TypeDef::new_with_kind(Kind::Array).with_inner_type(TypeDef::new_with_kind(Kind::Bytes)),
         "log_events": TypeDef::new_with_kind(Kind::Array)
             .with_inner_type(InnerTypeDef::Map(remap::type_def_map![
                 "id": TypeDef::new_with_kind(Kind::Bytes),
