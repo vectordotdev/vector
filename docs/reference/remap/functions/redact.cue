@@ -1,6 +1,14 @@
 package metadata
 
 remap: functions: redact: {
+	category: "String"
+	description: """
+		Redacts sensitive data from the `value` via the specified `patterns`.
+
+		This function is useful to redact personally identifiable information (PII) such as emails, credit card numbers,
+		and more.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -38,13 +46,7 @@ remap: functions: redact: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "String"
-	description: """
-		Redacts sensitive data in the provided `value` via the specified `patterns`.
 
-		This function is useful to redact personally identifiable information (PII) such as emails, credit card numbers,
-		and more.
-		"""
 	examples: [
 		{
 			title: "Redact (credit card number)"

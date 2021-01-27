@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: length: {
+	category: "Enumerate"
+	description: """
+		Returns the length of the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -18,10 +23,7 @@ remap: functions: length: {
 			"If `value` is a map, the number of map keys is returned (nested keys are ignored)",
 		]
 	}
-	category: "Enumerate"
-	description: """
-		Returns the length of the input.
-		"""
+
 	examples: [
 		{
 			title: "Length (map)"

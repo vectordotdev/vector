@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: flatten: {
+	category: "Enumerate"
+	description: #"""
+		Flattens the `value` into a single-level representation.
+		"""#
+
 	arguments: [
 		{
 			name:        "value"
@@ -16,10 +21,7 @@ remap: functions: flatten: {
 			"The return type will match the `value` type.",
 		]
 	}
-	category: "Enumerate"
-	description: #"""
-		Returns a nested `array` or `map` that has been flattened to a single level.
-		"""#
+
 	examples: [
 		{
 			title: "Flatten array"

@@ -1,4 +1,9 @@
 remap: functions: to_timestamp: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a timestamp.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -18,10 +23,7 @@ remap: functions: to_timestamp: {
 			"If `value` is an `integer`, it assumed to be a Unix representation of the timestamp (the number of seconds after January 1st, 1970).",
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `timestamp`.
-		"""#
+
 	examples: [
 		{
 			title: "Coerce to a timestamp"

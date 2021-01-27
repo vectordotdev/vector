@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: ip_to_ipv6: {
+	category: "IP"
+	description: """
+		Converts the `ip` to an IPv6 address.
+		"""
+
 	arguments: [
 		{
 			name:        "ip"
@@ -19,10 +24,7 @@ remap: functions: ip_to_ipv6: {
 			"If `ip` is a IPv4 address then it converted to IPv4 mapped IPv6 addresses.",
 		]
 	}
-	category: "IP"
-	description: #"""
-		Converts the provided `ip` to an IPv6 address.
-		"""#
+
 	examples: [
 		{
 			title: "IPv4 to IPv6"

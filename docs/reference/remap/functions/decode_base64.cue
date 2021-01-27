@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: decode_base64: {
+	category:    "Codec"
+	description: """
+		Decodes the `value` (a [Base64](\(urls.base64)) string) into it's original string.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -13,10 +18,7 @@ remap: functions: decode_base64: {
 		"`value` is not a valid encoded base64 string.",
 	]
 	return: types: ["string"]
-	category:    "Codec"
-	description: """
-		Decodes the provided `value` (a [Base64](\(urls.base64)) string) into it's original string.
-		"""
+
 	examples: [
 		{
 			title: "Decode Base64 data"

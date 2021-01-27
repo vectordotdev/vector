@@ -19,6 +19,9 @@ package metadata
 			return?: _
 			output?: #Event
 		}
+
+		notes?: [string, ...string]
+		warnings?: [string, ...string]
 	}
 
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "path" | "string" | "regex" | "timestamp"
@@ -59,11 +62,14 @@ remap: #Remap & {
 				msgid:     "ID389"
 				procid:    2666
 				severity:  "info"
-				timestamp: "2020-12-22 15:22:31.111 UTC"
+				timestamp: "2020-12-22T15:22:31.111Z"
 			}
+			notes: [
+				"Attributes are coerced into their proper types, including `timestamp`.",
+			]
 		},
 		{
-			title: "Parse key/value logs"
+			title: "Parse key/value (logfmt) logs"
 			input: log: message: "@timestamp=\"Sun Jan 10 16:47:39 EST 2021\" level=info msg=\"Stopping all fetchers\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"
 			source: """
 				structured = parse_key_value!(.message)
@@ -77,6 +83,9 @@ remap: #Remap & {
 				id:               "ConsumerFetcherManager-1382721708341"
 				module:           "kafka.consumer.ConsumerFetcherManager"
 			}
+			warnings: [
+				"All attributes are strings and will require manual type coercing.",
+			]
 		},
 		{
 			title: "Parse custom logs"
@@ -107,6 +116,27 @@ remap: #Remap & {
 				server:    "localhost"
 				request:   "GET /test.php HTTP/1.1"
 				host:      "yyy.yyy.yyy.yyy"
+			}
+		},
+		{
+			title: "Multiple parsing strategies"
+			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
+			source: #"""
+				structured =
+				  parse_syslog(.message) ??
+				  parse_common_log(.message) ??
+				  parse_regex!(.message, /^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$/)
+				. = merge(., structured)
+				"""#
+			output: log: {
+				appname:   "su"
+				facility:  "ntp"
+				hostname:  "vector-user.biz"
+				message:   "Something went wrong"
+				msgid:     "ID389"
+				procid:    2666
+				severity:  "info"
+				timestamp: "2020-12-22 15:22:31.111 UTC"
 			}
 		},
 		{
