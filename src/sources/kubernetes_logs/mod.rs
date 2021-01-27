@@ -254,7 +254,7 @@ impl Source {
             // left off.
             ignore_checkpoints: false,
             // Match the default behavior
-            read_from: ReadFrom::default(),
+            read_from: ReadFrom::Beginning,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
