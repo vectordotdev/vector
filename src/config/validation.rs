@@ -7,8 +7,25 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
     if config.sources.is_empty() {
         errors.push("No sources defined in the config.".to_owned());
     }
+
     if config.sinks.is_empty() {
         errors.push("No sinks defined in the config.".to_owned());
+    }
+
+    // Check for non-unique names across sources, sinks, and transforms
+    let mut name_counts = HashMap::<&str, usize>::new();
+    for name in config
+        .sources
+        .keys()
+        .chain(config.transforms.keys())
+        .chain(config.sinks.keys())
+    {
+        let count = name_counts.entry(name).or_default();
+        *count += 1;
+    }
+
+    for (name, _count) in name_counts.into_iter().filter(|(_name, count)| *count > 1) {
+        errors.push(format!("More than one component with name \"{}\".", name));
     }
 
     // Warnings and errors
