@@ -240,6 +240,7 @@ prost-build = "0.6.1"
 built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
+collnew = { path = "lib/collnew", features = ["btreemap"] }
 base64 = "0.13"
 approx = "0.4.0"
 criterion = "0.3"

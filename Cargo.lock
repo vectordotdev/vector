@@ -7563,6 +7563,7 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "codec",
+ "collnew",
  "colored",
  "criterion",
  "crossterm 0.19.0",
