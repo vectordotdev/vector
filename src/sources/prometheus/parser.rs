@@ -930,7 +930,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce "}))
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
             ])
         );
     }
