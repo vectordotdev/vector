@@ -46,6 +46,10 @@ mod ip_subnet;
 mod ip_to_ipv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 mod ipv6_to_ipv4;
+#[cfg(feature = "is_log")]
+mod is_log;
+#[cfg(feature = "is_metric")]
+mod is_metric;
 #[cfg(feature = "is_nullish")]
 mod is_nullish;
 #[cfg(feature = "length")]
@@ -187,6 +191,10 @@ pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+#[cfg(feature = "is_log")]
+pub use is_log::IsLog;
+#[cfg(feature = "is_metric")]
+pub use is_metric::IsMetric;
 #[cfg(feature = "is_nullish")]
 pub use is_nullish::IsNullish;
 #[cfg(feature = "length")]
@@ -324,6 +332,10 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_log")]
+        Box::new(IsLog),
+        #[cfg(feature = "is_metric")]
+        Box::new(IsMetric),
         #[cfg(feature = "is_nullish")]
         Box::new(IsNullish),
         #[cfg(feature = "length")]

@@ -61,6 +61,8 @@ default = [
     "ip_subnet",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
+    "is_log",
+    "is_metric",
     "is_nullish",
     "length",
     "log",
@@ -130,6 +132,8 @@ ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
+is_log = []
+is_metric = []
 is_nullish = []
 length = []
 log = ["tracing"]

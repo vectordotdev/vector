@@ -569,6 +569,10 @@ enum MetricPathError<'a> {
 }
 
 impl Object for Metric {
+    fn identifier(&self) -> &'static str {
+        "metric"
+    }
+
     fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());

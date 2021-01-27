@@ -245,6 +245,10 @@ impl Serialize for LogEvent {
 }
 
 impl Object for LogEvent {
+    fn identifier(&self) -> &'static str {
+        "log"
+    }
+
     fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
         if path.is_root() {
             let iter = self

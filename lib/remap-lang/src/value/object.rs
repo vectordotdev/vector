@@ -1,6 +1,10 @@
 use crate::{Object, Path, Value};
 
 impl Object for Value {
+    fn identifier(&self) -> &'static str {
+        "value"
+    }
+
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
         self.insert_by_path(path, value);
         Ok(())

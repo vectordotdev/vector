@@ -1938,3 +1938,49 @@
       source = '''
         .a != ""
       '''
+
+[transforms.remap_function_is_log]
+  inputs = []
+  type = "remap"
+  source = """
+    .log = is_log()
+    .metric = is_metric()
+  """
+[[tests]]
+  name = "remap_function_is_log"
+  [tests.input]
+    insert_at = "remap_function_is_log"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_is_log"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .log == true && .metric == false
+      '''
+
+[transforms.remap_is_metric]
+  inputs = []
+  type = "remap"
+  source = """
+    .tags.log = to_string(is_log())
+    .tags.metric = to_string(is_metric())
+  """
+[[tests]]
+  name = "remap_is_metric"
+  [tests.input]
+    insert_at = "remap_is_metric"
+    type = "metric"
+    [tests.input.metric]
+      name = "example counter"
+      namespace = "zork"
+      kind = "absolute"
+      counter.value = 1.0
+  [[tests.outputs]]
+    extract_from = "remap_is_metric"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .tags.log == "false" && .tags.metric == "true" ?? false
+      '''
