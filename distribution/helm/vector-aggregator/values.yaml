@@ -53,14 +53,12 @@ podAnnotations: {}
 podLabels: {}
 
 # PodSecurityContext to set at the `Pod`s managed by `StatefulSet`.
-podSecurityContext:
-  {}
+podSecurityContext: {}
   # fsGroup: 2000
 
 # Security context to set at the `vector` container at the `Pod`s managed by
 # `StatefulSet`.
-securityContext:
-  {}
+securityContext: {}
   # capabilities:
   #   drop:
   #   - ALL
@@ -69,8 +67,7 @@ securityContext:
   # runAsUser: 1000
 
 # Extra env vars to pass to the `vector` container.
-env:
-  []
+env: []
   # - name: VAR
   #    valueFrom:
   #      secretKeyRef:
@@ -157,8 +154,7 @@ psp:
 service:
   # Additional ports to expose.
   type: "ClusterIP"
-  ports:
-    []
+  ports: []
     # - name: http
     #   port: 1234
     #   protocol: TCP
@@ -204,8 +200,7 @@ vectorSource:
   # The port to use if service.type is NodePort
   nodePort: null
   # Additional config to embed at the vector source.
-  config:
-    {}
+  config: {}
     # option: "value"
   # Raw TOML config to embed at the vector source (deprecated).
   rawConfig: null
@@ -218,8 +213,7 @@ internalMetricsSource:
   # The name to use for the "built-in" internal metrics source.
   sourceId: internal_metrics
   # Additional config to embed at the internal metrics source.
-  config:
-    {}
+  config: {}
     # option: "value"
   # Raw TOML config to embed at the internal metrics source (deprecated).
   rawConfig: null
@@ -248,8 +242,7 @@ prometheusSink:
   # The port to listen at.
   listenPort: "9090"
   # Additional config to embed at the prometheus sink.
-  config:
-    {}
+  config: {}
     # option: "value"
   # Raw TOML config to embed at the prometheus sink (deprecated).
   rawConfig: null
@@ -270,16 +263,14 @@ prometheusSink:
     extraRelabelings: []
 
 # Sources to add to the generated `vector` config
-sources:
-  {}
+sources: {}
   # source_name:
   #   type: "source_type"
   #   rawConfig: |
   #     option = "value"
 
 # Transforms to add to the generated `vector` config.
-transforms:
-  {}
+transforms: {}
   # transform_name:
   #   type: "transform_type"
   #   inputs: ["input1", "input2"]
@@ -287,8 +278,7 @@ transforms:
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
-sinks:
-  {}
+sinks: {}
   # sink_name:
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
