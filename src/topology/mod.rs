@@ -152,7 +152,7 @@ impl RunningTopology {
             delay_until(deadline).await;
             // Remove all tasks that have shutdown.
             check_handles2.retain(|_name, handles| {
-                retain(handles, |handle| handle.peek().is_some());
+                retain(handles, |handle| handle.peek().is_none());
                 !handles.is_empty()
             });
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
@@ -170,7 +170,7 @@ impl RunningTopology {
                 interval.tick().await;
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_name, handles| {
-                    retain(handles, |handle| handle.peek().is_some());
+                    retain(handles, |handle| handle.peek().is_none());
                     !handles.is_empty()
                 });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
