@@ -15,7 +15,7 @@ The question posed by @binarylogic in #5843 is a good definition for the motivat
 
 From a high level my proposal is pretty simple. I'll dive into the rationale and context lower in the doc but lets just tee that up, shall we?
 
-I propose that if we're not explicitly searching for alternate tooling because we've decided that we wholly can't deal with the tooling overhead of protobufs, we should instead continue to use them with prost. As an added dimension to the issue I'd suggest that we support an initial Transport of HTTP/1.1 and consider a fast-follow of effort to implement HTTP/2 (or even optionally GRPC - though it bares saying I am unconvinced of the necessity of GRPC over HTTP/2 for our usecase).
+I propose that if we're not explicitly searching for alternate tooling because we've decided that we wholly can't deal with the tooling overhead of protobufs, we should instead continue to use them with prost. As an added dimension to the issue I'd suggest that we support an initial Transport of HTTP/1.1 and consider a fast-follow of effort to implement gRPC (or even optionally HTTP/2 - we'll discuss why I'd suggest gRPC over HTTP/2 later in the doc).
 
 Performance of the format itself is not a huge concern as everything we're considering is fast enough not to be a bottleneck for us. However, our current implementation of Protobufs in vector and the integration point to our data model is unoptimized. Should we continue using Protobuf, we should take an optimization pass at them.
 
@@ -57,7 +57,184 @@ These four concerns don't fully enumerate the problem but I think they're a real
 
 It might not be totally clear from the serialization benchmark examples but while protobufs are inherently slow in some respects, they're _still_ more performant than raw JSON implementations and even MessagePack or CBOR. And their maintenance cost has already been paid since we're using them today. Any schema based data format is likely going to have better perf than something schemaless. The schema itself is obviously part of the tooling overhead here but I'd argue that if we cared _more_ about tooling overhead than we did about perfomance and sustainability we'd probably be writing this project in something other than Rust.
 
-With regards to the tansport and the suggested path of implementing HTTP/1.1 _before_ HTTP/2 we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/timberio/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repurcussions on our deployment architecture and ultimately HTTP/2 with Protobufs provides us what we think are the right tradeoffs for our implementation. However, just quickly getting out a low-effort HTTP/1.1 implementation with batching solves some immediate pain for ourselves and our users around dynamic IPs and kubernetes load-balancing. I'd classify it as low-hanging fruit while a more thorough HTTP/2 and optimized Protobufs effort gets underway.
+With regards to the tansport and the suggested path of implementing HTTP/1.1 _before_ gRPC we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/timberio/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repurcussions on our deployment architecture and ultimately gRPC with Protobufs provides us what we think are the right tradeoffs for our implementation. However, just quickly getting out a low-effort HTTP/1.1 implementation with batching solves some immediate pain for ourselves and our users around dynamic IPs and kubernetes load-balancing. I'd classify it as low-hanging fruit while a more thorough gRPC and optimized Protobufs effort gets underway.
+
+This brings us to the question of _why_ gRPC instead of HTTP/2 or even HTTP/3 for that matter. There are benefits in HTTP/3 but not _really_ around throughput performance as much as reliability and behavior. HTTP/3 being based on UDP means that in the case of fetching multiple objets simultaneously in the case of a dropped packet only the single interrupted stream is blocked as opposed to all streams being blocked head of line. While this might be useful behavior, the cost of writing and maintaining something in HTTP/3 will (likely) initially be much higher. Available libraries in Rust are fairly low-level and don't provide much in the way of quality abstraction for consumers, which doesn't even cover the major glaring issue that Http/3 as a protocol hasn't fully proliferated or become ubiquitious and novelty at this stage of the project is probably not what we want. That alone makes me feel like it should be avoided initially.
+
+So there are some tangible benefits to using gRPC instead of just HTTP/2 specifically relating to ergonomics and maintenance which ends up being the principle motivator for this decision for me. Most everything that could want to do with gRPC out of box can be achieved with HTTP/2 in hyper. However, if using gRPC we suddenly have access to [tonic](https://github.com/hyperium/tonic) which provides some truly excellent abstractions out-of-box that could pay dividends on our tooling and maintenance overhead the further we go with it, including the maintenance and overhead of protobuf generation. As a specific and shining example, should we want or need to adopt streaming requests, bi-directional stream or mutual tls authentication. `Tonic` makes this really straightforward. Once you've implemented rpc for the service you define in your .proto's the ergonomics of the library make development a breeze. Lets look at an example. First let's start with the protofbuf file specifically:
+
+```
+    syntax = "proto3";
+
+    package our_rpc;
+
+    service Dummy {
+      rpc Send (DummyRequest) returns (DummyResponse);
+      rpc SendStream(DummyRequest) returns (stream DummyResponse);
+      rpc ReceiveStream(stream DummyRequest) returns (DummyResponse);
+      rpc Bidirectional(stream DummyRequest) returns (stream DummyResponse);
+    }
+
+    message DummyRequest {
+      string name = 1;
+    }
+
+    // return value
+    message DummyResponse {
+      string message = 1;
+    }
+```
+
+This example assumes a server that has trait implementations for the services we've defined in our protos. So let's whip those up real quick here.
+
+```rust
+use tokio::sync::mpsc;
+use tonic::{transport::Server, Request, Response, Status};
+
+use our_rpc_mod::say_server::{Dummy}, DummyServer};
+use our_rpc_mod::{DummyRequest, DummyResponse};
+
+mod our_rpc_mod;
+
+#[derive(Default)]
+pub struct MyHandler {}
+
+#[tonic::async_trait]
+//Implementation of the traits we need for our various "services" defined in our protos.
+impl Dummy for MyHandler {
+    type SendStreamStream = mpsc::Receiver<Result<DummyResponse, Status>>;
+    async fn send_stream(
+        &self,
+        request: Request<DummyRequest>,
+    ) -> Result<Response<Self::SendStreamStream>, Status> {
+        let (mut tx, rx) = mpsc::channel(4);
+
+        tokio::spawn(async move {
+            for _ in 0..4 {
+                tx.send(Ok(DummyResponse {
+                    message: format!("hello"),
+                }))
+                .await;
+            }
+        });
+
+        Ok(Response::new(rx))
+    }
+
+    type BidirectionalStream = mpsc::Receiver<Result<DummyResponse, Status>>;
+    async fn bidirectional(
+        &self,
+        request: Request<tonic::Streaming<DummyRequest>>,
+    ) -> Result<Response<Self::BidirectionalStream>, Status> {
+        let mut streamer = request.into_inner();
+        let (mut tx, rx) = mpsc::channel(4);
+
+        tokio::spawn(async move {
+            while let Some(req) = streamer.message().await.unwrap(){
+                tx.send(Ok(DummyResponse {
+                    message: format!("hello {}", req.name),
+                }))
+                .await;
+            }
+        });
+
+        Ok(Response::new(rx))
+    }
+
+    async fn receive_stream(
+        &self,
+        request: Request<tonic::Streaming<DummyRequest>>,
+    ) -> Result<Response<DummyResponse>, Status> {
+        let mut stream = request.into_inner();
+        let mut message = String::from("");
+
+        while let Some(req) = stream.message().await? {
+            message.push_str(&format!("Hello {}\n", req.name))
+        }
+
+        Ok(Response::new(DummyResponse { message }))
+    }
+
+    async fn send(&self, request: Request<DummyRequest>) -> Result<Response<DummyResponse>, Status> {
+        Ok(Response::new(DummyResponse {
+            message: format!("hello {}", request.get_ref().name),
+        }))
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let addr = "[::1]:9999".parse().unwrap();
+    let handler = MyHandler::default();
+    println!("Server listening on {}", addr);
+    Server::builder()
+        .add_service(DummyServer::new(handler))
+        .serve(addr)
+        .await?;
+    Ok(())
+}
+```
+
+Hopefully those protos looks familiar enough. In order for all of this to fit together correctly we then create a module to "include" the generated proto handling code in our project with a lovely macro. This refers to the package name of our proto file. Let's say we name this `our_rpc_mod.rs`.
+
+```rust
+// this allows us to easily include code generated for package our_rpc from the .proto file
+tonic::include_proto!("our_rpc");
+```
+
+With that done we have access to `our_rpc` generated code in our theoretical `client.rs` module as well as our previously written `server.rs`:
+
+```rust
+    use our_rpc_mod::dummy_client::DummyClient;
+    use our_rpc_mod::DummyRequest;
+
+    mod our_rpc_mod;
+
+    #[tokio::main]
+    async fn main() -> Result<(), Box<dyn std::error::Error>> {
+      // Start a connection channel to the server
+      let channel = tonic::transport::Channel::from_static("http://[::1]:9999")
+        .connect()
+        .await?;
+
+    // Create a gRPC client from the channel
+        let mut client = DummyClient::new(channel);
+
+    // Build ourselves a request
+        let request = tonic::Request::new(
+            DummyRequest {
+               name:String::from("eeyun")
+            },
+        );
+
+    // Send it and wait for response
+        let response = client.send(request).await?.into_inner();
+        println!("RESPONSE={:?}", response);
+        Ok(())
+    }
+```
+
+It's not much code and it should be very easy to follow but It should also give you an idea of how easy tonic makes it. Now to swap our client between these modalities is _super_ trivial. For streaming we can go from what we have here to:
+
+```rust
+    // sending stream
+        let response = client.receive_stream(request).await?.into_inner();
+        println!("RESPONSE=\n{}", response.message);
+```
+
+Or if we want to go to bidirectional?
+
+```rust
+    // calling rpc
+        let mut response = client.bidirectional(request).await?.into_inner();
+    // listening on the response stream
+        while let Some(res) = response.message().await? {
+            println!("NOTE = {:?}", res);
+        }
+        Ok(())
+```
+
+This is obviously overly simplistic and a bit hand-wavey but, hopefully it expresses the value tonic provides in the form of these easy to consume abstractions. That seems to remain true if we want to do mutual TLS authentication or a few other more niche gRPC specific features which is fantastic. This library alone has me won over.
 
 The truth is that of the formats that have wide adoption, all of them have their pitfalls and while Protobufs bring with it some maintenance burden its still some of the _best_ tools with better integrations and libraries than most of the other things out there.
 
