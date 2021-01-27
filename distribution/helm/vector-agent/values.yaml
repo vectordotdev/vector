@@ -51,12 +51,14 @@ podAnnotations: {}
 podLabels: {}
 
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
-podSecurityContext: {}
+podSecurityContext:
+  {}
   # fsGroup: 2000
 
 # Security context to set at the `vector` container at the `Pod`s managed by
 # `DaemonSet`.
-securityContext: {}
+securityContext:
+  {}
   # capabilities:
   #   drop:
   #   - ALL
@@ -118,6 +120,16 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The "built-in" api for healthchecks and graphql requests.
+# Will be disabled by default.
+vectorApi:
+  # Disable to omit the vector api from being added.
+  enabled: false
+  # The address to listen at.
+  address: "0.0.0.0:8686"
+  # Disable to omit the vector api playground from being added.
+  playground: true
+
 # The "built-in" kubernetes logs source to collect logs from the `Pod`s running
 # on the `Node`.
 # Will be added by default, unless explicitly disabled.
@@ -127,7 +139,8 @@ kubernetesLogsSource:
   # The name to use for the "built-in" kubernetes logs source.
   sourceId: kubernetes_logs
   # Additional config to embed at the kubernetes logs source.
-  config: {}
+  config:
+    {}
     # option: "value"
   # Raw TOML config to embed at the kubernetes logs source (deprecated).
   rawConfig: null
@@ -141,13 +154,14 @@ vectorSink:
   # The name to use for the "built-in" vector sink.
   sinkId: vector_sink
   # Inputs of the built-in vector sink.
-  inputs: null  # ["my_input_1", "my_input_2"]
+  inputs: null # ["my_input_1", "my_input_2"]
   # The host of the Vector to send the data to.
-  host: null  # "vector.internal"
+  host: null # "vector.internal"
   # The port of the Vector to send the data to.
-  port: null  # 9000
+  port: null # 9000
   # Additional config to embed at the vector sink.
-  config: {}
+  config:
+    {}
     # option: "value"
   # Raw TOML config to embed at the vector sink (deprecated).
   rawConfig: null
@@ -160,7 +174,8 @@ internalMetricsSource:
   # The name to use for the "built-in" internal metrics source.
   sourceId: internal_metrics
   # Additional config to embed at the internal metrics source.
-  config: {}
+  config:
+    {}
     # option: "value"
   # Raw TOML config to embed at the internal metrics source (deprecated).
   rawConfig: null
@@ -173,7 +188,8 @@ hostMetricsSource:
   # The name to use for the "built-in" host metrics source.
   sourceId: host_metrics
   # Additional config to embed at the host metrics source.
-  config: {}
+  config:
+    {}
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
@@ -202,7 +218,8 @@ prometheusSink:
   # The port to listen at.
   listenPort: "9090"
   # Additional config to embed at the prometheus sink.
-  config: {}
+  config:
+    {}
     # option: "value"
   # Raw TOML config to embed at the prometheus sink (deprecated).
   rawConfig: null
@@ -224,7 +241,8 @@ prometheusSink:
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes
 # logs source).
-sources: {}
+sources:
+  {}
   # source_name:
   #   type: "source_type"
   #   option: "value"
@@ -232,7 +250,8 @@ sources: {}
   #     option = "value"
 
 # Transforms to add to the generated `vector` config.
-transforms: {}
+transforms:
+  {}
   # transform_name:
   #   type: "transform_type"
   #   inputs: ["input1", "input2"]
@@ -241,7 +260,8 @@ transforms: {}
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
-sinks: {}
+sinks:
+  {}
   # sink_name:
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
