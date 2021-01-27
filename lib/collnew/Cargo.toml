@@ -5,4 +5,4 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "Macros for creating new Collection"
 publish = false
-license = "MIT"
+license = "MPL-2.0"
