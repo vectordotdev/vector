@@ -17,9 +17,8 @@ toml-extract() {
 }
 
 extract-features() {
-  features=( $(toml-extract ".features.\"$1\"|.[]" < Cargo.toml) )
   # The main "features.NAME" only lists categories, so extract from the categories
-  for feature in ${features[*]}
+  for feature in $(toml-extract ".features.\"$1\"|.[]" < Cargo.toml)
   do
     toml-extract ".features.\"$feature\"|.[]" < Cargo.toml
   done | grep "^${1}-" | sort --unique
