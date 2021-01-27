@@ -166,16 +166,13 @@ async fn statsd_udp(
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> Result<(), ()> {
-    let mut socket = UdpSocket::bind(&config.address)
+    let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
-    #[cfg(not(unix))]
-    let socket = socket;
-
     #[cfg(unix)]
     udp::set_buffer_sizes(
-        &mut socket,
+        &socket,
         config.send_buffer_bytes,
         config.receive_buffer_bytes,
     );

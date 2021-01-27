@@ -70,7 +70,7 @@ pub fn udp(
             .expect("Failed to bind to udp listener socket");
 
         #[cfg(unix)]
-        udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
+        udp::set_buffer_sizes(&socket, send_buffer_bytes, receive_buffer_bytes);
 
         #[cfg(unix)]
         let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {

@@ -318,15 +318,12 @@ pub fn udp(
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::pin(async move {
-        let mut socket = UdpSocket::bind(&addr)
+        let socket = UdpSocket::bind(&addr)
             .await
             .expect("Failed to bind to UDP listener socket");
 
-        #[cfg(not(unix))]
-        let socket = socket;
-
         #[cfg(unix)]
-        udp::set_buffer_sizes(&mut socket, send_buffer_bytes, receive_buffer_bytes);
+        udp::set_buffer_sizes(&socket, send_buffer_bytes, receive_buffer_bytes);
 
         info!(
             message = "Listening.",

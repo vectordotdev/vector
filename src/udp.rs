@@ -7,7 +7,7 @@ use tokio::net::UdpSocket;
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket. Until then, use of `unsafe` is necessary here.
 pub fn set_buffer_sizes(
-    socket: &mut UdpSocket,
+    socket: &UdpSocket,
     send_buffer_bytes: Option<usize>,
     receive_buffer_bytes: Option<usize>,
 ) {
