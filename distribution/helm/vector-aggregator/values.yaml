@@ -153,7 +153,6 @@ psp:
 # Configuration for both regular and headless `Service`.
 service:
   # Additional ports to expose.
-  type: "ClusterIP"
   ports: []
     # - name: http
     #   port: 1234
@@ -197,8 +196,6 @@ vectorSource:
   listenAddress: "0.0.0.0"
   # The port to listen at.
   listenPort: "9000"
-  # The port to use if service.type is NodePort
-  nodePort: null
   # Additional config to embed at the vector source.
   config: {}
     # option: "value"
