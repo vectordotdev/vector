@@ -1,4 +1,3 @@
-#[cfg(feature = "btreemap")]
 #[macro_export]
 macro_rules! btreemap {
     () => (::std::collections::BTreeMap::new());
@@ -19,7 +18,6 @@ macro_rules! btreemap {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "btreemap")]
     #[test]
     fn test_btreemap() {
         use std::collections::BTreeMap;

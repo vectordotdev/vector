@@ -6,7 +6,3 @@ edition = "2018"
 description = "Macros for creating new Collection"
 publish = false
 license = "MIT"
-
-[features]
-default = ["btreemap"]
-btreemap = []

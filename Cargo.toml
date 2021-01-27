@@ -57,7 +57,7 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-collnew = { path = "lib/collnew", features = ["btreemap"], optional = true }
+collnew = { path = "lib/collnew", optional = true }
 derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
@@ -242,7 +242,7 @@ built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
-collnew = { path = "lib/collnew", features = ["btreemap"] }
+collnew = { path = "lib/collnew" }
 approx = "0.4.0"
 criterion = "0.3"
 tempfile = "3.0.6"
