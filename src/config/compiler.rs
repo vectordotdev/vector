@@ -103,7 +103,7 @@ fn expand_wildcards(config: &mut ConfigBuilder) {
 }
 
 fn expand_wildcards_inner(inputs: &mut Vec<String>, name: &str, candidates: &[String]) {
-    let raw_inputs = inputs.drain(..).collect::<Vec<_>>();
+    let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
         if raw_input.ends_with('*') {
             let prefix = &raw_input[0..raw_input.len() - 1];
