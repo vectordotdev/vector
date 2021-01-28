@@ -11,6 +11,7 @@ components: transforms: sample: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -38,24 +39,33 @@ components: transforms: sample: {
 			common: false
 			description: """
 				The name of the log field whose value will be hashed to determine if the event should be passed.
-				Consistently samples the same events.
-				Actual rate of sampling may differ from the configured one if
-				values in the field are not uniformly distributed.
-				If left unspecified, or if the event doesn't have `key_field`, events will be count rated.
+
+				Consistently samples the same events. Actual rate of sampling may differ from the configured one if
+				values in the field are not uniformly distributed. If left unspecified, or if the event doesn't have
+				`key_field`, events will be count rated.
 				"""
 			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["message"]
+				syntax: "literal"
 			}
 		}
 		exclude: {
-			common:      true
-			description: "The set of logical conditions to exclude events from sampling."
-			required:    false
+			common: true
+			description: """
+				The set of logical conditions to exclude events from sampling.
+				"""
+			required: false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "remap"
+			}
 		}
 		rate: {
 			description: """

@@ -9,6 +9,7 @@ components: sinks: elasticsearch: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS", "Azure", "Elastic", "GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -102,6 +103,7 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
+							syntax: "literal"
 						}
 					}
 					strategy: {
@@ -113,6 +115,7 @@ components: sinks: elasticsearch: {
 								aws:   "Authentication strategy used for [AWS' hosted Elasticsearch service](\(urls.aws_elasticsearch))."
 								basic: "The [basic authentication strategy](\(urls.basic_auth))."
 							}
+							syntax: "literal"
 						}
 					}
 					user: {
@@ -121,6 +124,7 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_USERNAME}", "username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -142,6 +146,7 @@ components: sinks: elasticsearch: {
 						type: string: {
 							default: null
 							examples: ["us-east-1"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -155,6 +160,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: "index"
 				examples: ["index", "create"]
+				syntax: "literal"
 			}
 		}
 		doc_type: {
@@ -164,6 +170,7 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				default: "_doc"
+				syntax:  "literal"
 			}
 		}
 		endpoint: {
@@ -172,6 +179,7 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
+				syntax: "literal"
 			}
 		}
 		id_key: {
@@ -182,6 +190,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: null
 				examples: ["id", "_id"]
+				syntax: "literal"
 			}
 		}
 		index: {
@@ -192,7 +201,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		pipeline: {
@@ -203,6 +212,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: null
 				examples: ["pipeline-name"]
+				syntax: "literal"
 			}
 		}
 		query: {

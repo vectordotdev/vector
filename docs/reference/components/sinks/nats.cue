@@ -9,6 +9,7 @@ components: sinks: nats: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -63,6 +64,7 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
+				syntax: "literal"
 			}
 		}
 		subject: {
@@ -71,7 +73,7 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		name: {
@@ -81,6 +83,7 @@ components: sinks: nats: {
 			type: string: {
 				default: "vector"
 				examples: ["foo", "API Name Option Example"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: parse_aws_vpc_flow_log: {
+	category:    "Parse"
+	description: """
+		Parses `value` in the [VPC Flow Logs format](\(urls.aws_vpc_flow_logs)).
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -19,10 +24,7 @@ remap: functions: parse_aws_vpc_flow_log: {
 		"`value` is not a properly formatted AWS VPC Flow log",
 	]
 	return: types: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses [VPC Flow Logs]\(urls.aws_vpc_flow_logs\) into it's constituent components.
-		"""#
+
 	examples: [
 		{
 			title: "Parse AWS VPC Flow log (default format)"

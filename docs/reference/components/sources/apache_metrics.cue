@@ -9,6 +9,7 @@ components: sources: apache_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -62,7 +63,10 @@ components: sources: apache_metrics: {
 			description: "mod_status endpoints to scrape metrics from."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
+				items: type: string: {
+					examples: ["http://localhost:8080/server-status/?auto"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -81,6 +85,7 @@ components: sources: apache_metrics: {
 			warnings: []
 			type: string: {
 				default: "apache"
+				syntax:  "literal"
 			}
 		}
 	}

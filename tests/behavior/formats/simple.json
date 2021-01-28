@@ -1,6 +1,6 @@
 {
   "transforms": {
-    "add_fields_nested": {
+    "add_fields_nested_json": {
       "inputs": [],
       "type": "add_fields",
       "fields": {
@@ -14,19 +14,19 @@
   },
   "tests": [
     {
-      "name": "add_fields_nested",
+      "name": "add_fields_nested_json",
       "input": {
-        "insert_at": "add_fields_nested",
+        "insert_at": "add_fields_nested_json",
         "type": "raw",
         "value": ""
       },
       "outputs": [
         {
-          "extract_from": "add_fields_nested",
+          "extract_from": "add_fields_nested_json",
           "conditions": [
             {
-                "type": "remap",
-                "source": ".a.b == 123 && .x.y == 456 && .x.z == 789"
+              "type": "remap",
+              "source": ".a.b == 123 && .x.y == 456 && .x.z == 789"
             }
           ]
         }
@@ -34,3 +34,4 @@
     }
   ]
 }
+

@@ -9,6 +9,7 @@ components: sinks: aws_sqs: components._aws & {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -76,6 +77,7 @@ components: sinks: aws_sqs: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+				syntax: "literal"
 			}
 		}
 		message_group_id: {
@@ -86,6 +88,7 @@ components: sinks: aws_sqs: components._aws & {
 			type: string: {
 				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
+				syntax: "literal"
 			}
 		}
 	}

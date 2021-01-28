@@ -9,6 +9,7 @@ components: sinks: clickhouse: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Yandex"]
+		stateful: false
 	}
 
 	features: {
@@ -101,6 +102,7 @@ components: sinks: clickhouse: {
 			type: string: {
 				default: null
 				examples: ["mydatabase"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -108,6 +110,7 @@ components: sinks: clickhouse: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:8123"]
+				syntax: "literal"
 			}
 		}
 		table: {
@@ -116,6 +119,7 @@ components: sinks: clickhouse: {
 			warnings: []
 			type: string: {
 				examples: ["mytable"]
+				syntax: "literal"
 			}
 		}
 	}
