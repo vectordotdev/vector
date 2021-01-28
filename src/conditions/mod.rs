@@ -57,6 +57,7 @@ impl AnyCondition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[derive(Deserialize, Debug)]
     struct Test {
@@ -67,36 +68,36 @@ mod tests {
     fn deserialize_anycondition_default() {
         let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
         assert_eq!(
-            "Test { condition: String(\".nork == false\") }",
-            format!("{:?}", conf)
+            r#"String(".nork == false""#,
+            format!("{:?}", conf.condition)
         )
     }
 
     #[test]
     fn deserialize_anycondition_check_fields() {
-        let conf: Test = toml::from_str(
-            r#"condition.type = "check_fields"
-               condition."norg.equals" = "nork""#,
-        )
+        let conf: Test = toml::from_str(indoc! {r#"
+            condition.type = "check_fields"
+            condition."norg.equals" = "nork"
+        "#})
         .unwrap();
 
         assert_eq!(
-            "Test { condition: Map(CheckFieldsConfig { predicates: {\"norg.equals\": \"nork\"} }) }",
-            format!("{:?}", conf)
+            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} }"#,
+            format!("{:?}", conf.condition)
         )
     }
 
     #[test]
     fn deserialize_anycondition_remap() {
-        let conf: Test = toml::from_str(
-            r#"condition.type = "remap"
-               condition.source = '.nork == true'"#,
-        )
+        let conf: Test = toml::from_str(indoc! {r#"
+            condition.type = "remap"
+            condition.source = '.nork == true'
+        "#})
         .unwrap();
 
         assert_eq!(
-            "Test { condition: Map(RemapConfig { source: \".nork == true\" }) }",
-            format!("{:?}", conf)
+            r#"Map(RemapConfig { source: ".nork == true" }"#,
+            format!("{:?}", conf.condition)
         )
     }
 }
