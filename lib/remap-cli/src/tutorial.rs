@@ -1,17 +1,37 @@
 use super::{
-    repl::{resolve, Repl},
+    repl::Repl,
     Error,
 };
-use remap::{state, Runtime, Value};
-use remap_functions::map;
+use remap::{state, Formatter, Object, Program, Runtime, Value};
+use remap_functions::{all as funcs, map};
 use rustyline::{error::ReadlineError, Editor};
 
 struct Tutorial {
     number: &'static str, // Making this a string allows for 1.1, 2.5, etc.
     title: &'static str,
     help_text: &'static str,
-    correct_answer: Option<&'static str>,
+    correct_answer: Value,
     object: Value,
+}
+
+pub fn resolve(
+    object: &mut impl Object,
+    runtime: &mut Runtime,
+    program: &str,
+    state: &mut state::Compiler,
+) -> Result<Value, Error> {
+    let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
+        Ok((program, _)) => program,
+        Err(diagnostics) => {
+            let msg = Formatter::new(program, diagnostics).colored().to_string();
+            return Err(Error::Parse(msg))
+        }
+    };
+
+    match runtime.run(object, &program) {
+        Ok(v) => Ok(v),
+        Err(err) => Err(Error::Runtime(err.to_string()))
+    }
 }
 
 pub fn tutorial() -> Result<(), Error> {
@@ -25,55 +45,13 @@ pub fn tutorial() -> Result<(), Error> {
         number: "1.1",
         title: "Assigning values",
         help_text: ASSIGNMENT_TEXT,
-        correct_answer: Some(r#".foo = "bar""#),
+        correct_answer: Value::from(map!["severity": "info"]),
         object: Value::from(map![]),
     };
 
-    let deletion_tut = Tutorial {
-        number: "1.2",
-        title: "Deleting values",
-        help_text: DELETION_TEXT,
-        correct_answer: Some(r#"del(.password)"#),
-        object: Value::from(
-            map!["timestamp": "2021-01-21T18:46:59.991Z", "method": "POST", "endpoint": "/inventions", "user": "adalovelace", "password": "opensesame"],
-        ),
-    };
+    let mut tutorials = vec![assignment_tut];
 
-    let syslog_tut = Tutorial {
-        number: "2.1",
-        title: "Syslog messages",
-        help_text: SYSLOG_HELP_TEXT,
-        correct_answer: None,
-        object: Value::from(map![
-            "timestamp": "2021-01-21T18:46:59.991Z",
-            "message": "<31>2 2021-01-21T18:46:59.991Z acmecorp.org auth 7726 ID312 - Uh oh, Spaghetti-o's"
-        ]),
-    };
-
-    let json_tut = Tutorial {
-        number: "2.2",
-        title: "JSON logs",
-        help_text: JSON_HELP_TEXT,
-        correct_answer: None,
-        object: Value::from(map![
-            "timestamp": "2021-01-21T18:46:59.991Z",
-            "message": "{\"host\":\"75.58.250.157\",\"user-identifier\":\"adalovelace1337\",\"datetime\":\"21/Jan/2021:18:46:59 -0700\",\"method\":\"PATCH\",\"request\":\"/wp-admin\",\"protocol\":\"HTTP/2.0\",\"status\":401,\"bytes\":20320,\"referer\":\"http://www.evilcorp.org/sql-injection\"}",
-        ]),
-    };
-
-    let grok_tut = Tutorial {
-        number: "2.3",
-        title: "Grok patterns",
-        help_text: GROK_HELP_TEXT,
-        correct_answer: None,
-        object: Value::from(map![
-            "message": "2021-01-21T18:46:59.991Z error Too many cooks in the kitchen"
-        ]),
-    };
-
-    let mut tutorials = vec![assignment_tut, deletion_tut, syslog_tut, json_tut, grok_tut];
-
-    println!("\nWelcome to the Vector Remap Language interactive tutorial!\n~~~~~~~~~~~~~~~~~~~\n");
+    println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
 
     print_tutorial_help_text(index, &tutorials);
 
@@ -100,7 +78,7 @@ pub fn tutorial() -> Result<(), Error> {
                     }
                     "prev" => {
                         if index == 0 {
-                            println!("You're back at the beginning!\n");
+                            println!("\n\nYou're back at the beginning!\n\n");
                         }
 
                         index = index.saturating_sub(1);
@@ -110,18 +88,27 @@ pub fn tutorial() -> Result<(), Error> {
                     command => {
                         let tut = &mut tutorials[index];
                         let object = &mut tut.object;
-                        let value = resolve(Some(object), &mut rt, command, &mut compiler_state);
-                        println!("{}\n", value);
+                        match resolve(object, &mut rt, command, &mut compiler_state) {
+                            Ok(result) => {
+                                if object == &tut.correct_answer {
+                                    println!("\n\nThat's correct!\n");
+                                    println!("{}", object);
 
-                        if let Some(correct_answer) = tut.correct_answer {
-                            if command == correct_answer {
-                                println!("That is correct!");
-                                index = index.saturating_add(1);
-
-                                println!("Current event state:\n{}", object);
-
-                                print_tutorial_help_text(index, &tutorials);
-                            }
+                                    if (index + 1) == tutorials.len() {
+                                        println!("\n\nCongratulations! You've successfully completed the VRL tutorial.");
+                                        break;
+                                    } else {
+                                        println!("\n\nMoving on to the next exercise...");
+                                        index = index.saturating_sub(1);
+                                        print_tutorial_help_text(index, &tutorials);
+                                    }
+                                } else {
+                                    println!("{}", result);
+                                }
+                            },
+                            Err(err) => {
+                                println!("{}", err);
+                            },
                         }
                     }
                 };
@@ -150,7 +137,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     }
 
     println!(
-        "\nTutorial {}: {}\n{}\nEvent:\n{}\n",
+        "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
         tut.number, tut.title, tut.help_text, tut.object
     );
 }
@@ -167,52 +154,6 @@ const ASSIGNMENT_TEXT: &str = r#"In VRL, you can assign values to fields like th
 
 .field = "value"
 
-Assign the string "bar" to the field "foo."
-"#;
-
-const DELETION_TEXT: &str = r#"You can delete fields using the `del` function and specifying the field, like this:
-
-del(.foo)
-
-Delete the "password" field from this HTTP server log line.
-"#;
-
-const SYSLOG_HELP_TEXT: &str = r#"
-First, parse the message to named Syslog fields using the parse_syslog function:
-
-. = parse_syslog!(.message)
-
-Run "." to see the new state of the event. Then you can modify the event however you like.
-
-Some example operations:
-
-.timestamp = to_unix_timestamp!(.timestamp)
-.msgid = uuid_v4()
-"#;
-
-const JSON_HELP_TEXT: &str = r#"First, parse the message string as JSON using the parse_json function:
-
-. = parse_json!(.message)
-
-Run "." to see the new state of the event. Then you can modify the event however you like.
-
-Some example operations:
-
-del(.method); del(.host)
-url = parse_url!(.referer)
-del(.referer)
-.referer_host = url.host
-"#;
-
-const GROK_HELP_TEXT: &str = r#"First, parse the message string using Grok with the parse_grok function:
-
-pattern = "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-. = parse_grok!(.message, pattern)
-
-Run "." to see the new state of the event. Then you can modify the event however you like.
-
-Some example operations:
-
-.timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
-.message = downcase(.message)
+TASK:
+Assign the string `"info"` to the field `severity`.
 "#;
