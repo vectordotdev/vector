@@ -14,26 +14,6 @@ struct Tutorial {
     object: Value,
 }
 
-pub fn resolve(
-    object: &mut impl Object,
-    runtime: &mut Runtime,
-    program: &str,
-    state: &mut state::Compiler,
-) -> Result<Value, Error> {
-    let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
-        Ok((program, _)) => program,
-        Err(diagnostics) => {
-            let msg = Formatter::new(program, diagnostics).colored().to_string();
-            return Err(Error::Parse(msg))
-        }
-    };
-
-    match runtime.run(object, &program) {
-        Ok(v) => Ok(v),
-        Err(err) => Err(Error::Runtime(err.to_string()))
-    }
-}
-
 pub fn tutorial() -> Result<(), Error> {
     let mut index = 0;
     let mut compiler_state = state::Compiler::default();
@@ -41,31 +21,7 @@ pub fn tutorial() -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
-    let assignment_tut = Tutorial {
-        number: "1.1",
-        title: "Assigning values to event fields",
-        help_text: ASSIGNMENT_TEXT,
-        correct_answer: Value::from(map!["severity": "info"]),
-        object: Value::from(map![]),
-    };
-
-    let deletion_tut = Tutorial {
-        number: "1.2",
-        title: "Deleting fields",
-        help_text: DELETION_TEXT,
-        correct_answer: Value::from(map!["three": 3]),
-        object: Value::from(map!["one": 1, "two": 2, "three": 3])
-    };
-
-    let rename_tut = Tutorial {
-        number: "1.3",
-        title: "Renaming fields",
-        help_text: RENAME_TEXT,
-        correct_answer: Value::from(map!["new_field": "old value"]),
-        object: Value::from(map!["old_field": "old value"]),
-    };
-
-    let mut tutorials = vec![assignment_tut, deletion_tut, rename_tut];
+    let mut tutorials = tutorial_list();
 
     println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
 
@@ -151,6 +107,56 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
         "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
         tut.number, tut.title, tut.help_text, tut.object
     );
+}
+
+// This function reworks the resolve function in repl.rs to return a Result rather than a String. If the Result is
+// Ok, the value is used to check whether the current event is equal to the "correct" answer.
+pub fn resolve(
+    object: &mut impl Object,
+    runtime: &mut Runtime,
+    program: &str,
+    state: &mut state::Compiler,
+) -> Result<Value, Error> {
+    let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
+        Ok((program, _)) => program,
+        Err(diagnostics) => {
+            let msg = Formatter::new(program, diagnostics).colored().to_string();
+            return Err(Error::Parse(msg))
+        }
+    };
+
+    match runtime.run(object, &program) {
+        Ok(v) => Ok(v),
+        Err(err) => Err(Error::Runtime(err.to_string()))
+    }
+}
+
+fn tutorial_list() -> Vec<Tutorial> {
+    let assignment_tut = Tutorial {
+        number: "1.1",
+        title: "Assigning values to event fields",
+        help_text: ASSIGNMENT_TEXT,
+        correct_answer: Value::from(map!["severity": "info"]),
+        object: Value::from(map![]),
+    };
+
+    let deletion_tut = Tutorial {
+        number: "1.2",
+        title: "Deleting fields",
+        help_text: DELETION_TEXT,
+        correct_answer: Value::from(map!["three": 3]),
+        object: Value::from(map!["one": 1, "two": 2, "three": 3])
+    };
+
+    let rename_tut = Tutorial {
+        number: "1.3",
+        title: "Renaming fields",
+        help_text: RENAME_TEXT,
+        correct_answer: Value::from(map!["new_field": "old value"]),
+        object: Value::from(map!["old_field": "old value"]),
+    };
+
+    vec![assignment_tut, deletion_tut, rename_tut]
 }
 
 // Help text
