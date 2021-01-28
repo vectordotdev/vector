@@ -137,7 +137,6 @@ mod test {
         },
     }];
 
-
     #[test]
     fn check_invalid_grok_error() {
         let mut arguments = ArgumentList::default();
