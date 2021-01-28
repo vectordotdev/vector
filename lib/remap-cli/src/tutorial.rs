@@ -43,13 +43,29 @@ pub fn tutorial() -> Result<(), Error> {
 
     let assignment_tut = Tutorial {
         number: "1.1",
-        title: "Assigning values",
+        title: "Assigning values to event fields",
         help_text: ASSIGNMENT_TEXT,
         correct_answer: Value::from(map!["severity": "info"]),
         object: Value::from(map![]),
     };
 
-    let mut tutorials = vec![assignment_tut];
+    let deletion_tut = Tutorial {
+        number: "1.2",
+        title: "Deleting fields",
+        help_text: DELETION_TEXT,
+        correct_answer: Value::from(map!["three": 3]),
+        object: Value::from(map!["one": 1, "two": 2, "three": 3])
+    };
+
+    let rename_tut = Tutorial {
+        number: "1.3",
+        title: "Renaming fields",
+        help_text: RENAME_TEXT,
+        correct_answer: Value::from(map!["new_field": "old value"]),
+        object: Value::from(map!["old_field": "old value"]),
+    };
+
+    let mut tutorials = vec![assignment_tut, deletion_tut, rename_tut];
 
     println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
 
@@ -91,15 +107,14 @@ pub fn tutorial() -> Result<(), Error> {
                         match resolve(object, &mut rt, command, &mut compiler_state) {
                             Ok(result) => {
                                 if object == &tut.correct_answer {
-                                    println!("\n\nThat's correct!\n");
-                                    println!("{}", object);
+                                    println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", object);
 
                                     if (index + 1) == tutorials.len() {
                                         println!("\n\nCongratulations! You've successfully completed the VRL tutorial.");
                                         break;
                                     } else {
-                                        println!("\n\nMoving on to the next exercise...");
-                                        index = index.saturating_sub(1);
+                                        println!("\nMoving on to the next exercise...\n\n");
+                                        index = index.saturating_add(1);
                                         print_tutorial_help_text(index, &tutorials);
                                     }
                                 } else {
@@ -132,10 +147,6 @@ fn help() {
 fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     let tut = &tutorials[index];
 
-    if index != 0 {
-        println!("------------");
-    }
-
     println!(
         "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
         tut.number, tut.title, tut.help_text, tut.object
@@ -156,4 +167,22 @@ const ASSIGNMENT_TEXT: &str = r#"In VRL, you can assign values to fields like th
 
 TASK:
 Assign the string `"info"` to the field `severity`.
+"#;
+
+const DELETION_TEXT: &str = r#"You can delete fields using the `del` function:
+
+del(.field)
+
+TASK:
+Use the `del` function to get rid of the `one` and `two` fields.
+"#;
+
+const RENAME_TEXT: &str = r#"When you delete a field, the `del` function returns the value
+of the deleted field. You can change the names of fields by assigning a new
+field the value of the deleted field:
+
+.new = del(.old)
+
+TASK:
+Use the `del` function to rename `old_field` to `new_field`.
 "#;
