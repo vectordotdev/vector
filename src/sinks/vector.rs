@@ -20,7 +20,6 @@ pub struct VectorSinkConfig {
     #[set = "pub"]
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
 }
 
 impl VectorSinkConfig {
@@ -29,19 +28,17 @@ impl VectorSinkConfig {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
         send_buffer_bytes: Option<usize>,
-        receive_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             address,
             keepalive,
             tls,
             send_buffer_bytes,
-            receive_buffer_bytes,
         }
     }
 
     pub fn from_address(address: String) -> Self {
-        Self::new(address, None, None, None, None)
+        Self::new(address, None, None, None)
     }
 }
 
@@ -59,14 +56,7 @@ inventory::submit! {
 
 impl GenerateConfig for VectorSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::new(
-            "127.0.0.1:5000".to_string(),
-            None,
-            None,
-            None,
-            None,
-        ))
-        .unwrap()
+        toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
     }
 }
 
@@ -82,7 +72,6 @@ impl SinkConfig for VectorSinkConfig {
             self.keepalive,
             self.tls.clone(),
             self.send_buffer_bytes,
-            self.receive_buffer_bytes,
         );
 
         sink_config.build(cx, encode_event)

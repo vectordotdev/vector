@@ -223,7 +223,6 @@ mod test {
                     },
                 }),
                 None,
-                None,
             )),
             encoding: Encoding::Text.into(),
         };

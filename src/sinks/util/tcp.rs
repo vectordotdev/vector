@@ -53,7 +53,6 @@ pub struct TcpSinkConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
 }
 
 impl TcpSinkConfig {
@@ -62,14 +61,12 @@ impl TcpSinkConfig {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
         send_buffer_bytes: Option<usize>,
-        receive_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             address,
             keepalive,
             tls,
             send_buffer_bytes,
-            receive_buffer_bytes,
         }
     }
 
@@ -79,7 +76,6 @@ impl TcpSinkConfig {
             keepalive: None,
             tls: None,
             send_buffer_bytes: None,
-            receive_buffer_bytes: None,
         }
     }
 
@@ -92,14 +88,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-        let connector = TcpConnector::new(
-            host,
-            port,
-            self.keepalive,
-            tls,
-            self.send_buffer_bytes,
-            self.receive_buffer_bytes,
-        );
+        let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
@@ -116,7 +105,6 @@ struct TcpConnector {
     keepalive: Option<TcpKeepaliveConfig>,
     tls: MaybeTlsSettings,
     send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
 }
 
 impl TcpConnector {
@@ -126,7 +114,6 @@ impl TcpConnector {
         keepalive: Option<TcpKeepaliveConfig>,
         tls: MaybeTlsSettings,
         send_buffer_bytes: Option<usize>,
-        receive_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             host,
@@ -134,13 +121,12 @@ impl TcpConnector {
             keepalive,
             tls,
             send_buffer_bytes,
-            receive_buffer_bytes,
         }
     }
 
     #[cfg(test)]
     fn from_host_port(host: String, port: u16) -> Self {
-        Self::new(host, port, None, None.into(), None, None)
+        Self::new(host, port, None, None.into(), None)
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -173,12 +159,6 @@ impl TcpConnector {
                 if let Some(send_buffer_bytes) = self.send_buffer_bytes {
                     if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
                         warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
-                    }
-                }
-
-                if let Some(receive_buffer_bytes) = self.receive_buffer_bytes {
-                    if let Err(error) = maybe_tls.set_receive_buffer_bytes(receive_buffer_bytes) {
-                        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
                     }
                 }
 

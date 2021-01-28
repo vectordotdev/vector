@@ -23,7 +23,6 @@ pub struct VectorConfig {
     shutdown_timeout_secs: u64,
     #[set = "pub"]
     tls: Option<TlsConfig>,
-    send_buffer_bytes: Option<usize>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -38,7 +37,6 @@ impl VectorConfig {
             keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
-            send_buffer_bytes: None,
             receive_buffer_bytes: None,
         }
     }
@@ -74,7 +72,6 @@ impl SourceConfig for VectorConfig {
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
-            self.send_buffer_bytes,
             self.receive_buffer_bytes,
             shutdown,
             out,

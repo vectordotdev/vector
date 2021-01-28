@@ -38,8 +38,6 @@ enum StatsdConfig {
 pub struct UdpConfig {
     address: SocketAddr,
     #[cfg(unix)]
-    send_buffer_bytes: Option<usize>,
-    #[cfg(unix)]
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -47,8 +45,6 @@ impl UdpConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
-            #[cfg(unix)]
-            send_buffer_bytes: None,
             #[cfg(unix)]
             receive_buffer_bytes: None,
         }
@@ -63,7 +59,6 @@ struct TcpConfig {
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    send_buffer_bytes: Option<usize>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -75,7 +70,6 @@ impl TcpConfig {
             keepalive: None,
             tls: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            send_buffer_bytes: None,
             receive_buffer_bytes: None,
         }
     }
@@ -117,7 +111,6 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
-                    config.send_buffer_bytes,
                     config.receive_buffer_bytes,
                     shutdown,
                     out,
@@ -171,11 +164,9 @@ async fn statsd_udp(
         .await?;
 
     #[cfg(unix)]
-    udp::set_buffer_sizes(
-        &socket,
-        config.send_buffer_bytes,
-        config.receive_buffer_bytes,
-    );
+    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
+        udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+    }
 
     info!(
         message = "Listening.",

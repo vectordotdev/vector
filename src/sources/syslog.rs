@@ -50,13 +50,10 @@ pub enum Mode {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
-        send_buffer_bytes: Option<usize>,
         receive_buffer_bytes: Option<usize>,
     },
     Udp {
         address: SocketAddr,
-        #[cfg(unix)]
-        send_buffer_bytes: Option<usize>,
         #[cfg(unix)]
         receive_buffer_bytes: Option<usize>,
     },
@@ -89,7 +86,6 @@ impl GenerateConfig for SyslogConfig {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
                 tls: None,
-                send_buffer_bytes: None,
                 receive_buffer_bytes: None,
             },
             host_key: None,
@@ -119,7 +115,6 @@ impl SourceConfig for SyslogConfig {
                 address,
                 keepalive,
                 tls,
-                send_buffer_bytes,
                 receive_buffer_bytes,
             } => {
                 let source = SyslogTcpSource {
@@ -133,7 +128,6 @@ impl SourceConfig for SyslogConfig {
                     keepalive,
                     shutdown_secs,
                     tls,
-                    send_buffer_bytes,
                     receive_buffer_bytes,
                     shutdown,
                     out,
@@ -142,13 +136,11 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Udp {
                 address,
-                send_buffer_bytes,
                 receive_buffer_bytes,
             } => Ok(udp(
                 address,
                 self.max_length,
                 host_key,
-                send_buffer_bytes,
                 receive_buffer_bytes,
                 shutdown,
                 out,
@@ -310,7 +302,6 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
-    #[cfg(unix)] send_buffer_bytes: Option<usize>,
     #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -323,7 +314,9 @@ pub fn udp(
             .expect("Failed to bind to UDP listener socket");
 
         #[cfg(unix)]
-        udp::set_buffer_sizes(&socket, send_buffer_bytes, receive_buffer_bytes);
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        }
 
         info!(
             message = "Listening.",
@@ -483,27 +476,24 @@ mod test {
     }
 
     #[test]
-    fn config_tcp_with_buffer_size() {
+    fn config_tcp_with_receive_buffer_size() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "tcp"
             address = "127.0.0.1:1235"
-            send_buffer_bytes = 2048
             receive_buffer_bytes = 256
           "#,
         )
         .unwrap();
 
-        let (send_buffer_bytes, receive_buffer_bytes) = match config.mode {
+        let receive_buffer_bytes = match config.mode {
             Mode::Tcp {
-                send_buffer_bytes,
                 receive_buffer_bytes,
                 ..
-            } => (send_buffer_bytes, receive_buffer_bytes),
+            } => receive_buffer_bytes,
             _ => panic!("expected Mode::Tcp"),
         };
 
-        assert_eq!(send_buffer_bytes, Some(2048));
         assert_eq!(receive_buffer_bytes, Some(256));
     }
 
@@ -561,28 +551,25 @@ mod test {
 
     #[cfg(unix)]
     #[test]
-    fn config_udp_with_buffer_size() {
+    fn config_udp_with_receive_buffer_size() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "udp"
             address = "127.0.0.1:1235"
             max_length = 32187
-            send_buffer_bytes = 2048
             receive_buffer_bytes = 256
           "#,
         )
         .unwrap();
 
-        let (send_buffer_bytes, receive_buffer_bytes) = match config.mode {
+        let receive_buffer_bytes = match config.mode {
             Mode::Udp {
-                send_buffer_bytes,
                 receive_buffer_bytes,
                 ..
-            } => (send_buffer_bytes, receive_buffer_bytes),
+            } => receive_buffer_bytes,
             _ => panic!("expected Mode::Udp"),
         };
 
-        assert_eq!(send_buffer_bytes, Some(2048));
         assert_eq!(receive_buffer_bytes, Some(256));
     }
 

@@ -181,20 +181,6 @@ impl MaybeTlsIncomingStream<TcpStream> {
     }
 
     #[cfg(feature = "sources-utils-tcp-socket")]
-    pub(crate) fn set_send_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
-        let stream = self.get_ref().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotConnected,
-                "Can't set send buffer size on connection that has not been accepted yet.",
-            )
-        })?;
-
-        stream.set_send_buffer_size(bytes)?;
-
-        Ok(())
-    }
-
-    #[cfg(feature = "sources-utils-tcp-socket")]
     pub(crate) fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
         let stream = self.get_ref().ok_or_else(|| {
             io::Error::new(

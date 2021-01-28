@@ -29,9 +29,6 @@ pub struct UdpConfig {
     host_key: Option<String>,
     #[cfg(unix)]
     #[get_copy = "pub"]
-    send_buffer_bytes: Option<usize>,
-    #[cfg(unix)]
-    #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -46,8 +43,6 @@ impl UdpConfig {
             max_length: default_max_length(),
             host_key: None,
             #[cfg(unix)]
-            send_buffer_bytes: None,
-            #[cfg(unix)]
             receive_buffer_bytes: None,
         }
     }
@@ -57,7 +52,6 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
-    #[cfg(unix)] send_buffer_bytes: Option<usize>,
     #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
@@ -70,7 +64,9 @@ pub fn udp(
             .expect("Failed to bind to udp listener socket");
 
         #[cfg(unix)]
-        udp::set_buffer_sizes(&socket, send_buffer_bytes, receive_buffer_bytes);
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        }
 
         #[cfg(unix)]
         let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {

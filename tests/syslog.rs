@@ -32,7 +32,6 @@ async fn test_tcp_syslog() {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
-            send_buffer_bytes: None,
             receive_buffer_bytes: None,
         }),
     );
@@ -151,7 +150,6 @@ async fn test_octet_counting_syslog() {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
-            send_buffer_bytes: None,
             receive_buffer_bytes: None,
         }),
     );

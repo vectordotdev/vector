@@ -27,8 +27,6 @@ pub struct TcpConfig {
     #[getset(get = "pub", set = "pub")]
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
-    send_buffer_bytes: Option<usize>,
-    #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -48,7 +46,6 @@ impl TcpConfig {
         shutdown_timeout_secs: u64,
         host_key: Option<String>,
         tls: Option<TlsConfig>,
-        send_buffer_bytes: Option<usize>,
         receive_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
@@ -58,7 +55,6 @@ impl TcpConfig {
             shutdown_timeout_secs,
             host_key,
             tls,
-            send_buffer_bytes,
             receive_buffer_bytes,
         }
     }
@@ -71,7 +67,6 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
             tls: None,
-            send_buffer_bytes: None,
             receive_buffer_bytes: None,
         }
     }

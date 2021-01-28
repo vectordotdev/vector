@@ -97,7 +97,6 @@ impl SourceConfig for SocketConfig {
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
-                    config.send_buffer_bytes(),
                     config.receive_buffer_bytes(),
                     shutdown,
                     out,
@@ -112,8 +111,6 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
-                    #[cfg(unix)]
-                    config.send_buffer_bytes(),
                     #[cfg(unix)]
                     config.receive_buffer_bytes(),
                     shutdown,

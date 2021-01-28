@@ -22,7 +22,6 @@ pub struct PapertrailConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
     send_buffer_bytes: Option<usize>,
-    receive_buffer_bytes: Option<usize>,
 }
 
 inventory::submit! {
@@ -64,13 +63,7 @@ impl SinkConfig for PapertrailConfig {
         let pid = std::process::id();
         let encoding = self.encoding.clone();
 
-        let sink_config = TcpSinkConfig::new(
-            address,
-            self.keepalive,
-            tls,
-            self.send_buffer_bytes,
-            self.receive_buffer_bytes,
-        );
+        let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
         sink_config.build(cx, move |event| encode_event(event, pid, &encoding))
     }
