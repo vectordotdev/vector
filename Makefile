@@ -548,7 +548,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 
 .PHONY: bench-languages
 bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench language ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-metrics
