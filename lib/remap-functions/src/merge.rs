@@ -120,31 +120,31 @@ mod tests {
                               from: map![ "key2": "val2" ]
             ],
             want: Ok(map![ "key1": "val1",
-                            "key2": "val2" ])
+                           "key2": "val2" ])
         }
 
         shallow {
             args: func_args![ to: map![ "key1": "val1",
-                                         "child": map! [ "grandchild1": "val1" ] ],
+                                        "child": map! [ "grandchild1": "val1" ] ],
                               from: map![ "key2": "val2",
-                                           "child": map! [ "grandchild2": "val2" ] ]
+                                          "child": map! [ "grandchild2": "val2" ] ]
             ],
             want: Ok(map![ "key1": "val1",
-                                    "key2": "val2",
-                                    "child": map! [ "grandchild2": "val2" ] ] )
+                           "key2": "val2",
+                           "child": map! [ "grandchild2": "val2" ] ])
         }
 
         deep {
             args: func_args![to: map![ "key1": "val1",
-                                        "child": map! [ "grandchild1": "val1" ] ],
+                                       "child": map![ "grandchild1": "val1" ] ],
                              from: map![ "key2": "val2",
-                                          "child": map! [ "grandchild2": "val2" ] ],
+                                         "child": map![ "grandchild2": "val2" ] ],
                              deep: true
             ],
             want: Ok( map![ "key1": "val1",
-                             "key2": "val2",
-                             "child": map! [ "grandchild1": "val1",
-                                              "grandchild2": "val2" ] ])
+                            "key2": "val2",
+                            "child": map![ "grandchild1": "val1",
+                                           "grandchild2": "val2" ] ])
         }
     ];
 }
