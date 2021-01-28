@@ -113,18 +113,18 @@ pub fn resolve(
     runtime: &mut Runtime,
     program: &str,
     state: &mut state::Compiler,
-) -> Result<Value, Error> {
+) -> Result<Value, String> {
     let program = match Program::new_with_state(program.to_owned(), &funcs(), None, true, state) {
         Ok((program, _)) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(program, diagnostics).colored().to_string();
-            return Err(Error::Parse(msg));
+            return Err(msg)
         }
     };
 
     match runtime.run(object, &program) {
         Ok(v) => Ok(v),
-        Err(err) => Err(Error::Runtime(err.to_string())),
+        Err(err) => Err(err.to_string()),
     }
 }
 
