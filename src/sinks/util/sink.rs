@@ -499,6 +499,7 @@ where
                 match result {
                     Ok(response) if response.is_successful() => {
                         trace!(message = "Response successful.", ?response);
+                        response.emit_events(batch_size);
                     }
                     Ok(response) => {
                         error!(message = "Response wasn't successful.", ?response);
@@ -561,6 +562,8 @@ pub trait Response: fmt::Debug {
     fn is_successful(&self) -> bool {
         true
     }
+
+    fn emit_events(&self, _batch_size: usize) {}
 }
 
 impl Response for () {}

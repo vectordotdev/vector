@@ -11,7 +11,7 @@ use crate::{
     template::{Template, TemplateError},
     Event,
 };
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
@@ -185,7 +185,7 @@ impl SqsSink {
 }
 
 impl Service<Vec<SendMessageEntry>> for SqsSink {
-    type Response = SendMessageResult;
+    type Response = (SendMessageResult, usize);
     type Error = RusotoError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -210,15 +210,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         Box::pin(async move {
             client
                 .send_message(request)
-                .inspect(|result| {
-                    emit!(AwsSqsEventSent {
-                        byte_size,
-                        message_id: result
-                            .as_ref()
-                            .map(|result| result.message_id.as_ref())
-                            .unwrap_or(None)
-                    })
-                })
+                .map_ok(|result| (result, byte_size))
                 .instrument(info_span!("request"))
                 .await
         })
@@ -237,14 +229,21 @@ impl EncodedLength for SendMessageEntry {
     }
 }
 
-impl Response for SendMessageResult {}
+impl Response for (SendMessageResult, usize) {
+    fn emit_events(&self, _batch_size: usize) {
+        emit!(AwsSqsEventSent {
+            byte_size: self.1,
+            message_id: self.0.message_id.as_ref()
+        })
+    }
+}
 
 #[derive(Debug, Clone)]
 struct SqsRetryLogic;
 
 impl RetryLogic for SqsRetryLogic {
     type Error = RusotoError<SendMessageError>;
-    type Response = SendMessageResult;
+    type Response = (SendMessageResult, usize);
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         rusoto::is_retriable_error(error)
