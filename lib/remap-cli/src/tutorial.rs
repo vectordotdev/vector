@@ -1,7 +1,4 @@
-use super::{
-    repl::Repl,
-    Error,
-};
+use super::{repl::Repl, Error};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::{all as funcs, map};
 use rustyline::{error::ReadlineError, Editor};
@@ -11,7 +8,7 @@ struct Tutorial {
     title: &'static str,
     help_text: &'static str,
     correct_answer: Value,
-    object: Value,
+    initial_event: Value,
 }
 
 pub fn tutorial() -> Result<(), Error> {
@@ -59,11 +56,11 @@ pub fn tutorial() -> Result<(), Error> {
                     "" => continue,
                     command => {
                         let tut = &mut tutorials[index];
-                        let object = &mut tut.object;
-                        match resolve(object, &mut rt, command, &mut compiler_state) {
+                        let event = &mut tut.initial_event;
+                        match resolve(event, &mut rt, command, &mut compiler_state) {
                             Ok(result) => {
-                                if object == &tut.correct_answer {
-                                    println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", object);
+                                if event == &tut.correct_answer {
+                                    println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", event);
 
                                     if (index + 1) == tutorials.len() {
                                         println!("\n\nCongratulations! You've successfully completed the VRL tutorial.");
@@ -76,10 +73,10 @@ pub fn tutorial() -> Result<(), Error> {
                                 } else {
                                     println!("{}", result);
                                 }
-                            },
+                            }
                             Err(err) => {
                                 println!("{}", err);
-                            },
+                            }
                         }
                     }
                 };
@@ -105,7 +102,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 
     println!(
         "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
-        tut.number, tut.title, tut.help_text, tut.object
+        tut.number, tut.title, tut.help_text, tut.initial_event
     );
 }
 
@@ -121,13 +118,13 @@ pub fn resolve(
         Ok((program, _)) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(program, diagnostics).colored().to_string();
-            return Err(Error::Parse(msg))
+            return Err(Error::Parse(msg));
         }
     };
 
     match runtime.run(object, &program) {
         Ok(v) => Ok(v),
-        Err(err) => Err(Error::Runtime(err.to_string()))
+        Err(err) => Err(Error::Runtime(err.to_string())),
     }
 }
 
@@ -137,7 +134,7 @@ fn tutorial_list() -> Vec<Tutorial> {
         title: "Assigning values to event fields",
         help_text: ASSIGNMENT_TEXT,
         correct_answer: Value::from(map!["severity": "info"]),
-        object: Value::from(map![]),
+        initial_event: Value::from(map![]),
     };
 
     let deletion_tut = Tutorial {
@@ -145,7 +142,7 @@ fn tutorial_list() -> Vec<Tutorial> {
         title: "Deleting fields",
         help_text: DELETION_TEXT,
         correct_answer: Value::from(map!["three": 3]),
-        object: Value::from(map!["one": 1, "two": 2, "three": 3])
+        initial_event: Value::from(map!["one": 1, "two": 2, "three": 3]),
     };
 
     let rename_tut = Tutorial {
@@ -153,7 +150,7 @@ fn tutorial_list() -> Vec<Tutorial> {
         title: "Renaming fields",
         help_text: RENAME_TEXT,
         correct_answer: Value::from(map!["new_field": "old value"]),
-        object: Value::from(map!["old_field": "old value"]),
+        initial_event: Value::from(map!["old_field": "old value"]),
     };
 
     vec![assignment_tut, deletion_tut, rename_tut]
