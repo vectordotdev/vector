@@ -76,11 +76,10 @@ mod tests {
                 pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
             def: TypeDef { kind: Kind::Map,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
-                               ]),
+                           inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                              "1": Kind::Bytes,
+                                                              "group": Kind::Bytes
+                           }),
                            ..Default::default() },
         }
 
@@ -91,11 +90,10 @@ mod tests {
             },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
-                               ]),
+                           inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                              "1": Kind::Bytes,
+                                                              "group": Kind::Bytes
+                           }),
             },
         }
 
@@ -106,12 +104,10 @@ mod tests {
             },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "group": TypeDef::new_with_kind(Kind::Bytes)
-                               ]
-                           ),
+                           inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                              "1": Kind::Bytes,
+                                                              "group": Kind::Bytes
+                           })
             },
         }
     ];

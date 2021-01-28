@@ -65,20 +65,20 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
 
 /// The type defs of the fields contained by the returned map.
 fn inner_type_def() -> InnerTypeDef {
-    InnerTypeDef::Map(remap::type_def_map![
-        "owner": TypeDef::new_with_kind(Kind::Bytes),
-        "message_type": TypeDef::new_with_kind(Kind::Bytes),
-        "log_group": TypeDef::new_with_kind(Kind::Bytes),
-        "log_stream": TypeDef::new_with_kind(Kind::Bytes),
-        "subscription_filters": TypeDef::new_with_kind(Kind::Array)
-            .with_inner_type(InnerTypeDef::Array(Box::new(TypeDef::new_with_kind(Kind::Bytes)))),
-        "log_events": TypeDef::new_with_kind(Kind::Array)
-            .with_inner_type(InnerTypeDef::Map(remap::type_def_map![
-                "id": TypeDef::new_with_kind(Kind::Bytes),
-                "timestamp": TypeDef::new_with_kind(Kind::Timestamp),
-                "message": TypeDef::new_with_kind(Kind::Bytes),
-            ]))
-    ])
+    inner_type_def! ({
+        "owner": Kind::Bytes,
+        "message_type": Kind::Bytes,
+        "log_group": Kind::Bytes,
+        "log_stream": Kind::Bytes,
+        "subscription_filters": TypeDef::from(Kind::Array)
+            .with_inner_type(inner_type_def!([ Kind::Bytes ])),
+        "log_events": TypeDef::from(Kind::Array)
+            .with_inner_type(inner_type_def! ({
+                "id": Kind::Bytes,
+                "timestamp": Kind::Timestamp,
+                "message": Kind::Bytes,
+            }))
+    })
 }
 
 #[cfg(test)]

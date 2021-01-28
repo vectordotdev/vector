@@ -80,7 +80,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Array,
-                inner_type_def: InnerTypeDef::Array(TypeDef::new_with_kind(
+                inner_type_def: InnerTypeDef::Array(TypeDef::from(
                     Kind::Bytes | Kind::Float | Kind::Integer,
                 ).boxed())
             },

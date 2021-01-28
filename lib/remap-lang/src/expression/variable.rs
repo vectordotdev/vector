@@ -66,7 +66,7 @@ impl Expression for Variable {
                     }
                     (Segment::Index(_), InnerTypeDef::Array(db)) => Some(*db.clone()),
                     (Segment::Coalesce(fields), InnerTypeDef::Map(td)) => Some(fields.iter().fold(
-                        TypeDef::new_with_kind(Kind::empty()),
+                        Kind::empty().into(),
                         |accum, field| match td.get(field.as_str()) {
                             Some(val) => accum | val.clone(),
                             None => accum,
@@ -77,14 +77,16 @@ impl Expression for Variable {
             }
         }
 
-        typedef.unwrap_or_else(|| TypeDef::new_with_kind(Kind::Null))
+        // TODO: we can make it so this can never happen, by making it a
+        // compile-time error to reference a variable before it is assigned.
+        typedef.unwrap_or_else(|| Kind::Null.into())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, type_def_map};
+    use crate::{inner_type_def, test_type_def};
 
     test_type_def![
         ident_match {
@@ -139,10 +141,9 @@ mod tests {
             expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     kind: Kind::Map,
-                    inner_type_def: InnerTypeDef::Map(
-                        type_def_map! [
-                            "bar": TypeDef::new_with_kind(Kind::Bytes)
-                        ]),
+                    inner_type_def: inner_type_def! ({
+                        "bar": Kind::Bytes
+                    }),
                     ..Default::default()
                 });
                 Variable::new("foo".to_owned(),
@@ -151,7 +152,7 @@ mod tests {
                                   path.into()
                               }))
             },
-            def: TypeDef::new_with_kind(Kind::Bytes),
+            def: Kind::Bytes.into(),
         }
     ];
 }

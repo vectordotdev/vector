@@ -90,8 +90,7 @@ impl Expression for Map {
 mod tests {
     use super::*;
     use crate::{
-        array, expression::Arithmetic, map, test_type_def, type_def_map, value::Kind, InnerTypeDef,
-        Operator,
+        array, expression::Arithmetic, inner_type_def, map, test_type_def, value::Kind, Operator,
     };
 
     test_type_def![
@@ -108,10 +107,9 @@ mod tests {
             expr: |_| map!{"a": true},
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: InnerTypeDef::Map(
-                    type_def_map! [
-                        "a": TypeDef::new_with_kind(Kind::Boolean),
-                    ]),
+                inner_type_def: inner_type_def! ({
+                    "a": Kind::Boolean,
+                }),
                 ..Default::default()
             },
         }
@@ -124,12 +122,11 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: InnerTypeDef::Map(
-                    type_def_map! [
-                        "a": TypeDef::new_with_kind(Kind::Bytes),
-                        "b": TypeDef::new_with_kind(Kind::Boolean),
-                        "c": TypeDef::new_with_kind(Kind::Integer)
-                    ]),
+                inner_type_def: inner_type_def! ({
+                    "a": Kind::Bytes,
+                    "b": Kind::Boolean,
+                    "c": Kind::Integer
+                }),
                 ..Default::default()
             },
         }
@@ -146,12 +143,10 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: InnerTypeDef::Map(
-                    type_def_map! [
-                        "a": TypeDef::new_with_kind(Kind::Boolean),
-                        "b": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true)
-                    ]
-                )
+                inner_type_def: inner_type_def! ({
+                    "a": Kind::Boolean,
+                    "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true)
+                })
             },
         }
 
@@ -168,12 +163,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: InnerTypeDef::Map(
-                    type_def_map! [
-                        "a": TypeDef::new_with_kind(Kind::Boolean),
-                        "b": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true),
-                        "c": TypeDef::new_with_kind(Kind::Array).with_inner_type(InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Integer).boxed()))
-                    ])
+                inner_type_def: inner_type_def! ({
+                    "a": Kind::Boolean,
+                    "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true),
+                    "c": TypeDef::from(Kind::Array).with_inner_type(inner_type_def!([ Kind::Integer ]))
+                })
             },
         }
     ];

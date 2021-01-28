@@ -60,16 +60,16 @@ impl Expression for ParseUrlFn {
 
 /// The type defs of the fields contained by the returned map.
 fn inner_type_def() -> InnerTypeDef {
-    InnerTypeDef::Map(remap::type_def_map![
-        "scheme": TypeDef::new_with_kind(Kind::Bytes),
-        "username": TypeDef::new_with_kind(Kind::Bytes),
-        "password": TypeDef::new_with_kind(Kind::Bytes),
-        "path": TypeDef::new_with_kind(Kind::Bytes),
-        "host": TypeDef::new_with_kind(Kind::Bytes),
-        "port": TypeDef::new_with_kind(Kind::Bytes),
-        "fragment": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-        "query": TypeDef::new_with_kind(Kind::Map),
-    ])
+    inner_type_def! ({
+        "scheme": Kind::Bytes,
+        "username": Kind::Bytes,
+        "password": Kind::Bytes,
+        "path": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes,
+        "port": Kind::Bytes,
+        "fragment": Kind::Bytes | Kind::Null,
+        "query": Kind::Map,
+    })
 }
 
 fn url_to_value(url: Url) -> Value {

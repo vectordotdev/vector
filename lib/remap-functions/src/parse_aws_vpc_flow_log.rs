@@ -71,32 +71,32 @@ impl Expression for ParseAwsVpcFlowLogFn {
 
 /// The type defs of the fields contained by the returned map.
 fn inner_type_def() -> InnerTypeDef {
-    InnerTypeDef::Map(remap::type_def_map![
-        "version": TypeDef::new_with_kind(Kind::Integer),
-        "account_id": TypeDef::new_with_kind(Kind::Integer),
-        "interface_id": TypeDef::new_with_kind(Kind::Bytes),
-        "srcaddr": TypeDef::new_with_kind(Kind::Bytes),
-        "dstaddr": TypeDef::new_with_kind(Kind::Bytes),
-        "srcport": TypeDef::new_with_kind(Kind::Integer),
-        "dstport": TypeDef::new_with_kind(Kind::Integer),
-        "protocol": TypeDef::new_with_kind(Kind::Integer),
-        "packets": TypeDef::new_with_kind(Kind::Integer),
-        "bytes": TypeDef::new_with_kind(Kind::Integer),
-        "start": TypeDef::new_with_kind(Kind::Integer),
-        "end": TypeDef::new_with_kind(Kind::Integer),
-        "action": TypeDef::new_with_kind(Kind::Bytes),
-        "log_status": TypeDef::new_with_kind(Kind::Bytes),
-        "vpc_id": TypeDef::new_with_kind(Kind::Bytes),
-        "subnet_id": TypeDef::new_with_kind(Kind::Bytes),
-        "instance_id": TypeDef::new_with_kind(Kind::Bytes),
-        "tcp_flags": TypeDef::new_with_kind(Kind::Integer),
-        "type": TypeDef::new_with_kind(Kind::Bytes),
-        "pkt_srcaddr": TypeDef::new_with_kind(Kind::Bytes),
-        "pkt_dstaddr": TypeDef::new_with_kind(Kind::Bytes),
-        "region": TypeDef::new_with_kind(Kind::Bytes),
-        "az_id": TypeDef::new_with_kind(Kind::Bytes),
-        "sublocation_type": TypeDef::new_with_kind(Kind::Bytes),
-    ])
+    inner_type_def! ({
+        "version": Kind::Integer | Kind::Null,
+        "account_id": Kind::Integer | Kind::Null,
+        "interface_id": Kind::Bytes | Kind::Null,
+        "srcaddr": Kind::Bytes | Kind::Null,
+        "dstaddr": Kind::Bytes | Kind::Null,
+        "srcport": Kind::Integer | Kind::Null,
+        "dstport": Kind::Integer | Kind::Null,
+        "protocol": Kind::Integer | Kind::Null,
+        "packets": Kind::Integer | Kind::Null,
+        "bytes": Kind::Integer | Kind::Null,
+        "start": Kind::Integer | Kind::Null,
+        "end": Kind::Integer | Kind::Null,
+        "action": Kind::Bytes | Kind::Null,
+        "log_status": Kind::Bytes | Kind::Null,
+        "vpc_id": Kind::Bytes | Kind::Null,
+        "subnet_id": Kind::Bytes | Kind::Null,
+        "instance_id": Kind::Bytes | Kind::Null,
+        "tcp_flags": Kind::Integer | Kind::Null,
+        "type": Kind::Bytes | Kind::Null,
+        "pkt_srcaddr": Kind::Bytes | Kind::Null,
+        "pkt_dstaddr": Kind::Bytes | Kind::Null,
+        "region": Kind::Bytes | Kind::Null,
+        "az_id": Kind::Bytes | Kind::Null,
+        "sublocation_type": Kind::Bytes | Kind::Null,
+    })
 }
 
 type ParseResult<T> = std::result::Result<T, String>;

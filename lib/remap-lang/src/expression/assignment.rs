@@ -226,9 +226,8 @@ mod tests {
     use super::*;
     use crate::{
         expression::{Arithmetic, Literal},
-        lit, path, test_type_def, InnerTypeDef, Operator,
+        lit, path, test_type_def, Operator,
     };
-    use std::collections::BTreeMap;
 
     #[test]
     fn path_typedef_added_to_state() {
@@ -239,11 +238,8 @@ mod tests {
         path_type_def(
             &mut state,
             &path,
-            TypeDef::new_with_kind(Kind::Map).with_inner_type(InnerTypeDef::Map({
-                let mut map = BTreeMap::new();
-                map.insert("flork".to_string(), TypeDef::new_with_kind(Kind::Integer));
-                map
-            })),
+            TypeDef::from(Kind::Map)
+                .with_inner_type(crate::inner_type_def!({ "flork": Kind::Integer })),
         );
 
         assert_eq!(
@@ -264,7 +260,7 @@ mod tests {
 
         // Assign a different type to this path.
         let path = path::Path::from_str(".ook").unwrap();
-        path_type_def(&mut state, &path, TypeDef::new_with_kind(Kind::Bytes));
+        path_type_def(&mut state, &path, Kind::Bytes.into());
 
         // Ensure the inner type is no longer defined.
         assert_eq!(

@@ -85,15 +85,16 @@ impl BitAnd for TypeDef {
     }
 }
 
-impl TypeDef {
-    /// Creates a default typedef with the given Kind.
-    pub fn new_with_kind(kind: value::Kind) -> Self {
-        TypeDef {
+impl From<value::Kind> for TypeDef {
+    fn from(kind: value::Kind) -> Self {
+        Self {
             kind,
             ..Default::default()
         }
     }
+}
 
+impl TypeDef {
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
@@ -313,22 +314,42 @@ impl BitAnd for InnerTypeDef {
 }
 
 /// Utility macro to make defining inner type def maps easier.
+/// For example, to specify an inner type def for an array of booleans:
+///
+/// ```rust
+/// # use remap_lang::{inner_type_def, value::Kind};
+/// inner_type_def!([Kind::Boolean]);
+/// ```
+///
+/// For a map with two fields:
+///
+/// ```rust
+/// # use remap_lang::{inner_type_def, value::Kind};
+/// inner_type_def!({ "field1": Kind::Boolean,
+///                   "field2": Kind::Integer });
+/// ```
+///
+///
 #[macro_export]
-macro_rules! type_def_map {
-    () => (
-        ::std::collections::BTreeMap::new()
+macro_rules! inner_type_def {
+    ([$v:expr]) => ( $crate::InnerTypeDef::Array( Box::new( $v.into())) );
+
+    ({}) => (
+        $crate::InnerTypeDef::Map(::std::collections::BTreeMap::new())
     );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.to_owned(), $v)),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
+
+    ({$($k:tt: $v:expr),+ $(,)?}) => ({
+        $crate::InnerTypeDef::Map(
+            vec![$(($k.to_owned(), $v.into())),+]
+                .into_iter()
+                .collect::<::std::collections::BTreeMap<_, _>>()
+        )
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::type_def_map;
     use value::Kind;
 
     #[test]
@@ -360,49 +381,35 @@ mod tests {
 
     #[test]
     fn inner_type_def_or() {
-        let type_def_a = InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Boolean).boxed());
-        let type_def_b = InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Integer).boxed());
-        let expected =
-            InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Integer | Kind::Boolean).boxed());
+        let type_def_a = inner_type_def!([Kind::Boolean]);
+        let type_def_b = inner_type_def!([Kind::Integer]);
+        let expected = inner_type_def!([Kind::Integer | Kind::Boolean]);
 
         assert_eq!(expected, type_def_a | type_def_b);
 
-        let type_def_a = InnerTypeDef::Map(type_def_map![
-            "a": TypeDef::new_with_kind(Kind::Boolean),
-            "b": TypeDef::new_with_kind(Kind::Bytes)
-        ]);
-        let type_def_b = InnerTypeDef::Map(type_def_map![
-            "a": TypeDef::new_with_kind(Kind::Float),
-            "c": TypeDef::new_with_kind(Kind::Timestamp)
-        ]);
-        let expected = InnerTypeDef::Map(type_def_map![
-            "a": TypeDef::new_with_kind(Kind::Boolean | Kind::Float),
-            "b": TypeDef::new_with_kind(Kind::Bytes),
-            "c": TypeDef::new_with_kind(Kind::Timestamp)
-        ]);
+        let type_def_a = inner_type_def!({ "a": Kind::Boolean, "b": Kind::Bytes });
+        let type_def_b = inner_type_def!({ "a": Kind::Float, "c": Kind::Timestamp });
+        let expected = inner_type_def!({
+            "a": Kind::Boolean | Kind::Float,
+            "b": Kind::Bytes,
+            "c": Kind::Timestamp
+        });
 
         assert_eq!(expected, type_def_a | type_def_b);
     }
 
     #[test]
     fn inner_type_def_and() {
-        let type_def_a = InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Boolean).boxed());
-        let type_def_b =
-            InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Integer | Kind::Boolean).boxed());
-        let expected = InnerTypeDef::Array(TypeDef::new_with_kind(Kind::Boolean).boxed());
+        let type_def_a = inner_type_def!([Kind::Boolean]);
+        let type_def_b = inner_type_def!([Kind::Integer | Kind::Boolean]);
+        let expected = inner_type_def!([Kind::Boolean]);
 
         assert_eq!(expected, type_def_a & type_def_b);
 
-        let type_def_a = InnerTypeDef::Map(type_def_map![
-            "a": TypeDef::new_with_kind(Kind::Boolean),
-            "b": TypeDef::new_with_kind(Kind::Bytes)
-        ]);
-        let type_def_b = InnerTypeDef::Map(type_def_map![
-            "a": TypeDef::new_with_kind(Kind::Float | Kind::Boolean),
-            "c": TypeDef::new_with_kind(Kind::Timestamp)
-        ]);
-        let expected =
-            InnerTypeDef::Map(type_def_map!["a": TypeDef::new_with_kind(Kind::Boolean),]);
+        let type_def_a = inner_type_def!({ "a": Kind::Boolean, "b": Kind::Bytes });
+        let type_def_b =
+            inner_type_def!({ "a": Kind::Float | Kind::Boolean, "c": Kind::Timestamp });
+        let expected = inner_type_def!({ "a": Kind::Boolean });
 
         assert_eq!(expected, type_def_a & type_def_b);
     }

@@ -1,4 +1,4 @@
-use remap::{value::Kind, InnerTypeDef, TypeDef, Value};
+use remap::{value::Kind, InnerTypeDef, Value};
 use std::collections::BTreeMap;
 
 #[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
@@ -62,12 +62,12 @@ pub(crate) fn regex_type_def(regex: &regex::Regex) -> InnerTypeDef {
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
-        inner_type.insert(num.to_string(), TypeDef::new_with_kind(Kind::Bytes));
+        inner_type.insert(num.to_string(), Kind::Bytes.into());
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().filter_map(std::convert::identity) {
-        inner_type.insert(name.to_owned(), TypeDef::new_with_kind(Kind::Bytes));
+        inner_type.insert(name.to_owned(), Kind::Bytes.into());
     }
 
     InnerTypeDef::Map(inner_type)

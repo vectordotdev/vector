@@ -57,11 +57,8 @@ impl Expression for ParseRegexAllFn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
-            .with_inner_type(InnerTypeDef::Array(
-                TypeDef::new_with_kind(value::Kind::Map)
-                    .with_inner_type(util::regex_type_def(&self.pattern))
-                    .boxed(),
-            ))
+            .with_inner_type(inner_type_def!([TypeDef::from(value::Kind::Map)
+                .with_inner_type(util::regex_type_def(&self.pattern))]))
             .with_constraint(value::Kind::Array)
     }
 }
@@ -81,11 +78,10 @@ mod tests {
             def: TypeDef { kind: Kind::Array,
                            inner_type_def: InnerTypeDef::Array( TypeDef {
                                kind: Kind::Map,
-                               inner_type_def: InnerTypeDef::Map(
-                                   remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "group": TypeDef::new_with_kind(Kind::Bytes)
-                                   ]),
+                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                                  "1": Kind::Bytes,
+                                                                  "group": Kind::Bytes
+                               }),
                                ..Default::default()
                            }.boxed()),
                            ..Default::default() },
@@ -100,11 +96,10 @@ mod tests {
                            kind: Kind::Array,
                            inner_type_def: InnerTypeDef::Array( TypeDef {
                                kind: Kind::Map,
-                               inner_type_def: InnerTypeDef::Map(
-                                   remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "group": TypeDef::new_with_kind(Kind::Bytes)
-                                   ]),
+                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                                  "1": Kind::Bytes,
+                                                                  "group": Kind::Bytes
+                               }),
                                ..Default::default()
                            }.boxed()),
             },
@@ -119,11 +114,10 @@ mod tests {
                            kind: Kind::Array,
                            inner_type_def: InnerTypeDef::Array( TypeDef {
                                kind: Kind::Map,
-                               inner_type_def: InnerTypeDef::Map(
-                                   remap::type_def_map! [ "0": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "1": TypeDef::new_with_kind(Kind::Bytes),
-                                                          "group": TypeDef::new_with_kind(Kind::Bytes)
-                                   ]),
+                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
+                                                                  "1": Kind::Bytes,
+                                                                  "group": Kind::Bytes
+                               }),
                                ..Default::default()
                            }.boxed()),
             },

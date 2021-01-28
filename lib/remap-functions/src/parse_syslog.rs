@@ -115,41 +115,21 @@ impl Expression for ParseSyslogFn {
             .type_def(state)
             .into_fallible(true)
             .with_constraint(Kind::Map)
-            .with_inner_type(InnerTypeDef::Map({
-                let mut map = BTreeMap::new();
-                map.insert("message".to_string(), TypeDef::new_with_kind(Kind::Bytes));
-                map.insert(
-                    "hostname".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                );
-                map.insert(
-                    "severity".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                );
-                map.insert(
-                    "facility".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                );
-                map.insert(
-                    "appname".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                );
-                map.insert(
-                    "msgid".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                );
-                map.insert(
-                    "timestamp".to_string(),
-                    TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
-                );
-                map.insert(
-                    "procid".to_string(),
-                    TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null),
-                );
-
-                map
-            }))
+            .with_inner_type(inner_type_def())
     }
+}
+
+fn inner_type_def() -> InnerTypeDef {
+    inner_type_def! ({
+        "message": Kind::Bytes,
+        "hostname": Kind::Bytes | Kind::Null,
+        "severity": Kind::Bytes | Kind::Null,
+        "facility": Kind::Bytes | Kind::Null,
+        "appname": Kind::Bytes | Kind::Null,
+        "msgid": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp | Kind::Null,
+        "procid": Kind::Bytes | Kind::Integer | Kind::Null
+    })
 }
 
 #[cfg(test)]
@@ -161,37 +141,17 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::Map,
+            def: TypeDef { kind: Kind::Map,
                            fallible: true,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
-                               ]
-                           ),
-                           ..Default::default() },
+                           inner_type_def: inner_type_def(),
+            },
         }
 
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
-                               ]
-                           ),
+                           inner_type_def: inner_type_def(),
             },
         }
 
@@ -199,17 +159,7 @@ mod tests {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: InnerTypeDef::Map(
-                               remap::type_def_map! [ "message": TypeDef::new_with_kind(Kind::Bytes),
-                                                      "hostname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "severity": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "facility": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "appname": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "msgid": TypeDef::new_with_kind(Kind::Bytes | Kind::Null),
-                                                      "timestamp": TypeDef::new_with_kind(Kind::Timestamp | Kind::Null),
-                                                      "procid": TypeDef::new_with_kind(Kind::Bytes | Kind::Integer | Kind::Null)
-                               ]
-                           ),
+                           inner_type_def: inner_type_def(),
             },
         }
     ];
