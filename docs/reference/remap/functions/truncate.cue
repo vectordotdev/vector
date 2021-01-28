@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: truncate: {
+	category: "String"
+	description: """
+		Truncates the `value` up to the `limit`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -29,10 +34,7 @@ remap: functions: truncate: {
 			"If `ellipsis` is `true`, then an ellipsis (...) will be appended to the string (beyond the specified limit).",
 		]
 	}
-	category: "String"
-	description: #"""
-		Truncates the provided `value` up to the provided `limit`.
-		"""#
+
 	examples: [
 		{
 			title: "Truncate a string"

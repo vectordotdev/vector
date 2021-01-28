@@ -9,6 +9,7 @@ components: sinks: loki: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
+		stateful: false
 	}
 
 	features: {
@@ -84,6 +85,7 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
+				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -110,7 +112,7 @@ components: sinks: loki: {
 						type: string: {
 							default: null
 							examples: ["vector", "{{ event_field }}"]
-							templateable: true
+							syntax: "template"
 						}
 					}
 				}
@@ -138,7 +140,7 @@ components: sinks: loki: {
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

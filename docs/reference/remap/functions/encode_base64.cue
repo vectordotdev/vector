@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: encode_base64: {
+	category:    "Codec"
+	description: """
+		Encodes the `value` to [Base64](\(urls.base64)).
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -29,11 +34,7 @@ remap: functions: encode_base64: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "Codec"
-	description: #"""
-		Encodes the provided `value` to [Base64](\(urls.base64)) either padded or non-padded and
-		using the specified character set.
-		"""#
+
 	examples: [
 		{
 			title: "Encode to Base64 (default)"

@@ -9,6 +9,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -95,6 +96,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

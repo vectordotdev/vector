@@ -1,5 +1,5 @@
 transforms:
-  add_fields_nested:
+  add_fields_nested_yaml:
     inputs: []
     type: add_fields
     fields:
@@ -9,13 +9,13 @@ transforms:
       x.z: 789
 
 tests:
-  - name: add_fields_nested
+  - name: add_fields_nested_yaml
     input:
-      insert_at: add_fields_nested
+      insert_at: add_fields_nested_yaml
       type: raw
       value: ""
     outputs:
-      - extract_from: add_fields_nested
+      - extract_from: add_fields_nested_yaml
         conditions:
            - type: remap
              source: ".a.b == 123 && .x.y == 456 && .x.z == 789"

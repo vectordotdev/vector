@@ -7,6 +7,7 @@ components: sinks: _humio: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Humio"]
+		stateful: false
 	}
 
 	support: {
@@ -93,6 +94,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: "https://cloud.humio.com"
 				examples: ["http://127.0.0.1", "http://example.com"]
+				syntax: "literal"
 			}
 		}
 		event_type: {
@@ -103,7 +105,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["json", "none"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		host_key: {
@@ -114,6 +116,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["hostname"]
+				syntax: "literal"
 			}
 		}
 		source: {
@@ -124,7 +127,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		token: {
@@ -133,6 +136,7 @@ components: sinks: _humio: {
 			warnings: []
 			type: string: {
 				examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -1,7 +1,7 @@
-use super::{Config, DataType, Resource};
+use super::{builder::ConfigBuilder, DataType, Resource};
 use std::collections::HashMap;
 
-pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
+pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
     if config.sources.is_empty() {
@@ -46,7 +46,7 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
+pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
@@ -73,7 +73,7 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn warnings(config: &Config) -> Vec<String> {
+pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
     let mut warnings = vec![];
 
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
@@ -102,7 +102,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     warnings
 }
 
-pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
+pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     Graph::from(config).typecheck()
 }
 
@@ -223,8 +223,8 @@ impl Graph {
     }
 }
 
-impl From<&Config> for Graph {
-    fn from(config: &Config) -> Self {
+impl From<&ConfigBuilder> for Graph {
+    fn from(config: &ConfigBuilder) -> Self {
         let mut graph = Graph::default();
 
         // TODO: validate that node names are unique across sources/transforms/sinks?

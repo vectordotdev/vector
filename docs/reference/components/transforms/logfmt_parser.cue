@@ -11,6 +11,7 @@ components: transforms: logfmt_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -61,6 +62,7 @@ components: transforms: logfmt_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		types: configuration._types

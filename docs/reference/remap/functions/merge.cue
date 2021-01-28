@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: merge: {
+	category: "Map"
+	description: """
+		Merges the `from` map into the `to` map.
+		"""
+
 	arguments: [
 		{
 			name:        "to"
@@ -23,15 +28,14 @@ remap: functions: merge: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["map"]
-	category: "Map"
-	description: #"""
-		Merges the `from` map provided into the `to` map.
+	return: {
+		types: ["map"]
+		rules: [
+			#"If a key exists in both maps, the field from the `from` map is chosen."#,
+			#"If `deep` is specified, and a key exists in both maps, and both these fields are also maps, then those maps will merge recursively as well."#,
+		]
+	}
 
-		* If a key exists in both maps, the field from the `from` map is chosen.
-		* If `deep` is specified, and a key exists in both maps, and both these fields are also maps, then those maps
-		  will merge recursively as well.
-		"""#
 	examples: [
 		{
 			title: "Object merge (shallow)"

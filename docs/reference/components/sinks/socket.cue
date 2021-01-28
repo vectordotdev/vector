@@ -9,6 +9,7 @@ components: sinks: socket: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -71,6 +72,7 @@ components: sinks: socket: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 		mode: {
@@ -83,6 +85,7 @@ components: sinks: socket: {
 					udp:  "UDP socket"
 					unix: "Unix domain socket"
 				}
+				syntax: "literal"
 			}
 		}
 		path: {
@@ -92,6 +95,7 @@ components: sinks: socket: {
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
+				syntax: "literal"
 			}
 		}
 	}

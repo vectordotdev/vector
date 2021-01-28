@@ -1,6 +1,19 @@
 package metadata
 
 remap: functions: assert: {
+	category: "Debug"
+	description: """
+		Asserts the `condition`.
+
+		If the `condition` evaluates to `false` the program is aborted with the `message`.
+		"""
+	notices: [
+		"""
+			This function is designed to be used in a standalone fashion, aborting the script if it fails. It should
+			not be used in logical expressions.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "condition"
@@ -19,12 +32,7 @@ remap: functions: assert: {
 		"`condition` evaluates to `false`",
 	]
 	return: types: ["null"]
-	category: "Debug"
-	description: #"""
-		Checks a given condition.
 
-		If that condition evaluates to `false` the event is aborted with the provided `message`.
-		"""#
 	examples: [
 		{
 			title: "Assertion (true)"
