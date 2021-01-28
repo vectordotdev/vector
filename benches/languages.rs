@@ -109,12 +109,8 @@ fn benchmark_parse_json(c: &mut Criterion) {
   source = """
   local json = require "json"
 
-  local function parse_json(message)
-    return json.decode(message)
-  end
-
   function process(event, emit)
-    event.log = parse_json(event.log.message)
+    event.log = json.decode(event.log.message)
     emit(event)
   end
   """
