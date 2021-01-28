@@ -15,6 +15,7 @@ configuration: {
 		type: string: {
 			default: "/var/lib/vector/"
 			examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
+			syntax: "literal"
 		}
 	}
 

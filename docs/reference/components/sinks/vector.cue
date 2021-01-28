@@ -13,6 +13,7 @@ components: sinks: vector: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -82,6 +83,7 @@ components: sinks: vector: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 	}

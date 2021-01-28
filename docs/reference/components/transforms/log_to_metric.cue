@@ -11,6 +11,7 @@ components: transforms: log_to_metric: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -47,6 +48,7 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration", "parent.child"]
+							syntax: "literal"
 						}
 					}
 					increment_by_value: {
@@ -69,8 +71,8 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default:      null
-							templateable: true
+							default: null
+							syntax:  "template"
 						}
 					}
 					namespace: {
@@ -80,8 +82,8 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["service"]
-							default:      null
-							templateable: true
+							default: null
+							syntax:  "template"
 						}
 					}
 					tags: {
@@ -122,6 +124,7 @@ components: transforms: log_to_metric: {
 								set:       "A [set metric type][docs.data-model.metric#set]."
 								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
 							}
+							syntax: "literal"
 						}
 					}
 				}

@@ -5338,6 +5338,7 @@ dependencies = [
  "cidr-utils",
  "grok",
  "hex",
+ "hostname",
  "lazy_static",
  "md-5 0.9.1",
  "nom 6.0.1",

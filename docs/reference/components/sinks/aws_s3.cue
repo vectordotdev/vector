@@ -9,6 +9,7 @@ components: sinks: aws_s3: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -100,6 +101,7 @@ components: sinks: aws_s3: components._aws & {
 					"bucket-owner-full-control": "Both the object owner and the bucket owner get `FULL_CONTROL` over the object."
 					"log-delivery-write":        "The LogDelivery group gets `WRITE` and `READ_ACP` permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](\(urls.aws_s3_server_access_logs))."
 				}
+				syntax: "literal"
 			}
 		}
 		bucket: {
@@ -108,6 +110,7 @@ components: sinks: aws_s3: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
+				syntax: "literal"
 			}
 		}
 		content_encoding: {
@@ -119,6 +122,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["gzip"]
+				syntax: "literal"
 			}
 		}
 		content_type: {
@@ -129,6 +133,7 @@ components: sinks: aws_s3: components._aws & {
 			warnings: []
 			type: string: {
 				default: "text/x-log"
+				syntax:  "literal"
 			}
 		}
 		filename_append_uuid: {
@@ -147,6 +152,7 @@ components: sinks: aws_s3: components._aws & {
 			warnings: []
 			type: string: {
 				default: "log"
+				syntax:  "literal"
 			}
 		}
 		filename_time_format: {
@@ -157,6 +163,7 @@ components: sinks: aws_s3: components._aws & {
 			warnings: []
 			type: string: {
 				default: "%s"
+				syntax:  "strftime"
 			}
 		}
 		grant_full_control: {
@@ -168,6 +175,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
+				syntax: "literal"
 			}
 		}
 		grant_read: {
@@ -179,6 +187,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
+				syntax: "literal"
 			}
 		}
 		grant_read_acp: {
@@ -190,6 +199,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
+				syntax: "literal"
 			}
 		}
 		grant_write_acp: {
@@ -201,6 +211,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
+				syntax: "literal"
 			}
 		}
 		key_prefix: {
@@ -212,7 +223,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		server_side_encryption: {
@@ -227,6 +238,7 @@ components: sinks: aws_s3: components._aws & {
 					"AES256":  "256-bit Advanced Encryption Standard"
 					"aws:kms": "AWS managed key encryption"
 				}
+				syntax: "literal"
 			}
 		}
 		ssekms_key_id: {
@@ -238,6 +250,7 @@ components: sinks: aws_s3: components._aws & {
 			type: string: {
 				default: null
 				examples: ["abcd1234"]
+				syntax: "literal"
 			}
 		}
 		storage_class: {
@@ -257,6 +270,7 @@ components: sinks: aws_s3: components._aws & {
 					GLACIER:             "Use for archives where portions of the data might need to be retrieved in minutes."
 					DEEP_ARCHIVE:        "Use for archiving data that rarely needs to be accessed."
 				}
+				syntax: "literal"
 			}
 		}
 		tags: {

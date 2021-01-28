@@ -9,6 +9,7 @@ components: sinks: gcp_pubsub: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -87,6 +88,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: null
 				examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -97,6 +99,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -107,6 +110,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: "https://pubsub.googleapis.com"
 				examples: ["https://us-central1-pubsub.googleapis.com"]
+				syntax: "literal"
 			}
 		}
 		project: {
@@ -115,6 +119,7 @@ components: sinks: gcp_pubsub: {
 			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
+				syntax: "literal"
 			}
 		}
 		topic: {
@@ -123,6 +128,7 @@ components: sinks: gcp_pubsub: {
 			warnings: []
 			type: string: {
 				examples: ["this-is-a-topic"]
+				syntax: "literal"
 			}
 		}
 	}

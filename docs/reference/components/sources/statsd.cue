@@ -11,6 +11,7 @@ components: sources: statsd: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -65,6 +66,7 @@ components: sources: statsd: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
+				syntax: "literal"
 			}
 		}
 		mode: {
@@ -77,6 +79,7 @@ components: sources: statsd: {
 					udp:  "UDP Socket."
 					unix: "Unix Domain Socket."
 				}
+				syntax: "literal"
 			}
 		}
 		path: {
@@ -86,6 +89,7 @@ components: sources: statsd: {
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {

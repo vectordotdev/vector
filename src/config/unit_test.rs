@@ -9,10 +9,9 @@ use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
-    path: PathBuf,
-    format: config::FormatHint,
+    paths: &[(PathBuf, config::FormatHint)],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
+    let config = super::loading::load_builder_from_paths(paths, false)?;
 
     // Ignore failures on calls other than the first
     crate::config::LOG_SCHEMA
@@ -22,12 +21,14 @@ pub async fn build_unit_tests_main(
     build_unit_tests(config).await
 }
 
-async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut tests = vec![];
     let mut errors = vec![];
 
+    let expansions = super::compiler::expand_macros(&mut builder)?;
+
     // Don't let this escape since it's not validated
-    let mut config = Config {
+    let config = Config {
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
@@ -36,10 +37,8 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
-        expansions: Default::default(),
+        expansions,
     };
-
-    super::compiler::expand_macros(&mut config)?;
 
     for test in &config.tests {
         match build_unit_test(test, &config).await {
