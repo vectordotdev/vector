@@ -131,6 +131,7 @@ components: sinks: loki: {
 			required: false
 			warnings: []
 			type: string: {
+				syntax:  "literal"
 				default: "drop"
 				enum: {
 					"drop":              "Drop the event, with a warning."
