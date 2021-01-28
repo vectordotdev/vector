@@ -134,7 +134,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn resolve(
+fn resolve(
     object: Option<&mut impl Object>,
     runtime: &mut Runtime,
     program: &str,
