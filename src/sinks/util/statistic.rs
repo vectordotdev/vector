@@ -8,6 +8,7 @@ pub enum ValidationError {
     QuantileOutOfRange,
 }
 
+#[derive(Debug)]
 pub struct DistributionStatistic {
     pub min: f64,
     pub max: f64,
@@ -60,13 +61,10 @@ impl DistributionStatistic {
             bins[i].rate += bins[i - 1].rate;
         }
 
-        let median = find_sample(&bins, (0.50 * count as f64 - 1.0).round() as u32);
+        let median = find_quantile(&bins, 0.5);
         let quantiles = quantiles
             .iter()
-            .map(|&p| {
-                let idx = (p * count as f64 - 1.0).round() as u32;
-                (p, find_sample(&bins, idx))
-            })
+            .map(|&p| (p, find_quantile(&bins, p)))
             .collect();
 
         Some(Self {
@@ -82,12 +80,26 @@ impl DistributionStatistic {
 }
 
 /// `bins` is a cumulative histogram
-fn find_sample(bins: &[Sample], index: u32) -> f64 {
-    let i = match bins.binary_search_by_key(&index, |sample| sample.rate) {
-        Ok(i) => i,
-        Err(i) => i,
+/// We are using R-3 (without choosing the even integer in the case of a tie),
+/// it might be preferable to use a more common function, such as R-7.
+///
+/// List of quantile functions:
+/// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
+fn find_quantile(bins: &[Sample], p: f64) -> f64 {
+    let count = bins.last().expect("bins is not empty").rate;
+    find_sample(bins, (p * count as f64).round() as u32)
+}
+
+/// `bins` is a cumulative histogram
+/// Return the i-th smallest value,
+/// i starts from 1 (i == 1 mean the smallest value).
+/// i == 0 is equivalent to i == 1.
+fn find_sample(bins: &[Sample], i: u32) -> f64 {
+    let i = match bins.binary_search_by_key(&i, |sample| sample.rate) {
+        Ok(index) => index,
+        Err(index) => index,
     };
-    bins[i].value
+    bins[index].value
 }
 
 pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
@@ -98,5 +110,92 @@ pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
         Ok(())
     } else {
         Err(ValidationError::QuantileOutOfRange)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    impl PartialEq<Self> for DistributionStatistic {
+        fn eq(&self, other: &Self) -> bool {
+            self.min == other.min
+                && self.max == other.max
+                && self.median == other.median
+                && self.avg == other.avg
+                && self.sum == other.sum
+                && self.count == other.count
+                && self
+                    .quantiles
+                    .iter()
+                    .zip(other.quantiles.iter())
+                    .all(|(this, other)| this.0 == other.0 && this.1 == other.1)
+        }
+    }
+
+    impl Eq for DistributionStatistic {}
+
+    fn samples(v: &[(f64, u32)]) -> Vec<Sample> {
+        v.iter()
+            .map(|&(value, rate)| Sample { value, rate })
+            .collect()
+    }
+
+    #[test]
+    fn distribution() {
+        // should return None on empty input
+        assert_eq!(DistributionStatistic::from_samples(&[], &[0.5]), None);
+        assert_eq!(
+            DistributionStatistic::from_samples(&samples(&[(0.0, 0)]), &[0.5]),
+            None
+        );
+
+        // test len == 1 case
+        assert_eq!(
+            DistributionStatistic::from_samples(&samples(&[(0.9, 100)]), &[0.5],).unwrap(),
+            DistributionStatistic {
+                min: 0.9,
+                max: 0.9,
+                median: 0.9,
+                avg: 0.9,
+                sum: 90.0,
+                count: 100,
+                quantiles: vec![(0.5, 0.9)],
+            }
+        );
+
+        assert_eq!(
+            DistributionStatistic::from_samples(
+                &samples(&[(1.0, 1), (2.0, 1), (3.0, 1), (4.0, 1), (5.0, 1)]),
+                &[]
+            )
+            .unwrap(),
+            DistributionStatistic {
+                min: 1.0,
+                max: 5.0,
+                median: 3.0,
+                avg: 3.0,
+                sum: 15.0,
+                count: 5,
+                quantiles: Vec::new(),
+            }
+        );
+
+        assert_eq!(
+            DistributionStatistic::from_samples(
+                &samples(&[(1.0, 1), (2.0, 1), (4.0, 1), (3.0, 1)]),
+                &[]
+            )
+            .unwrap(),
+            DistributionStatistic {
+                min: 1.0,
+                max: 4.0,
+                median: 2.0,
+                avg: 2.5,
+                sum: 10.0,
+                count: 4,
+                quantiles: Vec::new(),
+            }
+        );
     }
 }
