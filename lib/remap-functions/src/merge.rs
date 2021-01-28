@@ -111,6 +111,45 @@ where
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    test_type_def![
+
+        value_non_maps {
+            expr: |_| MergeFn {
+                to: array!["ook"].boxed(),
+                from: array!["ook"].boxed(),
+                deep: None
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Map,
+                inner_type_def: Some(Box::new(TypeDef {
+                    fallible: false,
+                    kind: Kind::Bytes,
+                    ..Default::default()
+                }))
+            },
+        }
+
+        value_maps {
+            expr: |_| MergeFn {
+                to: remap::map![ "ook" : 2 ].boxed(),
+                from: remap::map![ "ook" : 4 ].boxed(),
+                deep: None
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Map,
+                inner_type_def: Some(Box::new(TypeDef {
+                    fallible: false,
+                    kind: Kind::Integer,
+                    ..Default::default()
+                }))
+            },
+        }
+
+    ];
 
     test_function! [
         merge => Merge;
