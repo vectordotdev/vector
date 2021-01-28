@@ -7,6 +7,11 @@ remap: features: ergonomic_safety: {
 		prevent the need for unsafe low-level constructs present in generic languages.
 		"""
 
+	principles: {
+		performance: true
+		safety:      true
+	}
+
 	characteristics: {
 		limitations: {
 			title: "Limitations"
