@@ -95,7 +95,7 @@ fn find_quantile(bins: &[Sample], p: f64) -> f64 {
 /// i starts from 1 (i == 1 mean the smallest value).
 /// i == 0 is equivalent to i == 1.
 fn find_sample(bins: &[Sample], i: u32) -> f64 {
-    let i = match bins.binary_search_by_key(&i, |sample| sample.rate) {
+    let index = match bins.binary_search_by_key(&i, |sample| sample.rate) {
         Ok(index) => index,
         Err(index) => index,
     };
@@ -184,7 +184,7 @@ mod test {
         assert_eq!(
             DistributionStatistic::from_samples(
                 &samples(&[(1.0, 1), (2.0, 1), (4.0, 1), (3.0, 1)]),
-                &[]
+                &[0.0, 1.0, 0.9]
             )
             .unwrap(),
             DistributionStatistic {
@@ -194,7 +194,7 @@ mod test {
                 avg: 2.5,
                 sum: 10.0,
                 count: 4,
-                quantiles: Vec::new(),
+                quantiles: vec![(0.0, 1.0), (1.0, 4.0), (0.9, 4.0)],
             }
         );
     }
