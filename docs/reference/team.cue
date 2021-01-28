@@ -23,20 +23,6 @@ import "strings"
 
 team: [#Member, ...#Member] & [
 	{
-		name:     "Ana"
-		_github:  "hoverbear"
-		_twitter: "a_hoverbear"
-		bio:      """
-			Ana is the proprietor of [Hoverbear Consulting](https://hoverbear.org)
-			and [Timber.io](\(urls.timber)) supports her work as a Vector
-			team member. She is focused on building capacity within
-			the Rust ecosystem and her local community. A frequent speaker, teacher,
-			and mentor, she was a founding organizer of [RustFest](https://rustfest.eu),
-			[RustCon Asia](https://rustcon.asia), and [Rust Belt
-			Rust](https://www.rust-belt-rust.com/).
-			"""
-	},
-	{
 		name:     "Ben"
 		_github:  "binarylogic"
 		_keybase: "binarylogic"
