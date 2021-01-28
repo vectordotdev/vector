@@ -15,6 +15,7 @@ use std::{
     fmt,
     future::Future,
     hash::Hash,
+    marker::PhantomData,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -45,16 +46,17 @@ pub trait HttpSink: Send + Sync + 'static {
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
 #[pin_project]
-pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
+pub struct BatchedHttpSink<T, B, R, L = HttpRetryLogic<R>>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
+    R: fmt::Debug,
 {
     sink: Arc<T>,
     #[pin]
     inner: TowerBatchedSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        HttpBatchService<R, BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
         L,
         B::Output,
@@ -65,11 +67,13 @@ where
     slot: Option<B::Input>,
 }
 
-impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
+impl<T, B, R> BatchedHttpSink<T, B, R, HttpRetryLogic<R>>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn new(
         sink: T,
@@ -82,7 +86,7 @@ where
         Self::with_retry_logic(
             sink,
             batch,
-            HttpRetryLogic,
+            HttpRetryLogic::default(),
             request_settings,
             batch_timeout,
             client,
@@ -91,12 +95,14 @@ where
     }
 }
 
-impl<T, B, L> BatchedHttpSink<T, B, L>
+impl<T, B, R, L> BatchedHttpSink<T, B, R, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R), Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    R: From<usize> + fmt::Debug + Send + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn with_retry_logic(
         sink: T,
@@ -127,12 +133,14 @@ where
     }
 }
 
-impl<T, B, L> Sink<Event> for BatchedHttpSink<T, B, L>
+impl<T, B, R, L> Sink<Event> for BatchedHttpSink<T, B, R, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    R: From<usize> + fmt::Debug + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     type Error = crate::Error;
 
@@ -177,19 +185,19 @@ where
 }
 
 #[pin_project]
-pub struct PartitionHttpSink<T, B, K, L = HttpRetryLogic>
+pub struct PartitionHttpSink<T, B, R, K, L = HttpRetryLogic<R>>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     sink: Arc<T>,
     #[pin]
     inner: TowerPartitionSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        HttpBatchService<R, BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
         L,
         K,
@@ -198,13 +206,15 @@ where
     slot: Option<B::Input>,
 }
 
-impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
+impl<T, B, R, K> PartitionHttpSink<T, B, R, K, HttpRetryLogic<R>>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn new(
         sink: T,
@@ -217,7 +227,7 @@ where
         Self::with_retry_logic(
             sink,
             batch,
-            HttpRetryLogic,
+            HttpRetryLogic::default(),
             request_settings,
             batch_timeout,
             client,
@@ -226,14 +236,16 @@ where
     }
 }
 
-impl<T, B, K, L> PartitionHttpSink<T, B, K, L>
+impl<T, B, R, K, L> PartitionHttpSink<T, B, R, K, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R), Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
+    R: From<usize> + fmt::Debug + Send + Sync + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn with_retry_logic(
         sink: T,
@@ -264,14 +276,16 @@ where
     }
 }
 
-impl<T, B, K, L> Sink<Event> for PartitionHttpSink<T, B, K, L>
+impl<T, B, R, K, L> Sink<Event> for PartitionHttpSink<T, B, R, K, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
+    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    (hyper::Response<Bytes>, R): sink::Response,
 {
     type Error = crate::Error;
 
@@ -315,29 +329,32 @@ where
     }
 }
 
-pub struct HttpBatchService<F, B = Vec<u8>> {
+pub struct HttpBatchService<R, F, B = Vec<u8>> {
+    _request_data: PhantomData<R>,
     inner: HttpClient<Body>,
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
 }
 
-impl<F, B> HttpBatchService<F, B> {
+impl<R, F, B> HttpBatchService<R, F, B> {
     pub fn new(
         inner: HttpClient,
         request_builder: impl Fn(B) -> F + Send + Sync + 'static,
     ) -> Self {
         HttpBatchService {
+            _request_data: PhantomData,
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
         }
     }
 }
 
-impl<F, B> Service<B> for HttpBatchService<F, B>
+impl<R, F, B> Service<B> for HttpBatchService<R, F, B>
 where
+    R: From<usize> + fmt::Debug + Send,
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
     B: Send + 'static,
 {
-    type Response = http::Response<Bytes>;
+    type Response = (hyper::Response<Bytes>, R);
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -350,43 +367,56 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?.map(Body::from);
+            let request: hyper::Request<Vec<u8>> = request_builder(body).await?;
+            let request_byte_size: R = request.body().len().into();
+            let request: hyper::Request<Body> = request.map(Body::from);
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
-            Ok(hyper::Response::from_parts(parts, body.to_bytes()))
+            Ok((
+                hyper::Response::from_parts(parts, body.to_bytes()),
+                request_byte_size,
+            ))
         })
     }
 }
 
-impl<F, B> Clone for HttpBatchService<F, B> {
+impl<R, F, B> Clone for HttpBatchService<R, F, B> {
     fn clone(&self) -> Self {
         Self {
+            _request_data: self._request_data.clone(),
             inner: self.inner.clone(),
             request_builder: Arc::clone(&self.request_builder),
         }
     }
 }
 
-impl<T: fmt::Debug> sink::Response for http::Response<T> {
-    fn is_successful(&self) -> bool {
-        self.status().is_success()
+#[derive(Debug, Clone)]
+pub struct HttpRetryLogic<R> {
+    _request_data: PhantomData<R>,
+}
+
+impl<R> Default for HttpRetryLogic<R> {
+    fn default() -> Self {
+        HttpRetryLogic {
+            _request_data: PhantomData,
+        }
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct HttpRetryLogic;
-
-impl RetryLogic for HttpRetryLogic {
+impl<R> RetryLogic for HttpRetryLogic<R>
+where
+    R: Clone + Send + Sync + 'static,
+{
     type Error = hyper::Error;
-    type Response = hyper::Response<Bytes>;
+    type Response = (hyper::Response<Bytes>, R);
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.status();
+        let status = response.0.status();
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
@@ -396,7 +426,7 @@ impl RetryLogic for HttpRetryLogic {
             _ if status.is_server_error() => RetryAction::Retry(format!(
                 "{}: {}",
                 status,
-                String::from_utf8_lossy(response.body())
+                String::from_utf8_lossy(response.0.body())
             )),
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
@@ -436,20 +466,24 @@ mod test {
 
     #[test]
     fn util_http_retry_logic() {
-        let logic = HttpRetryLogic;
+        let logic = HttpRetryLogic::default();
 
         let response_429 = Response::builder().status(429).body(Bytes::new()).unwrap();
         let response_500 = Response::builder().status(500).body(Bytes::new()).unwrap();
         let response_400 = Response::builder().status(400).body(Bytes::new()).unwrap();
         let response_501 = Response::builder().status(501).body(Bytes::new()).unwrap();
 
-        assert!(logic.should_retry_response(&response_429).is_retryable());
-        assert!(logic.should_retry_response(&response_500).is_retryable());
         assert!(logic
-            .should_retry_response(&response_400)
+            .should_retry_response(&(response_429, 0usize))
+            .is_retryable());
+        assert!(logic
+            .should_retry_response(&(response_500, 0usize))
+            .is_retryable());
+        assert!(logic
+            .should_retry_response(&(response_400, 0usize))
             .is_not_retryable());
         assert!(logic
-            .should_retry_response(&response_501)
+            .should_retry_response(&(response_501, 0usize))
             .is_not_retryable());
     }
 
@@ -463,7 +497,10 @@ mod test {
 
         let request = b"hello".to_vec();
         let client = HttpClient::new(None).unwrap();
-        let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
+        let mut service: HttpBatchService<
+            usize,
+            Pin<Box<futures::future::Ready<crate::Result<hyper::Request<Vec<u8>>>>>>,
+        > = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),
             ))

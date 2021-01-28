@@ -110,19 +110,22 @@ impl SinkConfig for HecSinkConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink: BatchedHttpSink<HecSinkConfig, Buffer, RequestByteSize> = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
             request,
             batch.timeout,
             client.clone(),
             cx.acker(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
-
+        );
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((
+            super::VectorSink::Sink(Box::new(
+                sink.sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error)),
+            )),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -228,12 +231,7 @@ impl HttpSink for HecSinkConfig {
         }
 
         match serde_json::to_vec(&body) {
-            Ok(value) => {
-                emit!(SplunkEventSent {
-                    byte_size: value.len()
-                });
-                Some(value)
-            }
+            Ok(value) => Some(value),
             Err(error) => {
                 emit!(SplunkEventEncodeError { error });
                 None
@@ -294,6 +292,28 @@ pub fn validate_host(host: &str) -> crate::Result<()> {
 
 fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
+}
+
+#[derive(Debug, Copy, Clone)]
+struct RequestByteSize(usize);
+
+impl From<usize> for RequestByteSize {
+    fn from(value: usize) -> Self {
+        RequestByteSize(value)
+    }
+}
+
+impl crate::sinks::util::sink::Response for (hyper::Response<bytes::Bytes>, RequestByteSize) {
+    fn is_successful(&self) -> bool {
+        self.0.status().is_success()
+    }
+
+    fn emit_events(&self, batch_size: usize) {
+        emit!(SplunkEventSent {
+            batch_size,
+            byte_size: self.1 .0,
+        });
+    }
 }
 
 #[cfg(test)]
