@@ -1,6 +1,17 @@
 package metadata
 
 remap: functions: push: {
+	category: "Array"
+	description: """
+		Adds the `item` to the end of the `value` array.
+		"""
+	notices: [
+		"""
+			The `push` function does _not_ change the array in place. You must reassign original value if you wish to
+			replace it.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -22,12 +33,7 @@ remap: functions: push: {
 			"A new array is returned, the `value` is not modified in place.",
 		]
 	}
-	category: "Array"
-	description: """
-		Adds the provided `item` to the end of the `value` array.
 
-		The `push` function does _not_ change the array in place.
-		"""
 	examples: [
 		{
 			title: "Push an item onto an array"

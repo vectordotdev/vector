@@ -1,6 +1,12 @@
 package metadata
 
 remap: functions: to_syslog_level: {
+	category:    "Coerce"
+	description: """
+		Coerces the `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,
+		i.e. 0 into `"emerg"`, 1 into `"alert", etc.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -13,11 +19,7 @@ remap: functions: to_syslog_level: {
 		"`value` is not a valid Syslog [severity level](\(urls.syslog_levels)).",
 	]
 	return: types: ["string"]
-	category:    "Coerce"
-	description: """
-		Coerces the provided `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,
-		i.e. 0 into `"emerg"`, 1 into `"alert", etc.
-		"""
+
 	examples: [
 		{
 			title: "Coerce to a Syslog level"
