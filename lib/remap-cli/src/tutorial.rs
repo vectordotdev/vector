@@ -63,10 +63,10 @@ pub fn tutorial() -> Result<(), Error> {
                                     println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", event);
 
                                     if (index + 1) == tutorials.len() {
-                                        println!("\n\nCongratulations! You've successfully completed the VRL tutorial.");
+                                        println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                                         break;
                                     } else {
-                                        println!("\nMoving on to the next exercise...\n\n");
+                                        println!("Moving on to the next exercise...\n\n");
                                         index = index.saturating_add(1);
                                         print_tutorial_help_text(index, &tutorials);
                                     }
