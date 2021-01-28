@@ -34,8 +34,6 @@ pub enum HttpError {
     CallRequest { source: hyper::Error },
 }
 
-pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
-
 pub struct HttpClient<B = Body> {
     client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
     span: Span,

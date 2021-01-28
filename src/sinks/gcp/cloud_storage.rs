@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    http::{HttpClient, HttpClientFuture, HttpError},
+    http::{HttpClient, HttpError},
     serde::to_string,
     sinks::{
         util::{
@@ -18,7 +18,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream, FutureExt, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -252,7 +252,7 @@ impl GcsSink {
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
     type Error = HttpError;
-    type Future = HttpClientFuture;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
