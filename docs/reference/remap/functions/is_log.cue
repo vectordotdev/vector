@@ -10,7 +10,7 @@ remap: functions: is_log: {
 			#"If the current event is a log event, then `true` is returned."#,
 		]
 	}
-	category: "Type"
+	category: "Event"
 	description: #"""
 		Determines whether the current event is a log event.
 		"""#
