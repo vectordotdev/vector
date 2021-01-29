@@ -1293,7 +1293,7 @@
   source = """
     .foo = parse_json!(.foo)
     .bar = parse_json!(.bar)
-    merge!(.bar, .foo, deep: true)
+    .bar = merge!(.bar, .foo, deep: true)
   """
 [[tests]]
   name = "remap_function_merge"
