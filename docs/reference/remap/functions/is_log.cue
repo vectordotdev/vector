@@ -11,9 +11,9 @@ remap: functions: is_log: {
 		]
 	}
 	category: "Event"
-	description: #"""
-		Determines whether the current event is a log event.
-		"""#
+	description: """
+		Determines whether the current event is a [`log` event](\(urls.vector_log)).
+		"""
 	examples: [
 		{
 			title: "A log event"
