@@ -16,18 +16,18 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
     fn tagged<'a>(
         tag: &'static str,
         iter: impl Iterator<Item = &'a String>,
-    ) -> impl Iterator<Item = (String, &'a String)> {
-        iter.map(move |x| (tag.to_owned(), x))
+    ) -> impl Iterator<Item = (&'static str, &'a String)> {
+        iter.map(move |x| (tag, x))
     }
 
     // Check for non-unique names across sources, sinks, and transforms
-    let mut name_uses = HashMap::<&str, Vec<String>>::new();
+    let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
     for (ctype, name) in tagged("source", config.sources.keys())
         .chain(tagged("transform", config.transforms.keys()))
         .chain(tagged("sink", config.sinks.keys()))
     {
         let uses = name_uses.entry(name).or_default();
-        uses.push(ctype.to_owned());
+        uses.push(ctype);
     }
 
     for (name, uses) in name_uses.into_iter().filter(|(_name, uses)| uses.len() > 1) {
