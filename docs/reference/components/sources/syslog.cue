@@ -56,6 +56,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["app-name"]
+					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -64,6 +65,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
+					syntax: "literal"
 				}
 			}
 			facility: {
@@ -71,6 +73,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["1"]
+					syntax: "literal"
 				}
 			}
 			message: {
@@ -78,6 +81,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["Hello world"]
+					syntax: "literal"
 				}
 			}
 			msgid: {
@@ -85,6 +89,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["ID47"]
+					syntax: "literal"
 				}
 			}
 			procid: {
@@ -92,6 +97,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["8710"]
+					syntax: "literal"
 				}
 			}
 			severity: {
@@ -99,6 +105,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["notice"]
+					syntax: "literal"
 				}
 			}
 			source_ip: {
@@ -106,6 +113,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
+					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -120,7 +128,10 @@ components: sources: syslog: {
 			"*": {
 				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
-				type: string: examples: ["hello world"]
+				type: string: {
+					examples: ["hello world"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

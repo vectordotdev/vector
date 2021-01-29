@@ -15,6 +15,7 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -69,6 +70,7 @@ components: sources: vector: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {

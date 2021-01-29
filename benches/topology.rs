@@ -291,9 +291,9 @@ fn benchmark_complex(c: &mut Criterion) {
                     },
                 );
                 config.add_transform(
-                    "sampler",
+                    "sample",
                     &["parser"],
-                    transforms::sampler::SamplerConfig {
+                    transforms::sample::SampleConfig {
                         rate: sample_rate,
                         key_field: None,
                         exclude: None,
@@ -308,7 +308,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 );
                 config.add_sink(
                     "out_sampled",
-                    &["sampler"],
+                    &["sample"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_sampled.to_string(),
                     ),

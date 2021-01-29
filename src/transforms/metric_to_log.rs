@@ -139,14 +139,13 @@ mod tests {
 
     #[test]
     fn transform_counter() {
-        let counter = Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        };
+        let counter = Metric::new(
+            "counter".into(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -166,14 +165,12 @@ mod tests {
 
     #[test]
     fn transform_gauge() {
-        let gauge = Metric {
-            name: "gauge".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 1.0 },
-        };
+        let gauge = Metric::new(
+            "gauge".into(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -191,16 +188,14 @@ mod tests {
 
     #[test]
     fn transform_set() {
-        let set = Metric {
-            name: "set".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Set {
+        let set = Metric::new(
+            "set".into(),
+            MetricKind::Absolute,
+            MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -219,17 +214,15 @@ mod tests {
 
     #[test]
     fn transform_distribution() {
-        let distro = Metric {
-            name: "distro".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Distribution {
+        let distro = Metric::new(
+            "distro".into(),
+            MetricKind::Absolute,
+            MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -266,18 +259,16 @@ mod tests {
 
     #[test]
     fn transform_histogram() {
-        let histo = Metric {
-            name: "histo".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
+        let histo = Metric::new(
+            "histo".into(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -312,18 +303,16 @@ mod tests {
 
     #[test]
     fn transform_summary() {
-        let summary = Metric {
-            name: "summary".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
+        let summary = Metric::new(
+            "summary".into(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.all_fields().collect();

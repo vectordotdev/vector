@@ -9,6 +9,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -90,6 +91,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			type: string: {
 				default: null
 				examples: ["user_id"]
+				syntax: "literal"
 			}
 		}
 		stream_name: {
@@ -98,6 +100,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -1293,7 +1293,7 @@
   source = """
     .foo = parse_json!(.foo)
     .bar = parse_json!(.bar)
-    merge!(.bar, .foo, deep: true)
+    .bar = merge!(.bar, .foo, deep: true)
   """
 [[tests]]
   name = "remap_function_merge"
@@ -1918,3 +1918,23 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '[.a, .b, .c] == [3, 2, 3]'
+
+[transforms.remap_function_get_hostname]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = get_hostname!()
+  """
+[[tests]]
+  name = "remap_function_get_hostname"
+  [tests.input]
+    insert_at = "remap_function_get_hostname"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_get_hostname"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .a != ""
+      '''

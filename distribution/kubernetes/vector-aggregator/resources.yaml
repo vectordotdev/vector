@@ -38,6 +38,11 @@ data:
     
     data_dir = "/vector-data-dir"
     
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
+    
     [log_schema]
       host_key = "host"
       message_key = "message"

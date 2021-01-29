@@ -54,7 +54,7 @@ remap: expressions: path: {
 					dynamic: {
 						title: "Dynamic paths"
 						description: """
-							Dynamic paths are currently not supported.
+							⚠ Dynamic paths are currently not supported.
 							"""
 					}
 					nested_maps: {
@@ -70,19 +70,19 @@ remap: expressions: path: {
 					nonexistent: {
 						title: "Non-existent paths"
 						description: """
-							Non-existent paths resolve to null.
+							Non-existent paths resolve to `null`.
 							"""
 					}
 					quoting: {
 						title: "Path quoting"
-						description: """
+						description: #"""
 							Path segments can be quoted to include special characters, such as spaces, periods, and
 							others:
 
 							```vrl
 							."parent.key.with.special \"characters\"".child
 							```
-							"""
+							"""#
 					}
 					valid_characters: {
 						title: "Valid path characters"

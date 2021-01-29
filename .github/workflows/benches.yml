@@ -87,6 +87,7 @@ jobs:
           path: "./target/criterion.zip"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
+        if: github.ref == 'refs/heads/master'
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"

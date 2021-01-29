@@ -2,6 +2,8 @@ use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
+    // https://github.com/timberio/vector/runs/1746002475
+    group.noise_threshold(0.02);
     for &cardinality in [0, 1, 10, 100, 1000, 10000].iter() {
         group.bench_with_input(
             BenchmarkId::new("cardinality", cardinality),

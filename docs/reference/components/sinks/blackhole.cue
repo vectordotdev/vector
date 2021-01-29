@@ -9,6 +9,7 @@ components: sinks: blackhole: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
