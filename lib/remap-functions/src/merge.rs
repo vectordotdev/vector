@@ -61,17 +61,23 @@ impl Expression for MergeFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        // TODO Merge inner types - PR #6182 needs to be merged first.
-        self.from
-            .type_def(state)
+        let from = self.from.type_def(state);
+
+        let to = self.to.type_def(state);
+        let from_inner = from.inner_type_def.clone();
+
+        let mut type_def = from
             .fallible_unless(value::Kind::Map)
-            .merge(self.to.type_def(state).fallible_unless(value::Kind::Map))
+            .merge(to.fallible_unless(value::Kind::Map))
             .merge_optional(
                 self.deep
                     .as_ref()
                     .map(|deep| deep.type_def(state).fallible_unless(value::Kind::Boolean)),
             )
-            .with_constraint(value::Kind::Map)
+            .with_constraint(value::Kind::Map);
+
+        type_def.inner_type_def = merge_inner_type_defs(type_def.inner_type_def, from_inner);
+        type_def
     }
 }
 
@@ -107,6 +113,30 @@ where
     }
 }
 
+/// Merges the inner type defs of the two maps.
+/// The merge has to be a shallow one, since we don't necessarily know the value of the `deep`
+/// parameter at compile time.
+fn merge_inner_type_defs(to: InnerTypeDef, from: InnerTypeDef) -> InnerTypeDef {
+    match (to, from) {
+        (InnerTypeDef::Map(map1), InnerTypeDef::Map(map2))
+        | (InnerTypeDef::Both { map: map1, .. }, InnerTypeDef::Map(map2))
+        | (InnerTypeDef::Map(map1), InnerTypeDef::Both { map: map2, .. })
+        | (InnerTypeDef::Both { map: map1, .. }, InnerTypeDef::Both { map: map2, .. }) => {
+            // Any combinations of maps, we can merge these and use as the resulting inner type def.
+            InnerTypeDef::Map(map1.into_iter().chain(map2.into_iter()).collect())
+        }
+        (InnerTypeDef::None, InnerTypeDef::Map(map))
+        | (InnerTypeDef::None, InnerTypeDef::Both { map, .. }) => {
+            // Otherwise, if the to inner_type_def is not known the from type_def will override
+            // any fields within the to, so we can take this on.
+            // The same does not hold if we don't know the type def of the from, these fields could
+            // override any of the known fields in the to.
+            InnerTypeDef::Map(map)
+        }
+        _ => InnerTypeDef::None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,31 +154,30 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: Some(Box::new(TypeDef {
-                    fallible: false,
-                    kind: Kind::Bytes,
-                    ..Default::default()
-                }))
+                inner_type_def: InnerTypeDef::None
             },
         }
 
         value_maps {
             expr: |_| MergeFn {
-                to: remap::map![ "ook" : 2 ].boxed(),
-                from: remap::map![ "ook" : 4 ].boxed(),
+                to: remap::map![ "ook" : 2,
+                                 "nork" : "oog",
+                                 "both" : 3
+                ].boxed(),
+                from: remap::map![ "ook" : 4,
+                                   "both" : "nerg"
+                ].boxed(),
                 deep: None
             },
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Map,
-                inner_type_def: Some(Box::new(TypeDef {
-                    fallible: false,
-                    kind: Kind::Integer,
-                    ..Default::default()
-                }))
+                inner_type_def: inner_type_def! ({ "ook": Kind::Integer,
+                                                   "nork": Kind::Bytes,
+                                                   "both": Kind::Bytes
+                })
             },
         }
-
     ];
 
     test_function! [
