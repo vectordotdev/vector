@@ -103,15 +103,15 @@ impl Expression for ParseGrokFn {
 
                 Ok(Value::from(result))
             }
-            None => Ok(Value::from(BTreeMap::new())),
+            None => Err("unable to parse input with grok pattern".into()),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .with_constraint(value::Kind::Array)
+            .into_fallible(true)
+            .with_constraint(value::Kind::Map)
     }
 }
 
@@ -131,7 +131,8 @@ mod test {
             remove_empty: Some(Literal::from(false).boxed()),
         },
         def: TypeDef {
-            kind: value::Kind::Array,
+            kind: value::Kind::Map,
+            fallible: true,
             ..Default::default()
         },
     }];
@@ -170,7 +171,7 @@ mod test {
         let cases = vec![
             (
                 map!["message": "an ungrokkable message"],
-                Ok(Value::from(map![])),
+                Err("function call error: unable to parse input with grok pattern".into()),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -181,7 +182,7 @@ mod test {
             ),
             (
                 map!["message": "2020-10-02T23:22:12.223222Z an ungrokkable message"],
-                Ok(Value::from(map![])),
+                Err("function call error: unable to parse input with grok pattern".into()),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
