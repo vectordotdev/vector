@@ -7666,6 +7666,7 @@ dependencies = [
  "smpl_jwt",
  "snafu",
  "snap",
+ "socket2",
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt 0.3.21",

@@ -176,6 +176,7 @@ percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.9.0", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
+socket2 = { version = "0.3.19", optional = true }
 inventory = "0.1.10"
 maxminddb = { version = "0.17.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0"}
@@ -374,16 +375,18 @@ sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
-sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-utils-fake = []
 sources-utils-http = ["sources-utils-tls", "warp", "snap"]
 sources-utils-tcp-keepalive = []
+sources-utils-tcp-socket = []
 sources-utils-tls = []
+sources-utils-udp = ["socket2"]
 sources-utils-unix = []
 
 # Transforms
@@ -529,12 +532,13 @@ sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = ["snap", "sources-utils-tls"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
-sinks-socket = []
+sinks-socket = ["sinks-utils-udp"]
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
-sinks-statsd = ["tokio-util/udp"]
-sinks-vector = []
+sinks-statsd = ["tokio-util/udp", "sinks-utils-udp"]
+sinks-vector = ["sinks-utils-udp"]
 sinks-pulsar = ["avro-rs", "pulsar"]
+sinks-utils-udp = ["socket2"]
 
 # Identifies that the build is a nightly build
 nightly = []

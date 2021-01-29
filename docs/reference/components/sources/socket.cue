@@ -19,7 +19,6 @@ components: sources: socket: {
 		receive: {
 			from: {
 				service: services.socket_client
-
 				interface: socket: {
 					direction: "incoming"
 					port:      _port
@@ -27,9 +26,11 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
 			keepalive: enabled: true
-
 			tls: {
 				enabled:                true
 				can_enable:             true
