@@ -123,10 +123,10 @@ impl RunningTopology {
     /// Transforms and sinks should shut down automatically once their input tasks finish.
     /// Note that this takes ownership of `self`, so once this function returns everything in the
     /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
-    /// into the returned future and is used to poll for when the tasks have completed. One the
+    /// into the returned future and is used to poll for when the tasks have completed. Once the
     /// returned future is dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    pub async fn stop(self) {
+    pub fn stop(self) -> impl Future<Output = ()> {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for pump in self.tasks,
@@ -201,9 +201,7 @@ impl RunningTopology {
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
 
-        futures::future::join(source_shutdown_complete, shutdown_complete_future)
-            .map(|_| ())
-            .await;
+        futures::future::join(source_shutdown_complete, shutdown_complete_future).map(|_| ())
     }
 
     /// On Error, topology is in invalid state.
