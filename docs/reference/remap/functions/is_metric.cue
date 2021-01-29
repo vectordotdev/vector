@@ -10,7 +10,7 @@ remap: functions: is_metric: {
 			#"If the current event is a metric event, then `true` is returned."#,
 		]
 	}
-	category: "Type"
+	category: "Event"
 	description: #"""
 		Determines whether the current event is a metric event.
 		"""#
