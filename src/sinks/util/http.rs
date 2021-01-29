@@ -72,7 +72,7 @@ where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Clone + Send + Sync + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn new(
@@ -101,7 +101,7 @@ where
     B::Output: Clone + Send + 'static,
     L: RetryLogic<Response = (hyper::Response<Bytes>, R), Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    R: From<usize> + fmt::Debug + Send + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Send + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn with_retry_logic(
@@ -138,7 +138,7 @@ where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    R: From<usize> + fmt::Debug + Send + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Send + 'static,
     L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
@@ -213,7 +213,7 @@ where
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Clone + Send + Sync + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn new(
@@ -244,7 +244,7 @@ where
     K: Hash + Eq + Clone + Send + 'static,
     L: RetryLogic<Response = (hyper::Response<Bytes>, R), Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    R: From<usize> + fmt::Debug + Send + Sync + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Send + Sync + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
     pub fn with_retry_logic(
@@ -284,7 +284,7 @@ where
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     L: RetryLogic<Response = (hyper::Response<Bytes>, R)> + Send + 'static,
-    R: From<usize> + fmt::Debug + Clone + Send + Sync + 'static,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Clone + Send + Sync + 'static,
     (hyper::Response<Bytes>, R): sink::Response,
 {
     type Error = crate::Error;
@@ -350,7 +350,7 @@ impl<R, F, B> HttpBatchService<R, F, B> {
 
 impl<R, F, B> Service<B> for HttpBatchService<R, F, B>
 where
-    R: From<usize> + fmt::Debug + Send,
+    R: for<'a> From<&'a hyper::Request<Vec<u8>>> + fmt::Debug + Send,
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
     B: Send + 'static,
 {
@@ -368,14 +368,14 @@ where
 
         Box::pin(async move {
             let request: hyper::Request<Vec<u8>> = request_builder(body).await?;
-            let request_byte_size: R = request.body().len().into();
+            let request_data = R::from(&request);
             let request: hyper::Request<Body> = request.map(Body::from);
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok((
                 hyper::Response::from_parts(parts, body.to_bytes()),
-                request_byte_size,
+                request_data,
             ))
         })
     }
@@ -389,6 +389,23 @@ impl<R, F, B> Clone for HttpBatchService<R, F, B> {
             request_builder: Arc::clone(&self.request_builder),
         }
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct RequestDataEmpty;
+
+impl From<&hyper::Request<Vec<u8>>> for RequestDataEmpty {
+    fn from(_request: &hyper::Request<Vec<u8>>) -> Self {
+        RequestDataEmpty
+    }
+}
+
+impl crate::sinks::util::sink::Response for (hyper::Response<bytes::Bytes>, RequestDataEmpty) {
+    fn is_successful(&self) -> bool {
+        true
+    }
+
+    fn emit_events(&self, _batch_size: usize) {}
 }
 
 #[derive(Debug, Clone)]
@@ -498,7 +515,7 @@ mod test {
         let request = b"hello".to_vec();
         let client = HttpClient::new(None).unwrap();
         let mut service: HttpBatchService<
-            usize,
+            RequestDataEmpty,
             Pin<Box<futures::future::Ready<crate::Result<hyper::Request<Vec<u8>>>>>>,
         > = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(

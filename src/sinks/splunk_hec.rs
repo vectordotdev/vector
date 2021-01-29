@@ -297,9 +297,9 @@ fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
 #[derive(Debug, Copy, Clone)]
 struct RequestByteSize(usize);
 
-impl From<usize> for RequestByteSize {
-    fn from(value: usize) -> Self {
-        RequestByteSize(value)
+impl From<&hyper::Request<Vec<u8>>> for RequestByteSize {
+    fn from(request: &hyper::Request<Vec<u8>>) -> Self {
+        RequestByteSize(request.body().len())
     }
 }
 
