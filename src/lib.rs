@@ -75,7 +75,7 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
-#[cfg(feature = "socket2")]
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub mod udp;
 pub mod unit_test;
 pub mod validate;
