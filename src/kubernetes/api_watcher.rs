@@ -91,7 +91,6 @@ where
             Ok(WatchEvent::ErrorStatus(status)) if status.code == Some(410) => {
                 Err(watcher::stream::Error::desync(stream::Error::Desync))
             }
-            // unwrap OK values other than watchevent error status
             Ok(val) => Ok(val),
             Err(err) => Err(watcher::stream::Error::other(stream::Error::K8sStream {
                 source: err,
@@ -208,6 +207,15 @@ mod tests {
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
     };
+
+    macro_rules! assert_matches {
+        ($expression:expr, $($pattern:tt)+) => {
+            match $expression {
+                $($pattern)+ => (),
+                ref e => panic!("assertion failed: `{:?}` does not match `{}`", e, stringify!($($pattern)+)),
+            }
+        }
+    }
 
     /// Test that it can handle invocation errors.
     #[tokio::test]
@@ -368,14 +376,13 @@ mod tests {
                         );
                 }),
                 vec![Box::new(|item| {
-                    // panic! on pass is err is what we expected
                     let error = item.unwrap_err();
-                    match error {
+                    assert_matches!(
+                        error,
                         watcher::stream::Error::Desync {
-                            source: stream::Error::Desync,
-                        } => {}
-                        _ => panic!("expected a desync error"),
-                    }
+                            source: stream::Error::Desync
+                        }
+                    )
                 })],
             ),
             // Desync error mid-stream.
@@ -423,12 +430,12 @@ mod tests {
                     }),
                     Box::new(|item| {
                         let error = item.unwrap_err();
-                        match error {
+                        assert_matches!(
+                            error,
                             watcher::stream::Error::Desync {
-                                source: stream::Error::Desync,
-                            } => {}
-                            _ => panic!("expected a desync error"),
-                        }
+                                source: stream::Error::Desync
+                            }
+                        )
                     }),
                 ],
             ),
@@ -465,12 +472,12 @@ mod tests {
                 vec![
                     Box::new(|item| {
                         let error = item.unwrap_err();
-                        match error {
+                        assert_matches!(
+                            error,
                             watcher::stream::Error::Desync {
-                                source: stream::Error::Desync,
-                            } => {}
-                            _ => panic!("expected a desync error"),
-                        }
+                                source: stream::Error::Desync
+                            }
+                        )
                     }),
                     Box::new(|item| {
                         assert_eq!(
@@ -538,16 +545,13 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    match error {
-                        watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Other {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
                                 },
                         } if format!("{:?}", source)
-                            == r#"Json(Error("expected ident", line: 1, column: 2))"# => {}
-                        err => panic!("Expect an 'other' error: {:?}", err),
-                    }
+                            == r#"Json(Error("expected ident", line: 1, column: 2))"#)
                 })],
             ),
             // Valid JSON of Invalid Response API
@@ -560,16 +564,13 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    match error {
-                        watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Other {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
                                 },
                         } if format!("{:?}", source)
-                            == r#"Json(Error("missing field `type`", line: 1, column: 9))"# => {}
-                        err => panic!("Expect an 'other' error: {:?}", err),
-                    }
+                            == r#"Json(Error("missing field `type`", line: 1, column: 9))"#)
                 })],
             ),
             // Non-standard object type
@@ -593,17 +594,13 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    match error {
-                        watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Other {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
                                 },
                         } if format!("{:?}", source)
-                            == r#"Json(Error("unknown variant `nonstandard_type`, expected one of `ADDED`, `DELETED`, `MODIFIED`, `BOOKMARK`, `ERROR`", line: 2, column: 58))"# =>
-                            {}
-                        err => panic!("Expect an 'other' error: {:?}", err),
-                    }
+                            == r#"Json(Error("unknown variant `nonstandard_type`, expected one of `ADDED`, `DELETED`, `MODIFIED`, `BOOKMARK`, `ERROR`", line: 2, column: 58))"#)
                 })],
             ),
             // Incorrect object type
@@ -627,17 +624,13 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    match error {
-                        watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Other {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
                                 },
                         } if format!("{:?}", source)
-                            == r#"Json(Error("invalid value: string \"StatefulSet\", expected Pod", line: 10, column: 29))"# =>
-                            {}
-                        err => panic!("Expect an 'other' error: {:?}", err),
-                    }
+                            == r#"Json(Error("invalid value: string \"StatefulSet\", expected Pod", line: 10, column: 29))"#)
                 })],
             ),
         ];
@@ -674,16 +667,6 @@ mod tests {
             }
             assert!(stream.next().await.is_none(), "expected to cover the whole stream with assertion, but got some items after all assertions passed");
             mock.assert_async().await;
-        }
-    }
-
-    #[macro_export]
-    macro_rules! assert_matches {
-        ($expression:expr, $($pattern:tt)+) => {
-            match $expression {
-                $($pattern)+ => (),
-                ref e => panic!("assertion failed: `{:?}` does not match `{}`", e, stringify!($($pattern)+)),
-            }
         }
     }
 }
