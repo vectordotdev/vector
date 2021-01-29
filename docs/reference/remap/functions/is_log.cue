@@ -7,7 +7,7 @@ remap: functions: is_log: {
 	return: {
 		types: ["boolean"]
 		rules: [
-			#"If the current event is a log event, then `true` is returned."#,
+			"If the current event is a [`log` event](\(urls.vector_log)), then `true` is returned.",
 		]
 	}
 	category: "Event"
