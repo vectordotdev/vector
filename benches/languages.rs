@@ -10,9 +10,131 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_parse_syslog
+    targets = benchmark_add_fields, benchmark_parse_json, benchmark_parse_syslog
 );
 criterion_main!(benches);
+
+// Add two fields to the event: four=4 and five=5
+fn benchmark_add_fields(c: &mut Criterion) {
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            r#"
+[transforms.last]
+  type = "remap"
+  inputs = ["in"]
+  source = """
+    .four = 4
+    .five = 4
+  """
+            "#,
+        ),
+        (
+            "native",
+            r#"
+[transforms.last]
+  type = "add_fields"
+  inputs = ["in"]
+  fields.four = 4
+  fields.five = 5
+            "#,
+        ),
+        (
+            "lua",
+            r#"
+[transforms.last]
+  type = "lua"
+  inputs = ["in"]
+  version = "2"
+  source = """
+  function process(event, emit)
+    event.log.four = 4
+    event.log.five = 5
+    emit(event)
+  end
+  """
+  hooks.process = "process"
+            "#,
+        ),
+        (
+            "wasm",
+            r#"
+[transforms.last]
+  type = "wasm"
+  inputs = ["in"]
+  module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
+  artifact_cache = "target/artifacts/"
+        "#,
+        ),
+    ];
+
+    let input = r#"{"one":1,"two":2,"three":3}"#;
+    let output =
+        serde_json::from_str(r#"{ "one": 1, "two": 2, "three": 3, "four": 4, "five": 5 }"#)
+            .unwrap();
+
+    benchmark_configs(c, "add_fields", configs, "in", "last", input, output);
+}
+
+fn benchmark_parse_json(c: &mut Criterion) {
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            r#"
+[transforms.last]
+  type = "remap"
+  inputs = ["in"]
+  source = """
+    . = parse_json!(.message)
+  """
+            "#,
+        ),
+        (
+            "native",
+            r#"
+[transforms.last]
+  type = "json_parser"
+  inputs = ["in"]
+  field = "message"
+            "#,
+        ),
+        (
+            "lua",
+            r#"
+[transforms.last]
+  type = "lua"
+  inputs = ["in"]
+  version = "2"
+  search_dirs = ["benches/lua_deps"]
+  source = """
+  local json = require "json"
+
+  function process(event, emit)
+    event.log = json.decode(event.log.message)
+    emit(event)
+  end
+  """
+  hooks.process = "process"
+        "#,
+        ),
+        (
+            "wasm",
+            r#"
+[transforms.last]
+  type = "wasm"
+  inputs = ["in"]
+  module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+  artifact_cache = "target/artifacts/"
+        "#,
+        ),
+    ];
+
+    let input =
+        r#"{"string":"bar","array":[1,2,3],"boolean":true,"number":47.5,"object":{"key":"value"}}"#;
+    let output = serde_json::from_str(r#"{ "array": [1, 2, 3], "boolean": true, "number": 47.5, "object": { "key": "value" }, "string": "bar" }"#).unwrap();
+
+    benchmark_configs(c, "parse_json", configs, "in", "last", input, output);
+}
 
 fn benchmark_parse_syslog(c: &mut Criterion) {
     let configs: Vec<(&str, &str)> = vec![
@@ -23,7 +145,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
   type = "remap"
   inputs = ["in"]
   source = """
-      . = parse_syslog!(.message)
+    . = parse_syslog!(.message)
   """
          "#,
         ),

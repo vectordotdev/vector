@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: del: {
+	category: "Event"
+	description: """
+		Removes the field specified by the `path` from the current event object.
+		"""
+
 	arguments: [
 		{
 			name:        "path"
@@ -10,19 +15,18 @@ remap: functions: del: {
 		},
 	]
 	internal_failure_reasons: []
+	notices: [
+		"""
+			The `del` function _modifies the current event in-place_ and returns the value of the deleted field.
+			""",
+	]
 	return: {
 		types: ["any"]
 		rules: [
-			"The return is the value of the field being deleted.",
+			"The return is the value of the field being deleted. If the field does not exist, `null` is returned.",
 		]
 	}
-	category: "Event"
-	description: #"""
-		Removes the field specified by the given path from the event object.
 
-		If the field exists, the field's value is returned by the delete operation, while `null` is returned if the
-		field doesn't exist.
-		"""#
 	examples: [
 		{
 			title: "Delete a field"

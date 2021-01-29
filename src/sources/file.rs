@@ -13,7 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter,
+    FileServer, FingerprintStrategy, Fingerprinter, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -63,7 +63,9 @@ pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
     pub file_key: Option<String>,
-    pub start_at_beginning: bool,
+    pub start_at_beginning: Option<bool>,
+    pub ignore_checkpoints: Option<bool>,
+    pub read_from: Option<ReadFromConfig>,
     pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
@@ -97,6 +99,22 @@ pub enum FingerprintConfig {
     DevInode,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFromConfig {
+    Beginning,
+    End,
+}
+
+impl From<ReadFromConfig> for ReadFrom {
+    fn from(rfc: ReadFromConfig) -> Self {
+        match rfc {
+            ReadFromConfig::Beginning => ReadFrom::Beginning,
+            ReadFromConfig::End => ReadFrom::End,
+        }
+    }
+}
+
 impl From<FingerprintConfig> for FingerprintStrategy {
     fn from(config: FingerprintConfig) -> FingerprintStrategy {
         match config {
@@ -122,7 +140,9 @@ impl Default for FileConfig {
             include: vec![],
             exclude: vec![],
             file_key: Some("file".to_string()),
-            start_at_beginning: false,
+            start_at_beginning: None,
+            ignore_checkpoints: None,
+            read_from: None,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::Checksum {
@@ -202,6 +222,11 @@ pub fn file_source(
         .ignore_older
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
+    let (ignore_checkpoints, read_from) = reconcile_position_options(
+        config.start_at_beginning,
+        config.ignore_checkpoints,
+        config.read_from,
+    );
 
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
         .expect("invalid glob patterns");
@@ -218,7 +243,8 @@ pub fn file_source(
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
-        start_at_beginning: config.start_at_beginning,
+        ignore_checkpoints,
+        read_from,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
@@ -309,6 +335,29 @@ pub fn file_source(
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await
     })
+}
+
+/// Emit deprecation warning if the old option is used, and take it into account when determining
+/// defaults. Any of the newer options will override it when set directly.
+fn reconcile_position_options(
+    start_at_beginning: Option<bool>,
+    ignore_checkpoints: Option<bool>,
+    read_from: Option<ReadFromConfig>,
+) -> (bool, ReadFrom) {
+    if start_at_beginning.is_some() {
+        warn!(message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead.")
+    }
+
+    match start_at_beginning {
+        Some(true) => (
+            ignore_checkpoints.unwrap_or(true),
+            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+        ),
+        _ => (
+            ignore_checkpoints.unwrap_or(false),
+            read_from.map(Into::into).unwrap_or_default(),
+        ),
+    }
 }
 
 fn wrap_with_line_agg(
@@ -451,6 +500,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "beginning"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "end"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::End));
     }
 
     #[test]
@@ -907,7 +972,8 @@ mod tests {
 
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                start_at_beginning: true,
+                ignore_checkpoints: Some(true),
+                read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = Pipeline::new_test();
@@ -1002,7 +1068,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
@@ -1279,7 +1344,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: false,
             ..test_default_file_config(&dir)
@@ -1343,7 +1407,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: true,
             ..test_default_file_config(&dir)
@@ -1407,7 +1470,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
         };

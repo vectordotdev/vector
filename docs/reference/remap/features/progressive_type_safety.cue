@@ -5,6 +5,11 @@ remap: features: progressive_type_safety: {
 		largely contributes to VRL's safety principle, ensuring scripts work as expected post-compilation.
 		"""
 
+	principles: {
+		performance: false
+		safety:      false
+	}
+
 	characteristics: {
 		errors: {
 			title: "Errors"

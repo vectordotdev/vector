@@ -5,4 +5,9 @@ remap: features: memory_safety: {
 		that deal with memory access. This makes VRL ideal for infrastructure use cases, like observability pipelines,
 		where reliability and security are top concerns.
 		"""
+
+	principles: {
+		performance: false
+		safety:      true
+	}
 }

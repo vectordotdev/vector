@@ -1,4 +1,9 @@
 remap: functions: to_float: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a float.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,10 +22,7 @@ remap: functions: to_float: {
 			"If `value` is a boolean, `0.0` will be returned for `false` and `1.0` will be returned for `true`.",
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `float`.
-		"""#
+
 	examples: [
 		{
 			title: "Coerce to a float"

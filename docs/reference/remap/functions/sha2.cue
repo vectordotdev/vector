@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: sha2: {
+	category:    "Hash"
+	description: """
+		Calculates a [SHA-2](\(urls.sha2)) hash of the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -26,10 +31,7 @@ remap: functions: sha2: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "Hash"
-	description: #"""
-		Calculates a sha2 hash of the provided `value`.
-		"""#
+
 	examples: [
 		{
 			title: "Calculate sha2 hash"
