@@ -209,6 +209,7 @@ components: sources: file: {
 			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
 			required:    false
 			type: string: {
+				syntax:  "literal"
 				default: "beginning"
 				enum: {
 					"beginning": "Read from the beginning of the file."
