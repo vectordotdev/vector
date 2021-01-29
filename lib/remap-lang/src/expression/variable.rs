@@ -61,17 +61,18 @@ impl Expression for Variable {
 
             for segment in path.segments() {
                 typedef = typedef.and_then(|td| match (segment, &td.inner_type_def) {
-                    (Segment::Field(field), InnerTypeDef::Map(td)) => {
+                    (Segment::Field(field), Some(InnerTypeDef::Map(td))) => {
                         td.get(field.as_str()).cloned()
                     }
-                    (Segment::Index(_), InnerTypeDef::Array(db)) => Some(*db.clone()),
-                    (Segment::Coalesce(fields), InnerTypeDef::Map(td)) => Some(fields.iter().fold(
-                        Kind::empty().into(),
-                        |accum, field| match td.get(field.as_str()) {
-                            Some(val) => accum | val.clone(),
-                            None => accum,
-                        },
-                    )),
+                    (Segment::Index(_), Some(InnerTypeDef::Array(db))) => Some(*db.clone()),
+                    (Segment::Coalesce(fields), Some(InnerTypeDef::Map(td))) => {
+                        Some(fields.iter().fold(Kind::empty().into(), |accum, field| {
+                            match td.get(field.as_str()) {
+                                Some(val) => accum | val.clone(),
+                                None => accum,
+                            }
+                        }))
+                    }
                     _ => None,
                 })
             }
@@ -141,9 +142,9 @@ mod tests {
             expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     kind: Kind::Map,
-                    inner_type_def: inner_type_def! ({
+                    inner_type_def: Some(inner_type_def! ({
                         "bar": Kind::Bytes
-                    }),
+                    })),
                     ..Default::default()
                 });
                 Variable::new("foo".to_owned(),

@@ -119,8 +119,8 @@ impl Expression for ParseSyslogFn {
     }
 }
 
-fn inner_type_def() -> InnerTypeDef {
-    inner_type_def! ({
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
         "message": Kind::Bytes,
         "hostname": Kind::Bytes | Kind::Null,
         "severity": Kind::Bytes | Kind::Null,
@@ -129,7 +129,7 @@ fn inner_type_def() -> InnerTypeDef {
         "msgid": Kind::Bytes | Kind::Null,
         "timestamp": Kind::Timestamp | Kind::Null,
         "procid": Kind::Bytes | Kind::Integer | Kind::Null
-    })
+    }))
 }
 
 #[cfg(test)]

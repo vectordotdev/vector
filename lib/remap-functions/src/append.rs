@@ -84,7 +84,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Array,
-                inner_type_def: inner_type_def!([ Kind::Boolean | Kind::Bytes | Kind::Integer ])
+                inner_type_def: Some(inner_type_def!([ Kind::Boolean | Kind::Bytes | Kind::Integer ]))
             },
         }
 
@@ -96,7 +96,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: inner_type_def!([ Kind::Integer ])
+                inner_type_def: Some(inner_type_def!([ Kind::Integer ]))
             },
         }
 
@@ -108,7 +108,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: inner_type_def!([ Kind::Integer ])
+                inner_type_def: Some(inner_type_def!([ Kind::Integer ]))
             },
         }
     ];

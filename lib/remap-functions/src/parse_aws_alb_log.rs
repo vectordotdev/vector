@@ -61,8 +61,8 @@ impl Expression for ParseAwsAlbLogFn {
 }
 
 /// The type defs of the fields contained by the returned map.
-fn inner_type_def() -> InnerTypeDef {
-    inner_type_def! ({
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
         "type": Kind::Bytes,
         "timestamp": Kind::Bytes,
         "elb": Kind::Bytes,
@@ -94,7 +94,7 @@ fn inner_type_def() -> InnerTypeDef {
         "target_status_code_list": Kind::Bytes,
         "classification": Kind::Bytes,
         "classification_reason": Kind::Bytes
-    })
+    }))
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {

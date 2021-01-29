@@ -57,8 +57,8 @@ impl Expression for ParseRegexAllFn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
-            .with_inner_type(inner_type_def!([TypeDef::from(value::Kind::Map)
-                .with_inner_type(util::regex_type_def(&self.pattern))]))
+            .with_inner_type(Some(inner_type_def!([TypeDef::from(value::Kind::Map)
+                .with_inner_type(Some(util::regex_type_def(&self.pattern)))])))
             .with_constraint(value::Kind::Array)
     }
 }
@@ -76,14 +76,11 @@ mod tests {
                 pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
             def: TypeDef { kind: Kind::Array,
-                           inner_type_def: InnerTypeDef::Array( TypeDef {
-                               kind: Kind::Map,
-                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
-                                                                  "1": Kind::Bytes,
-                                                                  "group": Kind::Bytes
-                               }),
-                               ..Default::default()
-                           }.boxed()),
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
                            ..Default::default() },
         }
 
@@ -94,14 +91,11 @@ mod tests {
             },
             def: TypeDef { fallible: true,
                            kind: Kind::Array,
-                           inner_type_def: InnerTypeDef::Array( TypeDef {
-                               kind: Kind::Map,
-                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
-                                                                  "1": Kind::Bytes,
-                                                                  "group": Kind::Bytes
-                               }),
-                               ..Default::default()
-                           }.boxed()),
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
             },
         }
 
@@ -112,14 +106,11 @@ mod tests {
             },
             def: TypeDef { fallible: true,
                            kind: Kind::Array,
-                           inner_type_def: InnerTypeDef::Array( TypeDef {
-                               kind: Kind::Map,
-                               inner_type_def: inner_type_def! ({ "0": Kind::Bytes,
-                                                                  "1": Kind::Bytes,
-                                                                  "group": Kind::Bytes
-                               }),
-                               ..Default::default()
-                           }.boxed()),
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
             },
         }
     ];

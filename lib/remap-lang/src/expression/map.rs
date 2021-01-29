@@ -68,14 +68,14 @@ impl Expression for Map {
             .any(|d| d.is_fallible());
 
         let inner_type_def = if self.expressions.is_empty() {
-            InnerTypeDef::None
+            None
         } else {
-            InnerTypeDef::Map(
+            Some(InnerTypeDef::Map(
                 self.expressions
                     .iter()
                     .map(|(name, expression)| (name.clone(), expression.type_def(state)))
                     .collect(),
-            )
+            ))
         };
 
         TypeDef {
@@ -107,9 +107,9 @@ mod tests {
             expr: |_| map!{"a": true},
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: inner_type_def! ({
+                inner_type_def: Some(inner_type_def! ({
                     "a": Kind::Boolean,
-                }),
+                })),
                 ..Default::default()
             },
         }
@@ -122,11 +122,11 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: inner_type_def! ({
+                inner_type_def: Some(inner_type_def! ({
                     "a": Kind::Bytes,
                     "b": Kind::Boolean,
                     "c": Kind::Integer
-                }),
+                })),
                 ..Default::default()
             },
         }
@@ -143,10 +143,10 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: inner_type_def! ({
+                inner_type_def: Some(inner_type_def! ({
                     "a": Kind::Boolean,
                     "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true)
-                })
+                }))
             },
         }
 
@@ -163,11 +163,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: inner_type_def! ({
+                inner_type_def: Some(inner_type_def! ({
                     "a": Kind::Boolean,
                     "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true),
-                    "c": TypeDef::from(Kind::Array).with_inner_type(inner_type_def!([ Kind::Integer ]))
-                })
+                    "c": TypeDef::from(Kind::Array).with_inner_type(Some(inner_type_def!([ Kind::Integer ])))
+                }))
             },
         }
     ];

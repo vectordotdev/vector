@@ -57,7 +57,7 @@ fn path_type_def(state: &mut state::Compiler, path: &path::Path, type_def: TypeD
     // is fallible (there may not be enough elements in the array) any
     // indexing needs to be handled.
     // This may change in future.
-    if let InnerTypeDef::Map(map) = type_def.inner_type_def {
+    if let Some(InnerTypeDef::Map(map)) = type_def.inner_type_def {
         for (field, type_def) in map {
             if let Ok(field) = Field::from_str(&field) {
                 let mut path = path.clone();
@@ -239,7 +239,7 @@ mod tests {
             &mut state,
             &path,
             TypeDef::from(Kind::Map)
-                .with_inner_type(crate::inner_type_def!({ "flork": Kind::Integer })),
+                .with_inner_type(Some(crate::inner_type_def!({ "flork": Kind::Integer }))),
         );
 
         assert_eq!(

@@ -70,8 +70,8 @@ impl Expression for ParseAwsVpcFlowLogFn {
 }
 
 /// The type defs of the fields contained by the returned map.
-fn inner_type_def() -> InnerTypeDef {
-    inner_type_def! ({
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
         "version": Kind::Integer | Kind::Null,
         "account_id": Kind::Integer | Kind::Null,
         "interface_id": Kind::Bytes | Kind::Null,
@@ -96,7 +96,7 @@ fn inner_type_def() -> InnerTypeDef {
         "region": Kind::Bytes | Kind::Null,
         "az_id": Kind::Bytes | Kind::Null,
         "sublocation_type": Kind::Bytes | Kind::Null,
-    })
+    }))
 }
 
 type ParseResult<T> = std::result::Result<T, String>;

@@ -59,8 +59,8 @@ impl Expression for ParseUrlFn {
 }
 
 /// The type defs of the fields contained by the returned map.
-fn inner_type_def() -> InnerTypeDef {
-    inner_type_def! ({
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
         "scheme": Kind::Bytes,
         "username": Kind::Bytes,
         "password": Kind::Bytes,
@@ -69,7 +69,7 @@ fn inner_type_def() -> InnerTypeDef {
         "port": Kind::Bytes,
         "fragment": Kind::Bytes | Kind::Null,
         "query": Kind::Map,
-    })
+    }))
 }
 
 fn url_to_value(url: Url) -> Value {

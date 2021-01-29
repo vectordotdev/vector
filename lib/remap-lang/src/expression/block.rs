@@ -104,11 +104,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: InnerTypeDef::Array(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     fallible: false,
                     kind: Kind::Integer,
                     ..Default::default()
-                }.boxed()),
+                }.boxed())),
             },
         }
     ];

@@ -116,24 +116,31 @@ where
 /// Merges the inner type defs of the two maps.
 /// The merge has to be a shallow one, since we don't necessarily know the value of the `deep`
 /// parameter at compile time.
-fn merge_inner_type_defs(to: InnerTypeDef, from: InnerTypeDef) -> InnerTypeDef {
+fn merge_inner_type_defs(
+    to: Option<InnerTypeDef>,
+    from: Option<InnerTypeDef>,
+) -> Option<InnerTypeDef> {
     match (to, from) {
-        (InnerTypeDef::Map(map1), InnerTypeDef::Map(map2))
-        | (InnerTypeDef::Both { map: map1, .. }, InnerTypeDef::Map(map2))
-        | (InnerTypeDef::Map(map1), InnerTypeDef::Both { map: map2, .. })
-        | (InnerTypeDef::Both { map: map1, .. }, InnerTypeDef::Both { map: map2, .. }) => {
+        (Some(InnerTypeDef::Map(map1)), Some(InnerTypeDef::Map(map2)))
+        | (Some(InnerTypeDef::Both { map: map1, .. }), Some(InnerTypeDef::Map(map2)))
+        | (Some(InnerTypeDef::Map(map1)), Some(InnerTypeDef::Both { map: map2, .. }))
+        | (
+            Some(InnerTypeDef::Both { map: map1, .. }),
+            Some(InnerTypeDef::Both { map: map2, .. }),
+        ) => {
             // Any combinations of maps, we can merge these and use as the resulting inner type def.
-            InnerTypeDef::Map(map1.into_iter().chain(map2.into_iter()).collect())
+            Some(InnerTypeDef::Map(
+                map1.into_iter().chain(map2.into_iter()).collect(),
+            ))
         }
-        (InnerTypeDef::None, InnerTypeDef::Map(map))
-        | (InnerTypeDef::None, InnerTypeDef::Both { map, .. }) => {
+        (None, Some(InnerTypeDef::Map(map))) | (None, Some(InnerTypeDef::Both { map, .. })) => {
             // Otherwise, if the to inner_type_def is not known the from type_def will override
             // any fields within the to, so we can take this on.
             // The same does not hold if we don't know the type def of the from, these fields could
             // override any of the known fields in the to.
-            InnerTypeDef::Map(map)
+            Some(InnerTypeDef::Map(map))
         }
-        _ => InnerTypeDef::None,
+        _ => None,
     }
 }
 
@@ -154,7 +161,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: InnerTypeDef::None
+                inner_type_def: None
             },
         }
 
@@ -172,10 +179,10 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Map,
-                inner_type_def: inner_type_def! ({ "ook": Kind::Integer,
-                                                   "nork": Kind::Bytes,
-                                                   "both": Kind::Bytes
-                })
+                inner_type_def: Some(inner_type_def! ({ "ook": Kind::Integer,
+                                                         "nork": Kind::Bytes,
+                                                         "both": Kind::Bytes
+                }))
             },
         }
     ];

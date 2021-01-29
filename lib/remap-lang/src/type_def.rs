@@ -36,15 +36,15 @@ pub struct TypeDef {
     ///     TypeDef {
     ///         fallible: false,
     ///         kind: Kind::Array,
-    ///         inner_type_def: InnerTypeDef::Array(TypeDef {
+    ///         inner_type_def: Some(InnerTypeDef::Array(TypeDef {
     ///             fallible: false,
     ///             kind: Kind::Null | Kind::Boolean,
-    ///             inner_type_def: InnerTypeDef::None,
-    ///         }.boxed()),
+    ///             inner_type_def: None,
+    ///         }.boxed())),
     ///     },
     /// );
     /// ```
-    pub inner_type_def: InnerTypeDef,
+    pub inner_type_def: Option<InnerTypeDef>,
 }
 
 impl Default for TypeDef {
@@ -52,7 +52,7 @@ impl Default for TypeDef {
         Self {
             fallible: false,
             kind: value::Kind::all(),
-            inner_type_def: InnerTypeDef::None,
+            inner_type_def: None,
         }
     }
 }
@@ -61,7 +61,12 @@ impl BitOr for TypeDef {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        let inner_type_def = self.inner_type_def | rhs.inner_type_def;
+        let inner_type_def = match (self.inner_type_def, rhs.inner_type_def) {
+            (None, None) => None,
+            (None, Some(rhs)) => Some(rhs),
+            (Some(lhs), None) => Some(lhs),
+            (Some(lhs), Some(rhs)) => Some(lhs | rhs),
+        };
 
         Self {
             fallible: self.fallible | rhs.fallible,
@@ -75,7 +80,26 @@ impl BitAnd for TypeDef {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        let inner_type_def = self.inner_type_def & rhs.inner_type_def;
+        let maps = |lhs: BTreeMap<String, TypeDef>, rhs: BTreeMap<String, TypeDef>| {
+            // Calculate the intersection of the two maps
+            let mut map = BTreeMap::new();
+            for (key, value1) in lhs.into_iter() {
+                if let Some(value2) = rhs.get(&key) {
+                    map.insert(key, value1 & value2.clone());
+                }
+            }
+            map
+        };
+
+        let inner_type_def = match (self.inner_type_def, rhs.inner_type_def) {
+            (Some(InnerTypeDef::Array(lhs)), Some(InnerTypeDef::Array(rhs))) => {
+                Some(InnerTypeDef::Array((*lhs & *rhs).boxed()))
+            }
+            (Some(InnerTypeDef::Map(lhs)), Some(InnerTypeDef::Map(rhs))) => {
+                Some(InnerTypeDef::Map(maps(lhs, rhs)))
+            }
+            _ => None,
+        };
 
         Self {
             fallible: self.fallible & rhs.fallible,
@@ -107,7 +131,7 @@ impl TypeDef {
         let mut kind = self.kind.scalar();
         let mut type_def = self.inner_type_def.clone();
 
-        while let InnerTypeDef::Array(td) = type_def {
+        while let Some(InnerTypeDef::Array(td)) = type_def {
             kind |= td.kind.scalar();
             type_def = td.inner_type_def;
         }
@@ -151,14 +175,14 @@ impl TypeDef {
         self.kind = kind.into();
 
         if self.kind.is_scalar() {
-            self.inner_type_def = InnerTypeDef::None;
+            self.inner_type_def = None;
         }
 
         self
     }
 
-    pub fn with_inner_type(mut self, inner_type: impl Into<InnerTypeDef>) -> Self {
-        self.inner_type_def = inner_type.into();
+    pub fn with_inner_type(mut self, inner_type: Option<InnerTypeDef>) -> Self {
+        self.inner_type_def = inner_type;
         self
     }
 
@@ -214,7 +238,6 @@ impl TypeDef {
 /// These expressions can be represented using `Both`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InnerTypeDef {
-    None,
     Array(Box<TypeDef>),
     Map(BTreeMap<String, TypeDef>),
     Both {
@@ -246,9 +269,6 @@ impl BitOr for InnerTypeDef {
         };
 
         match (self, rhs) {
-            (InnerTypeDef::None, InnerTypeDef::None) => InnerTypeDef::None,
-            (lhs, InnerTypeDef::None) => lhs,
-            (InnerTypeDef::None, rhs) => rhs,
             (InnerTypeDef::Array(lhs), InnerTypeDef::Array(rhs)) => {
                 InnerTypeDef::Array((*lhs | *rhs).boxed())
             }
@@ -284,31 +304,6 @@ impl BitOr for InnerTypeDef {
                 map: maps(map1, map2),
                 array: (*array1 | *array2).boxed(),
             },
-        }
-    }
-}
-
-impl BitAnd for InnerTypeDef {
-    type Output = Self;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        let maps = |lhs: BTreeMap<String, TypeDef>, rhs: BTreeMap<String, TypeDef>| {
-            // Calculate the intersection of the two maps
-            let mut map = BTreeMap::new();
-            for (key, value1) in lhs.into_iter() {
-                if let Some(value2) = rhs.get(&key) {
-                    map.insert(key, value1 & value2.clone());
-                }
-            }
-            map
-        };
-
-        match (self, rhs) {
-            (InnerTypeDef::Array(lhs), InnerTypeDef::Array(rhs)) => {
-                InnerTypeDef::Array((*lhs & *rhs).boxed())
-            }
-            (InnerTypeDef::Map(lhs), InnerTypeDef::Map(rhs)) => InnerTypeDef::Map(maps(lhs, rhs)),
-            _ => InnerTypeDef::None,
         }
     }
 }
@@ -356,20 +351,20 @@ mod tests {
     fn scalar_kind() {
         let type_def = TypeDef {
             kind: Kind::Array,
-            inner_type_def: InnerTypeDef::Array(
+            inner_type_def: Some(InnerTypeDef::Array(
                 TypeDef {
                     kind: Kind::Boolean | Kind::Float,
-                    inner_type_def: InnerTypeDef::Array(
+                    inner_type_def: Some(InnerTypeDef::Array(
                         TypeDef {
                             kind: Kind::Bytes,
                             ..Default::default()
                         }
                         .boxed(),
-                    ),
+                    )),
                     ..Default::default()
                 }
                 .boxed(),
-            ),
+            )),
             ..Default::default()
         };
 
@@ -396,21 +391,5 @@ mod tests {
         });
 
         assert_eq!(expected, type_def_a | type_def_b);
-    }
-
-    #[test]
-    fn inner_type_def_and() {
-        let type_def_a = inner_type_def!([Kind::Boolean]);
-        let type_def_b = inner_type_def!([Kind::Integer | Kind::Boolean]);
-        let expected = inner_type_def!([Kind::Boolean]);
-
-        assert_eq!(expected, type_def_a & type_def_b);
-
-        let type_def_a = inner_type_def!({ "a": Kind::Boolean, "b": Kind::Bytes });
-        let type_def_b =
-            inner_type_def!({ "a": Kind::Float | Kind::Boolean, "c": Kind::Timestamp });
-        let expected = inner_type_def!({ "a": Kind::Boolean });
-
-        assert_eq!(expected, type_def_a & type_def_b);
     }
 }
