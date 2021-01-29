@@ -7,7 +7,7 @@ remap: functions: is_metric: {
 	return: {
 		types: ["boolean"]
 		rules: [
-			#"If the current event is a metric event, then `true` is returned."#,
+			"If the current event is a [`metric` event](\(urls.vector_metric)), then `true` is returned."#,
 		]
 	}
 	category: "Event"
