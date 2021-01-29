@@ -35,10 +35,8 @@ pub fn tutorial() -> Result<(), Error> {
                     "help" => help(),
                     "next" => {
                         if (index + 1) == tutorials.len() {
-                            println!(
-                                "You've finished all the steps! Taking you back to the beginning\n"
-                            );
-                            index = 0;
+                            println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
+                            break;
                         } else {
                             index = index.saturating_add(1);
                         }
