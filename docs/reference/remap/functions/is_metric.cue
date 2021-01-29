@@ -11,9 +11,9 @@ remap: functions: is_metric: {
 		]
 	}
 	category: "Event"
-	description: #"""
-		Determines whether the current event is a metric event.
-		"""#
+	description: """
+		Determines whether the current event is a [`metric` event](\(urls.vector_metric)).
+		"""
 	examples: [
 		{
 			title: "A metric event"
