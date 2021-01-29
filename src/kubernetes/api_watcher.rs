@@ -14,7 +14,7 @@ use futures::{
 use http::StatusCode;
 use hyper::Error as BodyError;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::WatchEvent;
-use k8s_openapi::{WatchOptional, WatchResponse};
+use k8s_openapi::WatchOptional;
 use snafu::{ResultExt, Snafu};
 
 /// A simple watcher atop of the Kubernetes API [`Client`].
@@ -50,7 +50,7 @@ where
     ) -> Result<
         impl Stream<
                 Item = Result<
-                    WatchResponse<<B as WatchRequestBuilder>::Object>,
+                    WatchEvent<<B as WatchRequestBuilder>::Object>,
                     watcher::stream::Error<stream::Error>,
                 >,
             > + 'static,
@@ -88,9 +88,10 @@ where
         // Stream response body.
         let body = response.into_body();
         Ok(k8s_stream::body(body).map(|item| match item {
-            Ok(WatchResponse::Ok(WatchEvent::ErrorStatus(status))) if status.code == Some(410) => {
+            Ok(WatchEvent::ErrorStatus(status)) if status.code == Some(410) => {
                 Err(watcher::stream::Error::desync(stream::Error::Desync))
             }
+            // unwrap OK values other than watchevent error status
             Ok(val) => Ok(val),
             Err(err) => Err(watcher::stream::Error::other(stream::Error::K8sStream {
                 source: err,
@@ -111,7 +112,7 @@ where
     type StreamError = stream::Error;
     type Stream = BoxStream<
         'static,
-        Result<WatchResponse<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+        Result<WatchEvent<Self::Object>, watcher::stream::Error<Self::StreamError>>,
     >;
 
     fn watch<'a>(
@@ -179,7 +180,6 @@ pub mod stream {
             /// The underlying error.
             source: k8s_stream::Error<BodyError>,
         },
-
         /// Returned when desync watch response is detected.
         #[snafu(display("desync"))]
         Desync,
@@ -203,11 +203,11 @@ mod tests {
     use futures::StreamExt;
     use httpmock::MockServer;
     use httpmock::{Method::GET, Then, When};
+    use k8s_openapi::WatchOptional;
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status, WatchEvent},
     };
-    use k8s_openapi::{WatchOptional, WatchResponse};
 
     /// Test that it can handle invocation errors.
     #[tokio::test]
@@ -289,7 +289,7 @@ mod tests {
     async fn test_stream_errors() {
         let cases: Vec<(
             Box<dyn FnOnce(When, Then)>,
-            Vec<Box<dyn FnOnce(Result<WatchResponse<Pod>, watcher::stream::Error<stream::Error>>)>>,
+            Vec<Box<dyn FnOnce(Result<WatchEvent<Pod>, watcher::stream::Error<stream::Error>>)>>,
         )> = vec![
             // Tests a healthy stream
             (
@@ -321,9 +321,8 @@ mod tests {
                 }),
                 vec![
                     Box::new(|item| {
-                        // panic! on pass is err is what we expected
-                        assert_watch_response(
-                            item,
+                        assert_eq!(
+                            item.unwrap(),
                             WatchEvent::Added(Pod {
                                 metadata: ObjectMeta {
                                     uid: Some("uid0".to_owned()),
@@ -334,9 +333,8 @@ mod tests {
                         );
                     }),
                     Box::new(|item| {
-                        // panic! on pass is err is what we expected
-                        assert_watch_response(
-                            item,
+                        assert_eq!(
+                            item.unwrap(),
                             WatchEvent::Added(Pod {
                                 metadata: ObjectMeta {
                                     uid: Some("uid1".to_owned()),
@@ -412,9 +410,8 @@ mod tests {
                 }),
                 vec![
                     Box::new(|item| {
-                        // panic! on pass is err is what we expected
-                        assert_watch_response(
-                            item,
+                        assert_eq!(
+                            item.unwrap(),
                             WatchEvent::Added(Pod {
                                 metadata: ObjectMeta {
                                     uid: Some("uid0".to_owned()),
@@ -425,7 +422,6 @@ mod tests {
                         );
                     }),
                     Box::new(|item| {
-                        // panic! on pass is err is what we expected
                         let error = item.unwrap_err();
                         match error {
                             watcher::stream::Error::Desync {
@@ -468,7 +464,6 @@ mod tests {
                 }),
                 vec![
                     Box::new(|item| {
-                        // panic! on pass is err is what we expected
                         let error = item.unwrap_err();
                         match error {
                             watcher::stream::Error::Desync {
@@ -478,8 +473,8 @@ mod tests {
                         }
                     }),
                     Box::new(|item| {
-                        assert_watch_response(
-                            item,
+                        assert_eq!(
+                            item.unwrap(),
                             WatchEvent::Added(Pod {
                                 metadata: ObjectMeta {
                                     uid: Some("uid0".to_owned()),
@@ -513,8 +508,8 @@ mod tests {
                         );
                 }),
                 vec![Box::new(|item| {
-                    assert_watch_response(
-                        item,
+                    assert_eq!(
+                        item.unwrap(),
                         WatchEvent::ErrorStatus(Status {
                             code: Some(500),
                             message: Some("Internal Server Error".to_owned()),
@@ -680,17 +675,6 @@ mod tests {
             assert!(stream.next().await.is_none(), "expected to cover the whole stream with assertion, but got some items after all assertions passed");
             mock.assert_async().await;
         }
-    }
-
-    fn assert_watch_response<E>(
-        item: Result<WatchResponse<Pod>, E>,
-        expected_val: WatchEvent<Pod>,
-    ) {
-        let val = match item {
-            Ok(WatchResponse::Ok(val)) => val,
-            _ => panic!("unexpected response"),
-        };
-        assert_eq!(val, expected_val);
     }
 
     #[macro_export]

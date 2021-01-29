@@ -3,7 +3,7 @@
 use super::watcher::{self, Watcher};
 use crate::internal_events::kubernetes::instrumenting_watcher as internal_events;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
-use k8s_openapi::{WatchOptional, WatchResponse};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, WatchOptional};
 
 /// A watcher that wraps another watcher with instrumentation calls.
 pub struct InstrumentingWatcher<T>
@@ -35,7 +35,7 @@ where
     type StreamError = <T as Watcher>::StreamError;
     type Stream = BoxStream<
         'static,
-        Result<WatchResponse<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+        Result<WatchEvent<Self::Object>, watcher::stream::Error<Self::StreamError>>,
     >;
 
     fn watch<'a>(

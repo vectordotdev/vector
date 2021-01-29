@@ -6,7 +6,7 @@ use super::watcher::{self, Watcher};
 use async_stream::try_stream;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
-use k8s_openapi::{Resource, WatchOptional, WatchResponse};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, WatchOptional};
 use serde::de::DeserializeOwned;
 use std::fmt;
 
@@ -39,7 +39,7 @@ where
     T: DeserializeOwned + Resource,
 {
     /// Return a watch response.
-    Ok(WatchResponse<T>),
+    Ok(WatchEvent<T>),
     /// Return a desync error.
     ErrDesync,
     /// Return an "other" (i.e. non-desync) error.
@@ -82,7 +82,7 @@ where
     type StreamError = StreamError;
     type Stream = BoxStream<
         'static,
-        Result<WatchResponse<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+        Result<WatchEvent<Self::Object>, watcher::stream::Error<Self::StreamError>>,
     >;
 
     type InvocationError = InvocationError;
@@ -126,7 +126,7 @@ where
                     })
                         as BoxStream<
                             'static,
-                            Result<WatchResponse<Self::Object>, watcher::error::Error<StreamError>>,
+                            Result<WatchEvent<Self::Object>, watcher::error::Error<StreamError>>,
                         >;
                     Ok(stream)
                 }

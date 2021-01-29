@@ -8,7 +8,7 @@ use crate::internal_events::kubernetes::reflector as internal_events;
 use futures::{pin_mut, stream::StreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-    Metadata, WatchOptional, WatchResponse,
+    Metadata, WatchOptional,
 };
 use snafu::Snafu;
 use std::convert::Infallible;
@@ -136,7 +136,7 @@ where
                         // A fine watch respose arrived, we just pass it down.
                         Ok(val) => val,
                     };
-                    self.process_watch_response(response).await;
+                    self.process_watch_event(response).await;
                 } else {
                     // Response stream has ended.
                     // Break the watch reading loop so the flow can
@@ -165,23 +165,7 @@ where
     }
 
     /// Process an item from the watch response stream.
-    async fn process_watch_response(&mut self, response: WatchResponse<<W as Watcher>::Object>) {
-        // Unpack the event.
-        let event = match response {
-            WatchResponse::Ok(event) => event,
-            WatchResponse::Other(_) => {
-                // Even though we could parse the response, we didn't
-                // get the data we expected on the wire.
-                // According to the rules, we just ignore the unknown
-                // responses. This may be a newly added piece of data
-                // our code doesn't know of.
-                // TODO: add more details on the data here if we
-                // encounter these messages in practice.
-                warn!(message = "Got unexpected data in the watch response.");
-                return;
-            }
-        };
-
+    async fn process_watch_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
         // Prepare a resource version candidate so we can update (aka commit) it
         // later.
         let resource_version_candidate = match resource_version::Candidate::from_watch_event(&event)
@@ -263,7 +247,7 @@ mod tests {
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-        Metadata, WatchResponse,
+        Metadata,
     };
     use std::time::Duration;
 
@@ -313,7 +297,7 @@ mod tests {
 
     // A helper enum to encode expected mock watcher stream.
     enum ExpStmRes {
-        WatchResponse(WatchEvent<Pod>),
+        Item(WatchEvent<Pod>),
         Desync,
     }
 
@@ -379,16 +363,16 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Modified(make_pod("uid0", "20"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid2", "25"))),
+                    ExpStmRes::Item(WatchEvent::Modified(make_pod("uid0", "20"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid2", "25"))),
                 ]),
             ),
             (
@@ -398,7 +382,7 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("25".to_owned()),
-                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Bookmark {
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Bookmark {
                     resource_version: "50".into(),
                 })]),
             ),
@@ -410,8 +394,8 @@ mod tests {
                 ],
                 Some("50".to_owned()),
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Deleted(make_pod("uid2", "55"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Modified(make_pod("uid0", "60"))),
+                    ExpStmRes::Item(WatchEvent::Deleted(make_pod("uid2", "55"))),
+                    ExpStmRes::Item(WatchEvent::Modified(make_pod("uid0", "60"))),
                 ]),
             ),
         ];
@@ -431,8 +415,8 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
@@ -444,16 +428,16 @@ mod tests {
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
-                    make_pod("uid21", "1010"),
-                ))]),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -472,8 +456,8 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
@@ -485,16 +469,16 @@ mod tests {
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
-                    make_pod("uid21", "1010"),
-                ))]),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -513,15 +497,15 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid0", "10"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid1", "15"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid2", "20"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid2", "20"))),
                     ExpStmRes::Desync,
                 ]),
             ),
@@ -533,16 +517,16 @@ mod tests {
                 ],
                 None,
                 ExpInvRes::Stream(vec![
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid20", "1000"))),
-                    ExpStmRes::WatchResponse(WatchEvent::Added(make_pod("uid21", "1005"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![ExpStmRes::WatchResponse(WatchEvent::Modified(
-                    make_pod("uid21", "1010"),
-                ))]),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -690,8 +674,8 @@ mod tests {
 
             // Send pod addition to a stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                    WatchEvent::Added(make_pod("uid0", "10")),
+                .send(mock_watcher::ScenarioActionStream::Ok(WatchEvent::Added(
+                    make_pod("uid0", "10"),
                 )))
                 .await
                 .unwrap();
@@ -715,8 +699,8 @@ mod tests {
 
             // Send pod deletion to a stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                    WatchEvent::Deleted(make_pod("uid0", "15")),
+                .send(mock_watcher::ScenarioActionStream::Ok(WatchEvent::Deleted(
+                    make_pod("uid0", "15"),
                 )))
                 .await
                 .unwrap();
@@ -1081,12 +1065,10 @@ mod tests {
                     // Determine the requested action from the test scenario.
                     match action {
                         // Watch response is requested, send it to the stream.
-                        ExpStmRes::WatchResponse(response) => {
+                        ExpStmRes::Item(response) => {
                             // Send the requested action to the stream.
                             watch_stream_tx
-                                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                                    response,
-                                )))
+                                .send(mock_watcher::ScenarioActionStream::Ok(response))
                                 .await
                                 .unwrap();
                         }

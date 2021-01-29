@@ -1,7 +1,8 @@
 //! Watcher abstraction.
 
 use futures::{future::BoxFuture, stream::Stream};
-use k8s_openapi::{Resource, WatchOptional, WatchResponse};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, WatchOptional};
+
 use serde::de::DeserializeOwned;
 use snafu::Snafu;
 
@@ -17,7 +18,7 @@ pub trait Watcher {
     type StreamError: std::error::Error + Send + 'static;
 
     /// The stream type produced by the watch request.
-    type Stream: Stream<Item = Result<WatchResponse<Self::Object>, stream::Error<Self::StreamError>>>
+    type Stream: Stream<Item = Result<WatchEvent<Self::Object>, stream::Error<Self::StreamError>>>
         + Send;
 
     /// Issues a single watch request and returns a stream results.
