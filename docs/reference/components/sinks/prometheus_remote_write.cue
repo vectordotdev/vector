@@ -95,6 +95,10 @@ components: sinks: prometheus_remote_write: {
 				syntax: "literal"
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${HTTP_PASSWORD}"
+			username_example: "${HTTP_USERNAME}"
+		}}
 		default_namespace: {
 			common:      true
 			description: """
