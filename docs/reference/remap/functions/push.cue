@@ -5,12 +5,6 @@ remap: functions: push: {
 	description: """
 		Adds the `item` to the end of the `value` array.
 		"""
-	notices: [
-		"""
-			The `push` function does _not_ change the array in place. You must reassign original value if you wish to
-			replace it.
-			""",
-	]
 
 	arguments: [
 		{

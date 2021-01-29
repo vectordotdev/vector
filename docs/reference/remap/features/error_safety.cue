@@ -6,4 +6,9 @@ remap: features: error_safety: {
 		production observability pipelines. See the [error reference](\(urls.vrl_errors_reference)) for more info
 		on error handling.
 		"""
+
+	principles: {
+		performance: false
+		safety:      true
+	}
 }

@@ -9,7 +9,7 @@ remap: functions: merge: {
 	arguments: [
 		{
 			name:        "to"
-			description: "The path of the object to merge into."
+			description: "The object to merge into."
 			required:    true
 			type: ["string"]
 		},
