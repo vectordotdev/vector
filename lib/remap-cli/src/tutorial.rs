@@ -118,7 +118,7 @@ pub fn resolve(
         Ok((program, _)) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(program, diagnostics).colored().to_string();
-            return Err(msg)
+            return Err(msg);
         }
     };
 
