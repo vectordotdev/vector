@@ -18,4 +18,9 @@ remap: features: quality_error_messages: {
 		  = see language documentation at: https://vector.dev/docs/reference/vrl/
 		```
 		"""
+
+	principles: {
+		performance: false
+		safety:      false
+	}
 }

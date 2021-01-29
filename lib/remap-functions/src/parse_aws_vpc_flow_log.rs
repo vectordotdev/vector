@@ -132,7 +132,7 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
                     "pkt_dstaddr" => identity,
                     "region" => identity,
                     "az_id" => identity,
-                    "sublocation_type  " => identity,
+                    "sublocation_type" => identity,
                     "sublocation_id" => identity
                 );
 
