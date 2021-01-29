@@ -605,7 +605,7 @@ disable-resolv-conf = []
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua", "transforms-remap"]
 remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
-language-benches = ["sinks-socket", "sources-socket", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-regex_parser", "transforms-wasm", "transforms-lua", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 metrics-benches = ["sources-socket", "sinks-socket"]
 
