@@ -12,20 +12,30 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
         errors.push("No sinks defined in the config.".to_owned());
     }
 
-    // Check for non-unique names across sources, sinks, and transforms
-    let mut name_counts = HashMap::<&str, usize>::new();
-    for name in config
-        .sources
-        .keys()
-        .chain(config.transforms.keys())
-        .chain(config.sinks.keys())
-    {
-        let count = name_counts.entry(name).or_default();
-        *count += 1;
+    // Helper for below
+    fn tagged<'a>(
+        tag: &'static str,
+        iter: impl Iterator<Item = &'a String>,
+    ) -> impl Iterator<Item = (String, &'a String)> {
+        iter.map(move |x| (tag.to_owned(), x))
     }
 
-    for (name, _count) in name_counts.into_iter().filter(|(_name, count)| *count > 1) {
-        errors.push(format!("More than one component with name \"{}\".", name));
+    // Check for non-unique names across sources, sinks, and transforms
+    let mut name_uses = HashMap::<&str, Vec<String>>::new();
+    for (ctype, name) in tagged("source", config.sources.keys())
+        .chain(tagged("transform", config.transforms.keys()))
+        .chain(tagged("sink", config.sinks.keys()))
+    {
+        let uses = name_uses.entry(name).or_default();
+        uses.push(ctype.to_owned());
+    }
+
+    for (name, uses) in name_uses.into_iter().filter(|(_name, uses)| uses.len() > 1) {
+        errors.push(format!(
+            "More than one component with name \"{}\" ({}).",
+            name,
+            uses.join(", ")
+        ));
     }
 
     // Warnings and errors

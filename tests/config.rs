@@ -247,7 +247,10 @@ async fn duplicate_name() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["More than one component with name \"foo\".",]);
+    assert_eq!(
+        err,
+        vec!["More than one component with name \"foo\" (source, transform).",]
+    );
 }
 
 #[cfg(all(
