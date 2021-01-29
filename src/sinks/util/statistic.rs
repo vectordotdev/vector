@@ -142,7 +142,7 @@ mod test {
     }
 
     #[test]
-    fn distribution() {
+    fn test_distribution() {
         // should return None on empty input
         assert_eq!(DistributionStatistic::from_samples(&[], &[0.5]), None);
         assert_eq!(
@@ -195,6 +195,29 @@ mod test {
                 sum: 10.0,
                 count: 4,
                 quantiles: vec![(0.0, 1.0), (1.0, 4.0), (0.9, 4.0)],
+            }
+        );
+
+        assert_eq!(
+            DistributionStatistic::from_samples(
+                &samples(&[(1.0, 2), (2.0, 1), (3.0, 4), (4.0, 3)]),
+                &[0.75, 0.3, 0.31, 0.29, 0.24],
+            )
+            .unwrap(),
+            DistributionStatistic {
+                min: 1.0,
+                max: 4.0,
+                median: 3.0,
+                avg: 2.8,
+                sum: 28.0,
+                count: 10,
+                quantiles: vec![
+                    (0.75, 4.0),
+                    (0.3, 2.0),
+                    (0.31, 2.0),
+                    (0.29, 2.0),
+                    (0.24, 1.0)
+                ],
             }
         );
     }
