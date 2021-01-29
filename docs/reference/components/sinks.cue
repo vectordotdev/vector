@@ -350,6 +350,18 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.send_buffer_size != _|_ {
+				send_buffer_bytes: {
+					common:      false
+					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
+					required:    false
+					type: uint: {
+						examples: [65536]
+					}
+					relevant_when: sinks[Name].features.send.send_buffer_bytes.relevant_when
+				}
+			}
+
 			if sinks[Name].features.send.keepalive != _|_ {
 				keepalive: {
 					common:      false
