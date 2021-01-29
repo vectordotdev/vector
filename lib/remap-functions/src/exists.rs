@@ -53,7 +53,7 @@ impl Expression for ExistsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     #[test]
     fn exists() {

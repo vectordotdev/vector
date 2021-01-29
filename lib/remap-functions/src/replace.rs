@@ -150,7 +150,7 @@ impl Expression for ReplaceFn {
 #[allow(clippy::trivial_regex)]
 mod test {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![
         infallible {

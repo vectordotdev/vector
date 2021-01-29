@@ -151,8 +151,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
-    use collnew::btreemap;
     use pretty_assertions::assert_eq;
+    use shared::btreemap;
 
     #[test]
     fn test_counter() {

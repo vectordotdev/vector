@@ -59,7 +59,7 @@ impl Expression for ParseJsonFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
     use value::Kind;
 
     test_function![

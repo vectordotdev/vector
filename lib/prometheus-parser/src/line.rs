@@ -379,7 +379,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     #[test]
     fn test_parse_escaped_string() {

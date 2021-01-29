@@ -209,7 +209,7 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     #[test]
     fn test_compacted_array() {

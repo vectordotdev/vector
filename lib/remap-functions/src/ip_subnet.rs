@@ -155,7 +155,7 @@ fn ipv6_mask(subnet_bits: u32) -> IpAddr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![value_string {
         expr: |_| IpSubnetFn {

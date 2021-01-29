@@ -54,7 +54,7 @@ impl Expression for Md5Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![

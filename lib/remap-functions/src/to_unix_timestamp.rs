@@ -123,7 +123,7 @@ impl Expression for ToUnixTimestampFn {
 mod test {
     use super::*;
     use chrono::TimeZone;
-    use collnew::btreemap;
+    use shared::btreemap;
     use value::Kind;
 
     test_type_def![

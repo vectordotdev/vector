@@ -189,7 +189,7 @@ impl Expression for FormatNumberFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![

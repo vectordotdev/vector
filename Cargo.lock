@@ -954,10 +954,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "collnew"
-version = "1.0.0"
-
-[[package]]
 name = "colored"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4804,8 +4800,8 @@ dependencies = [
 name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
- "collnew",
  "nom 6.0.1",
+ "shared",
  "snafu",
 ]
 
@@ -5341,7 +5337,6 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "cidr-utils",
- "collnew",
  "grok",
  "hex",
  "hostname",
@@ -7563,7 +7558,6 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "codec",
- "collnew",
  "colored",
  "criterion",
  "crossterm 0.19.0",

@@ -79,7 +79,7 @@ impl Expression for ParseTimestampFn {
 mod tests {
     use super::*;
     use chrono::{DateTime, Utc};
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string_fallible {

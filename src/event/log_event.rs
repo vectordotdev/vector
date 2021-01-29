@@ -420,8 +420,8 @@ mod test {
 
     #[test]
     fn object_get() {
-        use collnew::btreemap;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
 
         let cases = vec![
             (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
@@ -474,8 +474,8 @@ mod test {
 
     #[test]
     fn object_insert() {
-        use collnew::btreemap;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
 
         let cases = vec![
             (
@@ -581,8 +581,8 @@ mod test {
 
     #[test]
     fn object_remove() {
-        use collnew::btreemap;
         use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
 
         let cases = vec![
             (

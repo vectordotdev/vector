@@ -731,8 +731,8 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use collnew::btreemap;
     use remap::{Path, Value};
+    use shared::btreemap;
     use std::str::FromStr;
 
     fn ts() -> DateTime<Utc> {

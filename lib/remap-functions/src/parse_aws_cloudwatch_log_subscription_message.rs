@@ -1,6 +1,5 @@
-use collnew::btreemap;
 use remap::prelude::*;
-use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
+use shared::{aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage, btreemap};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;

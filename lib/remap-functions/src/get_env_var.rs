@@ -48,7 +48,7 @@ impl Expression for GetEnvVarFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {

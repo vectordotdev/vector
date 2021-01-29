@@ -9,7 +9,6 @@ use crate::{
     BoolAndSome, Pipeline,
 };
 use chrono::{DateTime, Utc};
-use collnew::btreemap;
 use futures::{stream, SinkExt, StreamExt};
 use glob::{Pattern, PatternError};
 #[cfg(target_os = "macos")]
@@ -28,11 +27,11 @@ use heim::{
     units::{information::byte, time::second},
     Error,
 };
-
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;

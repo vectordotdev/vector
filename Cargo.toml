@@ -37,7 +37,6 @@ depends = ""
 members = [
   ".",
   "lib/codec",
-  "lib/collnew",
   "lib/derive_is_enum_variant",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -57,7 +56,6 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-collnew = { path = "lib/collnew", optional = true }
 derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
@@ -242,7 +240,6 @@ built = { version = "0.4.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
 base64 = "0.13"
-collnew = { path = "lib/collnew" }
 approx = "0.4.0"
 criterion = "0.3"
 tempfile = "3.0.6"
@@ -365,7 +362,7 @@ sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusot
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["sources-utils-fake"]
-sources-host_metrics = ["collnew", "heim"]
+sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
 sources-internal_logs = []
 sources-internal_metrics = []

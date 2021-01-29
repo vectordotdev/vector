@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn to_string() {
-        use collnew::btreemap;
+        use shared::btreemap;
 
         let cases = vec![
             (

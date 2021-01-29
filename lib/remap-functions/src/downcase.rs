@@ -56,7 +56,7 @@ impl Expression for DowncaseFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     #[test]
     fn downcase() {

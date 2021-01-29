@@ -87,7 +87,7 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use collnew::btreemap;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![

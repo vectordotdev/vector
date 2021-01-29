@@ -118,7 +118,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![string {
         expr: |_| ParseGrokFn {

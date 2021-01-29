@@ -113,7 +113,7 @@ impl Expression for ContainsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     #[test]
     fn contains() {

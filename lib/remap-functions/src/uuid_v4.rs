@@ -36,7 +36,7 @@ impl Expression for UuidV4Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
     use std::convert::TryFrom;
 
     remap::test_type_def![static_def {

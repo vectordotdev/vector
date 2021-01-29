@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn to_timestamp() {
-        use collnew::btreemap;
+        use shared::btreemap;
 
         let cases = vec![(
             btreemap! { "foo" => Utc.timestamp(10, 0) },

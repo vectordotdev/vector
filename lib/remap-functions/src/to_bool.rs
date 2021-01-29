@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn to_bool() {
-        use collnew::btreemap;
+        use shared::btreemap;
 
         let cases = vec![
             (

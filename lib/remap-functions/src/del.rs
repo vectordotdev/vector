@@ -69,7 +69,7 @@ impl Expression for DelFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
     use std::str::FromStr;
 
     #[test]

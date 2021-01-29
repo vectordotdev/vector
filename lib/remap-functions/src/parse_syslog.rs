@@ -121,7 +121,7 @@ impl Expression for ParseSyslogFn {
 mod tests {
     use super::*;
     use chrono::prelude::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {

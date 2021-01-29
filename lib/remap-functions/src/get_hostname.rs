@@ -36,7 +36,7 @@ impl Expression for GetHostnameFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use collnew::btreemap;
+    use shared::btreemap;
 
     remap::test_type_def![static_def {
         expr: |_| GetHostnameFn,
