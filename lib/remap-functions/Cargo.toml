@@ -19,7 +19,6 @@ hostname = { version = "0.3", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "6.0.1", optional = true }
-redeye = { version = "0.3.0", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -142,7 +141,7 @@ now = []
 parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
-parse_common_log = ["chrono", "redeye"]
+parse_common_log = ["chrono"]
 parse_duration = []
 parse_grok = ["grok"]
 parse_json = ["serde_json"]

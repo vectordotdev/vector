@@ -5237,21 +5237,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "redeye"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f6c7508b64c49e9999080e86e4da81590d9480782c77194c9041018703f7bbe"
-dependencies = [
- "chrono",
- "clap",
- "failure",
- "failure_derive",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5358,7 +5343,6 @@ dependencies = [
  "lazy_static",
  "md-5 0.9.1",
  "nom 6.0.1",
- "redeye",
  "regex",
  "remap-lang",
  "rust_decimal",
