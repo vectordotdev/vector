@@ -28,11 +28,11 @@ pub enum Error {
 #[macro_export]
 macro_rules! array {
     () => ({
-        let vec: Vec<Value> = ::std::vec::Vec::new();
-        Value::from(vec)
+        let vec: Vec<remap::Value> = ::std::vec::Vec::new();
+        remap::Value::from(vec)
     });
     ($($v:expr),+ $(,)?) => ({
-        let vec: Vec<Value> = vec![$($v.into()),+];
-        Value::from(vec)
+        let vec: Vec<remap::Value> = vec![$($v.into()),+];
+        remap::Value::from(vec)
     })
 }
