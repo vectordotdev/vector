@@ -1064,6 +1064,47 @@
         .grokked2.message == "Hello world"
       '''
 
+[transforms.remap_function_parse_common_log]
+  inputs = []
+  type = "remap"
+  source = """
+    .common_log = parse_common_log!(.message)
+    .common_log_timestamp_format = parse_common_log!(.message, "%d/%b/%Y:%T %z")
+    """
+[[tests]]
+  name = "remap_function_parse_common_log"
+  [tests.input]
+    insert_at = "remap_function_parse_common_log"
+    type = "log"
+    [tests.input.log_fields]
+      message = """127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"""
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_common_log"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .common_log.host == "127.0.0.1" && \
+        .common_log.identity == "bob" && \
+        .common_log.user == "frank" && \
+        .common_log.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
+        .common_log.message == "GET /apache_pb.gif HTTP/1.0" && \
+        .common_log.method == "GET" && \
+        .common_log.path == "/apache_pb.gif" && \
+        .common_log.protocol == "HTTP/1.0" && \
+        .common_log.status == 200 && \
+        .common_log.size == 2326 && \
+        .common_log_timestamp_format.host == "127.0.0.1" && \
+        .common_log_timestamp_format.identity == "bob" && \
+        .common_log_timestamp_format.user == "frank" && \
+        .common_log_timestamp_format.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
+        .common_log_timestamp_format.message == "GET /apache_pb.gif HTTP/1.0" && \
+        .common_log_timestamp_format.method == "GET" && \
+        .common_log_timestamp_format.path == "/apache_pb.gif" && \
+        .common_log_timestamp_format.protocol == "HTTP/1.0" && \
+        .common_log_timestamp_format.status == 200 && \
+        .common_log_timestamp_format.size == 2326
+      '''
+
 [transforms.remap_function_ip_subnet]
   inputs = []
   type = "remap"
