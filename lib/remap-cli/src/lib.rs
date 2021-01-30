@@ -24,3 +24,15 @@ pub enum Error {
     #[error("repl feature disabled, program input required")]
     ReplFeature,
 }
+
+#[macro_export]
+macro_rules! array {
+    () => ({
+        let vec: Vec<Value> = ::std::vec::Vec::new();
+        Value::from(vec)
+    });
+    ($($v:expr),+ $(,)?) => ({
+        let vec: Vec<Value> = vec![$($v.into()),+];
+        Value::from(vec)
+    })
+}

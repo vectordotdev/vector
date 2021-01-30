@@ -1,4 +1,4 @@
-use super::{repl::Repl, Error};
+use super::{array, repl::Repl, Error};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::{all as funcs, map};
 use rustyline::{error::ReadlineError, Editor};
@@ -131,7 +131,9 @@ fn tutorial_list() -> Vec<Tutorial> {
         number: "1.1",
         title: "Assigning values to event fields",
         help_text: ASSIGNMENT_TEXT,
-        correct_answer: Value::from(map!["severity": "info"]),
+        correct_answer: Value::from(
+            map!["severity": "info", "status": 200, "temperature": 98.6, "is_critical": false, "plans": array!["pro"], "url": map!["host": "acmecorp.io"]],
+        ),
         initial_event: Value::from(map![]),
     };
 
@@ -166,24 +168,29 @@ const ASSIGNMENT_TEXT: &str = r#"In VRL, you can assign values to fields like th
 
 .field = "value"
 
-TASK:
-Assign the string `"info"` to the field `severity`.
+TASKS:
+- Assign the string `"info"` to the `severity` field
+- Assign the float `98.6` to the `temperature` field
+- Assign the integer `200` to the `status` field
+- Assign the Boolean `false` to the `is_critical` field
+- Assign the array `["pro"]` to the `plans` field
+- Assign the map `{"host": "acmecorp.io"}` to the `url` field
 "#;
 
 const DELETION_TEXT: &str = r#"You can delete fields using the `del` function:
 
 del(.field)
 
-TASK:
-Use the `del` function to get rid of the `one` and `two` fields.
+TASKS:
+- Use the `del` function to get rid of fields `one` and `two`.
 "#;
 
-const RENAME_TEXT: &str = r#"When you delete a field, the `del` function returns the value
-of the deleted field. You can change the names of fields by assigning a new
-field the value of the deleted field:
+const RENAME_TEXT: &str = r#"When you delete a field, the `del` function returns the value of the
+deleted field. You can change the names of fields by assigning the value of the
+deleted field to the new field:
 
 .new = del(.old)
 
-TASK:
-Use the `del` function to rename `old_field` to `new_field`.
+TASKS:
+- Use the `del` function to rename `old_field` to `new_field`.
 "#;
