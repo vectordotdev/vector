@@ -87,7 +87,7 @@ fn url_to_value(url: Url) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -105,39 +105,39 @@ mod tests {
     fn parse_url() {
         let cases = vec![
             (
-                map![],
-                Ok(map![
-                        "scheme": "https",
-                        "username": "",
-                        "password": "",
-                        "host": "vector.dev",
-                        "port": Value::Null,
-                        "path": "/",
-                        "query": map![],
-                        "fragment": Value::Null,
-                ]
+                btreemap! {},
+                Ok(btreemap! {
+                        "scheme" => "https",
+                        "username" => "",
+                        "password" => "",
+                        "host" => "vector.dev",
+                        "port" => Value::Null,
+                        "path" => "/",
+                        "query" => btreemap!{},
+                        "fragment" => Value::Null,
+                }
                 .into()),
                 ParseUrlFn::new(Box::new(Literal::from("https://vector.dev"))),
             ),
             (
-                map![],
-                Ok(map![
-                        "scheme": "ftp",
-                        "username": "foo",
-                        "password": "bar",
-                        "host": "vector.dev",
-                        "port": 4343,
-                        "path": "/foobar",
-                        "query": map!["hello": "world"],
-                        "fragment": "123",
-                ]
+                btreemap! {},
+                Ok(btreemap! {
+                        "scheme" => "ftp",
+                        "username" => "foo",
+                        "password" => "bar",
+                        "host" => "vector.dev",
+                        "port" => 4343,
+                        "path" => "/foobar",
+                        "query" => btreemap!{ "hello" => "world" },
+                        "fragment" => "123",
+                }
                 .into()),
                 ParseUrlFn::new(Box::new(Literal::from(
                     "ftp://foo:bar@vector.dev:4343/foobar?hello=world#123",
                 ))),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unable to parse url: relative URL without a base".into()),
                 ParseUrlFn::new(Box::new(Literal::from("INVALID"))),
             ),

@@ -152,18 +152,7 @@ mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use pretty_assertions::assert_eq;
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
-    }
+    use shared::btreemap;
 
     #[test]
     fn test_counter() {
@@ -401,7 +390,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "}"}))]),
+            .with_tags(Some(btreemap! { "tag" => "}" }))]),
         );
     }
 
@@ -419,7 +408,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "a,b"}))]),
+            .with_tags(Some(btreemap! { "tag" => "a,b" }))]),
         );
     }
 
@@ -437,7 +426,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "\\n"}))]),
+            .with_tags(Some(btreemap! { "tag" => "\\n" }))]),
         );
     }
 
@@ -455,7 +444,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => " * "}))]),
+            .with_tags(Some(btreemap! { "tag" => " * " }))]),
         );
     }
 
@@ -871,77 +860,77 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 263719.0 },
                 )
-                .with_tags(Some(map! {"direction" => "in", "host" => "*"})),
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "*" })),
                 Metric::new(
                     "nginx_server_bytes".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 255061.0 },
                 )
-                .with_tags(Some(map! {"direction" => "in", "host" => "_"})),
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "_" })),
                 Metric::new(
                     "nginx_server_bytes".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 8658.0 },
                 )
                 .with_tags(Some(
-                    map! {"direction" => "in", "host" => "nginx-vts-status"}
+                    btreemap! { "direction" => "in", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
                     "nginx_server_bytes".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 944199.0 },
                 )
-                .with_tags(Some(map! {"direction" => "out", "host" => "*"})),
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "*" })),
                 Metric::new(
                     "nginx_server_bytes".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 360775.0 },
                 )
-                .with_tags(Some(map! {"direction" => "out", "host" => "_"})),
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "_" })),
                 Metric::new(
                     "nginx_server_bytes".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 583424.0 },
                 )
                 .with_tags(Some(
-                    map! {"direction" => "out", "host" => "nginx-vts-status"}
+                    btreemap! { "direction" => "out", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "bypass"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "bypass" })),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "expired"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "expired" })),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "hit"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "hit" })),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "miss"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "miss" })),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "revalidated"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "revalidated" })),
                 Metric::new(
                     "nginx_server_cache".into(),
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "scarce"}))
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
             ])
         );
     }

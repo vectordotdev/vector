@@ -118,7 +118,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![string {
         expr: |_| ParseGrokFn {
@@ -170,7 +170,7 @@ mod test {
     fn check_parse_grok() {
         let cases = vec![
             (
-                map!["message": "an ungrokkable message"],
+                btreemap! { "message" => "an ungrokkable message" },
                 Err("function call error: unable to parse input with grok pattern".into()),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
@@ -181,7 +181,7 @@ mod test {
                 .unwrap(),
             ),
             (
-                map!["message": "2020-10-02T23:22:12.223222Z an ungrokkable message"],
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z an ungrokkable message" },
                 Err("function call error: unable to parse input with grok pattern".into()),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
@@ -192,12 +192,12 @@ mod test {
                 .unwrap(),
             ),
             (
-                map!["message": "2020-10-02T23:22:12.223222Z info Hello world"],
-                Ok(Value::from(
-                    map!["timestamp": "2020-10-02T23:22:12.223222Z",
-                         "level": "info",
-                         "message": "Hello world"],
-                )),
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z info Hello world" },
+                Ok(Value::from(btreemap! {
+                    "timestamp" => "2020-10-02T23:22:12.223222Z",
+                    "level" => "info",
+                    "message" => "Hello world",
+                })),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -207,12 +207,11 @@ mod test {
                 .unwrap(),
             ),
             (
-                map!["message": "2020-10-02T23:22:12.223222Z"],
-                Ok(Value::from(
-                    map!["timestamp": "2020-10-02T23:22:12.223222Z",
-                         "level": ""
-                    ],
-                )),
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z" },
+                Ok(Value::from(btreemap! {
+                    "timestamp" => "2020-10-02T23:22:12.223222Z",
+                    "level" => "",
+                })),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
@@ -221,10 +220,9 @@ mod test {
                 .unwrap(),
             ),
             (
-                map!["message": "2020-10-02T23:22:12.223222Z"],
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z" },
                 Ok(Value::from(
-                    map!["timestamp": "2020-10-02T23:22:12.223222Z",
-                    ],
+                    btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
                 )),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),

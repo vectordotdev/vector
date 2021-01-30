@@ -110,7 +110,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     test_type_def![
@@ -155,35 +155,53 @@ mod tests {
         merge => Merge;
 
         simple {
-            args: func_args![ to: map![ "key1": "val1" ],
-                              from: map![ "key2": "val2" ]
+            args: func_args![ to: btreemap! { "key1" => "val1" },
+                              from: btreemap! { "key2"=> "val2" }
             ],
-            want: Ok(map![ "key1": "val1",
-                           "key2": "val2" ])
+            want: Ok(btreemap! {
+                "key1" => "val1",
+                "key2" => "val2",
+            })
         }
 
         shallow {
-            args: func_args![ to: map![ "key1": "val1",
-                                        "child": map! [ "grandchild1": "val1" ] ],
-                              from: map![ "key2": "val2",
-                                          "child": map! [ "grandchild2": "val2" ] ]
+            args: func_args![
+                to: btreemap! {
+                    "key1" => "val1",
+                    "child" => btreemap! { "grandchild1" => "val1" },
+                },
+                from: btreemap! {
+                    "key2" => "val2",
+                    "child" => btreemap! { "grandchild2" => "val2" },
+                }
             ],
-            want: Ok(map![ "key1": "val1",
-                           "key2": "val2",
-                           "child": map! [ "grandchild2": "val2" ] ])
+            want: Ok(btreemap! {
+                "key1" => "val1",
+                "key2" => "val2",
+                "child" => btreemap! { "grandchild2" => "val2" },
+            })
         }
 
         deep {
-            args: func_args![to: map![ "key1": "val1",
-                                       "child": map![ "grandchild1": "val1" ] ],
-                             from: map![ "key2": "val2",
-                                         "child": map![ "grandchild2": "val2" ] ],
-                             deep: true
+            args: func_args![
+                to: btreemap! {
+                    "key1" => "val1",
+                    "child" => btreemap! { "grandchild1" => "val1" },
+                },
+                from: btreemap! {
+                    "key2" => "val2",
+                    "child" => btreemap! { "grandchild2" => "val2" },
+                },
+                deep: true
             ],
-            want: Ok( map![ "key1": "val1",
-                            "key2": "val2",
-                            "child": map![ "grandchild1": "val1",
-                                           "grandchild2": "val2" ] ])
+            want: Ok(btreemap!{
+                "key1" => "val1",
+                "key2" => "val2",
+                "child" => btreemap! {
+                    "grandchild1" => "val1",
+                    "grandchild2" => "val2",
+                },
+            })
         }
     ];
 }
