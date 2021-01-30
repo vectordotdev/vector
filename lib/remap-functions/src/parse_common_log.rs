@@ -38,23 +38,44 @@ impl Function for ParseCommonLog {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                accepts: |v| matches!(v, Value::Bytes(_)),
+                required: true,
+            },
+            Parameter {
+                keyword: "timestamp_format",
+                accepts: |v| matches!(v, Value::Bytes(_)),
+                required: false,
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
+        let timestamp_format = arguments.optional_literal("timestamp_format")?.map_or(
+            Ok("%d/%b/%Y:%T %z".into()),
+            |literal| {
+                literal
+                    .as_value()
+                    .clone()
+                    .try_bytes_utf8_lossy()
+                    .map(|bytes| bytes.into_owned())
+            },
+        )?;
 
-        Ok(Box::new(ParseCommonLogFn { value }))
+        Ok(Box::new(ParseCommonLogFn {
+            value,
+            timestamp_format,
+        }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct ParseCommonLogFn {
     value: Box<dyn Expression>,
+    timestamp_format: String,
 }
 
 impl Expression for ParseCommonLogFn {
@@ -96,8 +117,13 @@ impl Expression for ParseCommonLogFn {
             log.insert(
                 "timestamp".into(),
                 Value::Timestamp(
-                    DateTime::parse_from_str(timestamp, "%d/%b/%Y:%T %z")
-                        .map_err(|_| "failed parsing timestamp.")?
+                    DateTime::parse_from_str(timestamp, &self.timestamp_format)
+                        .map_err(|error| {
+                            format!(
+                                r#"failed parsing timestamp {} using format {}: {}."#,
+                                timestamp, self.timestamp_format, error
+                            )
+                        })?
                         .into(),
                 ),
             );
@@ -213,6 +239,26 @@ mod tests {
             want: Ok(btreemap! {}),
         }
 
+        log_line_valid_with_timestamp_format {
+            args: {
+                let mut args = func_args![value: r#"- - - [2000-10-10T20:55:36Z] "-" - -"#];
+                args.insert(
+                    "timestamp_format",
+                    expression::Argument::new(
+                        Box::new(Literal::from("%+").into()),
+                        |_| true,
+                        "timestamp_format",
+                        "parse_common_log",
+                    )
+                    .into(),
+                );
+                args
+            },
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
+            }),
+        }
+
         log_line_invalid {
             args: func_args![value: r#"not a common log line"#],
             want: Err("function call error: failed parsing common log line."),
@@ -220,23 +266,23 @@ mod tests {
 
         log_line_invalid_timestamp {
             args: func_args![value: r#"- - - [1234] - - -"#],
-            want: Err("function call error: failed parsing timestamp."),
+            want: Err("function call error: failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters."),
         }
     ];
 
     test_type_def![
         value_string {
-            expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed() },
+            expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: "".into() },
             def: TypeDef { kind: value::Kind::Map, ..Default::default() },
         }
 
         value_non_string {
-            expr: |_| ParseCommonLogFn { value: Literal::from(1).boxed() },
+            expr: |_| ParseCommonLogFn { value: Literal::from(1).boxed(), timestamp_format: "".into() },
             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
         }
 
         value_optional {
-            expr: |_| ParseCommonLogFn { value: Box::new(Noop) },
+            expr: |_| ParseCommonLogFn { value: Box::new(Noop), timestamp_format: "".into() },
             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
         }
     ];
