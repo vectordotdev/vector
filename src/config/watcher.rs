@@ -1,6 +1,6 @@
 use crate::Error;
 #[cfg(unix)]
-use notify::{raw_watcher, Op, RawEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Op, PollWatcher, RawEvent, RecursiveMode, Watcher};
 use std::{path::PathBuf, time::Duration};
 #[cfg(unix)]
 use std::{
@@ -99,18 +99,16 @@ fn raise_sighup() {
 }
 
 #[cfg(unix)]
-fn create_watcher(
-    config_paths: &[PathBuf],
-) -> Result<(RecommendedWatcher, Receiver<RawEvent>), Error> {
+fn create_watcher(config_paths: &[PathBuf]) -> Result<(PollWatcher, Receiver<RawEvent>), Error> {
     info!("Creating configuration file watcher.");
     let (sender, receiver) = channel();
-    let mut watcher = raw_watcher(sender)?;
+    let mut watcher = PollWatcher::with_delay_ms(sender, 1000)?;
     add_paths(&mut watcher, config_paths)?;
     Ok((watcher, receiver))
 }
 
 #[cfg(unix)]
-fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Result<(), Error> {
+fn add_paths(watcher: &mut PollWatcher, config_paths: &[PathBuf]) -> Result<(), Error> {
     for path in config_paths {
         watcher.watch(path, RecursiveMode::NonRecursive)?;
     }
