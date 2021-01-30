@@ -3647,9 +3647,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.13.0-alpha.13"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efcf562c6940683fdd0dad97c99a0cef222d3738283d3396a735e8d21190e685"
+checksum = "b6d31b8f6fe04ed4ac33f735f97576b37750df3baf684107d545a8d30efcf584"
 dependencies = [
  "metrics-macros",
  "proc-macro-hack",
@@ -3657,9 +3657,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.1.0-alpha.9"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0197e48db63aa8c28f9fbae021585b8f1b299a0b21640cf98853211ac39eb294"
+checksum = "487119a99660e9b2879132f1b84e067b6d68c85cc228e31789567c14bcaa6a1a"
 dependencies = [
  "lazy_static",
  "proc-macro-hack",
