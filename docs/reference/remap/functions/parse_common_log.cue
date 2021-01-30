@@ -40,16 +40,16 @@ remap: functions: parse_common_log: {
 				parse_common_log("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326")
 				"""#
 			return: {
-				remote_host:      "127.0.0.1"
-				remote_logname:   "bob"
-				auth_user:        "frank"
-				timestamp:        "2000-10-10T20:55:36Z"
-				request_line:     "GET /apache_pb.gif HTTP/1.0"
-				request_method:   "GET"
-				request_path:     "/apache_pb.gif"
-				request_protocol: "HTTP/1.0"
-				status_code:      200
-				content_length:   2326
+				host:      "127.0.0.1"
+				identity:  "bob"
+				user:      "frank"
+				timestamp: "2000-10-10T20:55:36Z"
+				message:   "GET /apache_pb.gif HTTP/1.0"
+				method:    "GET"
+				path:      "/apache_pb.gif"
+				protocol:  "HTTP/1.0"
+				status:    200
+				size:      2326
 			}
 		},
 		{
@@ -61,16 +61,16 @@ remap: functions: parse_common_log: {
 				)
 				"""#
 			return: {
-				remote_host:      "127.0.0.1"
-				remote_logname:   "bob"
-				auth_user:        "frank"
-				timestamp:        "2000-10-10T20:55:36Z"
-				request_line:     "GET /apache_pb.gif HTTP/1.0"
-				request_method:   "GET"
-				request_path:     "/apache_pb.gif"
-				request_protocol: "HTTP/1.0"
-				status_code:      200
-				content_length:   2326
+				host:      "127.0.0.1"
+				identity:  "bob"
+				user:      "frank"
+				timestamp: "2000-10-10T20:55:36Z"
+				message:   "GET /apache_pb.gif HTTP/1.0"
+				method:    "GET"
+				path:      "/apache_pb.gif"
+				protocol:  "HTTP/1.0"
+				status:    200
+				size:      2326
 			}
 		},
 	]
