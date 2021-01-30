@@ -26,7 +26,7 @@ lazy_static! {
         (-|(?P<content_length>\d+))             # Match `-` or at least one digit.
         \s*$                                    # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log.");
+    .expect("failed compiling regex for common log");
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -87,7 +87,7 @@ impl Expression for ParseCommonLogFn {
 
         let captures = REGEX_COMMON_LOG
             .captures(&message)
-            .ok_or("failed parsing common log line.")?;
+            .ok_or("failed parsing common log line")?;
 
         if let Some(remote_host) = captures.name("remote_host").map(|capture| capture.as_str()) {
             log.insert(
@@ -120,7 +120,7 @@ impl Expression for ParseCommonLogFn {
                     DateTime::parse_from_str(timestamp, &self.timestamp_format)
                         .map_err(|error| {
                             format!(
-                                r#"failed parsing timestamp {} using format {}: {}."#,
+                                r#"failed parsing timestamp {} using format {}: {}"#,
                                 timestamp, self.timestamp_format, error
                             )
                         })?
@@ -175,7 +175,7 @@ impl Expression for ParseCommonLogFn {
                 Value::Integer(
                     status_code
                         .parse()
-                        .map_err(|_| "failed parsing status code.")?,
+                        .map_err(|_| "failed parsing status code")?,
                 ),
             );
         }
@@ -189,7 +189,7 @@ impl Expression for ParseCommonLogFn {
                 Value::Integer(
                     content_length
                         .parse()
-                        .map_err(|_| "failed parsing content length.")?,
+                        .map_err(|_| "failed parsing content length")?,
                 ),
             );
         }
@@ -261,12 +261,12 @@ mod tests {
 
         log_line_invalid {
             args: func_args![value: r#"not a common log line"#],
-            want: Err("function call error: failed parsing common log line."),
+            want: Err("function call error: failed parsing common log line"),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: r#"- - - [1234] - - -"#],
-            want: Err("function call error: failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters."),
+            want: Err("function call error: failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
         }
     ];
 
