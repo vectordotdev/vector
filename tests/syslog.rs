@@ -1,7 +1,6 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
@@ -52,7 +51,7 @@ async fn test_tcp_syslog() {
     send_lines(in_addr, input_lines).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
@@ -117,7 +116,7 @@ async fn test_unix_stream_syslog() {
     tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
@@ -182,7 +181,7 @@ async fn test_octet_counting_syslog() {
     send_encodable(in_addr, codec, input_lines).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);

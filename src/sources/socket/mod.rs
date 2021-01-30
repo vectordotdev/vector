@@ -180,7 +180,7 @@ mod test {
         Event, Pipeline,
     };
     use bytes::Bytes;
-    use futures::{compat::Future01CompatExt, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -428,7 +428,7 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -488,7 +488,7 @@ mod test {
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
@@ -658,7 +658,7 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -693,7 +693,7 @@ mod test {
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
