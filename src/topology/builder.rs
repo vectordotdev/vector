@@ -9,6 +9,7 @@ use crate::{
     event::Event,
     internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
+    stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
@@ -123,10 +124,10 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventProcessed))
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
+                    emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
@@ -134,7 +135,7 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventProcessed));
+                    .on_processed(|| emit!(EventProcessed));
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output)
