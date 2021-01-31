@@ -68,7 +68,7 @@ mod tests {
     fn deserialize_anycondition_default() {
         let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
         assert_eq!(
-            r#"String(".nork == false""#,
+            r#"String(".nork == false")"#,
             format!("{:?}", conf.condition)
         )
     }
@@ -82,7 +82,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} }"#,
+            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} })"#,
             format!("{:?}", conf.condition)
         )
     }
@@ -96,7 +96,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(RemapConfig { source: ".nork == true" }"#,
+            r#"Map(RemapConfig { source: ".nork == true" })"#,
             format!("{:?}", conf.condition)
         )
     }
