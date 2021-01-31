@@ -416,7 +416,12 @@ impl HostMetricsConfig {
         match heim::host::uptime().await {
             Ok(time) => {
                 let timestamp = Utc::now();
-                metrics.push(self.gauge("uptime", timestamp, time.get::<second>() as f64, tags![]));
+                metrics.push(self.gauge(
+                    "uptime",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
             }
             Err(error) => {
                 error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
@@ -430,7 +435,7 @@ impl HostMetricsConfig {
                     "boot_time",
                     timestamp,
                     time.get::<second>() as f64,
-                    tags![],
+                    BTreeMap::default(),
                 ));
             }
             Err(error) => {
