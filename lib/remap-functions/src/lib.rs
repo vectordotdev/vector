@@ -68,6 +68,8 @@ mod parse_aws_cloudwatch_log_subscription_message;
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
+#[cfg(feature = "parse_glog")]
+mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
 #[cfg(feature = "parse_json")]
@@ -205,6 +207,8 @@ pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubs
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
+#[cfg(feature = "parse_glog")]
+pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
@@ -344,6 +348,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
+        #[cfg(feature = "parse_glog")]
+        Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]

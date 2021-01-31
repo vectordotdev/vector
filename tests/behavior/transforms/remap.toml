@@ -775,6 +775,32 @@
         .b == 0.1
       '''
 
+[transforms.remap_function_parse_glog]
+  inputs = []
+  type = "remap"
+  source = """
+    .glog = parse_glog!(.message)
+    """
+[[tests]]
+  name = "remap_function_parse_glog"
+  [tests.input]
+    insert_at = "remap_function_parse_glog"
+    type = "log"
+    [tests.input.log_fields]
+      message = "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_glog"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .glog.level == "info" && \
+        .glog.timestamp == to_timestamp!("2021-01-31T14:48:54.411655Z") && \
+        .glog.id == 15520 && \
+        .glog.file == "main.c++" && \
+        .glog.line == 9 && \
+        .glog.message == "Hello world!"
+      '''
+
 [transforms.remap_function_format_number]
   inputs = []
   type = "remap"
