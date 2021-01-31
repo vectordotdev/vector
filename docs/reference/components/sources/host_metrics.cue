@@ -79,7 +79,7 @@ components: sources: host_metrics: {
 						disk:       "Metrics related to disk I/O utilization."
 						filesystem: "Metrics related to filesystem space utilization."
 						load:       "Load average metrics (UNIX only)."
-						host: 		"Metrics related to host"
+						host:       "Metrics related to host"
 						memory:     "Metrics related to memory utilization."
 						network:    "Metrics related to network utilization."
 					}
