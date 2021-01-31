@@ -59,17 +59,6 @@ components: _kafka: {
 				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
 			}
 		}
-		statistics_interval_ms: {
-			common:      false
-			description: "Interval in which statistics about Kafka should be polled and emitted into the `internal_metrics` stream.\n"
-			required:    false
-			warnings: []
-			type: uint: {
-				default: null
-				examples: [1000]
-				unit: "milliseconds"
-			}
-		}
 		librdkafka_options: {
 			common:      false
 			description: "Advanced options. See [librdkafka documentation](\(urls.librdkafka_config)) for details.\n"

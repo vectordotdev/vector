@@ -114,8 +114,7 @@ components: sources: kafka: {
 				examples: ["offset"]
 			}
 		}
-		statistics_interval_ms: components._kafka.configuration.statistics_interval_ms
-		librdkafka_options:     components._kafka.configuration.librdkafka_options
+		librdkafka_options: components._kafka.configuration.librdkafka_options
 		sasl: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."

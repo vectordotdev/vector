@@ -49,7 +49,6 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
-    statistics_interval_ms: Option<u64>,
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -228,16 +227,10 @@ fn create_consumer(
             &config.commit_interval_ms.to_string(),
         )
         .set("enable.auto.offset.store", "false")
+        .set("statistics.interval.ms", "1000")
         .set("client.id", "vector");
 
     config.auth.apply(&mut client_config)?;
-
-    if let Some(statistics_interval_ms) = &config.statistics_interval_ms {
-        client_config.set(
-            "statistics.interval.ms",
-            &statistics_interval_ms.to_string(),
-        );
-    }
 
     if let Some(librdkafka_options) = &config.librdkafka_options {
         for (key, value) in librdkafka_options {

@@ -59,7 +59,6 @@ pub struct KafkaSinkConfig {
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     message_timeout_ms: u64,
-    statistics_interval_ms: Option<u64>,
     #[serde(default)]
     librdkafka_options: HashMap<String, String>,
 }
@@ -147,16 +146,10 @@ impl KafkaSinkConfig {
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set("compression.codec", &to_string(self.compression))
             .set("socket.timeout.ms", &self.socket_timeout_ms.to_string())
-            .set("message.timeout.ms", &self.message_timeout_ms.to_string());
+            .set("message.timeout.ms", &self.message_timeout_ms.to_string())
+            .set("statistics.interval.ms", "1000");
 
         self.auth.apply(&mut client_config)?;
-
-        if let Some(statistics_interval_ms) = &self.statistics_interval_ms {
-            client_config.set(
-                "statistics.interval.ms",
-                &statistics_interval_ms.to_string(),
-            );
-        }
 
         // All batch options are producer only.
         if kafka_role == KafkaRole::Producer {
@@ -580,7 +573,6 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            statistics_interval_ms: None,
             librdkafka_options: HashMap::new(),
         };
 
@@ -635,7 +627,6 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             batch,
-            statistics_interval_ms: None,
             librdkafka_options,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
@@ -787,7 +778,6 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
-            statistics_interval_ms: None,
             librdkafka_options: HashMap::new(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
