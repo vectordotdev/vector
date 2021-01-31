@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_glog: {
 	category:    "Parse"
 	description: """
-		Parses the `value` using the [glog (Google Logging Library)](https://github.com/google/glog) format.
+		Parses the `value` using the [glog (Google Logging Library)](\(urls.glog)) format.
 		"""
 	arguments: [
 		{
