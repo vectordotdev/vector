@@ -29,10 +29,7 @@ impl Function for DecodeBase64 {
         let value = arguments.required("value")?.boxed();
         let charset = arguments.optional("charset").map(Expr::boxed);
 
-        Ok(Box::new(DecodeBase64Fn {
-            value,
-            charset,
-        }))
+        Ok(Box::new(DecodeBase64Fn { value, charset }))
     }
 }
 
@@ -60,7 +57,7 @@ impl Expression for DecodeBase64Fn {
 
         let config = match charset {
             Charset::Standard => base64::STANDARD,
-            Charset::UrlSafe => base64::URL_SAFE
+            Charset::UrlSafe => base64::URL_SAFE,
         };
 
         match base64::decode_config(value, config) {

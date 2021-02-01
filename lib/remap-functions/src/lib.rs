@@ -1,5 +1,5 @@
-mod util;
 mod base64_util;
+mod util;
 
 #[cfg(feature = "append")]
 mod append;
