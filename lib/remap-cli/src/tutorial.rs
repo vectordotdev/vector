@@ -1,6 +1,6 @@
-use super::{array, repl::Repl, Error};
+use super::{array, map, repl::Repl, Error};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
-use remap_functions::{all as funcs, map};
+use remap_functions::{all as funcs};
 use rustyline::{error::ReadlineError, Editor};
 
 struct Tutorial {
@@ -131,26 +131,24 @@ fn tutorial_list() -> Vec<Tutorial> {
         number: "1.1",
         title: "Assigning values to event fields",
         help_text: ASSIGNMENT_TEXT,
-        correct_answer: Value::from(
-            map!["severity": "info", "status": 200, "temperature": 98.6, "is_critical": false, "plans": array!["pro"], "url": map!["host": "acmecorp.io"]],
-        ),
-        initial_event: Value::from(map![]),
+        correct_answer: map!["severity": "info", "status": 200, "temperature": 98.6, "is_critical": false, "plans": array!["pro"], "url": map!["host": "acmecorp.io"]],
+        initial_event: map![],
     };
 
     let deletion_tut = Tutorial {
         number: "1.2",
         title: "Deleting fields",
         help_text: DELETION_TEXT,
-        correct_answer: Value::from(map!["three": 3]),
-        initial_event: Value::from(map!["one": 1, "two": 2, "three": 3]),
+        correct_answer: map!["three": 3],
+        initial_event: map!["one": 1, "two": 2, "three": 3],
     };
 
     let rename_tut = Tutorial {
         number: "1.3",
         title: "Renaming fields",
         help_text: RENAME_TEXT,
-        correct_answer: Value::from(map!["new_field": "old value"]),
-        initial_event: Value::from(map!["old_field": "old value"]),
+        correct_answer: map!["new_field": "old value"],
+        initial_event: map!["old_field": "old value"],
     };
 
     vec![assignment_tut, deletion_tut, rename_tut]
