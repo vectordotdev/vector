@@ -268,6 +268,7 @@ default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks
 default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+docs = ["api", "sources", "transforms", "sinks"]
 
 all-logs = ["sources-logs", "transforms-logs", "sinks-logs"]
 all-metrics = ["sources-metrics", "transforms-metrics", "sinks-metrics"]
