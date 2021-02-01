@@ -1,6 +1,5 @@
 use regex::Regex;
 use remap::prelude::*;
-use std::collections::BTreeMap;
 
 use crate::util;
 
@@ -46,18 +45,19 @@ impl Expression for ParseRegexFn {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
-        Ok(self
+        let parsed = self
             .pattern
             .captures(&value)
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
-            .unwrap_or_else(BTreeMap::new)
-            .into())
+            .ok_or("unable to parse regular expression")?;
+
+        Ok(parsed.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_inner_type(Some(util::regex_type_def(&self.pattern)))
             .with_constraint(value::Kind::Map)
     }
@@ -76,11 +76,11 @@ mod tests {
                 pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
             def: TypeDef { kind: Kind::Map,
+                           fallible: true,
                            inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
                                                                    "1": Kind::Bytes,
                                                                    "group": Kind::Bytes
-                           })),
-                           ..Default::default() },
+                           })) },
         }
 
         value_non_string {
