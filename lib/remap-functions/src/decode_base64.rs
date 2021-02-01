@@ -18,11 +18,6 @@ impl Function for DecodeBase64 {
                 required: true,
             },
             Parameter {
-                keyword: "padding",
-                accepts: |v| matches!(v, Value::Boolean(_)),
-                required: false,
-            },
-            Parameter {
                 keyword: "charset",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
@@ -32,12 +27,10 @@ impl Function for DecodeBase64 {
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required("value")?.boxed();
-        let padding = arguments.optional("padding").map(Expr::boxed);
         let charset = arguments.optional("charset").map(Expr::boxed);
 
         Ok(Box::new(DecodeBase64Fn {
             value,
-            padding,
             charset,
         }))
     }
@@ -46,23 +39,12 @@ impl Function for DecodeBase64 {
 #[derive(Clone, Debug)]
 struct DecodeBase64Fn {
     value: Box<dyn Expression>,
-    padding: Option<Box<dyn Expression>>,
     charset: Option<Box<dyn Expression>>,
 }
 
 impl Expression for DecodeBase64Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?.try_bytes()?;
-
-        let padding = self
-            .padding
-            .as_ref()
-            .map(|p| {
-                p.execute(state, object)
-                    .and_then(|v| Value::try_boolean(v).map_err(Into::into))
-            })
-            .transpose()?
-            .unwrap_or(true);
 
         let charset = self
             .charset
@@ -76,7 +58,10 @@ impl Expression for DecodeBase64Fn {
             .transpose()?
             .unwrap_or_default();
 
-        let config = base64::Config::new(charset.into(), padding);
+        let config = match charset {
+            Charset::Standard => base64::STANDARD,
+            Charset::UrlSafe => base64::URL_SAFE
+        };
 
         match base64::decode_config(value, config) {
             Ok(s) => Ok(Value::from(s)),
@@ -100,29 +85,18 @@ mod test {
     use value::Kind;
 
     test_type_def![
-        value_string_padding_unspecified_charset_unspecified_fallible {
-            expr: |_| DecodeBase64Fn {
-                value: lit!("foo").boxed(),
-                padding: None,
-                charset: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
         valid_charset_fallible {
             expr: |_| DecodeBase64Fn {
                 value: lit!("foo").boxed(),
-                padding: Some(lit!(false).boxed()),
                 charset: Some(lit!("standard").boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
-        padding_non_boolean_fallible {
+        invalid_charset_fallible {
             expr: |_| DecodeBase64Fn {
                 value: lit!("foo").boxed(),
-                padding: Some(lit!("foo").boxed()),
-                charset: None,
+                charset: Some(lit!("other").boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
@@ -130,7 +104,6 @@ mod test {
         value_non_string_fallible {
             expr: |_| DecodeBase64Fn {
                 value: Literal::from(127).boxed(),
-                padding: None,
                 charset: None,
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
@@ -139,7 +112,6 @@ mod test {
         all_types_wrong_fallible {
             expr: |_| DecodeBase64Fn {
                 value: Literal::from(127).boxed(),
-                padding: Some(lit!("foo").boxed()),
                 charset: Some(lit!(127).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
@@ -154,23 +126,13 @@ mod test {
             want: Ok(value!("some+=string/value")),
         }
 
-        with_padding_standard_charset {
-            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), padding: value!(true), charset: value!("standard")],
+        with_standard_charset {
+            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!["standard"]],
             want: Ok(value!("some+=string/value")),
         }
 
-        no_padding_standard_charset {
-            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), padding: value!(false), charset: value!("standard")],
-            want: Ok(value!("some+=string/value")),
-        }
-
-        with_padding_urlsafe_charset {
-            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), padding: value!(true), charset: value!("url_safe")],
-            want: Ok(value!("some+=string/value")),
-        }
-
-        no_padding_urlsafe_charset {
-            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), padding: value!(false), charset: value!("url_safe")],
+        with_urlsafe_charset {
+            args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!("url_safe")],
             want: Ok(value!("some+=string/value")),
         }
 
