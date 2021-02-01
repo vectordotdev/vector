@@ -208,6 +208,27 @@ impl Path {
 
         Ok(Self::new_unchecked(segments))
     }
+
+    /// Appends a new segment to the end of this path.
+    pub fn append(&mut self, segment: Segment) {
+        self.segments.push(segment);
+    }
+
+    /// Returns true if the current path starts with the same segments
+    /// as the given path.
+    ///
+    /// ".noog.norg.nink".starts_with(".noog.norg") == true
+    pub fn starts_with(&self, other: &Path) -> bool {
+        if self.segments.len() < other.segments.len() {
+            return false;
+        }
+
+        self.segments
+            .iter()
+            .take(other.segments.len())
+            .zip(other.segments.iter())
+            .all(|(me, them)| me == them)
+    }
 }
 
 impl fmt::Display for Path {
@@ -318,6 +339,21 @@ mod tests {
     use super::*;
     use Field::*;
     use Segment::*;
+
+    #[test]
+    fn test_starts_with() {
+        assert!(Path::from_str(".noog.nork.nink")
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork").unwrap()));
+
+        assert!(!Path::from_str(".noog.nork")
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
+
+        assert!(Path::from_str(".noog.nork.nink")
+            .unwrap()
+            .starts_with(&Path::from_str(".noog.nork.nink").unwrap()));
+    }
 
     #[test]
     fn test_path() {
