@@ -2,8 +2,14 @@ package metadata
 
 #Remap: {
 	#Characteristic: {
+		anchor:      "#\(name)"
+		name:        string
 		title:       string
 		description: string
+	}
+
+	#Characteristics: [Name=string]: #Characteristic & {
+		name: Name
 	}
 
 	#Example: {
@@ -28,12 +34,12 @@ package metadata
 
 	concepts:    _
 	description: string
+	examples: [#Example, ...#Example]
 	expressions: _
 	features:    _
 	functions:   _
 	literals:    _
 	principles:  _
-	real_world_examples: [#Example, ...#Example]
 }
 
 remap: #Remap & {
@@ -46,7 +52,7 @@ remap: #Remap & {
 		For a more in-depth picture, see the [announcement blog post](\#(urls.vrl_announcement)) for more details.
 		"""#
 
-	real_world_examples: [
+	examples: [
 		{
 			title: "Parse Syslog logs"
 			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
@@ -172,32 +178,29 @@ remap: #Remap & {
 			}
 		},
 		{
-			title: "Type safety"
+			title: "Invalid argument type"
 			input: log: not_a_string: 1
 			source: """
-				structured = parse_syslog!(.not_a_string)
-				. = merge(., structured)
+				upcase(.not_a_string)
 				"""
 			raises: compiletime: """
-				error: program aborted
+				error: invalid argument type
 				  ┌─ :1:1
 				  │
-				1 │ structured = parse_syslog!(.not_a_string)
-				  │                            ^^^^^^^^^^^^^
-				  │ │
-				  │ function call error
-				  │ unable to parse syslog: key must be a string at line 1 column 3
+				1 │ upcase(.not_a_string)
+				  │        ^^^^^^^^^^^^^
+				  │        │
+				  │        this expression resolves to unknown type
+				  │        but the parameter "value" expects the exact type "string"
 				  │
-				  = see function documentation at: https://master.vector.dev/docs/reference/remap/#parse_json
 				  = see language documentation at: https://vector.dev/docs/reference/vrl/
 				"""
 		},
 		{
-			title: "Error safety"
+			title: "Unhandled error"
 			input: log: message: "key1=value1 key2=value2"
 			source: """
 				structured = parse_key_value(.message)
-				. = merge(., structured)
 				"""
 			raises: compiletime: """
 				error: unhandled error

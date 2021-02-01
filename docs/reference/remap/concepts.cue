@@ -7,7 +7,7 @@ remap: {
 		title:       string
 		description: string
 
-		characteristics: [Name=string]: remap.#Characteristic
+		characteristics: remap.#Characteristics
 	}
 
 	concepts: [Name=string]: #Concept & {

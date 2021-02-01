@@ -16,10 +16,10 @@ remap: {
 	#Grammar: {
 		source: string
 		definitions: [Name=string]: {
-			name:        Name
-			description: string
-			characteristics?: [Name=string]: remap.#Characteristic
-			enum?: #Enum
+			name:             Name
+			description:      string
+			characteristics?: remap.#Characteristics
+			enum?:            #Enum
 			examples?: [string, ...string]
 		}
 	}
