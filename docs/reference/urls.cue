@@ -435,6 +435,7 @@ urls: {
 	vector_log:                                               "\(vector_website)/docs/about/data-model/log/"
 	vector_log_data_types:                                    "\(vector_website)/docs/about/data-model/log/#types"
 	vector_lua_rfc:                                           "\(vector_repo)/blob/master/rfcs/2020-03-06-1999-api-extensions-for-lua-transform.md"
+	vector_metric:                                            "\(vector_website)/docs/about/data-model/metric/"
 	vector_msi_source_files:                                  "\(vector_repo)/tree/master/distribution/msi"
 	vector_nightly_builds:                                    "https://packages.timber.io/vector/nightly/latest/"
 	vector_nix_package:                                       "\(github)/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix"
