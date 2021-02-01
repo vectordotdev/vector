@@ -93,6 +93,7 @@ components: sinks: [Name=string]: {
 									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
 									disk:   "Stores the sink's buffer on disk. This is less performant, but durable. Data will not be lost between restarts."
 								}
+								syntax: "literal"
 							}
 						}
 						when_full: {
@@ -105,6 +106,7 @@ components: sinks: [Name=string]: {
 									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
 									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 								}
+								syntax: "literal"
 							}
 						}
 					}
@@ -122,12 +124,14 @@ components: sinks: [Name=string]: {
 						default: sinks[Name].features.send.compression.default
 						enum: {
 							if list.Contains(sinks[Name].features.send.compression.algorithms, "none") {
-								none: "No compression."
+								none:   "No compression."
+								syntax: "literal"
 							}
 							if list.Contains(sinks[Name].features.send.compression.algorithms, "gzip") {
 								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
 							}
 						}
+						syntax: "literal"
 					}
 				}
 			}
@@ -143,7 +147,10 @@ components: sinks: [Name=string]: {
 							codec: {
 								description: "The encoding codec used to serialize the events before outputting."
 								required:    true
-								type: string: examples: sinks[Name].features.send.encoding.codec.enum
+								type: string: {
+									examples: sinks[Name].features.send.encoding.codec.enum
+									syntax:   "literal"
+								}
 							}
 						}
 
@@ -153,7 +160,10 @@ components: sinks: [Name=string]: {
 							required:    false
 							type: array: {
 								default: null
-								items: type: string: examples: ["message", "parent.child"]
+								items: type: string: {
+									examples: ["message", "parent.child"]
+									syntax: "field_path"
+								}
 							}
 						}
 
@@ -163,7 +173,10 @@ components: sinks: [Name=string]: {
 								required:    false
 								type: array: {
 									default: null
-									items: type: string: examples: ["message", "parent.child"]
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
 								}
 							}
 
@@ -177,6 +190,7 @@ components: sinks: [Name=string]: {
 										rfc3339: "Formats as a RFC3339 string"
 										unix:    "Formats as a unix timestamp"
 									}
+									syntax: "literal"
 								}
 							}
 						}
@@ -336,6 +350,18 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.send_buffer_size != _|_ {
+				send_buffer_bytes: {
+					common:      false
+					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
+					required:    false
+					type: uint: {
+						examples: [65536]
+					}
+					relevant_when: sinks[Name].features.send.send_buffer_bytes.relevant_when
+				}
+			}
+
 			if sinks[Name].features.send.keepalive != _|_ {
 				keepalive: {
 					common:      false

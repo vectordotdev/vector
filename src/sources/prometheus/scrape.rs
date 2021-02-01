@@ -255,7 +255,6 @@ mod test {
         test_util::{next_addr, start_topology},
         Error,
     };
-    use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
         {Body, Client, Response, Server},
@@ -382,7 +381,7 @@ mod test {
             ],
         );
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }
 
@@ -429,24 +428,24 @@ mod integration_tests {
         let find_metric = |name: &str| {
             metrics
                 .iter()
-                .find(|metric| metric.name == name)
+                .find(|metric| metric.name() == name)
                 .unwrap_or_else(|| panic!("Missing metric {:?}", name))
         };
 
         // Sample some well-known metrics
         let build = find_metric("prometheus_build_info");
-        assert!(matches!(build.kind, MetricKind::Absolute));
-        assert!(matches!(build.value, MetricValue::Gauge { ..}));
-        assert!(build.tags.as_ref().unwrap().contains_key("branch"));
-        assert!(build.tags.as_ref().unwrap().contains_key("version"));
+        assert!(matches!(build.data.kind, MetricKind::Absolute));
+        assert!(matches!(build.data.value, MetricValue::Gauge { ..}));
+        assert!(build.tags().unwrap().contains_key("branch"));
+        assert!(build.tags().unwrap().contains_key("version"));
 
         let queries = find_metric("prometheus_engine_queries");
-        assert!(matches!(queries.kind, MetricKind::Absolute));
-        assert!(matches!(queries.value, MetricValue::Gauge { .. }));
+        assert!(matches!(queries.data.kind, MetricKind::Absolute));
+        assert!(matches!(queries.data.value, MetricValue::Gauge { .. }));
 
         let go_info = find_metric("go_info");
-        assert!(matches!(go_info.kind, MetricKind::Absolute));
-        assert!(matches!(go_info.value, MetricValue::Gauge { .. }));
-        assert!(go_info.tags.as_ref().unwrap().contains_key("version"));
+        assert!(matches!(go_info.data.kind, MetricKind::Absolute));
+        assert!(matches!(go_info.data.value, MetricValue::Gauge { .. }));
+        assert!(go_info.tags().unwrap().contains_key("version"));
     }
 }

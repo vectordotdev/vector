@@ -59,7 +59,7 @@ impl Expression for ParseJsonFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     test_function![
@@ -77,7 +77,7 @@ mod tests {
 
         json {
             args: func_args![value: r#"{"field":"value"}"#],
-            want: Ok(map!["field": "value"]),
+            want: Ok(btreemap!{ "field" => "value" }),
         }
 
         invalid_value {

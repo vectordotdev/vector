@@ -1,7 +1,6 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
@@ -28,10 +27,11 @@ async fn test_tcp_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Tcp {
+        SyslogConfig::from_mode(Mode::Tcp {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
+            receive_buffer_bytes: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -51,7 +51,7 @@ async fn test_tcp_syslog() {
     send_lines(in_addr, input_lines).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
@@ -83,7 +83,7 @@ async fn test_unix_stream_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Unix {
+        SyslogConfig::from_mode(Mode::Unix {
             path: in_path.clone(),
         }),
     );
@@ -116,7 +116,7 @@ async fn test_unix_stream_syslog() {
     tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
@@ -145,10 +145,11 @@ async fn test_octet_counting_syslog() {
     let mut config = config::Config::builder();
     config.add_source(
         "in",
-        SyslogConfig::new(Mode::Tcp {
+        SyslogConfig::from_mode(Mode::Tcp {
             address: in_addr.into(),
             keepalive: None,
             tls: None,
+            receive_buffer_bytes: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
@@ -180,7 +181,7 @@ async fn test_octet_counting_syslog() {
     send_encodable(in_addr, codec, input_lines).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
@@ -339,7 +340,7 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 
 fn tcp_json_sink(address: String) -> SocketSinkConfig {
     SocketSinkConfig::new(
-        socket::Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+        socket::Mode::Tcp(TcpSinkConfig::from_address(address)),
         EncodingConfig::from(Encoding::Json),
     )
 }

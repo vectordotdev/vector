@@ -6,6 +6,11 @@ remap: features: affine_type_system: {
 		memory-safe.
 		"""
 
+	principles: {
+		performance: true
+		safety:      false
+	}
+
 	characteristics: {
 		absence_of_garbage_collection: {
 			title: "Absense of garbage collection"

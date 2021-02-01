@@ -177,12 +177,13 @@ impl StreamSink for NatsSink {
                     emit!(NatsEventSendSuccess {
                         byte_size: message_len,
                     });
-                    self.acker.ack(1);
                 }
                 Err(error) => {
                     emit!(NatsEventSendFail { error });
                 }
             }
+
+            self.acker.ack(1);
         }
 
         Ok(())

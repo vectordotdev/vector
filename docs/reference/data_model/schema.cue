@@ -127,9 +127,12 @@ data_model: schema: {
 								description: "The statistic to be calculated from the values."
 								required:    true
 								warnings: []
-								type: string: enum: {
-									histogram: "Counts values in buckets."
-									summary:   "Calculates quantiles of values."
+								type: string: {
+									enum: {
+										histogram: "Counts values in buckets."
+										summary:   "Calculates quantiles of values."
+									}
+									syntax: "literal"
 								}
 							}
 						}
@@ -237,6 +240,7 @@ data_model: schema: {
 							absolute:    "The metric value is absolute and replaces values as it is received downstream."
 							incremental: "The metric value increments a cumulated value as it is received downstream."
 						}
+						syntax: "literal"
 					}
 				}
 
@@ -246,6 +250,7 @@ data_model: schema: {
 					warnings: []
 					type: string: {
 						examples: ["memory_available_bytes"]
+						syntax: "literal"
 					}
 				}
 
@@ -255,6 +260,7 @@ data_model: schema: {
 					warnings: []
 					type: string: {
 						examples: ["host", "apache", "nginx"]
+						syntax: "literal"
 					}
 				}
 
@@ -272,7 +278,10 @@ data_model: schema: {
 								description: "The list of unique values."
 								required:    true
 								warnings: []
-								type: array: items: type: string: examples: ["value1", "value2"]
+								type: array: items: type: string: {
+									examples: ["value1", "value2"]
+									syntax: "literal"
+								}
 							}
 						}
 					}

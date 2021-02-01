@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: includes: {
+	category: "Enumerate"
+	description: """
+		Determines whether the `value` includes the `item`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,10 +22,7 @@ remap: functions: includes: {
 	]
 	internal_failure_reasons: []
 	return: types: ["boolean"]
-	category: "Enumerate"
-	description: """
-		Determines whether the provided `values` contains the provided `item`.
-		"""
+
 	examples: [
 		{
 			title: "Array includes"

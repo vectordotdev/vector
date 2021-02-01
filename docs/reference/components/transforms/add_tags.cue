@@ -8,6 +8,7 @@ components: transforms: add_tags: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

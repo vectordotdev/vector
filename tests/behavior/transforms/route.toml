@@ -1,17 +1,17 @@
 [transforms.foo]
   inputs = ["ignored"]
-  type = "swimlanes"
-  [transforms.foo.lanes.first]
+  type = "route"
+  [transforms.foo.route.first]
     type = "remap"
     source = '''
       .message == "test swimlane 1"
     '''
-  [transforms.foo.lanes.second]
+  [transforms.foo.route.second]
     type = "remap"
     source = '''
       .message == "test swimlane 2"
     '''
-  [transforms.foo.lanes.third]
+  [transforms.foo.route.third]
     type = "is_log"
 
 [transforms.bar]
@@ -21,7 +21,7 @@
     new_field = "new field added"
 
 [[tests]]
-  name = "swimlanes test 1"
+  name = "route test 1"
   no_outputs_from = [ "foo.second" ]
 
   [[tests.inputs]]
@@ -54,7 +54,7 @@
       '''
 
 [[tests]]
-  name = "swimlanes test 2"
+  name = "route test 2"
   no_outputs_from = [ "foo.first", "bar" ]
 
   [[tests.inputs]]

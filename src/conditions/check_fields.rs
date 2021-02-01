@@ -75,15 +75,13 @@ impl CheckFieldsPredicate for EqualsPredicate {
                     _ => false,
                 },
             }),
-            Event::Metric(m) => {
-                m.tags
-                    .as_ref()
-                    .and_then(|t| t.get(&self.target))
-                    .map_or(false, |v| match &self.arg {
-                        CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
-                        _ => false,
-                    })
-            }
+            Event::Metric(m) => m
+                .tags()
+                .and_then(|t| t.get(&self.target))
+                .map_or(false, |v| match &self.arg {
+                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
+                    _ => false,
+                }),
         }
     }
 }
@@ -244,8 +242,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
                     !self.arg.iter().any(|s| b == s.as_bytes())
                 }),
             Event::Metric(m) => m
-                .tags
-                .as_ref()
+                .tags()
                 .and_then(|t| t.get(&self.target))
                 .map_or(false, |v| {
                     !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
@@ -285,8 +282,7 @@ impl CheckFieldsPredicate for RegexPredicate {
                 .map(|field| field.to_string_lossy())
                 .map_or(false, |field| self.regex.is_match(&field)),
             Event::Metric(metric) => metric
-                .tags
-                .as_ref()
+                .tags()
                 .and_then(|tags| tags.get(&self.target))
                 .map_or(false, |field| self.regex.is_match(field)),
         }
@@ -317,10 +313,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
     fn check(&self, event: &Event) -> bool {
         (match event {
             Event::Log(l) => l.get(&self.target).is_some(),
-            Event::Metric(m) => m
-                .tags
-                .as_ref()
-                .map_or(false, |t| t.contains_key(&self.target)),
+            Event::Metric(m) => m.tags().map_or(false, |t| t.contains_key(&self.target)),
         }) == self.arg
     }
 }

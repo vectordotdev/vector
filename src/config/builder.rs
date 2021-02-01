@@ -39,6 +39,21 @@ impl Clone for ConfigBuilder {
     }
 }
 
+impl From<Config> for ConfigBuilder {
+    fn from(c: Config) -> Self {
+        ConfigBuilder {
+            global: c.global,
+            #[cfg(feature = "api")]
+            api: c.api,
+            healthchecks: c.healthchecks,
+            sources: c.sources,
+            sinks: c.sinks,
+            transforms: c.transforms,
+            tests: c.tests,
+        }
+    }
+}
+
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Vec<String>> {
         self.build_with(false)

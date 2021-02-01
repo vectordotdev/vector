@@ -16,7 +16,7 @@ installation: _interfaces: kubectl: {
 	}
 	platform_name: "kubernetes"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
 			_vector_version:           "0.11"
@@ -105,7 +105,7 @@ installation: _interfaces: kubectl: {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""

@@ -5,4 +5,9 @@ remap: features: vector_native: {
 		return Vector events. This makes VRL significantly faster than alternative runtimes, like Lua, where data must
 		be serialized as it's passed to and from the runtime.
 		"""
+
+	principles: {
+		performance: true
+		safety:      false
+	}
 }
