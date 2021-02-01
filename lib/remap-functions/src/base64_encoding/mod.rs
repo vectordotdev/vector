@@ -1,3 +1,9 @@
+mod decode_base64;
+mod encode_base64;
+
+pub use decode_base64::DecodeBase64;
+pub use encode_base64::EncodeBase64;
+
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

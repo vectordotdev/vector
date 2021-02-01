@@ -1,6 +1,7 @@
-mod base64_util;
 mod util;
 
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
+mod base64_encoding;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "assert")]
@@ -11,14 +12,10 @@ mod ceil;
 mod compact;
 #[cfg(feature = "contains")]
 mod contains;
-#[cfg(feature = "decode_base64")]
-mod decode_base64;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
 mod downcase;
-#[cfg(feature = "encode_base64")]
-mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
 #[cfg(feature = "ends_with")]
@@ -153,13 +150,13 @@ pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
-pub use decode_base64::DecodeBase64;
+pub use base64_encoding::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
 #[cfg(feature = "encode_base64")]
-pub use encode_base64::EncodeBase64;
+pub use base64_encoding::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
