@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
+    event::metric::{Metric, MetricValue, Sample, StatisticKind},
     http::HttpClient,
     sinks::{
         influxdb::{
@@ -221,9 +221,8 @@ impl MetricNormalize for InfluxMetricNormalize {
             (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
             // Convert incremental gauges into absolute ones
             (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
-            // All others are left as-is but aggregated
-            (MetricKind::Incremental, _) => state.aggregate_incremental(metric),
-            (MetricKind::Absolute, _) => Some(metric),
+            // All others are left as-is
+            _ => Some(metric),
         }
     }
 }

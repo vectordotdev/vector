@@ -103,8 +103,9 @@ impl DerefMut for MetricEntry {
 /// Batching mostly means that we will aggregate away timestamp
 /// information, and apply metric-specific compression to improve the
 /// performance of the pipeline.  In particular, only the latest in a
-/// series of metrics are output.  Any aggregation or conversion of
-/// metrics is handled by the `State` type.  Further, distribution
+/// series of metrics are output, and incremental metrics are summed
+/// into the output buffer.  Any conversion of metrics is handled by the
+/// normalization type `N: MetricNormalize`.  Further, distribution
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
 pub struct MetricsBuffer<N> {
@@ -148,7 +149,21 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
             PushResult::Overflow(item)
         } else {
             if let Some(item) = N::apply_state(&mut self.state, item.into_metric()) {
-                self.metrics.replace(MetricEntry(item));
+                let new_entry = match item.data.kind {
+                    MetricKind::Absolute => MetricEntry(item),
+                    MetricKind::Incremental => {
+                        // Incremental metrics update existing entries, if present
+                        let entry = MetricEntry(item);
+                        self.metrics
+                            .take(&entry)
+                            .map(|mut existing| {
+                                existing.data.update(&entry.data);
+                                existing
+                            })
+                            .unwrap_or(entry)
+                    }
+                };
+                self.metrics.replace(new_entry);
             }
             PushResult::Ok(self.num_items() >= self.max_events)
         }
@@ -159,7 +174,7 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
     }
 
     fn fresh(&self) -> Self {
-        Self::new_with_state(self.max_events, self.state.fresh(&self.metrics))
+        Self::new_with_state(self.max_events, self.state.clone())
     }
 
     fn finish(self) -> Self::Output {
@@ -237,7 +252,7 @@ impl MetricSet {
     pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
-            MetricKind::Incremental => self.aggregate_incremental(metric),
+            MetricKind::Incremental => Some(metric),
         }
     }
 
@@ -260,10 +275,13 @@ impl MetricSet {
     /// the increment from the last saved absolute state.
     fn absolute_to_incremental(&mut self, metric: Metric) -> Option<Metric> {
         let mut entry = MetricEntry(metric);
-        match self.0.get(&entry) {
-            Some(reference) => {
+        match self.0.take(&entry) {
+            Some(mut reference) => {
+                let new_value = entry.data.value.clone();
                 // From the stored reference value, emit an increment
                 entry.data.value.subtract(&reference.data.value);
+                reference.data.value = new_value;
+                self.0.insert(reference);
                 Some(entry.0.into_incremental())
             }
             None => {
@@ -272,41 +290,6 @@ impl MetricSet {
                 None
             }
         }
-    }
-
-    /// Add the saved state to this incremental metric, saving it as a
-    /// starting point if no previous state is present.
-    pub fn aggregate_incremental(&mut self, metric: Metric) -> Option<Metric> {
-        let mut entry = MetricEntry(metric);
-        let new_entry = match self.0.take(&entry) {
-            Some(mut previous) => {
-                previous.data.add(&entry.data);
-                entry.data = previous.data.clone();
-                previous
-            }
-            None => entry.clone(),
-        };
-        self.0.replace(new_entry);
-        Some(entry.0)
-    }
-
-    /// Produce a fresh state by cloning all the absolute references and
-    /// updating them with any increment previously emitted in this batch.
-    fn fresh(&self, metrics: &Self) -> Self {
-        Self(
-            self.0
-                .iter()
-                .filter(|entry| entry.data.kind.is_absolute())
-                .cloned()
-                .map(|entry| {
-                    let mut entry = MetricEntry(entry.0.into_incremental());
-                    if let Some(increment) = metrics.get(&entry) {
-                        entry.data.value.add(&increment.data.value);
-                    }
-                    MetricEntry(entry.0.into_absolute())
-                })
-                .collect(),
-        )
     }
 }
 
