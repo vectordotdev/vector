@@ -42,10 +42,7 @@ impl Expression for JoinFn {
         let array: Vec<Value> = self.value.execute(state, object)?
             .try_array()?;
 
-        let string_vec: Vec<String> = self
-            .value
-            .execute(state, object)?
-            .try_array()?
+        let string_vec: Vec<String> = array
             .iter()
             .filter_map(|s| s.clone().try_bytes().ok())
             .map(|s| String::from_utf8_lossy(&s).to_string())
