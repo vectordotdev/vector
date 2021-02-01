@@ -48,6 +48,6 @@ macro_rules! map {
             .into_iter()
             .collect::<std::collections::BTreeMap<_, _>>();
 
-            remap::Value::Map(map)
+        remap::Value::Map(map)
     });
 }

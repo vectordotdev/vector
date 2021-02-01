@@ -1,6 +1,6 @@
 use super::{array, map, repl::Repl, Error};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
-use remap_functions::{all as funcs};
+use remap_functions::all as funcs;
 use rustyline::{error::ReadlineError, Editor};
 
 struct Tutorial {
