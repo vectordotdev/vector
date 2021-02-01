@@ -11,8 +11,8 @@ remap: features: compilation: {
 	}
 
 	characteristics: {
-		error_safety_checks: {
-			title:       "Error-safety checks"
+		fail_safety_checks: {
+			title:       "Fail-safety checks"
 			description: """
 				At compile-time, Vector will perform [fail-safety](\(features.fail_safety.anchor)) checks to ensure all
 				possible errors are handled. For example, failing to pase a string with the `parse_syslog`
