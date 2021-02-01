@@ -58,6 +58,6 @@ remap: functions: decode_base64: {
 				decode_base64("eW91IGNhbid0IG1ha2UgeW91ciBoZWFydCBmZWVsIHNvbWV0aGluZyBpdCB3b24ndA==", charset: "url_safe")
 				"""
 			return: "you can't make your heart feel something it won't"
-		}
+		},
 	]
 }
