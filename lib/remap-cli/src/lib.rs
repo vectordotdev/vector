@@ -28,12 +28,12 @@ pub enum Error {
 #[macro_export]
 macro_rules! array {
     () => ({
-        let vec: Vec<Value> = Vec::new();
-        Value::from(vec)
+        let vec: Vec<remap::Value> = Vec::new();
+        remap::Value::from(vec)
     });
     ($($v:expr),+ $(,)?) => ({
-        let vec: Vec<Value> = vec![$($v.into()),+];
-        Value::from(vec)
+        let vec: Vec<remap::Value> = vec![$($v.into()),+];
+        remap::Value::from(vec)
     })
 }
 
@@ -41,13 +41,13 @@ macro_rules! array {
 macro_rules! map {
     () => ({
         let map = std::collections::BTreeMap::<String, Value>::new();
-        Value::Map(map)
+        remap::Value::Map(map)
     });
     ($($k:tt: $v:expr),+ $(,)?) => ({
         let map: std::collections::BTreeMap<String, Value> = vec![$(($k.into(), $v.into())),+]
             .into_iter()
             .collect::<std::collections::BTreeMap<_, _>>();
 
-        Value::Map(map)
+            remap::Value::Map(map)
     });
 }
