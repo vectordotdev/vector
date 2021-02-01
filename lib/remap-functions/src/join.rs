@@ -39,8 +39,7 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let array: Vec<Value> = self.value.execute(state, object)?
-            .try_array()?;
+        let array: Vec<Value> = self.value.execute(state, object)?.try_array()?;
 
         let string_vec: Vec<String> = array
             .iter()
@@ -80,14 +79,12 @@ impl Expression for JoinFn {
             .as_ref()
             .map(|sep| sep.type_def(state).fallible_unless(Kind::Bytes));
 
-        self
-            .value
+        self.value
             .type_def(state)
             .merge_optional(separator_type_def)
             // Always fallible because the `value` array could contain non-strings
             .into_fallible(true)
             .with_constraint(Kind::Bytes)
-
     }
 }
 
