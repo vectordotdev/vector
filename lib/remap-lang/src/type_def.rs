@@ -92,12 +92,32 @@ impl BitAnd for TypeDef {
         };
 
         let inner_type_def = match (self.inner_type_def, rhs.inner_type_def) {
-            (Some(InnerTypeDef::Array(lhs)), Some(InnerTypeDef::Array(rhs))) => {
-                Some(InnerTypeDef::Array((*lhs & *rhs).boxed()))
-            }
-            (Some(InnerTypeDef::Map(lhs)), Some(InnerTypeDef::Map(rhs))) => {
+            (
+                Some(InnerTypeDef::Both {
+                    map: lhsm,
+                    array: lhsa,
+                }),
+                Some(InnerTypeDef::Both {
+                    map: rhsm,
+                    array: rhsa,
+                }),
+            ) => Some(InnerTypeDef::Both {
+                map: maps(lhsm, rhsm),
+                array: (*lhsa & *rhsa).boxed(),
+            }),
+
+            (Some(InnerTypeDef::Map(lhs)), Some(InnerTypeDef::Map(rhs)))
+            | (Some(InnerTypeDef::Map(lhs)), Some(InnerTypeDef::Both { map: rhs, .. }))
+            | (Some(InnerTypeDef::Both { map: lhs, .. }), Some(InnerTypeDef::Map(rhs))) => {
                 Some(InnerTypeDef::Map(maps(lhs, rhs)))
             }
+
+            (Some(InnerTypeDef::Array(lhs)), Some(InnerTypeDef::Array(rhs)))
+            | (Some(InnerTypeDef::Both { array: lhs, .. }), Some(InnerTypeDef::Array(rhs)))
+            | (Some(InnerTypeDef::Array(lhs)), Some(InnerTypeDef::Both { array: rhs, .. })) => {
+                Some(InnerTypeDef::Array((*lhs & *rhs).boxed()))
+            }
+
             _ => None,
         };
 
