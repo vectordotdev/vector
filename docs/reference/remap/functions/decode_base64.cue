@@ -3,7 +3,7 @@ package metadata
 remap: functions: decode_base64: {
 	category:    "Codec"
 	description: """
-		Decodes the `value` (a [Base64](\(urls.base64)) string) into it's original string.
+		Decodes the `value` (a [Base64](\(urls.base64)) string) into its original string.
 		"""
 
 	arguments: [
@@ -14,15 +14,8 @@ remap: functions: decode_base64: {
 			type: ["string"]
 		},
 		{
-			name:        "padding"
-			description: "Whether the Base64 output is [padded](\(urls.base64_padding))."
-			required:    false
-			type: ["boolean"]
-			default: true
-		},
-		{
 			name:        "charset"
-			description: "The character set to use when encoding the data."
+			description: "The character set to use when decoding the data."
 			required:    false
 			type: ["string"]
 			default: "standard"
