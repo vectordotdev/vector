@@ -43,7 +43,7 @@ impl Function for EncodeBase64 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Charset {
+pub enum Charset {
     Standard,
     UrlSafe,
 }
