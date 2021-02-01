@@ -39,13 +39,6 @@ remap: functions: decode_base64: {
 			return: "you have successfully decoded me"
 		},
 		{
-			title: "Decode Base64 data (without padding)"
-			source: """
-				decode_base64("Z29vZCB0aW1lcyBuZXZlciBzZWVtZWQgc28gZ29vZA", padding: false)
-				"""
-			return: "good times never seemed so good"
-		},
-		{
 			title: "Decode Base64 data (URL safe)"
 			source: """
 				decode_base64("eW91IGNhbid0IG1ha2UgeW91ciBoZWFydCBmZWVsIHNvbWV0aGluZyBpdCB3b24ndA==", charset: "url_safe")
