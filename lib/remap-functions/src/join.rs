@@ -42,14 +42,17 @@ impl Expression for JoinFn {
         let array: Vec<Value> = self.value.execute(state, object)?
             .try_array()?;
 
-        let string_vec: Vec<String> = array
+        let string_vec: Vec<String> = self
+            .value
+            .execute(state, object)?
+            .try_array()?
             .iter()
             .filter_map(|s| s.clone().try_bytes().ok())
             .map(|s| String::from_utf8_lossy(&s).to_string())
             .collect();
 
         if string_vec.len() < array.len() {
-            Err("uh oh".into())
+            Err("all array items must be strings".into())
         } else {
             let separator: String = self
                 .separator
@@ -80,7 +83,8 @@ impl Expression for JoinFn {
             .value
             .type_def(state)
             .merge_optional(separator_type_def)
-            .fallible_unless(Kind::Array)
+            // Always fallible because the `value` array could contain non-strings
+            .into_fallible(true)
             .with_constraint(Kind::Bytes)
 
     }
@@ -89,6 +93,57 @@ impl Expression for JoinFn {
 #[cfg(test)]
 mod test {
     use super::*;
+    use value::Kind;
+
+    test_type_def![
+        value_string_array_fallible {
+            expr: |_| JoinFn {
+                value: array!["one", "two", "three"].boxed(),
+                separator: Some(lit!(", ").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        value_wrong_type_fallible {
+            expr: |_| JoinFn {
+                value: lit!(427).boxed(),
+                separator: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        separator_wrong_type_fallible {
+            expr: |_| JoinFn {
+                value: array!["one", "two", "three"].boxed(),
+                separator: Some(lit!(427).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        both_types_wrong_fallible {
+            expr: |_| JoinFn {
+                value: lit!(true).boxed(),
+                separator: Some(lit!(427).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+    ];
 
     test_function![
         join => Join;
@@ -101,6 +156,16 @@ mod test {
         with_space_separator {
             args: func_args![value: array!["one", "two", "three"], separator: lit!(" ")],
             want: Ok(value!("one two three")),
+        }
+
+        without_separator {
+            args: func_args![value: array!["one", "two", "three"]],
+            want: Ok(value!("onetwothree")),
+        }
+
+        non_string_array_item_throws_error {
+            args: func_args![value: array!["one", "two", 3]],
+            want: Err("function call error: all array items must be strings"),
         }
     ];
 }
