@@ -39,7 +39,33 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        Ok(Value::from("ok"))
+        let array: Vec<Value> = self.value.execute(state, object)?
+            .try_array()?;
+
+        let string_vec: Vec<String> = array
+            .iter()
+            .filter_map(|s| s.clone().try_bytes().ok())
+            .map(|s| String::from_utf8_lossy(&s).to_string())
+            .collect();
+
+        if string_vec.len() < array.len() {
+            Err("uh oh".into())
+        } else {
+            let separator: String = self
+                .separator
+                .as_ref()
+                .map(|s| {
+                    s.execute(state, object)
+                        .and_then(|v| Value::try_bytes(v).map_err(Into::into))
+                })
+                .transpose()?
+                .map(|s| String::from_utf8_lossy(&s).to_string())
+                .unwrap_or("".into());
+
+            let joined = string_vec.join(&separator);
+
+            Ok(Value::from(joined))
+        }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -58,4 +84,23 @@ impl Expression for JoinFn {
             .with_constraint(Kind::Bytes)
 
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    test_function![
+        join => Join;
+
+        with_comma_separator {
+            args: func_args![value: array!["one", "two", "three"], separator: lit!(", ")],
+            want: Ok(value!("one, two, three")),
+        }
+
+        with_space_separator {
+            args: func_args![value: array!["one", "two", "three"], separator: lit!(" ")],
+            want: Ok(value!("one two three")),
+        }
+    ];
 }
