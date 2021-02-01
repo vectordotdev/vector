@@ -1,4 +1,4 @@
-use crate::encode_base64::Charset;
+use crate::base64_util::Charset;
 use remap::prelude::*;
 use std::str::FromStr;
 
