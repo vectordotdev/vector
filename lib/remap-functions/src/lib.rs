@@ -1,11 +1,11 @@
 mod util;
 
-#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
-mod base64_encoding;
 #[cfg(feature = "append")]
 mod append;
 #[cfg(feature = "assert")]
 mod assert;
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
+mod base64_encoding;
 #[cfg(feature = "ceil")]
 mod ceil;
 #[cfg(feature = "compact")]
@@ -143,20 +143,20 @@ pub use crate::sha1::Sha1;
 pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
+#[cfg(feature = "decode_base64")]
+pub use base64_encoding::DecodeBase64;
+#[cfg(feature = "encode_base64")]
+pub use base64_encoding::EncodeBase64;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
 #[cfg(feature = "compact")]
 pub use compact::Compact;
 #[cfg(feature = "contains")]
 pub use contains::Contains;
-#[cfg(feature = "decode_base64")]
-pub use base64_encoding::DecodeBase64;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::Downcase;
-#[cfg(feature = "encode_base64")]
-pub use base64_encoding::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
 #[cfg(feature = "ends_with")]
