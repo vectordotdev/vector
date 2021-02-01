@@ -51,6 +51,10 @@ impl Expression for JoinFn {
             .map(|s| String::from_utf8_lossy(&s).to_string())
             .collect();
 
+        // This length comparison is used to discern whether one or more array items was
+        // discarded by the filter_map operation due to being a non-string. If so, the
+        // entire operation errors; if not, string_vec is considered valid and can be
+        // joined.
         if string_vec.len() < array.len() {
             Err("all array items must be strings".into())
         } else {
