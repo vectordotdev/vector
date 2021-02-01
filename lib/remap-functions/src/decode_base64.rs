@@ -1,5 +1,5 @@
-use remap::prelude::*;
 use crate::encode_base64::Charset;
+use remap::prelude::*;
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug)]
@@ -35,7 +35,11 @@ impl Function for DecodeBase64 {
         let padding = arguments.optional("padding").map(Expr::boxed);
         let charset = arguments.optional("charset").map(Expr::boxed);
 
-        Ok(Box::new(DecodeBase64Fn { value, padding, charset }))
+        Ok(Box::new(DecodeBase64Fn {
+            value,
+            padding,
+            charset,
+        }))
     }
 }
 
@@ -76,7 +80,7 @@ impl Expression for DecodeBase64Fn {
 
         match base64::decode_config(value, config) {
             Ok(s) => Ok(Value::from(s)),
-            Err(_) => Err("unable to decode value to base64".into())
+            Err(_) => Err("unable to decode value to base64".into()),
         }
     }
 
