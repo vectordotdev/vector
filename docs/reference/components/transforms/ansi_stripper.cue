@@ -11,6 +11,7 @@ components: transforms: ansi_stripper: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -48,6 +49,7 @@ components: transforms: ansi_stripper: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 	}

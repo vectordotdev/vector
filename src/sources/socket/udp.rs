@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
@@ -8,20 +10,26 @@ use crate::{
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::SinkExt;
+use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
 
 /// UDP processes messages per packet, where messages are separated by newline.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
-    pub address: SocketAddr,
+    #[get_copy = "pub"]
+    address: SocketAddr,
     #[serde(default = "default_max_length")]
-    pub max_length: usize,
-    pub host_key: Option<String>,
+    #[get_copy = "pub"]
+    max_length: usize,
+    #[get = "pub"]
+    host_key: Option<String>,
+    #[cfg(unix)]
+    #[get_copy = "pub"]
+    receive_buffer_bytes: Option<usize>,
 }
 
 fn default_max_length() -> usize {
@@ -29,11 +37,13 @@ fn default_max_length() -> usize {
 }
 
 impl UdpConfig {
-    pub fn new(address: SocketAddr) -> Self {
+    pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
             max_length: default_max_length(),
             host_key: None,
+            #[cfg(unix)]
+            receive_buffer_bytes: None,
         }
     }
 }
@@ -42,6 +52,7 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
+    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
@@ -51,6 +62,19 @@ pub fn udp(
         let mut socket = UdpSocket::bind(&address)
             .await
             .expect("Failed to bind to udp listener socket");
+
+        #[cfg(unix)]
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        }
+
+        #[cfg(unix)]
+        let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            std::cmp::min(max_length, receive_buffer_bytes)
+        } else {
+            max_length
+        };
+
         info!(message = "Listening.", address = %address);
 
         let mut buf = BytesMut::with_capacity(max_length);

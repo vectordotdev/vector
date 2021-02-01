@@ -1,6 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
@@ -34,11 +36,11 @@ use tokio_util::{
 // #[serde(deny_unknown_fields)]
 pub struct SyslogConfig {
     #[serde(flatten)]
-    pub mode: Mode,
+    mode: Mode,
     #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
-    pub host_key: Option<String>,
+    host_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -48,14 +50,15 @@ pub enum Mode {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
+        receive_buffer_bytes: Option<usize>,
     },
     Udp {
         address: SocketAddr,
+        #[cfg(unix)]
+        receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix {
-        path: PathBuf,
-    },
+    Unix { path: PathBuf },
 }
 
 pub fn default_max_length() -> usize {
@@ -63,7 +66,7 @@ pub fn default_max_length() -> usize {
 }
 
 impl SyslogConfig {
-    pub fn new(mode: Mode) -> Self {
+    pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
@@ -83,6 +86,7 @@ impl GenerateConfig for SyslogConfig {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
                 tls: None,
+                receive_buffer_bytes: None,
             },
             host_key: None,
             max_length: default_max_length(),
@@ -111,6 +115,7 @@ impl SourceConfig for SyslogConfig {
                 address,
                 keepalive,
                 tls,
+                receive_buffer_bytes,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -118,8 +123,29 @@ impl SourceConfig for SyslogConfig {
                 };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
-                source.run(address, keepalive, shutdown_secs, tls, shutdown, out)
+                source.run(
+                    address,
+                    keepalive,
+                    shutdown_secs,
+                    tls,
+                    receive_buffer_bytes,
+                    shutdown,
+                    out,
+                )
             }
+            #[cfg(unix)]
+            Mode::Udp {
+                address,
+                receive_buffer_bytes,
+            } => Ok(udp(
+                address,
+                self.max_length,
+                host_key,
+                receive_buffer_bytes,
+                shutdown,
+                out,
+            )),
+            #[cfg(not(unix))]
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
@@ -144,7 +170,7 @@ impl SourceConfig for SyslogConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address } => vec![Resource::udp(address)],
+            Mode::Udp { address, .. } => vec![Resource::udp(address)],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
@@ -276,6 +302,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
+    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -285,6 +312,12 @@ pub fn udp(
         let socket = UdpSocket::bind(&addr)
             .await
             .expect("Failed to bind to UDP listener socket");
+
+        #[cfg(unix)]
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        }
+
         info!(
             message = "Listening.",
             addr = %addr,
@@ -443,6 +476,28 @@ mod test {
     }
 
     #[test]
+    fn config_tcp_with_receive_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let receive_buffer_bytes = match config.mode {
+            Mode::Tcp {
+                receive_buffer_bytes,
+                ..
+            } => receive_buffer_bytes,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        assert_eq!(receive_buffer_bytes, Some(256));
+    }
+
+    #[test]
     fn config_tcp_keepalive_empty() {
         let config: SyslogConfig = toml::from_str(
             r#"
@@ -492,6 +547,30 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_udp());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_udp_with_receive_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "udp"
+            address = "127.0.0.1:1235"
+            max_length = 32187
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let receive_buffer_bytes = match config.mode {
+            Mode::Udp {
+                receive_buffer_bytes,
+                ..
+            } => receive_buffer_bytes,
+            _ => panic!("expected Mode::Udp"),
+        };
+
+        assert_eq!(receive_buffer_bytes, Some(256));
     }
 
     #[cfg(unix)]

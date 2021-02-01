@@ -1,5 +1,5 @@
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
-use futures::{compat::Future01CompatExt, TryFutureExt};
+use futures::TryFutureExt;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
@@ -71,7 +71,7 @@ fn benchmark_http(c: &mut Criterion) {
                         rt.block_on(async move {
                             let lines = random_lines(line_size).take(num_lines);
                             send_lines(in_addr, lines).await.unwrap();
-                            topology.stop().compat().await.unwrap();
+                            topology.stop().await;
                         })
                     },
                     BatchSize::PerIteration,

@@ -119,7 +119,7 @@ mod tests {
     // the TOML format.
     #[cfg(all(
         feature = "sources-socket",
-        feature = "transforms-sampler",
+        feature = "transforms-sample",
         feature = "sinks-socket"
     ))]
     #[test]
@@ -135,14 +135,14 @@ mod tests {
             type = "socket"
             mode = "tcp"
             address = "127.0.0.1:1235"
-            [transforms.sampler]
-            type = "sampler"
+            [transforms.sample]
+            type = "sample"
             inputs = ["in"]
             rate = 10
             [sinks.out]
             type = "socket"
             mode = "tcp"
-            inputs = ["sampler"]
+            inputs = ["sample"]
             encoding = "text"
             address = "127.0.0.1:9999"
         "#;
@@ -176,15 +176,15 @@ mod tests {
                     r#"    mode: "tcp""#,
                     r#"    address: "127.0.0.1:1235""#,
                     r#"transforms:"#,
-                    r#"  sampler:"#,
-                    r#"    type: "sampler""#,
+                    r#"  sample:"#,
+                    r#"    type: "sample""#,
                     r#"    inputs: ["in"]"#,
                     r#"    rate: 10"#,
                     r#"sinks:"#,
                     r#"  out:"#,
                     r#"    type: "socket""#,
                     r#"    mode: "tcp""#,
-                    r#"    inputs: ["sampler"]"#,
+                    r#"    inputs: ["sample"]"#,
                     r#"    encoding: "text""#,
                     r#"    address: "127.0.0.1:9999""#,
                 ),
@@ -202,8 +202,8 @@ mod tests {
                         }
                     },
                     "transforms": {
-                        "sampler": {
-                            "type": "sampler",
+                        "sample": {
+                            "type": "sample",
                             "inputs": ["in"],
                             "rate": 10
                         }
@@ -212,7 +212,7 @@ mod tests {
                         "out": {
                             "type": "socket",
                             "mode": "tcp",
-                            "inputs": ["sampler"],
+                            "inputs": ["sample"],
                             "encoding": "text",
                             "address": "127.0.0.1:9999"
                         }

@@ -11,6 +11,6 @@
     "takes_number": 123,
     "takes_string": "test"
   },
-  "path": "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm",
+  "path": "tests/data/wasm/assert_config/target/wasm32-wasi/release/assert_config.wasm",
   "role": "Transform"
 }

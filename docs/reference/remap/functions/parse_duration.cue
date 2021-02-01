@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: parse_duration: {
+	category: "Parse"
+	description: """
+		Parses the `value` in a human duration format specified by `unit`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -31,10 +36,7 @@ remap: functions: parse_duration: {
 		"`value` is not a properly formatted duration",
 	]
 	return: types: ["float"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` representing a duration in the specified `unit`.
-		"""#
+
 	examples: [
 		{
 			title: "Parse duration (milliseconds)"

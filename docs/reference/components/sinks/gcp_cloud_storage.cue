@@ -9,6 +9,7 @@ components: sinks: gcp_cloud_storage: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -104,6 +105,7 @@ components: sinks: gcp_cloud_storage: {
 					"project-private":           "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
 					"public-read":               "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
 				}
+				syntax: "literal"
 			}
 		}
 		bucket: {
@@ -112,6 +114,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -123,6 +126,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		filename_append_uuid: {
@@ -141,6 +145,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				default: "log"
+				syntax:  "literal"
 			}
 		}
 		filename_time_format: {
@@ -151,6 +156,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				default: "%s"
+				syntax:  "literal"
 			}
 		}
 		key_prefix: {
@@ -162,7 +168,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		metadata: {
@@ -173,6 +179,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: null
 				examples: []
+				syntax: "literal"
 			}
 		}
 		storage_class: {
@@ -189,6 +196,7 @@ components: sinks: gcp_cloud_storage: {
 					COLDLINE: "Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data."
 					ARCHIVE:  "Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."
 				}
+				syntax: "literal"
 			}
 		}
 	}

@@ -1,7 +1,7 @@
 package metadata
 
-components: transforms: swimlanes: {
-	title: "Swimlanes"
+components: transforms: route: {
+	title: "Route"
 
 	description: """
 		Splits a stream of events into multiple sub-streams based on a set of
@@ -12,6 +12,7 @@ components: transforms: swimlanes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -35,17 +36,28 @@ components: transforms: swimlanes: {
 	}
 
 	configuration: {
-		lanes: {
-			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
-			required:    true
+		route: {
+			description: """
+				A table of route identifiers to logical conditions representing the filter of the route. Each route
+				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
+				"""
+			required: true
 			warnings: []
 			type: object: {
 				options: {
 					"*": {
-						description: "test"
-						required:    true
+						description: """
+							The condition to be matched against every input event. Only messages that pass the
+							condition will be included in this route.
+							"""
+						required: true
 						warnings: []
-						type: object: configuration._conditions
+						type: string: {
+							examples: [
+								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+							]
+							syntax: "remap"
+						}
 					}
 				}
 			}
@@ -61,11 +73,11 @@ components: transforms: swimlanes: {
 		{
 			title: "Split by log level"
 			configuration: {
-				lanes: {
-					debug: "level.eq": "debug"
-					info: "level.eq":  "info"
-					warn: "level.eq":  "warn"
-					error: "level.eq": "error"
+				route: {
+					debug: #".level == "debug""#
+					info:  #".level == "info""#
+					warn:  #".level == "warn""#
+					error: #".level == "error""#
 				}
 			}
 			input: log: {

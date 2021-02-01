@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::{AnyCondition, Condition},
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
@@ -39,8 +39,8 @@ pub struct ReduceConfig {
 
     /// An optional condition that determines when an event is the end of a
     /// reduce.
-    pub ends_when: Option<Box<dyn ConditionConfig>>,
-    pub starts_when: Option<Box<dyn ConditionConfig>>,
+    pub ends_when: Option<AnyCondition>,
+    pub starts_when: Option<AnyCondition>,
 }
 
 inventory::submit! {

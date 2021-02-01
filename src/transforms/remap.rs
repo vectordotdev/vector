@@ -147,14 +147,11 @@ mod tests {
 
     #[test]
     fn check_remap_metric() {
-        let metric = Event::Metric(Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        });
+        let metric = Event::Metric(Metric::new(
+            "counter".into(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
 
         let conf = RemapConfig {
             source: r#".tags.host = "zoobub"
@@ -169,18 +166,19 @@ mod tests {
         let result = tform.transform_one(metric).unwrap();
         assert_eq!(
             result,
-            Event::Metric(Metric {
-                name: "zork".into(),
-                namespace: Some("zerk".into()),
-                timestamp: None,
-                tags: Some({
+            Event::Metric(
+                Metric::new(
+                    "zork".into(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(Some("zerk".into()))
+                .with_tags(Some({
                     let mut tags = BTreeMap::new();
                     tags.insert("host".into(), "zoobub".into());
                     tags
-                }),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            })
+                }))
+            )
         );
     }
 }

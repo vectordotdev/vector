@@ -248,7 +248,7 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::trace_init;
+    use crate::{event::Event, test_util::trace_init};
     use metrics::counter;
     use tracing::{span, Level};
 
@@ -276,7 +276,7 @@ mod tests {
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())
-            .find(|metric| metric.name == "labels_injected_total")
+            .find(|metric| metric.name() == "labels_injected_total")
             .unwrap();
 
         let expected_tags = Some(
@@ -289,7 +289,7 @@ mod tests {
             .collect(),
         );
 
-        assert_eq!(metric.tags, expected_tags);
+        assert_eq!(metric.tags(), expected_tags.as_ref());
     }
 
     #[test]
@@ -299,10 +299,10 @@ mod tests {
 
         let capture_value = || {
             let metric = super::capture_metrics(super::get_controller().unwrap())
-                .map(|e| e.into_metric())
-                .find(|metric| metric.name == super::CARDINALITY_KEY_NAME)
+                .map(Event::into_metric)
+                .find(|metric| metric.name() == super::CARDINALITY_KEY_NAME)
                 .unwrap();
-            match metric.value {
+            match metric.data.value {
                 crate::event::MetricValue::Counter { value } => value,
                 _ => panic!("invalid metric value type, expected coutner, got something else"),
             }
@@ -311,18 +311,31 @@ mod tests {
         let intial_value = capture_value();
 
         counter!("cardinality_test_metric_1", 1);
-        assert_eq!(capture_value(), intial_value + 1.0);
+        assert!(capture_value() >= intial_value + 1.0);
 
         counter!("cardinality_test_metric_1", 1);
-        assert_eq!(capture_value(), intial_value + 1.0);
+        assert!(capture_value() >= intial_value + 1.0);
 
         counter!("cardinality_test_metric_2", 1);
         counter!("cardinality_test_metric_3", 1);
-        assert_eq!(capture_value(), intial_value + 3.0);
+        assert!(capture_value() >= intial_value + 3.0);
 
-        counter!("cardinality_test_metric_1", 1);
-        counter!("cardinality_test_metric_2", 1);
-        counter!("cardinality_test_metric_3", 1);
-        assert_eq!(capture_value(), intial_value + 3.0);
+        // Other tests could possibly increase the cardinality, so just
+        // try adding the same test metrics a few times and fail only if
+        // it keeps increasing.
+        for count in 1..=10 {
+            let start_value = capture_value();
+            counter!("cardinality_test_metric_1", 1);
+            counter!("cardinality_test_metric_2", 1);
+            counter!("cardinality_test_metric_3", 1);
+            let end_value = capture_value();
+            assert!(end_value >= start_value);
+            if start_value == end_value {
+                break;
+            }
+            if count == 10 {
+                panic!("Cardinality count still increasing after 10 loops!");
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ components: sinks: influxdb_metrics: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["InfluxData"]
+		stateful: false
 	}
 
 	features: {
@@ -70,6 +71,7 @@ components: sinks: influxdb_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

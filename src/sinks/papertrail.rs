@@ -21,6 +21,7 @@ pub struct PapertrailConfig {
     encoding: EncodingConfig<Encoding>,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
+    send_buffer_bytes: Option<usize>,
 }
 
 inventory::submit! {
@@ -57,13 +58,13 @@ impl SinkConfig for PapertrailConfig {
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let address = format!("{}:{}", host, port);
-        let keepalive = self.keepalive;
         let tls = Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled));
 
         let pid = std::process::id();
         let encoding = self.encoding.clone();
 
-        let sink_config = TcpSinkConfig::new(address, keepalive, tls);
+        let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
+
         sink_config.build(cx, move |event| encode_event(event, pid, &encoding))
     }
 

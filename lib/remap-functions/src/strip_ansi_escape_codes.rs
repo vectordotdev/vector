@@ -61,7 +61,7 @@ impl Expression for StripAnsiEscapeCodesFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -79,22 +79,22 @@ mod tests {
     fn strip_ansi_escape_codes() {
         let cases = vec![
             (
-                map![],
+                btreemap![],
                 Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("foo bar"))),
             ),
             (
-                map![],
+                btreemap![],
                 Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[3;4Hfoo bar"))),
             ),
             (
-                map![],
+                btreemap![],
                 Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[46mfoo\x1b[0m bar"))),
             ),
             (
-                map![],
+                btreemap![],
                 Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[=3lfoo bar"))),
             ),
