@@ -8,33 +8,17 @@ either 'vector-aggregator.servicePorts' or 'vector-aggregator.headlessServicePor
 {{- $headless := index . 0 -}}
 {{- $values := index . 1 -}}
 {{- if $values.vectorSource.enabled }}
-- name: vector
-{{- if and $values.vectorSource.nodePort (not $headless) }}
-  nodePort: {{ $values.vectorSource.nodePort }}
-{{- end }}
-  port: {{ $values.vectorSource.listenPort }}
-  protocol: TCP
-{{- if not $headless }}
-  targetPort: {{ $values.vectorSource.listenPort }}
-{{- end }}
+{{- $servicePort := merge (dict) $values.vectorSource -}}
+{{- $_ := set $servicePort "name" "vector" -}}
+{{- $_ := set $servicePort "port" $values.vectorSource.listenPort -}}
+{{- $_ := set $servicePort "protocol" "TCP" -}}
+{{- if not $headless -}}
+{{- $_ := set $servicePort "targetPort" $values.vectorSource.listenPort -}}
+{{- end -}}
+{{ tuple $headless $servicePort | include "libvector.servicePort" }}
 {{- end }}
 {{- range $values.service.ports }}
-- port: {{ .port }}
-{{- if not $headless }}
-  targetPort: {{ .targetPort }}
-{{- end }}
-{{- if and .nodePort (not $headless) }}
-  nodePort: {{ .nodePort }}
-{{- end }}
-{{- with .name }}
-  name: {{.}}
-{{- end }}
-{{- with .protocol }}
-  protocol: {{.}}
-{{- end }}
-{{- with .appProtocol }}
-  appProtocol: {{.}}
-{{- end }}
+{{ tuple $headless . | include "libvector.servicePort" }}
 {{- end }}
 {{- end -}}
 

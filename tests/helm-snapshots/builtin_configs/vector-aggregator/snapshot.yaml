@@ -86,9 +86,8 @@ metadata:
 spec:
   clusterIP: None
   ports:
-  
-  - name: vector
-    port: 9000
+  - port: 9000
+    name: vector
     protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
@@ -108,11 +107,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  
-  - name: vector
-    port: 9000
-    protocol: TCP
+  - port: 9000
     targetPort: 9000
+    name: vector
+    protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
