@@ -158,7 +158,7 @@ mod tests {
                 pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
                             .unwrap()
             ],
-            want: Err("unable to parse regular expression".to_string()),
+            want: Err("function call error: unable to parse regular expression".to_string()),
         }
     ];
 }
