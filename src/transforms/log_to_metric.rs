@@ -5,7 +5,7 @@ use crate::{
     event::Value,
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        LogToMetricTemplateRenderingError,
+        TemplateRenderingFailed,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
@@ -162,7 +162,11 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(LogToMetricTemplateRenderingError { error });
+                        emit!(TemplateRenderingFailed {
+                            error,
+                            drop_event: false,
+                            field: Some(name.as_str()),
+                        });
                     }
                     Err(other) => return Err(other),
                 }
@@ -355,7 +359,11 @@ impl FunctionTransform for LogToMetric {
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(LogToMetricTemplateRenderingError { error })
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        drop_event: false,
+                        field: None,
+                    })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
                     emit!(LogToMetricTemplateParseError { error })
