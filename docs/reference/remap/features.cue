@@ -13,7 +13,7 @@ remap: {
 			}
 		}
 
-		characteristics: [Name=string]: remap.#Characteristic
+		characteristics: remap.#Characteristics
 	}
 
 	features: [Name=string]: #Feature & {
