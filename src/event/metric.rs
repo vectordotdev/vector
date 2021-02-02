@@ -257,10 +257,6 @@ impl Metric {
         self
     }
 
-    pub fn into_parts(self) -> (MetricSeries, MetricData) {
-        (self.series, self.data)
-    }
-
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {
