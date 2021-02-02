@@ -3,7 +3,7 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::HttpClient,
-    internal_events::PrometheusTemplateRenderingError,
+    internal_events::TemplateRenderingFailed,
     sinks::{
         self,
         util::{
@@ -100,7 +100,13 @@ impl SinkConfig for RemoteWriteConfig {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {
                         template
                             .render_string(&event)
-                            .map_err(|error| emit!(PrometheusTemplateRenderingError { error }))
+                            .map_err(|error| {
+                                emit!(TemplateRenderingFailed {
+                                    error,
+                                    field: Some("tenant_id"),
+                                    drop_event: false,
+                                })
+                            })
                             .ok()
                     });
                     let key = PartitionKey { tenant_id };

@@ -1,7 +1,6 @@
 use super::InternalEvent;
 #[cfg(feature = "sources-prometheus")]
 use crate::sources::prometheus::parser::ParserError;
-use crate::template::TemplateRenderingError;
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -157,25 +156,5 @@ impl InternalEvent for PrometheusServerRequestComplete {
 
     fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusTemplateRenderingError {
-    pub error: TemplateRenderingError,
-}
-
-impl InternalEvent for PrometheusTemplateRenderingError {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Failed to render templated value; discarding value.",
-            error = %self.error,
-            internal_log_rate_secs = 30,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
-        counter!("template_rendering_errors_total", 1);
     }
 }
