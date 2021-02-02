@@ -102,10 +102,10 @@ impl DerefMut for MetricEntry {
 ///
 /// Batching mostly means that we will aggregate away timestamp
 /// information, and apply metric-specific compression to improve the
-/// performance of the pipeline.  In particular, only the latest in a
+/// performance of the pipeline. In particular, only the latest in a
 /// series of metrics are output, and incremental metrics are summed
-/// into the output buffer.  Any conversion of metrics is handled by the
-/// normalization type `N: MetricNormalize`.  Further, distribution
+/// into the output buffer. Any conversion of metrics is handled by the
+/// normalization type `N: MetricNormalize`. Further, distribution
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
 pub struct MetricsBuffer<N> {
@@ -198,7 +198,7 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
 }
 
 /// The metrics state trait abstracts how data point normalization is
-/// done.  Normalisation is required to make sure Sources and Sinks are
+/// done. Normalisation is required to make sure Sources and Sinks are
 /// exchanging compatible data structures. For instance, delta gauges
 /// produced by Statsd source cannot be directly sent to Datadog API. In
 /// this case the buffer will keep the state of a gauge value, and
