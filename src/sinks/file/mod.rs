@@ -4,6 +4,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::FileOpen,
+    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -171,11 +172,11 @@ impl FileSink {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
             Err(error) => {
-                warn!(
-                    message = "Failed to render template; dropping event.",
-                    %error,
-                    internal_log_rate_secs = 30,
-                );
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("path"),
+                    drop_event: true,
+                });
                 return None;
             }
         };
