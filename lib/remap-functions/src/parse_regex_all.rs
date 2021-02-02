@@ -57,6 +57,8 @@ impl Expression for ParseRegexAllFn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::Bytes)
+            .with_inner_type(Some(inner_type_def!([TypeDef::from(value::Kind::Map)
+                .with_inner_type(Some(util::regex_type_def(&self.pattern)))])))
             .with_constraint(value::Kind::Array)
     }
 }
@@ -71,25 +73,45 @@ mod tests {
         value_string {
             expr: |_| ParseRegexAllFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
+            def: TypeDef { kind: Kind::Array,
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
+                           ..Default::default() },
         }
 
         value_non_string {
             expr: |_| ParseRegexAllFn {
                 value: Literal::from(1).boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Array,
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
+            },
         }
 
         value_optional {
             expr: |_| ParseRegexAllFn {
                 value: Box::new(Noop),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Array,
+                           inner_type_def: Some(inner_type_def!([ TypeDef::from(Kind::Map)
+                                                                  .with_inner_type(Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                                                           "1": Kind::Bytes,
+                                                                                                           "group": Kind::Bytes
+                                                                  }))) ])),
+            },
         }
     ];
 

@@ -89,7 +89,7 @@ fn encode<T: Digest>(value: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -122,37 +122,37 @@ mod tests {
     fn sha2() {
         let cases = vec![
             (
-                map!["foo": "foo"],
+                btreemap! { "foo" => "foo" },
                 Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()),
                 Sha2Fn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("0808f64e60d58979fcb676c96ec938270dea42445aeefcd3a4e6f8db".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-224")),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-256")),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("98c11ffdfdd540676b1a137cb1a22b2a70350c9a44171d6b1180c6be5cbb2ee3f79d532c8a1dd9ef2e8e08e752a3babb".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-384")),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512")),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512/224")),
             ),
             (
-                map![],
+                btreemap!{},
                 Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512/256")),
             ),

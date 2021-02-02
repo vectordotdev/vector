@@ -11,6 +11,7 @@ components: sources: aws_kinesis_firehose: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -70,7 +71,10 @@ components: sources: aws_kinesis_firehose: {
 		address: {
 			description: "The address to listen for connections on"
 			required:    true
-			type: string: examples: ["0.0.0.0:443", "localhost:443"]
+			type: string: {
+				examples: ["0.0.0.0:443", "localhost:443"]
+				syntax: "literal"
+			}
 		}
 		access_key: {
 			common: true
@@ -84,6 +88,7 @@ components: sources: aws_kinesis_firehose: {
 			type: "string": {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -96,17 +101,26 @@ components: sources: aws_kinesis_firehose: {
 				message: {
 					description: "The raw record from the incoming payload."
 					required:    true
-					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: string: {
+						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+						syntax: "literal"
+					}
 				}
 				request_id: {
 					description: "The AWS Kinesis Firehose request ID, value of the `X-Amz-Firehose-Request-Id` header."
 					required:    true
-					type: string: examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+					type: string: {
+						examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+						syntax: "literal"
+					}
 				}
 				source_arn: {
 					description: "The AWS Kinises Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
 					required:    true
-					type: string: examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+					type: string: {
+						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+						syntax: "literal"
+					}
 				}
 			}
 		}

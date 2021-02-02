@@ -5,7 +5,6 @@
 ))]
 
 use approx::assert_relative_eq;
-use futures::compat::Future01CompatExt;
 use vector::{
     config, sinks, sources,
     test_util::{
@@ -46,7 +45,7 @@ async fn pipe() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
@@ -93,7 +92,7 @@ async fn sample() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     let num_output_lines = output_lines.len();
@@ -148,7 +147,7 @@ async fn fork() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines1 = output_lines1.await;
     let output_lines2 = output_lines2.await;
@@ -216,7 +215,7 @@ async fn merge_and_fork() {
     tokio::task::yield_now().await;
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines1 = output_lines1.await;
     let output_lines2 = output_lines2.await;
@@ -269,7 +268,7 @@ async fn reconnect() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server and wait for it to fully flush
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert!(num_lines >= 2);

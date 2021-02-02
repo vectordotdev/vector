@@ -481,19 +481,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                let mut m = BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
-    }
+    use shared::btreemap;
 
     // Test ExtendedStatus: Off
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
@@ -549,7 +537,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "closing"}))
+                .with_tags(Some(btreemap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -557,7 +545,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "keepalive"}))
+                .with_tags(Some(btreemap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -565,7 +553,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "total"}))
+                .with_tags(Some(btreemap! { "state" => "total" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -573,7 +561,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "writing"}))
+                .with_tags(Some(btreemap! { "state" => "writing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -581,7 +569,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "closing"}))
+                .with_tags(Some(btreemap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -589,7 +577,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "dnslookup"}))
+                .with_tags(Some(btreemap! { "state" => "dnslookup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -597,7 +585,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "finishing"}))
+                .with_tags(Some(btreemap! { "state" => "finishing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -605,7 +593,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "idle_cleanup"}))
+                .with_tags(Some(btreemap! { "state" => "idle_cleanup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -613,7 +601,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "keepalive"}))
+                .with_tags(Some(btreemap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -621,7 +609,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "logging"}))
+                .with_tags(Some(btreemap! { "state" => "logging" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -629,7 +617,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 325.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "open"}))
+                .with_tags(Some(btreemap! { "state" => "open" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -637,7 +625,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "reading"}))
+                .with_tags(Some(btreemap! { "state" => "reading" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -645,7 +633,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "sending"}))
+                .with_tags(Some(btreemap! { "state" => "sending" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -653,7 +641,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "starting"}))
+                .with_tags(Some(btreemap! { "state" => "starting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -661,7 +649,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 64.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "waiting"}))
+                .with_tags(Some(btreemap! { "state" => "waiting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "uptime_seconds_total".into(),
@@ -676,7 +664,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "busy"}))
+                .with_tags(Some(btreemap! { "state" => "busy" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "workers".into(),
@@ -684,7 +672,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 74.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "idle"}))
+                .with_tags(Some(btreemap! { "state" => "idle" }))
                 .with_timestamp(Some(now)),
             ]
         );
@@ -765,7 +753,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "closing"}))
+                .with_tags(Some(btreemap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -773,7 +761,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "keepalive"}))
+                .with_tags(Some(btreemap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -781,7 +769,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "total"}))
+                .with_tags(Some(btreemap! { "state" => "total" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections".into(),
@@ -789,7 +777,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "writing"}))
+                .with_tags(Some(btreemap! { "state" => "writing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_load".into(),
@@ -804,7 +792,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"type" => "children_system"}))
+                .with_tags(Some(btreemap! { "type" => "children_system" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total".into(),
@@ -812,7 +800,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"type" => "children_user"}))
+                .with_tags(Some(btreemap! { "type" => "children_user" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total".into(),
@@ -820,7 +808,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.02 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"type" => "system"}))
+                .with_tags(Some(btreemap! { "type" => "system" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total".into(),
@@ -828,7 +816,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.2 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"type" => "user"}))
+                .with_tags(Some(btreemap! { "type" => "user" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "duration_seconds_total".into(),
@@ -843,7 +831,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "closing"}))
+                .with_tags(Some(btreemap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -851,7 +839,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "dnslookup"}))
+                .with_tags(Some(btreemap! { "state" => "dnslookup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -859,7 +847,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "finishing"}))
+                .with_tags(Some(btreemap! { "state" => "finishing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -867,7 +855,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "idle_cleanup"}))
+                .with_tags(Some(btreemap! { "state" => "idle_cleanup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -875,7 +863,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "keepalive"}))
+                .with_tags(Some(btreemap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -883,7 +871,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "logging"}))
+                .with_tags(Some(btreemap! { "state" => "logging" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -891,7 +879,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 325.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "open"}))
+                .with_tags(Some(btreemap! { "state" => "open" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -899,7 +887,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "reading"}))
+                .with_tags(Some(btreemap! { "state" => "reading" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -907,7 +895,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "sending"}))
+                .with_tags(Some(btreemap! { "state" => "sending" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -915,7 +903,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "starting"}))
+                .with_tags(Some(btreemap! { "state" => "starting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard".into(),
@@ -923,7 +911,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 64.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "waiting"}))
+                .with_tags(Some(btreemap! { "state" => "waiting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "sent_bytes_total".into(),
@@ -945,7 +933,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "busy"}))
+                .with_tags(Some(btreemap! { "state" => "busy" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "workers".into(),
@@ -953,7 +941,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 74.0 },
                 )
                 .with_namespace(Some("apache".into()))
-                .with_tags(Some(map! {"state" => "idle"}))
+                .with_tags(Some(btreemap! { "state" => "idle" }))
                 .with_timestamp(Some(now)),
             ]
         );
@@ -989,7 +977,7 @@ ConnsTotal: 1
                 MetricValue::Gauge { value: 1.0 },
             )
             .with_namespace(Some("apache".into()))
-            .with_tags(Some(map! {"state" => "total"}))
+            .with_tags(Some(btreemap! { "state" => "total" }))
             .with_timestamp(Some(now)),]
         );
         assert_eq!(errors.len(), 1);

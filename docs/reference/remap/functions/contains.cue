@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: contains: {
+	category: "String"
+	description: """
+		Determines if the `value` contains a `substring`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -24,10 +29,7 @@ remap: functions: contains: {
 	]
 	internal_failure_reasons: []
 	return: types: ["boolean"]
-	category: "String"
-	description: #"""
-		Determines if the provided `value` contains a given `substring`.
-		"""#
+
 	examples: [
 		{
 			title: "String contains (case sensitive)"

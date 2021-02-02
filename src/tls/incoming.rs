@@ -121,7 +121,11 @@ impl<S> MaybeTlsIncomingStream<S> {
     }
 
     /// None if connection still hasn't been established.
-    #[cfg(any(feature = "listenfd", feature = "sources-utils-tcp-keepalive"))]
+    #[cfg(any(
+        feature = "listenfd",
+        feature = "sources-utils-tcp-keepalive",
+        feature = "sources-utils-tcp-socket"
+    ))]
     pub fn get_ref(&self) -> Option<&S> {
         use super::MaybeTls;
 
@@ -172,6 +176,20 @@ impl MaybeTlsIncomingStream<TcpStream> {
         })?;
 
         stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "sources-utils-tcp-socket")]
+    pub(crate) fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+        let stream = self.get_ref().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotConnected,
+                "Can't set receive buffer size on connection that has not been accepted yet.",
+            )
+        })?;
+
+        stream.set_recv_buffer_size(bytes)?;
 
         Ok(())
     }

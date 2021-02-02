@@ -11,6 +11,7 @@ components: transforms: aws_ec2_metadata: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -54,6 +55,7 @@ components: transforms: aws_ec2_metadata: {
 			required:    false
 			type: string: {
 				default: "http://169.254.169.254"
+				syntax:  "literal"
 			}
 		}
 		fields: {
@@ -63,7 +65,10 @@ components: transforms: aws_ec2_metadata: {
 			warnings: []
 			type: array: {
 				default: ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
-				items: type: string: examples: ["instance-id", "local-hostname"]
+				items: type: string: {
+					examples: ["instance-id", "local-hostname"]
+					syntax: "literal"
+				}
 			}
 		}
 		namespace: {
@@ -74,6 +79,7 @@ components: transforms: aws_ec2_metadata: {
 			type: string: {
 				default: ""
 				examples: ["", "ec2", "aws.ec2"]
+				syntax: "literal"
 			}
 		}
 		refresh_interval_secs: {
@@ -101,6 +107,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["ami-00068cd7555f543d5"]
+					syntax: "literal"
 				}
 			}
 			"availability-zone": {
@@ -108,6 +115,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["54.234.246.107"]
+					syntax: "literal"
 				}
 			}
 			"instance-id": {
@@ -115,6 +123,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["i-096fba6d03d36d262"]
+					syntax: "literal"
 				}
 			}
 			"local-hostname": {
@@ -122,6 +131,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["ip-172-31-93-227.ec2.internal"]
+					syntax: "literal"
 				}
 			}
 			"local-ipv4": {
@@ -129,6 +139,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["172.31.93.227"]
+					syntax: "literal"
 				}
 			}
 			"public-hostname": {
@@ -136,6 +147,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["ec2-54-234-246-107.compute-1.amazonaws.com"]
+					syntax: "literal"
 				}
 			}
 			"public-ipv4": {
@@ -143,6 +155,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["54.234.246.107"]
+					syntax: "literal"
 				}
 			}
 			"region": {
@@ -150,6 +163,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["us-east-1"]
+					syntax: "literal"
 				}
 			}
 			"role-name": {
@@ -157,6 +171,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["some_iam_role"]
+					syntax: "literal"
 				}
 			}
 			"subnet-id": {
@@ -164,6 +179,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["subnet-9d6713b9"]
+					syntax: "literal"
 				}
 			}
 			"vpc-id": {
@@ -171,6 +187,7 @@ components: transforms: aws_ec2_metadata: {
 				required:    true
 				type: string: {
 					examples: ["vpc-a51da4dc"]
+					syntax: "literal"
 				}
 			}
 		}

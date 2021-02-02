@@ -11,6 +11,7 @@ components: transforms: filter: {
 		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -35,10 +36,18 @@ components: transforms: filter: {
 
 	configuration: {
 		condition: {
-			description: "The condition to be matched against every input event. Only messages that pass the condition will be forwarded."
-			required:    true
+			description: """
+				The condition to be matched against every input event. Only messages that pass the condition will
+				be forwarded.
+				"""
+			required: true
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "remap_boolean_expression"
+			}
 		}
 	}
 
@@ -58,26 +67,29 @@ components: transforms: filter: {
 		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: {
-					type:   "remap"
-					source: '.level == "debug"'
-				}
+				condition: '.level == "debug"'
 			}
 			input: [
-				{log: {
-					level:   "debug"
-					message: "I'm a noisy debug log"
-				}},
-				{log: {
-					level:   "info"
-					message: "I'm a normal info log"
-				}},
+				{
+					log: {
+						level:   "debug"
+						message: "I'm a noisy debug log"
+					}
+				},
+				{
+					log: {
+						level:   "info"
+						message: "I'm a normal info log"
+					}
+				},
 			]
 			output: [
-				{log: {
-					level:   "info"
-					message: "I'm a normal info log"
-				}},
+				{
+					log: {
+						level:   "info"
+						message: "I'm a normal info log"
+					}
+				},
 			]
 		},
 	]

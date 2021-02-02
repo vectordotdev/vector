@@ -24,7 +24,7 @@ pub use operator::Operator;
 pub use path::{Field, Path, Segment};
 pub use program::{Program, TypeConstraint};
 pub use runtime::{Runtime, RuntimeResult};
-pub use type_def::TypeDef;
+pub use type_def::{InnerTypeDef, TypeDef};
 pub use value::Value;
 
 pub use paste::paste;

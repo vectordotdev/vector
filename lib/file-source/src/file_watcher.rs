@@ -1,4 +1,4 @@
-use crate::FilePosition;
+use crate::{FilePosition, ReadFrom};
 use bstr::Finder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
@@ -42,7 +42,7 @@ impl FileWatcher {
     /// None if the path does not exist or is not readable by the current process.
     pub fn new(
         path: PathBuf,
-        file_position: FilePosition,
+        read_from: ReadFrom,
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
@@ -61,28 +61,57 @@ impl FileWatcher {
             false
         };
 
-        let (reader, file_position): (Box<dyn BufRead>, FilePosition) = if is_gzipped(&mut reader)?
-        {
-            if file_position != 0 || too_old {
-                // We can't accurately seek into gzipped files without manually scanning through
-                // the entire thing, so for now we simply refuse to read gzipped files for which we
-                // already have a stored file position from a previous run.
-                debug!(
-                    message = "Not re-reading gzipped file with existing stored offset.",
-                    ?path,
-                    %file_position
-                );
-                (Box::new(null_reader()), file_position)
-            } else {
-                (Box::new(io::BufReader::new(MultiGzDecoder::new(reader))), 0)
-            }
-        } else if too_old {
-            let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
-            (Box::new(reader), pos)
-        } else {
-            let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
-            (Box::new(reader), pos)
-        };
+        let gzipped = is_gzipped(&mut reader)?;
+
+        // Determine the actual position at which we should start reading
+        let (reader, file_position): (Box<dyn BufRead>, FilePosition) =
+            match (gzipped, too_old, read_from) {
+                (true, true, _) => {
+                    debug!(
+                        message = "Not reading gzipped file older than `ignore_older`.",
+                        ?path,
+                    );
+                    (Box::new(null_reader()), 0)
+                }
+                (true, _, ReadFrom::Checkpoint(file_position)) => {
+                    debug!(
+                        message = "Not re-reading gzipped file with existing stored offset.",
+                        ?path,
+                        %file_position
+                    );
+                    (Box::new(null_reader()), file_position)
+                }
+                // TODO: This may become the default, leading us to stop reading gzipped files that
+                // we were reading before. Should we merge this and the next branch to read
+                // compressed file from the beginning even when `read_from = "end"` (implicitly via
+                // default or explicitly via config)?
+                (true, _, ReadFrom::End) => {
+                    debug!(
+                        message = "Can't read from the end of already-compressed file.",
+                        ?path,
+                    );
+                    (Box::new(null_reader()), 0)
+                }
+                (true, false, ReadFrom::Beginning) => {
+                    (Box::new(io::BufReader::new(MultiGzDecoder::new(reader))), 0)
+                }
+                (false, true, _) => {
+                    let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+                    (Box::new(reader), pos)
+                }
+                (false, false, ReadFrom::Checkpoint(file_position)) => {
+                    let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
+                    (Box::new(reader), pos)
+                }
+                (false, false, ReadFrom::Beginning) => {
+                    let pos = reader.seek(io::SeekFrom::Start(0)).unwrap();
+                    (Box::new(reader), pos)
+                }
+                (false, false, ReadFrom::End) => {
+                    let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+                    (Box::new(reader), pos)
+                }
+            };
 
         let ts = metadata
             .modified()

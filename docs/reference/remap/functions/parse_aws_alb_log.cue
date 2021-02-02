@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: parse_aws_alb_log: {
+	category:    "Parse"
+	description: """
+		Parses `value` in the [Elastic Load Balancer Access format](\(urls.aws_elb_access_format)).
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -13,10 +18,7 @@ remap: functions: parse_aws_alb_log: {
 		"`value` is not a properly formatted AWS ALB log",
 	]
 	return: types: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses a Elastic Load Balancer Access log into it's constituent components.
-		"""#
+
 	examples: [
 		{
 			title: "Parse AWS ALB log"

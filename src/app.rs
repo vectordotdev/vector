@@ -8,7 +8,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{compat::Future01CompatExt, StreamExt};
+use futures::StreamExt;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "sources-host_metrics")]
@@ -275,7 +275,7 @@ impl Application {
                 SignalTo::Shutdown => {
                     emit!(VectorStopped);
                     tokio::select! {
-                    _ = topology.stop().compat() => (), // Graceful shutdown finished
+                    _ = topology.stop() => (), // Graceful shutdown finished
                     _ = signals.next() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);

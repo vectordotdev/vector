@@ -7,7 +7,13 @@ remap: {
 		title:       string
 		description: string
 
-		characteristics: [Name=string]: remap.#Characteristic
+		principles: {
+			for k, v in remap.principles {
+				"\( k )": bool
+			}
+		}
+
+		characteristics: remap.#Characteristics
 	}
 
 	features: [Name=string]: #Feature & {

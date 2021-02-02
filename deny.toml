@@ -27,6 +27,10 @@ license-files = [
 
 [advisories]
 ignore = [
+    # term is looking for a new maintainer
+    # https://github.com/timberio/vector/issues/6225
+    "RUSTSEC-2018-0015",
+
     # `net2` crate has been deprecated; use `socket2` instead
     # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
@@ -51,4 +55,12 @@ ignore = [
     # GenericMutexGuard allows data races of non-Sync types across threads
     # https://github.com/timberio/vector/issues/5586
     "RUSTSEC-2020-0072",
+
+    # difference is unmaintained
+    # https://github.com/timberio/vector/issues/6224
+    "RUSTSEC-2020-0095",
+
+    # Soundness issues in `raw-cpuid`
+    # https://github.com/timberio/vector/issues/6223
+    "RUSTSEC-2021-0013",
 ]

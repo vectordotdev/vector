@@ -128,7 +128,7 @@ impl Expression for ParseDurationFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -152,57 +152,57 @@ mod tests {
     fn parse_duration() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(0.5.into()),
                 ParseDurationFn::new(Box::new(Literal::from("30s")), "m"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1.2.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1200ms")), "s"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(100.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ms")), "ms"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1.005.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1005ms")), "s"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(0.0001.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ns")), "ms"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(86400.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1d")), "s"),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1000000000.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1 s")), "ns"),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unable to parse duration: 'foo'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("foo")), "µs"),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unable to parse duration: '1'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1")), "ns"),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unknown duration unit: 'w'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1w")), "ns"),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unknown output format: 'w'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1s")), "w"),
             ),

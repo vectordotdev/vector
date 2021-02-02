@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{FilterEventDiscarded, FilterEventProcessed},
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct FilterConfig {
-    condition: Box<dyn ConditionConfig>,
+    condition: AnyCondition,
 }
 
 inventory::submit! {

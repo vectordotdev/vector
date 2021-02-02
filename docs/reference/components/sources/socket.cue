@@ -11,6 +11,7 @@ components: sources: socket: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -18,7 +19,6 @@ components: sources: socket: {
 		receive: {
 			from: {
 				service: services.socket_client
-
 				interface: socket: {
 					direction: "incoming"
 					port:      _port
@@ -26,9 +26,11 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
 			keepalive: enabled: true
-
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -66,6 +68,7 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
+				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -76,6 +79,7 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				default: "host"
+				syntax:  "literal"
 			}
 		}
 		max_length: {
@@ -99,6 +103,7 @@ components: sources: socket: {
 					unix_datagram: "Unix domain datagram socket."
 					unix_stream:   "Unix domain stream socket."
 				}
+				syntax: "literal"
 			}
 		}
 		path: {
@@ -108,6 +113,7 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
