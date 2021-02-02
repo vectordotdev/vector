@@ -55,6 +55,7 @@ impl Application {
             "off" => "off".to_owned(),
             level => [
                 format!("vector={}", level),
+                format!("remap={}", level),
                 format!("codec={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),

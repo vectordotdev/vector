@@ -23,6 +23,11 @@ impl Function for Log {
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
+            Parameter {
+                keyword: "rate_limit_secs",
+                accepts: |v| matches!(v, Value::Integer(_)),
+                required: false,
+            },
         ]
     }
 
@@ -31,8 +36,13 @@ impl Function for Log {
         let level = arguments
             .optional_enum("level", &LEVELS)?
             .unwrap_or_else(|| "info".to_string());
+        let rate_limit_secs = arguments.optional("rate_limit_secs").map(Expr::boxed);
 
-        Ok(Box::new(LogFn { value, level }))
+        Ok(Box::new(LogFn {
+            value,
+            level,
+            rate_limit_secs,
+        }))
     }
 }
 
@@ -40,25 +50,38 @@ impl Function for Log {
 struct LogFn {
     value: Box<dyn Expression>,
     level: String,
+    rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
 impl LogFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, level: String) -> Self {
-        Self { value, level }
+    fn new(
+        value: Box<dyn Expression>,
+        level: String,
+        rate_limit_secs: Option<Box<dyn Expression>>,
+    ) -> Self {
+        Self {
+            value,
+            level,
+            rate_limit_secs,
+        }
     }
 }
 
 impl Expression for LogFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
+        let rate_limit_secs = match &self.rate_limit_secs {
+            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            None => 1,
+        };
 
         match self.level.as_ref() {
-            "trace" => trace!("{}", value),
-            "debug" => debug!("{}", value),
-            "warn" => warn!("{}", value),
-            "error" => error!("{}", value),
-            _ => info!("{}", value),
+            "trace" => trace!(internal_log_rate_secs = rate_limit_secs, "{}", value),
+            "debug" => debug!(internal_log_rate_secs = rate_limit_secs, "{}", value),
+            "warn" => warn!(internal_log_rate_secs = rate_limit_secs, "{}", value),
+            "error" => error!(internal_log_rate_secs = rate_limit_secs, "{}", value),
+            _ => info!(internal_log_rate_secs = rate_limit_secs, "{}", value),
         }
 
         Ok(Value::Null)
@@ -67,6 +90,11 @@ impl Expression for LogFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
+            .merge_optional(
+                self.rate_limit_secs
+                    .as_ref()
+                    .map(|r| r.type_def(state).fallible_unless(value::Kind::Integer)),
+            )
             .with_constraint(value::Kind::Null)
     }
 }
@@ -76,6 +104,27 @@ mod tests {
     use super::*;
     use shared::btreemap;
 
+    remap::test_type_def! [
+
+        rate_limit_integer {
+            expr: |_| LogFn {
+                value: Literal::from("foo").boxed(),
+                level: "error".to_string(),
+                rate_limit_secs: Some(Literal::from(30).boxed()),
+            },
+            def: TypeDef { kind: value::Kind::Null, fallible: false, ..Default::default() },
+        }
+
+        rate_limit_non_integer {
+            expr: |_| LogFn {
+                value: Literal::from("foo").boxed(),
+                level: "error".to_string(),
+                rate_limit_secs: Some(Literal::from("bar").boxed()),
+            },
+            def: TypeDef { kind: value::Kind::Null, fallible: true, ..Default::default() },
+        }
+    ];
+
     #[test]
     fn log() {
         // This is largely just a smoke test to ensure it doesn't crash as there isn't really much to test.
@@ -83,6 +132,7 @@ mod tests {
         let func = LogFn::new(
             Box::new(Array::from(vec![Value::from(42)])),
             "warn".to_string(),
+            None,
         );
         let mut object = Value::Map(btreemap! {});
         let got = func.execute(&mut state, &mut object);
