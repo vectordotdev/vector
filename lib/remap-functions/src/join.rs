@@ -63,7 +63,7 @@ impl Expression for JoinFn {
                 })
                 .transpose()?
                 .map(|s| String::from_utf8_lossy(&s).to_string())
-                .unwrap_or("".into());
+                .unwrap_or_else(|| "".into());
 
             let joined = string_vec.join(&separator);
 
