@@ -1,28 +1,4 @@
 use super::InternalEvent;
-use crate::template::TemplateRenderingError;
-use metrics::counter;
-
-#[derive(Debug)]
-pub struct AddFieldsTemplateRenderingError<'a> {
-    pub field: &'a str,
-    pub error: TemplateRenderingError,
-}
-
-impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Failed to render templated value; discarding value.",
-            field = %self.field,
-            error = %self.error,
-            internal_log_rate_secs = 30
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
-        counter!("template_rendering_errors_total", 1);
-    }
-}
 
 #[derive(Debug)]
 pub struct AddFieldsFieldOverwritten<'a> {

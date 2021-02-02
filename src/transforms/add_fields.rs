@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, AddFieldsTemplateRenderingError,
+        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
     },
     template::Template,
     transforms::{FunctionTransform, Transform},
@@ -109,7 +109,11 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(error) => {
-                        emit!(AddFieldsTemplateRenderingError { field: &key, error });
+                        emit!(TemplateRenderingFailed {
+                            error,
+                            field: Some(&key),
+                            drop_event: false
+                        });
                         continue;
                     }
                 }
