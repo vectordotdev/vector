@@ -1,4 +1,5 @@
 use remap::prelude::*;
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Join;
@@ -39,17 +40,16 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let string_vec: Vec<String> = self
+        let array = self
             .value
             .execute(state, object)?
-            .try_array()?
+            .try_array()?;
+
+        let string_vec: Vec<Cow<'_, str>> = array
             .iter()
             .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
             .collect::<Result<Vec<std::borrow::Cow<'_, str>>>>()
-            .map_err(|_| "all array items must be strings")?
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+            .map_err(|_| "all array items must be strings")?;
 
         let separator: String = self
             .separator
