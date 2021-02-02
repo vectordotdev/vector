@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkTemplateRenderingError},
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
@@ -144,9 +144,10 @@ impl HttpSink for HecSinkConfig {
             sourcetype
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(SplunkTemplateRenderingError {
-                        field: "sourcetype",
+                    emit!(TemplateRenderingFailed {
                         error,
+                        field: Some("sourcetype"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -156,9 +157,10 @@ impl HttpSink for HecSinkConfig {
             source
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(SplunkTemplateRenderingError {
-                        field: "source",
+                    emit!(TemplateRenderingFailed {
                         error,
+                        field: Some("source"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -168,9 +170,10 @@ impl HttpSink for HecSinkConfig {
             index
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(SplunkTemplateRenderingError {
-                        field: "index",
+                    emit!(TemplateRenderingFailed {
                         error,
+                        field: Some("index"),
+                        drop_event: false,
                     });
                 })
                 .ok()
