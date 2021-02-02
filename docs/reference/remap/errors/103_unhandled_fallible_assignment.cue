@@ -7,7 +7,7 @@ remap: errors: "103": {
 		can fail and the error is not being [handled](\(urls.vrl_error_handling)).
 		"""
 	rationale:   """
-		VRL is [fail-safe](\(urls.vrl_error_safety)) and requires that all possible runtime errors be handled. This
+		VRL is [fail-safe](\(urls.vrl_fail_safety)) and requires that all possible runtime errors be handled. This
 		contributes heavily to VRL's [safety principle](\(urls.vrl_safety)), ensuring that VRL programs are reliable
 		once deployed.
 		"""
