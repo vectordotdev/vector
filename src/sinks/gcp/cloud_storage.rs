@@ -2,6 +2,7 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     http::{HttpClient, HttpClientFuture, HttpError},
+    internal_events::TemplateRenderingFailed,
     serde::to_string,
     sinks::{
         util::{
@@ -404,11 +405,11 @@ fn encode_event(
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
-            warn!(
-                message = "Failed to render template; dropping event.",
-                %error,
-                internal_log_rate_secs = 30,
-            );
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("key_prefix"),
+                drop_event: true,
+            });
         })
         .ok()?;
     encoding.apply_rules(&mut event);
