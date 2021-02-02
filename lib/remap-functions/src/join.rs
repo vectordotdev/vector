@@ -39,36 +39,32 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let array: Vec<Value> = self.value.execute(state, object)?.try_array()?;
-
-        let string_vec: Vec<String> = array
+        let string_vec: Vec<String> = self
+            .value
+            .execute(state, object)?
+            .try_array()?
             .iter()
-            .filter_map(|s| s.clone().try_bytes().ok())
-            .map(|s| String::from_utf8_lossy(&s).to_string())
+            .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
+            .collect::<Result<Vec<std::borrow::Cow<'_, str>>>>()
+            .map_err(|_| "all array items must be strings")?
+            .iter()
+            .map(|s| s.to_string())
             .collect();
 
-        // This length comparison is used to discern whether one or more array items was
-        // discarded by the filter_map operation due to being a non-string. If so, the
-        // entire operation errors; if not, string_vec is considered valid and can be
-        // joined.
-        if string_vec.len() < array.len() {
-            Err("all array items must be strings".into())
-        } else {
-            let separator: String = self
-                .separator
-                .as_ref()
-                .map(|s| {
-                    s.execute(state, object)
-                        .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-                })
-                .transpose()?
-                .map(|s| String::from_utf8_lossy(&s).to_string())
-                .unwrap_or_else(|| "".into());
+        let separator: String = self
+            .separator
+            .as_ref()
+            .map(|s| {
+                s.execute(state, object)
+                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
+            })
+            .transpose()?
+            .map(|s| String::from_utf8_lossy(&s).to_string())
+            .unwrap_or_else(|| "".into());
 
-            let joined = string_vec.join(&separator);
+        let joined = string_vec.join(&separator);
 
-            Ok(Value::from(joined))
-        }
+        Ok(Value::from(joined))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
