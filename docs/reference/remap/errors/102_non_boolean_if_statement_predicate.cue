@@ -9,11 +9,13 @@ remap: errors: "102": {
 	rationale:   """
 		VRL does not implement "truthy" values (non-boolean values that resolve to a boolean, such as `1`) since these
 		are common foot-guns that can result in unexpected behavior when used in if expressions. This decision
-		contributes to VRL's [safety principle](\(urls.vrl_safety)).
+		contributes to VRL's [safety principle](\(urls.vrl_safety)), ensuring that VRL programs are reliable once
+		deployed.
 		"""
 	resolution:  """
-		Adjust your if expression predicate to resolve to a boolean. Helpful functions include
-		[`exists`](\(urls.vrl_functions)\(remap.functions.exists.anchor)).
+		Adjust your if expression predicate to resolve to a boolean. Helpful functions to solve this include
+		[`exists`](\(urls.vrl_functions)\(remap.functions.exists.anchor)) and
+		[`is_nullish`](\(urls.vrl_functions)\(remap.functions.is_nullish.anchor)).
 		"""
 
 	examples: [

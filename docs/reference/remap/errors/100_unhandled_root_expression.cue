@@ -3,7 +3,7 @@ package metadata
 remap: errors: "100": {
 	title: "Unhandled root expression"
 	description: """
-		A root expression is effectively dead code; it does not change the result of your program.
+		A unhandled root expression is effectively dead code; it does not contribute the result of your program.
 		"""
 	rationale: """
 		Dead code is unecessary and needlessly contributes to the execution time of your program. Removing it will
