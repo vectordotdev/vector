@@ -218,6 +218,48 @@ async fn nonexistant_input() {
     feature = "sinks-socket"
 ))]
 #[tokio::test]
+async fn duplicate_name() {
+    let err = load(
+        r#"
+        [sources.foo]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1234"
+
+        [sources.bar]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.foo]
+        type = "sample"
+        inputs = ["bar"]
+        rate = 10
+
+        [sinks.out]
+        type = "socket"
+        mode = "tcp"
+        inputs = ["foo"]
+        encoding = "text"
+        address = "127.0.0.1:9999"
+        "#,
+        Some(Format::TOML),
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        vec!["More than one component with name \"foo\" (source, transform).",]
+    );
+}
+
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sample",
+    feature = "sinks-socket"
+))]
+#[tokio::test]
 async fn bad_regex() {
     let err = load(
         r#"

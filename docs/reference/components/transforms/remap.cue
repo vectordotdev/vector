@@ -61,7 +61,7 @@ components: transforms: "remap": {
 						del(.old_name)
 						""",
 				]
-				syntax: "remap"
+				syntax: "remap_program"
 			}
 		}
 	}
@@ -79,7 +79,7 @@ components: transforms: "remap": {
 	}
 
 	examples: [
-		for k, v in remap.real_world_examples if v.raises == _|_ {
+		for k, v in remap.examples if v.raises == _|_ {
 			{
 				title: v.title
 				configuration: source: v.source

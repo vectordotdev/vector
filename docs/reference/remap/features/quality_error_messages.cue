@@ -2,9 +2,16 @@ remap: features: quality_error_messages: {
 	title: "Quality error messages"
 	description: """
 		VRL strives to provide high-quality, helpful error messages, reducing the development iteration	cycle.
-		For example:
 
+		For example, the following VRL program:
+
+		```vrl
+		.foo, err = upcase(.foo)
 		```
+
+		Would result in this error:
+
+		```rust
 		error: program aborted
 		  ┌─ :2:1
 		  │

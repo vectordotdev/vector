@@ -19,7 +19,6 @@ components: sources: statsd: {
 		receive: {
 			from: {
 				service: services.statsd
-
 				interface: socket: {
 					api: {
 						title: "StatsD"
@@ -31,10 +30,12 @@ components: sources: statsd: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
 			keepalive: enabled: true
-
-			tls: enabled: false
+			tls: enabled:       false
 		}
 	}
 

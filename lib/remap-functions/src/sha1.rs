@@ -54,7 +54,7 @@ impl Expression for Sha1Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn sha1() {
         let cases = vec![(
-            map!["foo": "foo"],
+            btreemap! { "foo" => "foo" },
             Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
             Sha1Fn::new(Box::new(Path::from("foo"))),
         )];

@@ -25,6 +25,10 @@ components: sinks: socket: {
 					enum: ["json", "text"]
 				}
 			}
+			send_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
 			keepalive: enabled: true
 			request: enabled:   false
 			tls: {

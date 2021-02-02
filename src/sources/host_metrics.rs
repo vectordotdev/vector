@@ -27,11 +27,11 @@ use heim::{
     units::{information::byte, time::second},
     Error,
 };
-
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
@@ -138,15 +138,6 @@ impl SourceConfig for HostMetricsConfig {
     }
 }
 
-macro_rules! tags {
-    ( $( $key:expr => $value:expr ),* ) => {{
-        #[allow(unused_mut)]
-        let mut result = std::collections::BTreeMap::default();
-        $( result.insert($key.to_string(), $value.to_string()); )*
-            result
-    }}
-}
-
 impl HostMetricsConfig {
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut out =
@@ -217,26 +208,26 @@ impl HostMetricsConfig {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    tags!["mode" => "idle", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "idle", "cpu" => index.to_string() },
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    tags!["mode" => "nice", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "nice", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    tags!["mode" => "system", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "system", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    tags!["mode" => "user", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "user", "cpu" => index.to_string() },
                                 ),
                             ]
                             .into_iter(),
@@ -262,68 +253,68 @@ impl HostMetricsConfig {
                         "memory_total_bytes",
                         timestamp,
                         memory.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_free_bytes",
                         timestamp,
                         memory.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_available_bytes",
                         timestamp,
                         memory.available().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(any(target_os = "linux", target_os = "macos"))]
                     self.gauge(
                         "memory_active_bytes",
                         timestamp,
                         memory.active().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_buffers_bytes",
                         timestamp,
                         memory.buffers().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_cached_bytes",
                         timestamp,
                         memory.cached().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_shared_bytes",
                         timestamp,
                         memory.shared().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_used_bytes",
                         timestamp,
                         memory.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_inactive_bytes",
                         timestamp,
                         memory.inactive().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_wired_bytes",
                         timestamp,
                         memory.wire().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -343,33 +334,33 @@ impl HostMetricsConfig {
                         "memory_swap_free_bytes",
                         timestamp,
                         swap.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_total_bytes",
                         timestamp,
                         swap.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_used_bytes",
                         timestamp,
                         swap.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_in_bytes_total",
                         timestamp,
                         swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_out_bytes_total",
                         timestamp,
                         swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -386,13 +377,23 @@ impl HostMetricsConfig {
             Ok(loadavg) => {
                 let timestamp = Utc::now();
                 vec![
-                    self.gauge("load1", timestamp, loadavg.0.get::<ratio>() as f64, tags![]),
-                    self.gauge("load5", timestamp, loadavg.1.get::<ratio>() as f64, tags![]),
+                    self.gauge(
+                        "load1",
+                        timestamp,
+                        loadavg.0.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
+                    self.gauge(
+                        "load5",
+                        timestamp,
+                        loadavg.1.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -433,45 +434,45 @@ impl HostMetricsConfig {
                                     "network_receive_bytes_total",
                                     timestamp,
                                     counter.bytes_recv().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_errs_total",
                                     timestamp,
                                     counter.errors_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.packets_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_bytes_total",
                                     timestamp,
                                     counter.bytes_sent().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_errs_total",
                                     timestamp,
                                     counter.errors_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_drop_total",
                                     timestamp,
                                     counter.drop_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,
                                     counter.packets_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                             ]
                             .into_iter(),
@@ -541,10 +542,10 @@ impl HostMetricsConfig {
                     .map(|(partition, usage)| {
                         let timestamp = Utc::now();
                         let fs = partition.file_system();
-                        let mut tags = tags![
+                        let mut tags = btreemap! {
                             "filesystem" => fs.as_str(),
                             "mountpoint" => partition.mount_point().to_string_lossy()
-                        ];
+                        };
                         if let Some(device) = partition.device() {
                             tags.insert("device".into(), device.to_string_lossy().into());
                         }
@@ -599,9 +600,9 @@ impl HostMetricsConfig {
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
                         let timestamp = Utc::now();
-                        let tags = tags![
+                        let tags = btreemap! {
                             "device" => counter.device_name().to_string_lossy()
-                        ];
+                        };
                         stream::iter(
                             vec![
                                 self.counter(

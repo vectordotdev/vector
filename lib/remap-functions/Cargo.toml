@@ -33,10 +33,10 @@ url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
 
 [dev-dependencies]
+shared = { path = "../shared", features = ["btreemap"] }
 anyhow = "1"
 
 [features]
-
 default = [
     "append",
     "assert",
@@ -138,7 +138,7 @@ md5 = ["md-5", "hex"]
 merge = []
 now = []
 parse_aws_alb_log = ["nom"]
-parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription"]
+parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
 parse_duration = []
 parse_grok = ["grok"]
