@@ -1,5 +1,6 @@
 use chrono::{DateTime, Datelike, Utc};
 use remap::prelude::*;
+use remap::value::Kind;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId};
 
@@ -113,30 +114,53 @@ impl Expression for ParseSyslogFn {
         self.value
             .type_def(state)
             .into_fallible(true)
-            .with_constraint(value::Kind::Map)
+            .with_constraint(Kind::Map)
+            .with_inner_type(inner_type_def())
     }
+}
+
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
+        "message": Kind::Bytes,
+        "hostname": Kind::Bytes | Kind::Null,
+        "severity": Kind::Bytes | Kind::Null,
+        "facility": Kind::Bytes | Kind::Null,
+        "appname": Kind::Bytes | Kind::Null,
+        "msgid": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp | Kind::Null,
+        "procid": Kind::Bytes | Kind::Integer | Kind::Null
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::prelude::*;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { kind: Kind::Map,
+                           fallible: true,
+                           inner_type_def: inner_type_def(),
+            },
         }
 
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
         }
 
         value_optional {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
         }
     ];
 
@@ -145,19 +169,19 @@ mod tests {
 
         valid {
             args: func_args![value: r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#],
-            want: Ok( map![
-                        "severity": "notice",
-                        "facility": "user",
-                        "timestamp": chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
-                        "hostname": "dynamicwireless.name",
-                        "appname": "non",
-                        "procid": 2426,
-                        "msgid": "ID931",
-                        "exampleSDID@32473.iut": "3",
-                        "exampleSDID@32473.eventSource": "Application",
-                        "exampleSDID@32473.eventID": "1011",
-                        "message": "Try to override the THX port, maybe it will reboot the neural interface!",
-                ])
+            want: Ok(btreemap! {
+                "severity" => "notice",
+                "facility" => "user",
+                "timestamp" => chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
+                "hostname" => "dynamicwireless.name",
+                "appname" => "non",
+                "procid" => 2426,
+                "msgid" => "ID931",
+                "exampleSDID@32473.iut" => "3",
+                "exampleSDID@32473.eventSource" => "Application",
+                "exampleSDID@32473.eventID" => "1011",
+                "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
+            })
         }
 
         invalid {
@@ -167,24 +191,24 @@ mod tests {
 
         haproxy {
             args: func_args![value: r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#],
-            want: Ok(map![
-                        "facility": "local0",
-                        "severity": "notice",
-                        "message": "Proxy sticky-servers started.",
-                        "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-                        "appname": "haproxy",
-                        "procid": 73411
-                ])
+            want: Ok(btreemap! {
+                    "facility" => "local0",
+                    "severity" => "notice",
+                    "message" => "Proxy sticky-servers started.",
+                    "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                    "appname" => "haproxy",
+                    "procid" => 73411,
+            })
         }
 
         missing_pri {
             args: func_args![value: r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#],
-            want: Ok(map![
-                        "message": "I am missing a pri.",
-                        "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-                        "appname": "haproxy",
-                        "procid": 73411
-                ])
+            want: Ok(btreemap! {
+                "message" => "I am missing a pri.",
+                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                "appname" => "haproxy",
+                "procid" => 73411,
+            })
         }
     ];
 
@@ -200,7 +224,7 @@ mod tests {
         }
 
         let mut state = state::Program::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = btreemap! {}.into();
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,

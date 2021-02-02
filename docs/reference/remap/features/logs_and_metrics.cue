@@ -1,8 +1,8 @@
 remap: features: logs_and_metrics: {
-	title: "Logs & metrics"
+	title:       "Logs & metrics"
 	description: """
-		VRL works with both logs and metrics data within Vector. With metrics, operations are limited to metric tags.
-		Since VRL is stateless, stateful operations, like aggregation, or delegated to other Vector transforms.
+		VRL works with both [logs](\(urls.vector_log)) and [metrics](\(urls.vector_metric)) data within Vector making
+		it usable for all [Vector events](\(urls.vector_data_model)).
 		"""
 
 	principles: {

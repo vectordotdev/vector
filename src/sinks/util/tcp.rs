@@ -52,6 +52,7 @@ pub struct TcpSinkConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpSinkConfig {
@@ -59,11 +60,22 @@ impl TcpSinkConfig {
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
+        send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             address,
             keepalive,
             tls,
+            send_buffer_bytes,
+        }
+    }
+
+    pub fn from_address(address: String) -> Self {
+        Self {
+            address,
+            keepalive: None,
+            tls: None,
+            send_buffer_bytes: None,
         }
     }
 
@@ -75,10 +87,8 @@ impl TcpSinkConfig {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-        let keepalive = self.keepalive;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-
-        let connector = TcpConnector::new(host, port, keepalive, tls);
+        let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
@@ -94,6 +104,7 @@ struct TcpConnector {
     port: u16,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: MaybeTlsSettings,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpConnector {
@@ -102,13 +113,20 @@ impl TcpConnector {
         port: u16,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: MaybeTlsSettings,
+        send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             host,
             port,
             keepalive,
             tls,
+            send_buffer_bytes,
         }
+    }
+
+    #[cfg(test)]
+    fn from_host_port(host: String, port: u16) -> Self {
+        Self::new(host, port, None, None.into(), None)
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -135,6 +153,12 @@ impl TcpConnector {
                 if let Some(keepalive) = self.keepalive {
                     if let Err(error) = maybe_tls.set_keepalive(keepalive) {
                         warn!(message = "Failed configuring TCP keepalive.", %error);
+                    }
+                }
+
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
+                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
+                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
                     }
                 }
 
@@ -261,11 +285,11 @@ mod test {
 
         let addr = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
-        let good = TcpConnector::new(addr.ip().to_string(), addr.port(), None, None.into());
+        let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
         let addr = next_addr();
-        let bad = TcpConnector::new(addr.ip().to_string(), addr.port(), None, None.into());
+        let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }
 }

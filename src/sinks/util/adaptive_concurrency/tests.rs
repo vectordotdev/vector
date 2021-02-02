@@ -21,7 +21,6 @@ use crate::{
 };
 use core::task::Context;
 use futures::{
-    compat::Future01CompatExt,
     future::{self, BoxFuture},
     FutureExt, SinkExt,
 };
@@ -386,7 +385,7 @@ async fn run_test(params: TestParams) -> TestResults {
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
         time::advance(Duration::from_millis(1)).await;
     }
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let stats = Arc::try_unwrap(stats)
         .expect("Failed to unwrap stats Arc")

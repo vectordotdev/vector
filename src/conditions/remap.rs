@@ -7,9 +7,9 @@ use crate::{
 use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {
-    source: String,
+    pub source: String,
 }
 
 inventory::submit! {

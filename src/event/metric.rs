@@ -730,9 +730,9 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use remap::{Path, Value};
+    use shared::btreemap;
     use std::str::FromStr;
 
     fn ts() -> DateTime<Utc> {
@@ -1012,13 +1012,14 @@ mod test {
 
         assert_eq!(
             Ok(Some(
-                map!["name": "zub",
-                     "namespace": "zoob",
-                     "timestamp": Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
-                     "tags": map!["tig": "tog"],
-                     "kind": "absolute",
-                     "type": "counter"
-                ]
+                btreemap! {
+                    "name" => "zub",
+                    "namespace" => "zoob",
+                    "timestamp" => Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
+                    "tags" => btreemap! { "tig" => "tog" },
+                    "kind" => "absolute",
+                    "type" => "counter",
+                }
                 .into()
             )),
             metric.get(&Path::from_str(".").unwrap())

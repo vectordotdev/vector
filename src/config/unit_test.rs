@@ -1,7 +1,7 @@
-use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
+use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{self, TransformConfig};
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::Condition,
     event::{Event, Value},
     transforms::Transform,
 };
@@ -502,37 +502,15 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf {
-                    TestCondition::Embedded(b) => match b.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::NoTypeEmbedded(n) => match n.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::String(_s) => {
-                        errors.push(format!(
-                            "failed to create test condition '{}': condition references are not yet supported",
-                            index
-                        ));
-                    }
+                match cond_conf.build() {
+                    Ok(c) => conditions.push(c),
+                    Err(e) => errors.push(format!(
+                        "failed to create test condition '{}': {}",
+                        index, e,
+                    )),
                 }
             }
+
             UnitTestCheck {
                 extract_from: o.extract_from.clone(),
                 conditions,

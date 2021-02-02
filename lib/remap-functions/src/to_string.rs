@@ -120,16 +120,16 @@ mod tests {
 
     #[test]
     fn to_string() {
-        use crate::map;
+        use shared::btreemap;
 
         let cases = vec![
             (
-                map!["foo": 20],
+                btreemap! { "foo" => 20 },
                 Ok(Value::from("20")),
                 ToStringFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": 20.5],
+                btreemap! { "foo" => 20.5 },
                 Ok(Value::from("20.5")),
                 ToStringFn::new(Box::new(Path::from("foo"))),
             ),

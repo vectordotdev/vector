@@ -48,7 +48,7 @@ impl Expression for GetEnvVarFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -71,11 +71,11 @@ mod tests {
         std::env::set_var("VAR2", "var");
 
         let cases = vec![
-            (map!["foo": "VAR1"], Err(())),
-            (map!["foo": "VAR2"], Ok("var".into())),
-            (map!["foo": "="], Err(())),
-            (map!["foo": ""], Err(())),
-            (map!["foo": "a=b"], Err(())),
+            (btreemap! { "foo" => "VAR1" }, Err(())),
+            (btreemap! { "foo" => "VAR2" }, Ok("var".into())),
+            (btreemap! { "foo" => "=" }, Err(())),
+            (btreemap! { "foo" => "" }, Err(())),
+            (btreemap! { "foo" => "a=b" }, Err(())),
         ];
 
         for (object, expected) in cases {

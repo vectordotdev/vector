@@ -47,6 +47,7 @@ mod tests {
     use crate::{
         expression::{Arithmetic, Array, Literal},
         test_type_def,
+        type_def::InnerTypeDef,
         value::Kind,
         Operator,
     };
@@ -103,11 +104,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     fallible: false,
                     kind: Kind::Integer,
                     ..Default::default()
-                }.boxed()),
+                }.boxed())),
             },
         }
     ];
