@@ -655,35 +655,35 @@ timestamp = "time"
                 config.append(parsed).unwrap();
 
                 config.add_sink(
-                    "company_api",
+                    "company_api_sink",
                     &["company_api_rename"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_company_api.to_string(),
                     ),
                 );
                 config.add_sink(
-                    "company_admin",
+                    "company_admin_sink",
                     &["company_admin_rename"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_company_admin.to_string(),
                     ),
                 );
                 config.add_sink(
-                    "company_media_proxy",
+                    "company_media_proxy_sink",
                     &["company_media_proxy_rename"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_company_media_proxy.to_string(),
                     ),
                 );
                 config.add_sink(
-                    "company_unfurler",
+                    "company_unfurler_sink",
                     &["company_unfurler_filter"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_company_unfurler.to_string(),
                     ),
                 );
                 config.add_sink(
-                    "audit",
+                    "audit_sink",
                     &["audit_rename"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_audit.to_string(),
