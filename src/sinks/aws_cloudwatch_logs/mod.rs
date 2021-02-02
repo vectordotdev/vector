@@ -3,6 +3,7 @@ mod request;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
+    internal_events::TemplateRenderingFailed,
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -443,11 +444,11 @@ fn partition_encode(
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
-            warn!(
-                message = "Failed to render group template; dropping event.",
-                %error,
-                internal_log_rate_secs = 30
-            );
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("group"),
+                drop_event: true,
+            });
             return None;
         }
     };
@@ -455,11 +456,11 @@ fn partition_encode(
     let stream = match stream.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
-            warn!(
-                message = "Failed to render stream template; dropping event.",
-                %error,
-                internal_log_rate_secs = 30
-            );
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("stream"),
+                drop_event: true,
+            });
             return None;
         }
     };
