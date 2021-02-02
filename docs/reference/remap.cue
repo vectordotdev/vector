@@ -26,6 +26,10 @@ package metadata
 			output?: #Event
 		}
 
+		if raises != _|_ {
+			diff?: string
+		}
+
 		notes?: [string, ...string]
 		warnings?: [string, ...string]
 	}
@@ -34,6 +38,7 @@ package metadata
 
 	concepts:    _
 	description: string
+	errors:      _
 	examples: [#Example, ...#Example]
 	expressions: _
 	features:    _

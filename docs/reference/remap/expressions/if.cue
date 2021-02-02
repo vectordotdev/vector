@@ -13,12 +13,12 @@ remap: expressions: if: {
 
 	grammar: {
 		source: """
-			"if" ~ boolean_expression ~ block ~ ("else if" ~ boolean_expression ~ block)* ~ ("else" ~ block)?
+			"if" ~ predicate ~ block ~ ("else if" ~ predicate ~ block)* ~ ("else" ~ block)?
 			"""
 		definitions: {
-			boolean_expression: {
+			predicate: {
 				description: """
-					The `boolean_expression` must be an expression that resolves to a boolean. If a boolean is not
+					The `predicate` _must_ be an expression that resolves to a boolean. If a boolean is not
 					returned a compile-time error will be raised.
 					"""
 			}
