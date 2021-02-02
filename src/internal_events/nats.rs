@@ -1,5 +1,4 @@
 use super::InternalEvent;
-use crate::template::TemplateRenderingError;
 use metrics::counter;
 use std::io::Error;
 
@@ -31,25 +30,5 @@ impl InternalEvent for NatsEventSendFail {
 
     fn emit_metrics(&self) {
         counter!("send_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct NatsTemplateRenderingError {
-    pub error: TemplateRenderingError,
-}
-
-impl InternalEvent for NatsTemplateRenderingError {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Failed to render template; dropping event.",
-            error = %self.error,
-            internal_log_rate_secs = 30,
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("template_rendering_errors_total", 1);
-        counter!("events_discarded_total", 1);
     }
 }
