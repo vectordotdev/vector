@@ -60,8 +60,8 @@ components: sinks: splunk_hec: {
 				interface: {
 					socket: {
 						api: {
-							title: "Splunk HEC protocol"
-							url:   urls.splunk_hec_protocol
+							title: "Splunk HEC event endpoint"
+							url:   urls.splunk_hec_event_endpoint
 						}
 						direction: "outgoing"
 						protocols: ["http"]
