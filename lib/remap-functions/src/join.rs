@@ -74,14 +74,8 @@ impl Expression for JoinFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let separator_type_def = self
-            .separator
-            .as_ref()
-            .map(|sep| sep.type_def(state).fallible_unless(Kind::Bytes));
-
         self.value
             .type_def(state)
-            .merge_optional(separator_type_def)
             // Always fallible because the `value` array could contain non-strings
             .into_fallible(true)
             .with_constraint(Kind::Bytes)
