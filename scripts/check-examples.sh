@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# check-component-features.sh
+# check-examples.sh
 #
 # SUMMARY
 #
