@@ -13,20 +13,22 @@ use std::borrow::Cow::{self, Borrowed, Owned};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
-  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  help docs         Navigate to the VRL docs on the Vector website
-  help docs <func>  Navigate to the VRL docs for the specified function
-  next              Load the next object or create a new one
-  prev              Load the previous object
-  exit              Terminate the program
+  help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+  help docs          Navigate to the VRL docs on the Vector website
+  help docs <func>   Navigate to the VRL docs for the specified function
+  help error <code>  Navigate to the docs for a specific error code
+  next               Load the next object or create a new one
+  prev               Load the previous object
+  exit               Terminate the program
 "#;
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
-const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
+const ERRORS: &'static [&'static str; 11] = &["100", "101", "102", "103", "104", "105", "106", "107", "108", "109", "110"];
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
+    let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
@@ -82,6 +84,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                 print_function_list()
             }
             Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help error <code>"
+            Ok(line) if error_docs_regex.is_match(line) => show_error_docs(line, &error_docs_regex),
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
@@ -293,9 +297,22 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if funcs().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/#{}", FUNCTIONS_ROOT_URL, func_name);
+        let func_url = format!("{}/functions/{}", DOCS_URL, func_name);
         open_url(&func_url);
     } else {
         println!("function name {} not recognized", func_name);
+    }
+}
+
+fn show_error_docs(line: &str, pattern: &Regex) {
+    // As in show_func_docs, unwrap is okay here
+    let matches = pattern.captures(line).unwrap();
+    let error_code = matches.get(1).unwrap().as_str();
+
+    if ERRORS.iter().any(|e| e == &error_code) {
+        let error_code_url = format!("{}/errors/#{}", DOCS_URL, error_code);
+        open_url(&error_code_url);
+    } else {
+        println!("error code {} not recognized", error_code);
     }
 }
