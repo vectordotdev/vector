@@ -727,19 +727,15 @@ async fn handle_errors(
     task: impl Future<Output = Result<TaskOutput, ()>>,
     abort_tx: mpsc::UnboundedSender<()>,
 ) -> Result<TaskOutput, ()> {
-    match AssertUnwindSafe(task)
+    AssertUnwindSafe(task)
         .catch_unwind()
         .await
         .map_err(|_| ())
         .and_then(|res| res)
-    {
-        Err(_) => {
+        .map_err(|_| {
             error!("An error occurred that vector couldn't handle.");
             let _ = abort_tx.send(());
-            Err(())
-        }
-        Ok(result) => Ok(result),
-    }
+        })
 }
 
 /// If the closure returns false, then the element is removed
