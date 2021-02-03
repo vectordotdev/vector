@@ -93,6 +93,7 @@ pub(crate) fn is_nullish(value: &Value) -> bool {
     }
 }
 
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Base64Charset {
     Standard,
