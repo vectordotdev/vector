@@ -3,7 +3,7 @@ package metadata
 remap: errors: "109": {
 	title:       "Cannot abort function"
 	description: """
-		A [function call expression](\(urls.vrl_expressions)\(remap.literals.regular_expression.anchor)) cannot end
+		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) cannot end
 		with `!` unless it _fallible_. If a function does not error, then it will not have an abort variant that ends
 		with `!`.
 		"""

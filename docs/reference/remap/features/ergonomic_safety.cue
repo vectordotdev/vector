@@ -2,7 +2,7 @@ remap: features: ergonomic_safety: {
 	title:       "Ergonomic-safety"
 	description: """
 		VRL is ergonomically safe, preventing the production of slow and unmaintainable VRL programs. While VRL's
-		[compile-time checks](\(features.compilation.anchor)) prevent runtime errors, they do not prevent more
+		[compile-time checks](#\(features.compilation.anchor)) prevent runtime errors, they do not prevent more
 		ellusive problems that result from program complexity, like performance or maintainability problems. These
 		are pernicious problems that result in pipeline instability and high cost. To protect against this, VRL is
 		*intentionally* designed with the thoughtful ergonomics that come in the form of limitations.

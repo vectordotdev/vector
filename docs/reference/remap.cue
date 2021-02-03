@@ -2,7 +2,7 @@ package metadata
 
 #Remap: {
 	#Characteristic: {
-		anchor:      "#\(name)"
+		anchor:      name
 		name:        string
 		title:       string
 		description: string

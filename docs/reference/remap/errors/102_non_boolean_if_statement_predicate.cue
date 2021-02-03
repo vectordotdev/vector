@@ -3,7 +3,7 @@ package metadata
 remap: errors: "102": {
 	title:       "Non-boolean if expression predicate"
 	description: """
-		An [if expression](\(urls.vrl_expressions)\(remap.literals.regular_expression.anchor)) predicate does not
+		An [if expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) predicate does not
 		evaluate to a boolean.
 		"""
 	rationale:   """
@@ -14,8 +14,8 @@ remap: errors: "102": {
 		"""
 	resolution:  """
 		Adjust your if expression predicate to resolve to a boolean. Helpful functions to solve this include
-		[`exists`](\(urls.vrl_functions)\(remap.functions.exists.anchor)) and
-		[`is_nullish`](\(urls.vrl_functions)\(remap.functions.is_nullish.anchor)).
+		[`exists`](\(urls.vrl_functions)#\(remap.functions.exists.anchor)) and
+		[`is_nullish`](\(urls.vrl_functions)#\(remap.functions.is_nullish.anchor)).
 		"""
 
 	examples: [

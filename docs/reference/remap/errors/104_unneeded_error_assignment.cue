@@ -3,7 +3,7 @@ package metadata
 remap: errors: "104": {
 	title:       "Unneeded error assignment"
 	description: """
-		The left-hand side of an [assignment expression](\(urls.vrl_expressions)\(remap.literals.regular_expression.anchor))
+		The left-hand side of an [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
 		needlessly handles errors when the right-hand side _cannot_ fail.
 		"""
 	rationale: """

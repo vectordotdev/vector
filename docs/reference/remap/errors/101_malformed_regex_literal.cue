@@ -3,7 +3,7 @@ package metadata
 remap: errors: "101": {
 	title:       "Malformed regex literal"
 	description: """
-		A [regex literal expression](\(urls.vrl_expressions)\(remap.literals.regular_expression.anchor)) is malformed
+		A [regex literal expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) is malformed
 		and does not result in a valid Regular Expression.
 		"""
 	rationale: """

@@ -4,7 +4,7 @@ import "strconv"
 
 remap: {
 	#Error: {
-		anchor:      "#\(code)"
+		anchor:      "\(code)"
 		code:        >=100 & <1000 & int
 		description: string
 		rationale:   string | null

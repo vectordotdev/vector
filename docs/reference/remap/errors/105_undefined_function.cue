@@ -3,7 +3,7 @@ package metadata
 remap: errors: "105": {
 	title:       "Undefined function"
 	description: """
-		A [function call expression](\(urls.vrl_expressions)\(remap.literals.regular_expression.anchor)) invokes an
+		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) invokes an
 		unknown function.
 		"""
 	rationale:   null
