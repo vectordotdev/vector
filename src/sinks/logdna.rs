@@ -125,11 +125,11 @@ impl HttpSink for LogdnaConfig {
         let key = self
             .render_key(&event)
             .map_err(|error| {
-                warn!(
-                    message = "Failed to render template; dropping event.",
-                    %error,
-                    internal_log_rate_secs = 30
-                );
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: None,
+                    drop_event: true,
+                });
             })
             .ok()?;
 
