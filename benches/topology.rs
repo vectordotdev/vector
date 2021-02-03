@@ -741,7 +741,13 @@ timestamp = "time"
             )| {
                 rt.block_on(async move {
                     // Generate the inputs.
-                    let lines = random_lines(100).take(num_lines);
+                    let lines = [
+                        r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-api 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                        r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-admin 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                        r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-media-proxy 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z"}"#,
+                        r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-unfurler 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z", "msg": "unfurl"}"#,
+                        r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-admin 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                    ].iter().cycle().take(num_lines).map(|&s| s.to_owned());
                     send_lines(in_addr, lines).await.unwrap();
 
                     topology.stop().await;
