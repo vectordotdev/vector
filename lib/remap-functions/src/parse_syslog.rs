@@ -1,5 +1,6 @@
 use chrono::{DateTime, Datelike, Utc};
 use remap::prelude::*;
+use remap::value::Kind;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId};
 
@@ -113,8 +114,22 @@ impl Expression for ParseSyslogFn {
         self.value
             .type_def(state)
             .into_fallible(true)
-            .with_constraint(value::Kind::Map)
+            .with_constraint(Kind::Map)
+            .with_inner_type(inner_type_def())
     }
+}
+
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
+        "message": Kind::Bytes,
+        "hostname": Kind::Bytes | Kind::Null,
+        "severity": Kind::Bytes | Kind::Null,
+        "facility": Kind::Bytes | Kind::Null,
+        "appname": Kind::Bytes | Kind::Null,
+        "msgid": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Timestamp | Kind::Null,
+        "procid": Kind::Bytes | Kind::Integer | Kind::Null
+    }))
 }
 
 #[cfg(test)]
@@ -126,17 +141,26 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { kind: Kind::Map,
+                           fallible: true,
+                           inner_type_def: inner_type_def(),
+            },
         }
 
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
         }
 
         value_optional {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
         }
     ];
 

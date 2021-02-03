@@ -6,8 +6,9 @@ use crate::{
     internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
+        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        BatchConfig, BatchSettings, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
@@ -146,7 +147,7 @@ impl SematextMetricsService {
             .batch_sink(
                 HttpRetryLogic,
                 sematext_service,
-                MetricBuffer::new(batch.size),
+                MetricsBuffer::<SematextMetricNormalize>::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
@@ -173,6 +174,21 @@ impl Service<Vec<Metric>> for SematextMetricsService {
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
+    }
+}
+
+struct SematextMetricNormalize;
+
+impl MetricNormalize for SematextMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            MetricValue::Counter { .. } => state.make_incremental(metric),
+            _ => {
+                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                None
+            }
+        }
     }
 }
 
@@ -207,14 +223,7 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
         let (metric_type, fields) = match event.data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
-            _ => {
-                emit!(SematextMetricsInvalidMetricReceived {
-                    value: event.data.value,
-                    kind: event.data.kind,
-                });
-
-                continue;
-            }
+            _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
         if let Err(error) = influx_line_protocol(

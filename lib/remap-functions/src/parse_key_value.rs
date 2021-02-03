@@ -86,6 +86,9 @@ impl Expression for ParseKeyValueFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        // Note, we can't specify an inner type def for this result since we don't
+        // know the resulting fields at compile time.
+
         self.value
             .type_def(state)
             .merge(self.key_value_delimiter.type_def(state))

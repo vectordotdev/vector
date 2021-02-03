@@ -3,8 +3,8 @@ use derive_is_enum_variant::is_enum_variant;
 use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::{BTreeMap, BTreeSet};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::FromIterator,
@@ -257,11 +257,19 @@ impl Metric {
         self
     }
 
-    /// Create a new Metric from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    /// Rewrite this into a Metric with the data marked as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
-            series: self.series.clone(),
-            data: self.data.to_absolute(),
+            series: self.series,
+            data: self.data.into_absolute(),
+        }
+    }
+
+    /// Rewrite this into a Metric with the data marked as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            series: self.series,
+            data: self.data.into_incremental(),
         }
     }
 
@@ -347,36 +355,117 @@ impl Metric {
     pub fn delete_tag(&mut self, name: &str) -> Option<String> {
         self.series.tags.as_mut().and_then(|tags| tags.remove(name))
     }
+
+    /// Create a new metric from this with the data zeroed.
+    pub fn zero(&self) -> Self {
+        Self {
+            series: self.series.clone(),
+            data: self.data.zero(),
+        }
+    }
 }
 
 impl MetricData {
-    /// Create new MetricData from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    /// Rewrite this data to mark it as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
             kind: MetricKind::Absolute,
-            value: self.value.clone(),
+            value: self.value,
+        }
+    }
+
+    /// Rewrite this data to mark it as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: MetricKind::Incremental,
+            value: self.value,
         }
     }
 
     /// Update this MetricData by adding the value from another.
     pub fn update(&mut self, other: &Self) {
-        match (&mut self.value, &other.value) {
-            (MetricValue::Counter { ref mut value }, MetricValue::Counter { value: value2 }) => {
+        self.value.add(&other.value)
+    }
+
+    /// Add the data from the other metric to this one. The `other` must
+    /// be relative and contain the same value type as this one.
+    pub fn add(&mut self, other: &Self) {
+        if other.kind.is_incremental() {
+            self.update(other);
+        }
+    }
+
+    /// Create a new metric data from this with a zero value.
+    pub fn zero(&self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: self.kind,
+            value: self.value.zero(),
+        }
+    }
+}
+
+impl MetricValue {
+    /// Create a new metric value with all the contained values set to
+    /// zero. This keeps all the bucket/value vectors for the histogram
+    /// and summary metric types intact while zeroing the
+    /// counts. Distribution metrics are emptied of all their values.
+    pub fn zero(&self) -> Self {
+        match self {
+            Self::Counter { .. } => Self::Counter { value: 0.0 },
+            Self::Gauge { .. } => Self::Gauge { value: 0.0 },
+            Self::Set { .. } => Self::Set {
+                values: BTreeSet::default(),
+            },
+            Self::Distribution { samples, statistic } => Self::Distribution {
+                samples: Vec::with_capacity(samples.len()),
+                statistic: *statistic,
+            },
+            Self::AggregatedHistogram { buckets, .. } => Self::AggregatedHistogram {
+                buckets: buckets
+                    .iter()
+                    .map(|&Bucket { upper_limit, .. }| Bucket {
+                        upper_limit,
+                        count: 0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
+            Self::AggregatedSummary { quantiles, .. } => Self::AggregatedSummary {
+                quantiles: quantiles
+                    .iter()
+                    .map(|&Quantile { upper_limit, .. }| Quantile {
+                        upper_limit,
+                        value: 0.0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
+        }
+    }
+
+    /// Add another same value to this.
+    pub fn add(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
                 *value += value2;
             }
-            (MetricValue::Gauge { ref mut value }, MetricValue::Gauge { value: value2 }) => {
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
             }
-            (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
                 values.extend(values2.iter().map(Into::into));
             }
             (
-                MetricValue::Distribution {
+                Self::Distribution {
                     ref mut samples,
                     statistic: statistic_a,
                 },
-                MetricValue::Distribution {
+                Self::Distribution {
                     samples: samples2,
                     statistic: statistic_b,
                 },
@@ -384,12 +473,12 @@ impl MetricData {
                 samples.extend_from_slice(&samples2);
             }
             (
-                MetricValue::AggregatedHistogram {
+                Self::AggregatedHistogram {
                     ref mut buckets,
                     ref mut count,
                     ref mut sum,
                 },
-                MetricValue::AggregatedHistogram {
+                Self::AggregatedHistogram {
                     buckets: buckets2,
                     count: count2,
                     sum: sum2,
@@ -408,62 +497,119 @@ impl MetricData {
                     *sum += sum2;
                 }
             }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value += b2.value;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
             _ => {}
         }
     }
 
-    /// Add the data from the other metric to this one. The `other` must
-    /// be relative and contain the same value type as this one.
-    pub fn add(&mut self, other: &Self) {
-        if other.kind.is_incremental() {
-            self.update(other);
-        }
-    }
-
-    /// Set all the values of this metric to zero without emptying
-    /// it. This keeps all the bucket/value vectors for the histogram
-    /// and summary metric types intact while zeroing the
-    /// counts. Distribution metrics are emptied of all their values.
-    pub fn reset(&mut self) {
-        match &mut self.value {
-            MetricValue::Counter { ref mut value } => {
-                *value = 0.0;
+    /// Subtract another (same type) value from this.
+    pub fn subtract(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
+                *value -= value2;
             }
-            MetricValue::Gauge { ref mut value } => {
-                *value = 0.0;
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+                *value -= value2;
             }
-            MetricValue::Set { ref mut values } => {
-                values.clear();
-            }
-            MetricValue::Distribution {
-                ref mut samples, ..
-            } => {
-                samples.clear();
-            }
-            MetricValue::AggregatedHistogram {
-                ref mut buckets,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for bucket in buckets {
-                    bucket.count = 0;
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+                for item in values2 {
+                    values.remove(item);
                 }
-                *count = 0;
-                *sum = 0.0;
             }
-            MetricValue::AggregatedSummary {
-                ref mut quantiles,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for quantile in quantiles {
-                    quantile.value = 0.0;
+            (
+                Self::Distribution {
+                    ref mut samples,
+                    statistic: statistic_a,
+                },
+                Self::Distribution {
+                    samples: samples2,
+                    statistic: statistic_b,
+                },
+            ) if statistic_a == statistic_b => {
+                // This is an ugly algorithm, but the use of a HashSet
+                // or equivalent is complicated by neither Hash nor Eq
+                // being implemented for the f64 part of Sample.
+                *samples = samples
+                    .iter()
+                    .copied()
+                    .filter(|sample| samples2.iter().find(|sample2| sample == *sample2).is_none())
+                    .collect();
+            }
+            (
+                Self::AggregatedHistogram {
+                    ref mut buckets,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: buckets2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets.len() == buckets2.len()
+                    && buckets
+                        .iter()
+                        .zip(buckets2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                        b1.count -= b2.count;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
                 }
-                *count = 0;
-                *sum = 0.0;
             }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value -= b2.value;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
+                }
+            }
+            _ => {}
         }
     }
 }
