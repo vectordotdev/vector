@@ -206,6 +206,17 @@ impl TypeDef {
         self
     }
 
+    pub fn fallible_unless_inner_array_has_type(mut self, kind: impl Into<value::Kind>) -> Self {
+        match &self.inner_type_def {
+            Some(InnerTypeDef::Array(inner_kind)) if kind.into() != inner_kind.kind => {
+                self.fallible = true;
+            },
+            _ => ()
+        }
+
+        self
+    }
+
     pub fn merge(self, other: Self) -> Self {
         self | other
     }

@@ -80,9 +80,9 @@ impl Expression for JoinFn {
             .with_inner_type(
                 self.value
                     .type_def(state)
-                    .fallible_unless(Kind::Bytes)
                     .inner_type_def,
             )
+            .fallible_unless_inner_array_has_type(Kind::Bytes)
     }
 }
 
