@@ -13,7 +13,7 @@ remap: errors: "106": {
 
 	examples: [
 		{
-			"title": "\(title)"
+			"title": title
 			source: #"""
 				parse_json(.message, pretty: true)
 				"""#
