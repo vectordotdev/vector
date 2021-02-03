@@ -4,7 +4,7 @@ remap: errors: "101": {
 	title:       "Malformed regex literal"
 	description: """
 		A [regex literal expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) is malformed
-		and does not result in a valid Regular Expression.
+		and does not result in a valid regular expression.
 		"""
 	rationale: """
 		Invalid regular expressions will not compile.
