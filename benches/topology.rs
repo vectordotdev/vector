@@ -446,7 +446,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("real_world_1");
     group.sampling_mode(SamplingMode::Flat);
-
+    group.throughput(Throughput::Elements(num_lines as u64));
     group.bench_function("topology", |b| {
         b.iter_batched(
             || {
