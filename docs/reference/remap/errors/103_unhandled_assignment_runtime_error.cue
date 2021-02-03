@@ -1,10 +1,11 @@
 package metadata
 
 remap: errors: "103": {
-	title:       "Unhandled fallible assignment"
+	title:       "Unhandled assignment runtime error"
 	description: """
 		The right-hand side of an [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
-		can fail and the error is not being [handled](\(urls.vrl_error_handling)).
+		is fallible and can produce a [runtime error](\(urls.vrl_runtime_errors)), but the error is not being
+		[handled](\(urls.vrl_error_handling)).
 		"""
 	rationale:   """
 		VRL is [fail-safe](\(urls.vrl_fail_safety)) and requires that all possible runtime errors be handled. This
@@ -12,7 +13,9 @@ remap: errors: "103": {
 		once deployed.
 		"""
 	resolution:  """
-		Handle the error using one of the [documented error handling strategies](\(urls.vrl_error_handling)).
+		[Handle](\(urls.vrl_error_handling)) the runtime error by [assigning](\(urls.vrl_error_handling_assigning)),
+		[coalescing](\(urls.vrl_error_handling_coalescing)), or [raising](\(urls.vrl_error_handling_raising)) the
+		error.
 		"""
 
 	examples: [...{
@@ -34,21 +37,21 @@ remap: errors: "103": {
 
 	examples: [
 		{
-			"title": "\(title) (coalesce)"
+			"title": "\(title) (coalescing)"
 			diff: #"""
 				-. |= parse_key_value(.message)
 				+. |= parse_key_value(.message) ?? {}
 				"""#
 		},
 		{
-			"title": "\(title) (raise & abort)"
+			"title": "\(title) (raising)"
 			diff: #"""
 				-. |= parse_key_value(.message)
 				+. |= parse_key_value!(.message)
 				"""#
 		},
 		{
-			"title": "\(title) (assignment)"
+			"title": "\(title) (assigning)"
 			diff: #"""
 				-. |= parse_key_value(.message)
 				+., err |= parse_key_value(.message)
