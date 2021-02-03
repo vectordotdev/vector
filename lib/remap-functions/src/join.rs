@@ -70,18 +70,19 @@ impl Expression for JoinFn {
         let separator_type = self
             .separator
             .as_ref()
-            .map(|separator| {
-                separator
-                    .type_def(state)
-                    .fallible_unless(Kind::Bytes)
-            });
+            .map(|separator| separator.type_def(state).fallible_unless(Kind::Bytes));
 
         self.value
             .type_def(state)
             .fallible_unless(Kind::Array)
             .merge_optional(separator_type)
             .with_constraint(Kind::Bytes)
-            .with_inner_type(self.value.type_def(state).inner_type_def)
+            .with_inner_type(
+                self.value
+                    .type_def(state)
+                    .fallible_unless(Kind::Bytes)
+                    .inner_type_def,
+            )
     }
 }
 
@@ -99,11 +100,19 @@ mod test {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Bytes,
-                inner_type_def: Some(TypeDef {
-                    fallible: false,
-                    kind: Kind::Bytes,
-                    inner_type_def: None,
-                }.boxed())
+                inner_type_def: Some(inner_type_def!([ Kind::Bytes ]))
+            },
+        }
+
+        value_mixed_array_fallible {
+            expr: |_| JoinFn {
+                value: array!["one", 1].boxed(),
+                separator: Some(lit!(", ").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                inner_type_def: Some(inner_type_def!([ Kind::Bytes | Kind::Integer ]))
             },
         }
 
@@ -127,11 +136,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
-                inner_type_def: Some(TypeDef {
-                    fallible: false,
-                    kind: Kind::Bytes,
-                    inner_type_def: None,
-                }.boxed())
+                inner_type_def: Some(inner_type_def!([ Kind::Bytes ]))
             },
         }
 
