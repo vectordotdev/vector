@@ -29,7 +29,7 @@ remap: errors: "107": {
 				"""#
 			diff: #"""
 				-parse_timestamp(.timestamp)
-				+parse_timestamp(.timestamp, "%D")
+				+parse_timestamp(.timestamp, format: "%D")
 				"""#
 		},
 	]

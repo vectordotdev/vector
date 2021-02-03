@@ -43,8 +43,7 @@ remap: errors: "110": {
 		{
 			"title": "\(title) (guard with errors)"
 			diff: #"""
-				+string!(.message)
-				 downcase(.message)
+				 downcase(string!(.message))
 				"""#
 		},
 		{
