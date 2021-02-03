@@ -124,7 +124,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             } => {
                 let bytes = match bytes {
                     Some(bytes) => {
-                        warn!(message = "`fingerprint.bytes` will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
+                        warn!(message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
                         bytes
                     }
                     None => 256,
