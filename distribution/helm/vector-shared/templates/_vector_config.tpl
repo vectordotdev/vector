@@ -91,6 +91,11 @@ The common header for Vector ConfigMaps.
 # Docs: https://vector.dev/docs/
 
 data_dir = "{{ .Values.globalOptions.dataDir }}"
+
+[api]
+  enabled = {{ .Values.vectorApi.enabled }}
+  address = {{ .Values.vectorApi.address | quote }}
+  playground = {{ .Values.vectorApi.playground }}
 {{- printf "\n" -}}
 
 {{- with .Values.logSchema }}

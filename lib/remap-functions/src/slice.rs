@@ -122,7 +122,7 @@ impl Expression for SliceFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -144,7 +144,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+                inner_type_def: Some(inner_type_def!([ Kind::Bytes ])),
             },
         }
 
@@ -162,47 +162,47 @@ mod tests {
     fn bytes() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("o".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), -2, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 3, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(2)),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, Some(4)),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, Some(5)),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
@@ -211,7 +211,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
@@ -237,22 +237,22 @@ mod tests {
     fn array() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(vec![0, 1, 2].into()),
                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 0, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(vec![1, 2].into()),
                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 1, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(vec![1, 2].into()),
                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), -2, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
@@ -261,7 +261,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
@@ -287,17 +287,17 @@ mod tests {
     fn errors() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 4, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),
                 SliceFn::new(Box::new(Literal::from("foo")), -4, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Err(r#"function call error: "end" must be greater or equal to "start""#.into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(1)),
             ),

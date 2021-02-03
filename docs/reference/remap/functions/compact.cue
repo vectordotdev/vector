@@ -1,6 +1,13 @@
 package metadata
 
 remap: functions: compact: {
+	category: "Enumerate"
+	description: """
+		Compacts the `value` by removing "empty" values.
+
+		What is considered empty can be specified with the parameters.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -52,13 +59,12 @@ remap: functions: compact: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array", "map"]
-	category: "Enumerate"
-	description: #"""
-		Compacts an `array` or `map` by removing "empty" values.
-
-		What is considered empty can be specified with the parameters.
-		"""#
+	return: {
+		types: ["array", "map"]
+		rules: [
+			"The return type will match the `value` type.",
+		]
+	}
 	examples: [
 		{
 			title: "Compact an array"

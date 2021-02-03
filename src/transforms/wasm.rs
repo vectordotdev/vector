@@ -293,4 +293,42 @@ mod tests {
         )
         .await;
     }
+
+    #[tokio::test]
+    async fn parse_syslog() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_syslog");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/parse_syslog/fixtures/a/input.json",
+            "tests/data/wasm/parse_syslog/fixtures/a/expected.json",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn parse_json() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_json");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/parse_json/fixtures/a/input.json",
+            "tests/data/wasm/parse_json/fixtures/a/expected.json",
+        )
+        .await;
+    }
 }

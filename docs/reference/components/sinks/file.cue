@@ -10,6 +10,7 @@ components: sinks: file: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -68,7 +69,7 @@ components: sinks: file: {
 			warnings: []
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

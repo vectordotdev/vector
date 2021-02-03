@@ -74,7 +74,7 @@ impl Expression for LogFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     #[test]
     fn log() {
@@ -84,7 +84,7 @@ mod tests {
             Box::new(Array::from(vec![Value::from(42)])),
             "warn".to_string(),
         );
-        let mut object = Value::Map(map![]);
+        let mut object = Value::Map(btreemap! {});
         let got = func.execute(&mut state, &mut object);
 
         assert_eq!(Ok(Value::Null), got);

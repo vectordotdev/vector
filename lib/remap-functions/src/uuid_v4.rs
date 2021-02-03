@@ -36,7 +36,7 @@ impl Expression for UuidV4Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use std::convert::TryFrom;
 
     remap::test_type_def![static_def {
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = state::Program::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = btreemap! {}.into();
         let value = UuidV4Fn.execute(&mut state, &mut object).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

@@ -1,27 +1,31 @@
 remap: functions: to_int: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into an integer.
+		"""
+
 	arguments: [
 		{
-			name:        "value"
+			name: "value"
 			description: """
 				The value to convert to an integer.
-
-				* If a string, it must be the string representation of an integer or else an error
-					is raised.
-				* If a Boolean, returns `0` for `false` and `1` for `true`.
-				* If a timestamp, returns the [Unix timestamp](\(urls.unix_timestamp)) in seconds.
 				"""
-			required:    true
+			required: true
 			type: ["integer", "float", "boolean", "string", "timestamp"]
 		},
 	]
 	internal_failure_reasons: [
 		"`value` is not a supported integer representation",
 	]
-	return: ["integer"]
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `string`.
-		"""#
+	return: {
+		types: ["integer"]
+		rules: [
+			"If `value` is a string, it must be the string representation of an integer or else an error is raised.",
+			"If `value` is a boolean, `0` will be returned for `false` and `1` will be returned for `true`.",
+			"If `value` is a timestamp, a [Unix timestamp](\(urls.unix_timestamp)) (in seconds) is returned.",
+		]
+	}
+
 	examples: [
 		{
 			title: "Coerce to an int (string)"

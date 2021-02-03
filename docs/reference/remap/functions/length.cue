@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: length: {
+	category: "Enumerate"
+	description: """
+		Returns the length of the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -10,15 +15,15 @@ remap: functions: length: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["integer"]
-	category: "Enumerate"
-	description: """
-		Returns the length of the input:
+	return: {
+		types: ["integer"]
+		rules: [
+			"If `value` is an array, the size of the array is returned.",
+			"If `value` is a string, the size of the string is returned.",
+			"If `value` is a map, the number of map keys is returned (nested keys are ignored)",
+		]
+	}
 
-		* If an array, the size of the array
-		* If a string, the number of bytes in the string
-		* If a map, the number of keys in the map (nested keys are ignored)
-		"""
 	examples: [
 		{
 			title: "Length (map)"

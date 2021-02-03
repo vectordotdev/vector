@@ -1,4 +1,9 @@
 remap: functions: to_bool: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a boolean.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -10,21 +15,18 @@ remap: functions: to_bool: {
 	internal_failure_reasons: [
 		"`value` is not a supported boolean representation",
 	]
-	return: ["float"]
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `boolean`.
+	return: {
+		types: ["boolean"]
+		rules: [
+			#"If `value` is `"true"`, `"t"`, `"yes"`, `"y"` then `true` is returned."#,
+			#"If `value` is `"false"`, `"f"`, `"no"`, `"n"`, `"0"` then `false` is returned."#,
+			#"If `value` is `0.0` then `false` is returned, otherwise `true` is returned."#,
+			#"If `value` is `0` then `false` is returned, otherwise `true` is returned."#,
+			#"If `value` is `null` then `false` is returned."#,
+			#"If `value` is a boolean then it is passed through."#,
+		]
+	}
 
-		The conversion rules vary by type:
-
-		| Type      | `true` values | `false` values |
-		|:----------|:--------------|:---------------|
-		| `string`  | `"true"`, `"t"`, `"yes"`, `"y"` | `"false"`, `"f"`, `"no"`, `"n"`, `"0"` |
-		| `float`   | == `0.0` | != `0.0` |
-		| `int`     | == `0` | != `0` |
-		| `null`    | | `null` |
-		| `boolean` | `true` | `false` |
-		"""#
 	examples: [
 		{
 			title: "Coerce to a boolean (string)"

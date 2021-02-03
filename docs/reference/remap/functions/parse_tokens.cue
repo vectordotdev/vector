@@ -1,6 +1,22 @@
 package metadata
 
 remap: functions: parse_tokens: {
+	category: "Parse"
+	description: #"""
+		Parses the `value` in "token" format.
+
+		A token is considered to be:
+
+		* A word surrounded by whitespace.
+		* Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
+		* Text delimited by square brackets: `[..]`. Closing square brackets can be included in the token if they are escaped by a backslash (`\`).
+		"""#
+	notices: [
+		"""
+			All token values are returned as strings, it is recommended to manually coerce values as you see fit.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -12,17 +28,8 @@ remap: functions: parse_tokens: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted tokenized string",
 	]
-	return: ["array"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` in token format.
+	return: types: ["array"]
 
-		A token is considered to be:
-
-		* A word surrounded by whitespace.
-		* Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
-		* Text delimited by square brackets: `[..]`. Closing square brackets can be included in the token if they are escaped by a backslash (`\`).
-		"""#
 	examples: [
 		{
 			title: "Parse tokens"

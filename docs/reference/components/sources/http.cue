@@ -11,6 +11,7 @@ components: sources: http: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -62,7 +63,10 @@ components: sources: http: {
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
-			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+			type: string: {
+				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+				syntax: "literal"
+			}
 		}
 		encoding: {
 			common:      true
@@ -75,6 +79,7 @@ components: sources: http: {
 					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
 					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
 				}
+				syntax: "literal"
 			}
 		}
 		headers: {
@@ -83,7 +88,10 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+				items: type: string: {
+					examples: ["User-Agent", "X-My-Custom-Header"]
+					syntax: "literal"
+				}
 			}
 		}
 		auth: configuration._http_basic_auth
@@ -93,7 +101,10 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["application", "source"]
+				items: type: string: {
+					examples: ["application", "source"]
+					syntax: "literal"
+				}
 			}
 		}
 	}
@@ -106,7 +117,10 @@ components: sources: http: {
 					description:   "The raw line line from the incoming payload."
 					relevant_when: "encoding == \"text\""
 					required:      true
-					type: string: examples: ["Hello world"]
+					type: string: {
+						examples: ["Hello world"]
+						syntax: "literal"
+					}
 				}
 				timestamp: fields._current_timestamp
 			}

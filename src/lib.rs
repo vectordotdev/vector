@@ -41,6 +41,7 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
 #[cfg(feature = "rdkafka")]
@@ -74,6 +75,8 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
+pub mod udp;
 pub mod unit_test;
 pub mod validate;
 #[cfg(windows)]

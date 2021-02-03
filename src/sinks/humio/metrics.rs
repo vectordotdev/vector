@@ -112,6 +112,7 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -168,42 +169,48 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            Event::from(Metric {
-                name: "metric1".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
-                tags: Some(
+            Event::from(
+                Metric::new(
+                    "metric1".to_string(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 42.0 },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 42.0 },
-            }),
-            Event::from(Metric {
-                name: "metric2".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
-                tags: Some(
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+            ),
+            Event::from(
+                Metric::new(
+                    "metric2".to_string(),
+                    MetricKind::Absolute,
+                    MetricValue::Distribution {
+                        samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        statistic: StatisticKind::Histogram,
+                    },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Distribution {
-                    values: vec![1.0, 2.0, 3.0],
-                    sample_rates: vec![100, 200, 300],
-                    statistic: StatisticKind::Histogram,
-                },
-            }),
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
+            ),
         ];
 
         let len = metrics.len();
         let _ = sink.run(stream::iter(metrics)).await.unwrap();
 
         let output = rx.take(len).collect::<Vec<_>>().await;
-        assert_eq!("{\"event\":{\"counter\":{\"value\":42.0},\"kind\":\"incremental\",\"name\":\"metric1\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784401.0}", output[0].1);
         assert_eq!(
-            "{\"event\":{\"distribution\":{\"sample_rates\":[100,200,300],\"statistic\":\"histogram\",\"values\":[1.0,2.0,3.0]},\"kind\":\"absolute\",\"name\":\"metric2\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784402.0}", output[1].1);
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"}},"fields":{},"time":1597784401.0}"#,
+            output[0].1
+        );
+        assert_eq!(
+            r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"}},"fields":{},"time":1597784402.0}"#,
+            output[1].1
+        );
     }
 }

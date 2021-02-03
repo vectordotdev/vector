@@ -13,7 +13,7 @@ impl Function for IsNullish {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_) | Value::Null),
+            accepts: |_| true,
             required: true,
         }]
     }

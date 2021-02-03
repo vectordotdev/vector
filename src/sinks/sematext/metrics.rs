@@ -6,8 +6,9 @@ use crate::{
     internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
+        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        BatchConfig, BatchSettings, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
@@ -17,11 +18,7 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    task::Poll,
-};
+use std::{collections::HashMap, future::ready, task::Poll};
 use tower::Service;
 
 #[derive(Clone)]
@@ -150,7 +147,7 @@ impl SematextMetricsService {
             .batch_sink(
                 HttpRetryLogic,
                 sematext_service,
-                MetricBuffer::new(batch.size),
+                MetricsBuffer::<SematextMetricNormalize>::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
@@ -180,6 +177,21 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 }
 
+struct SematextMetricNormalize;
+
+impl MetricNormalize for SematextMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            MetricValue::Counter { .. } => state.make_incremental(metric),
+            _ => {
+                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                None
+            }
+        }
+    }
+}
+
 fn create_build_request(
     uri: http::Uri,
 ) -> impl Fn(Vec<u8>) -> BoxFuture<'static, Result<Request<Vec<u8>>>> + Sync + Send + 'static {
@@ -197,26 +209,21 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
     let mut output = String::new();
     for event in events.into_iter() {
         let namespace = event
+            .series
+            .name
             .namespace
-            .unwrap_or_else(|| default_namespace.to_string());
-        let label = event.name;
-        let ts = encode_timestamp(event.timestamp);
+            .unwrap_or_else(|| default_namespace.into());
+        let label = event.series.name.name;
+        let ts = encode_timestamp(event.data.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
-        let mut tags = event.tags.clone().unwrap_or_else(BTreeMap::new);
+        let mut tags = event.series.tags.clone().unwrap_or_default();
         tags.insert("token".into(), token.into());
 
-        let (metric_type, fields) = match event.value {
+        let (metric_type, fields) = match event.data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
-            _ => {
-                emit!(SematextMetricsInvalidMetricReceived {
-                    value: event.value,
-                    kind: event.kind,
-                });
-
-                continue;
-            }
+            _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
         if let Err(error) = influx_line_protocol(
@@ -260,14 +267,13 @@ mod tests {
 
     #[test]
     fn test_encode_counter_event() {
-        let events = vec![Metric {
-            name: "pool.used".into(),
-            namespace: Some("jvm".into()),
-            timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 42.0 },
-        }];
+        let events = vec![Metric::new(
+            "pool.used".into(),
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+        )
+        .with_namespace(Some("jvm".into()))
+        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
@@ -277,14 +283,12 @@ mod tests {
 
     #[test]
     fn test_encode_counter_event_no_namespace() {
-        let events = vec![Metric {
-            name: "used".into(),
-            namespace: None,
-            timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 42.0 },
-        }];
+        let events = vec![Metric::new(
+            "used".into(),
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+        )
+        .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
@@ -295,22 +299,20 @@ mod tests {
     #[test]
     fn test_encode_counter_multiple_events() {
         let events = vec![
-            Metric {
-                name: "pool.used".into(),
-                namespace: Some("jvm".into()),
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 42.0 },
-            },
-            Metric {
-                name: "pool.committed".into(),
-                namespace: Some("jvm".into()),
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 18874368.0 },
-            },
+            Metric::new(
+                "pool.used".into(),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_namespace(Some("jvm".into()))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0))),
+            Metric::new(
+                "pool.committed".into(),
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 18874368.0 },
+            )
+            .with_namespace(Some("jvm".into()))
+            .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1))),
         ];
 
         assert_eq!(
@@ -361,18 +363,20 @@ mod tests {
 
         let mut events = Vec::new();
         for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
-            let event = Event::from(Metric {
-                name: metric.to_string(),
-                namespace: Some(namespace.to_string()),
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
-                tags: Some(
+            let event = Event::from(
+                Metric::new(
+                    metric.to_string(),
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: *val as f64 },
+                )
+                .with_namespace(Some(namespace.to_string()))
+                .with_tags(Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]
                         .into_iter()
                         .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: *val as f64 },
-            });
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32))),
+            );
             events.push(event);
         }
 

@@ -18,7 +18,7 @@ installation: _interfaces: msi: {
 		config:      #"\#(_dir)\config\vector.{config_format}"#
 	}
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			configure: #"""
 						cat <<-VECTORCFG > \#(paths.config)
@@ -61,8 +61,8 @@ installation: _interfaces: msi: {
 		}
 	}
 
-	roles: {
-		agent:      roles._file_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._file_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

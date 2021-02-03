@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: strip_ansi_escape_codes: {
+	category:    "String"
+	description: """
+		Strips [ANSI escape codes](\(urls.ansi_escape_codes)) from the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -10,11 +15,8 @@ remap: functions: strip_ansi_escape_codes: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "String"
-	description: #"""
-		Strips any [ANSI escape codes](\(urls.ansi_escape_codes)) from the provided `value`.
-		"""#
+	return: types: ["string"]
+
 	examples: [
 		{
 			title: "Strip ANSI escape codes"

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: ends_with: {
+	category: "String"
+	description: """
+		Determines if the `value` ends with the `substring`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -23,11 +28,8 @@ remap: functions: ends_with: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
-	category: "String"
-	description: #"""
-		Determines if the provided `value` ends with a given `substring`.
-		"""#
+	return: types: ["boolean"]
+
 	examples: [
 		{
 			title: "String ends with (case sensitive)"

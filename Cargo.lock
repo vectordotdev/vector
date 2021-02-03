@@ -1804,6 +1804,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "801bbab217d7f79c0062f4f7205b5d4427c6d1a7bd7aafdd1475f7c59d62b283"
 dependencies = [
  "cfg-if 1.0.0",
+ "serde",
 ]
 
 [[package]]
@@ -1955,6 +1956,7 @@ dependencies = [
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "bstr",
  "bytes 0.5.6",
  "chrono",
  "crc",
@@ -3102,12 +3104,12 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcaa8ea719de24e21fe6fddb2ea996ca4e312d467c119f827551c4768d97dc5c"
+checksum = "bcc1f973542059e6d5a6d63de6a9539d0ec784f82b2327f3c1915d33200bc6a4"
 dependencies = [
  "base64 0.13.0",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "http",
  "percent-encoding",
@@ -4799,6 +4801,7 @@ name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
  "nom 6.0.1",
+ "shared",
  "snafu",
 ]
 
@@ -5336,6 +5339,7 @@ dependencies = [
  "cidr-utils",
  "grok",
  "hex",
+ "hostname",
  "lazy_static",
  "md-5 0.9.1",
  "nom 6.0.1",
@@ -6606,9 +6610,9 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7981176aaf014836371693ebc7e254e865bb2dafa9f7d71943fbde7c87640e35"
+checksum = "b87c43adeba9354cdb8527ad333bae41caf5cad5ce5cbeb8b11eafcf9de5e07a"
 dependencies = [
  "chrono",
  "nom 6.0.1",
@@ -7557,11 +7561,13 @@ dependencies = [
  "colored",
  "criterion",
  "crossterm 0.19.0",
+ "dashmap 3.11.10",
  "db-key",
  "derivative 2.1.3",
  "derive_is_enum_variant",
  "dirs-next 2.0.0",
  "dyn-clone",
+ "encoding_rs",
  "evmap",
  "exitcode",
  "fakedata_generator",
@@ -7661,6 +7667,7 @@ dependencies = [
  "smpl_jwt",
  "snafu",
  "snap",
+ "socket2",
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt 0.3.21",

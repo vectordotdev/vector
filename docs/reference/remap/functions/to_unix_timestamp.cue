@@ -1,6 +1,14 @@
 package metadata
 
 remap: functions: to_unix_timestamp: {
+	category:    "Coerce"
+	description: """
+		Coerces the `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+
+		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
+		returned via the `unit` argument.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -22,14 +30,8 @@ remap: functions: to_unix_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["integer"]
-	category:    "Coerce"
-	description: """
-		Coerces the provided `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+	return: types: ["integer"]
 
-		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
-		returned via the `unit` argument.
-		"""
 	examples: [
 		{
 			title: "Convert to a Unix timestamp (seconds)"

@@ -1,7 +1,7 @@
-use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
+use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{self, TransformConfig};
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::Condition,
     event::{Event, Value},
     transforms::Transform,
 };
@@ -9,10 +9,9 @@ use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
-    path: PathBuf,
-    format: config::FormatHint,
+    paths: &[(PathBuf, config::FormatHint)],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
+    let config = super::loading::load_builder_from_paths(paths, false)?;
 
     // Ignore failures on calls other than the first
     crate::config::LOG_SCHEMA
@@ -22,12 +21,14 @@ pub async fn build_unit_tests_main(
     build_unit_tests(config).await
 }
 
-async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut tests = vec![];
     let mut errors = vec![];
 
+    let expansions = super::compiler::expand_macros(&mut builder)?;
+
     // Don't let this escape since it's not validated
-    let mut config = Config {
+    let config = Config {
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
@@ -36,10 +37,8 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
-        expansions: Default::default(),
+        expansions,
     };
-
-    super::compiler::expand_macros(&mut config)?;
 
     for test in &config.tests {
         match build_unit_test(test, &config).await {
@@ -503,37 +502,15 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf {
-                    TestCondition::Embedded(b) => match b.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::NoTypeEmbedded(n) => match n.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::String(_s) => {
-                        errors.push(format!(
-                            "failed to create test condition '{}': condition references are not yet supported",
-                            index
-                        ));
-                    }
+                match cond_conf.build() {
+                    Ok(c) => conditions.push(c),
+                    Err(e) => errors.push(format!(
+                        "failed to create test condition '{}': {}",
+                        index, e,
+                    )),
                 }
             }
+
             UnitTestCheck {
                 extract_from: o.extract_from.clone(),
                 conditions,
@@ -560,11 +537,7 @@ async fn build_unit_test(
     }
 }
 
-#[cfg(all(
-    test,
-    feature = "transforms-add_fields",
-    feature = "transforms-swimlanes"
-))]
+#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-route"))]
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
@@ -986,16 +959,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_swimlanes() {
+    async fn test_route() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
-  type = "swimlanes"
-  [transforms.foo.lanes.first]
+  type = "route"
+  [transforms.foo.route.first]
     type = "check_fields"
     "message.eq" = "test swimlane 1"
-  [transforms.foo.lanes.second]
+  [transforms.foo.route.second]
     type = "check_fields"
     "message.eq" = "test swimlane 2"
 
@@ -1006,7 +979,7 @@ mod tests {
     new_field = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 1"
+  name = "successful route test 1"
 
   [tests.input]
     insert_at = "foo"
@@ -1026,7 +999,7 @@ mod tests {
       "new_field.equals" = "new field added"
 
 [[tests]]
-  name = "successful swimlanes test 2"
+  name = "successful route test 2"
 
   [tests.input]
     insert_at = "foo"

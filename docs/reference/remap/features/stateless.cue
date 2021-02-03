@@ -6,4 +6,9 @@ remap: features: stateless: {
 		[deduplication](\(urls.vector_dedupe_transform)), are delegated to other Vector transforms designed
 		specifically for the stateful operation, guardrails and all.
 		"""
+
+	principles: {
+		performance: true
+		safety:      true
+	}
 }

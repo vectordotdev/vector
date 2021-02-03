@@ -10,6 +10,7 @@ components: sources: postgresql_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -61,7 +62,10 @@ components: sources: postgresql_metrics: {
 			description: "PostgreSQL server endpoint in libpq-style connection strings."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
+				items: type: string: {
+					examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -77,31 +81,44 @@ components: sources: postgresql_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "postgresql"
+			type: string: {
+				default: "postgresql"
+				syntax:  "literal"
+			}
 		}
 		include_databases: {
 			description: """
-				A list of databases to match against the `datname` column for which you want to collect metrics from.
+				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
+				the `datname` column for which you want to collect metrics from.
 				If not set, metrics will be collected from all databases.
+				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`exclude_databases`](#exclude_databases).
 				"""
 			common:   false
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["postgres", "vector"]
+				items: type: string: {
+					examples: ["^postgres$", "^vector$", "^foo"]
+					syntax: "literal"
+				}
 			}
 		}
 		exclude_databases: {
 			description: """
-				A list of databases to match against the `datname` column for which you don't want to collect metrics from.
+				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
+				the `datname` column for which you don't want to collect metrics from.
+				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`include_databases`](#include_databases).
 				"""
 			common:   false
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["postgres", "vector"]
+				items: type: string: {
+					examples: ["^postgres$", "^template.*", ""]
+					syntax: "literal"
+				}
 			}
 		}
 		tls: {
@@ -117,6 +134,7 @@ components: sources: postgresql_metrics: {
 						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
+							syntax: "literal"
 						}
 					}
 				}

@@ -11,6 +11,7 @@ components: transforms: remove_tags: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -44,7 +45,10 @@ components: transforms: remove_tags: {
 			description: "The tag names to drop."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["tag1", "tag2"]
+			type: array: items: type: string: {
+				examples: ["tag1", "tag2"]
+				syntax: "literal"
+			}
 		}
 	}
 
