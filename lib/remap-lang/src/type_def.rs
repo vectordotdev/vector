@@ -214,6 +214,9 @@ impl TypeDef {
             Some(InnerTypeDef::Array(inner_kind)) if kind.into() != inner_kind.kind => {
                 self.fallible = true;
             }
+            None => {
+                self.fallible = true;
+            }
             _ => (),
         }
 
@@ -455,5 +458,15 @@ mod tests {
         .fallible_unless_array_has_inner_type(Kind::Float);
 
         assert!(mismatched_array.is_fallible());
+
+        // Any non-array should be fallible if an inner type constraint is
+        // applied
+        let non_array = TypeDef {
+            kind: Kind::Bytes | Kind::Float | Kind::Boolean,
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(non_array.is_fallible());
     }
 }
