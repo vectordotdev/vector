@@ -426,4 +426,34 @@ mod tests {
 
         assert_eq!(expected, type_def_a | type_def_b);
     }
+
+    #[test]
+    fn array_inner_type() {
+        // All items are strings + must all be strings -> infallible
+        let non_mixed_array = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Bytes])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(!non_mixed_array.is_fallible());
+
+        // Items are strings or Booleans + must be strings -> fallible
+        let mixed_array = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Bytes | Kind::Boolean])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(mixed_array.is_fallible());
+
+        // Items are Booleans or maps + must be floats -> fallible
+        let mismatched_array = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Boolean | Kind::Map])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Float);
+
+        assert!(mismatched_array.is_fallible());
+    }
 }
