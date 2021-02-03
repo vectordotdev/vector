@@ -85,7 +85,7 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read the first line of the file,  skipping the first `ignored_header_bytes` bytes to uniquely identify files via a checksum."
+							checksum:         "Read the first line of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						syntax: "literal"
