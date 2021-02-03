@@ -1,4 +1,4 @@
-use super::Charset;
+use crate::util::Base64Charset;
 use remap::prelude::*;
 use std::str::FromStr;
 
@@ -51,13 +51,13 @@ impl Expression for DecodeBase64Fn {
                     .and_then(|v| Value::try_bytes(v).map_err(Into::into))
             })
             .transpose()?
-            .map(|c| Charset::from_str(&String::from_utf8_lossy(&c)))
+            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
             .transpose()?
             .unwrap_or_default();
 
         let config = match charset {
-            Charset::Standard => base64::STANDARD,
-            Charset::UrlSafe => base64::URL_SAFE,
+            Base64Charset::Standard => base64::STANDARD,
+            Base64Charset::UrlSafe => base64::URL_SAFE,
         };
 
         match base64::decode_config(value, config) {
