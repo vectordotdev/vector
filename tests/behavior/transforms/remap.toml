@@ -1944,10 +1944,10 @@
   type = "remap"
   source = """
     items = ["foo", "bar", "baz"]
-    .comma = join(.items, ", ")
-    .space = join(.items, " ")
-    .none = join(.items)
-    .from_split = join(split("big bad booper", " "), "__")
+    .comma = join(items, ", ")
+    .space = join(items, " ")
+    .none = join(items)
+    .from_split = join!(split("big bad booper", " "), "__")
   """
 [[tests]]
   name = "remap_function_join"
