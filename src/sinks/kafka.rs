@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    internal_events::TemplateRenderingFailed,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
@@ -278,11 +279,11 @@ impl Sink<Event> for KafkaSink {
         );
 
         let topic = self.topic.render_string(&item).map_err(|error| {
-            warn!(
-                message = "Failed to render topic template; dropping event.",
-                %error,
-                internal_log_rate_secs = 30,
-            );
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("topic"),
+                drop_event: true,
+            });
         })?;
 
         let timestamp_ms = match &item {
