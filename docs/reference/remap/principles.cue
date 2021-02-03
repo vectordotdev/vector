@@ -2,7 +2,7 @@ package metadata
 
 remap: {
 	#Principle: {
-		anchor:      "#\(name)"
+		anchor:      name
 		name:        string
 		title:       string
 		description: string

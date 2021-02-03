@@ -144,7 +144,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
+                inner_type_def: Some(inner_type_def!([ Kind::Bytes ])),
             },
         }
 

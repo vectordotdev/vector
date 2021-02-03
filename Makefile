@@ -606,7 +606,7 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes

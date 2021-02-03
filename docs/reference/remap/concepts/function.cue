@@ -11,7 +11,7 @@ remap: concepts: function: {
 		fallibility: {
 			title:       "Fallibility"
 			description: """
-				Of particular note for functions is fallibility. [Error-safety](\(urls.vrl_error_safety)) is a defining
+				Of particular note for functions is fallibility. [Fail-safety](\(urls.vrl_fail_safety)) is a defining
 				characteristic of VRL and function fallibility is core to achieving that feature.
 				"""
 		}
