@@ -1,8 +1,8 @@
 remap: features: type_safety: {
 	title:       "Type-safety"
 	description: """
-		VRL implements [_progressive_](\(characteristics.progressive.anchor)) [type safety](\(urls.type_safety)),
-		erroring at [compilation-time](\(features.compilation.anchor)) if a type mismatch is detected.
+		VRL implements [_progressive_](#\(characteristics.progressive.anchor)) [type safety](\(urls.type_safety)),
+		erroring at [compilation-time](#\(features.compilation.anchor)) if a type mismatch is detected.
 		"""
 
 	principles: {
