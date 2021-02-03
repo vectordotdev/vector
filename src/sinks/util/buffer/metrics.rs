@@ -108,29 +108,25 @@ impl DerefMut for MetricEntry {
 /// normalization type `N: MetricNormalize`. Further, distribution
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
-pub struct MetricsBuffer<N> {
-    state: MetricSet,
+pub struct MetricsBuffer {
     metrics: MetricSet,
     max_events: usize,
-    _normalize: PhantomData<N>,
 }
 
-impl<N> MetricsBuffer<N> {
+impl MetricsBuffer {
     pub fn new(settings: BatchSize<Self>) -> Self {
-        Self::new_with_state(settings.events, MetricSet::default())
+        Self::with_capacity(settings.events)
     }
 
-    fn new_with_state(max_events: usize, state: MetricSet) -> Self {
+    fn with_capacity(max_events: usize) -> Self {
         Self {
-            state,
             metrics: MetricSet::with_capacity(max_events),
             max_events,
-            _normalize: PhantomData::default(),
         }
     }
 }
 
-impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
+impl Batch for MetricsBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
@@ -148,23 +144,22 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            if let Some(item) = N::apply_state(&mut self.state, item.into_metric()) {
-                let new_entry = match item.data.kind {
-                    MetricKind::Absolute => MetricEntry(item),
-                    MetricKind::Incremental => {
-                        // Incremental metrics update existing entries, if present
-                        let entry = MetricEntry(item);
-                        self.metrics
-                            .take(&entry)
-                            .map(|mut existing| {
-                                existing.data.update(&entry.data);
-                                existing
-                            })
-                            .unwrap_or(entry)
-                    }
-                };
-                self.metrics.replace(new_entry);
-            }
+            let item = item.into_metric();
+            let new_entry = match item.data.kind {
+                MetricKind::Absolute => MetricEntry(item),
+                MetricKind::Incremental => {
+                    // Incremental metrics update existing entries, if present
+                    let entry = MetricEntry(item);
+                    self.metrics
+                        .take(&entry)
+                        .map(|mut existing| {
+                            existing.data.update(&entry.data);
+                            existing
+                        })
+                        .unwrap_or(entry)
+                }
+            };
+            self.metrics.replace(new_entry);
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -174,7 +169,7 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
     }
 
     fn fresh(&self) -> Self {
-        Self::new_with_state(self.max_events, self.state.clone())
+        Self::with_capacity(self.max_events)
     }
 
     fn finish(self) -> Self::Output {
@@ -194,6 +189,27 @@ impl<N: MetricNormalize> Batch for MetricsBuffer<N> {
 
     fn num_items(&self) -> usize {
         self.metrics.len()
+    }
+}
+
+/// This is a simple wrapper for using `MetricNormalize` with a
+/// persistent `MetricSet` state, to be used in sinks in `with_flat_map`
+/// before sending the events to the `MetricsBuffer`
+pub struct MetricNormalizer<N> {
+    state: MetricSet,
+    _norm: PhantomData<N>,
+}
+
+impl<N: MetricNormalize> MetricNormalizer<N> {
+    pub fn default() -> Self {
+        Self {
+            state: MetricSet::default(),
+            _norm: PhantomData::default(),
+        }
+    }
+
+    pub fn apply(&mut self, event: Event) -> Option<Event> {
+        N::apply_state(&mut self.state, event.into_metric()).map(Into::into)
     }
 }
 
@@ -350,18 +366,21 @@ mod test {
             .collect()
     }
 
-    fn rebuffer<State: MetricNormalize>(events: Vec<Metric>) -> Buffer {
+    fn rebuffer<State: MetricNormalize>(metrics: Vec<Metric>) -> Buffer {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
-        let mut buffer = MetricsBuffer::<State>::new(batch_size);
+        let mut normalizer = MetricNormalizer::<State>::default();
+        let mut buffer = MetricsBuffer::new(batch_size);
         let mut result = vec![];
 
-        for event in events {
-            match buffer.push(Event::Metric(event)) {
-                PushResult::Overflow(_) => panic!("overflowed too early"),
-                PushResult::Ok(true) => {
-                    result.push(buffer.fresh_replace().finish());
+        for metric in metrics {
+            if let Some(event) = normalizer.apply(Event::Metric(metric)) {
+                match buffer.push(event) {
+                    PushResult::Overflow(_) => panic!("overflowed too early"),
+                    PushResult::Ok(true) => {
+                        result.push(buffer.fresh_replace().finish());
+                    }
+                    PushResult::Ok(false) => (),
                 }
-                PushResult::Ok(false) => (),
             }
         }
 

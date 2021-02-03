@@ -1,19 +1,22 @@
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricValue},
+    event::{
+        metric::{Metric, MetricValue},
+        Event,
+    },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
-        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
         BatchConfig, BatchSettings, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
-use futures::{future::BoxFuture, FutureExt, SinkExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
@@ -142,15 +145,17 @@ impl SematextMetricsService {
             config,
             inner: http_service,
         };
+        let mut normalizer = MetricNormalizer::<SematextMetricNormalize>::default();
 
         let sink = request
             .batch_sink(
                 HttpRetryLogic,
                 sematext_service,
-                MetricsBuffer::<SematextMetricNormalize>::new(batch.size),
+                MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
+            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
