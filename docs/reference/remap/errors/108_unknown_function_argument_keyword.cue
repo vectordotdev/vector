@@ -13,7 +13,7 @@ remap: errors: "108": {
 
 	examples: [
 		{
-			"title": "\(title)"
+			"title": title
 			source: #"""
 				parse_timestamp(.timestamp, fmt: "%D")
 				"""#
