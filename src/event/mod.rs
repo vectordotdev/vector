@@ -10,10 +10,12 @@ pub mod merge_state;
 pub mod metric;
 pub mod util;
 
+mod inspect;
 mod log_event;
 mod lookup;
 mod value;
 
+pub use inspect::EventInspector;
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};

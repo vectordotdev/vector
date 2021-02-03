@@ -1,11 +1,11 @@
 use super::{handler, schema};
-use crate::config;
+use crate::{config, event::EventInspector};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    Request, Schema,
+    Data, Request, Schema,
 };
-use async_graphql_warp::{graphql_subscription, Response as GQLResponse};
-use std::{convert::Infallible, net::SocketAddr};
+use async_graphql_warp::{graphql_subscription_with_data, Response as GQLResponse};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::sync::oneshot;
 use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
@@ -18,8 +18,8 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: &config::Config) -> Self {
-        let routes = make_routes(config.api.playground);
+    pub fn start(config: &config::Config, event_inspector: EventInspector) -> Self {
+        let routes = make_routes(config.api.playground, event_inspector);
 
         let (_shutdown, rx) = oneshot::channel();
         let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
@@ -51,7 +51,10 @@ impl Server {
     }
 }
 
-fn make_routes(playground: bool) -> BoxedFilter<(impl Reply,)> {
+fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter<(impl Reply,)> {
+    // Make the event inspector thread-safe, to pass via context
+    let event_inspector = Arc::new(event_inspector);
+
     // Build the GraphQL schema
     let schema = schema::build_schema().finish();
 
@@ -64,13 +67,38 @@ fn make_routes(playground: bool) -> BoxedFilter<(impl Reply,)> {
     let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
     // GraphQL query and subscription handler
-    let graphql_handler = warp::path("graphql").and(graphql_subscription(schema.clone()).or(
-        async_graphql_warp::graphql(schema).and_then(
-            |(schema, request): (Schema<_, _, _>, Request)| async move {
-                Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
-            },
-        ),
-    ));
+    let graphql_handler = warp::path("graphql").and(
+        graphql_subscription_with_data(
+            schema.clone(),
+            Some(move |_| {
+                let mut data = Data::default();
+                data.insert(Arc::clone(&event_inspector));
+                Ok(data)
+            }),
+        )
+        .or(async_graphql_warp::graphql(schema)
+            // .and(warp::any().map(move || Arc::clone(&event_inspector)))
+            .and(warp::any().map(move || String::from("Hello!")))
+            .and_then(
+                |(schema, mut request): (Schema<_, _, _>, Request), event_inspector| async move {
+                    request = request.data(event_inspector);
+                    Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
+                },
+            )),
+    );
+
+    // GraphQL query and subscription handler
+    // let graphql_handler = warp::path("graphql")
+    //     .and(graphql_subscription(schema.clone()))
+    //     .or(warp::any()
+    //         .map(move || Arc::clone(&event_inspector))
+    //         .and(async_graphql_warp::graphql(schema))
+    //         .and_then(
+    //             |event_inspector, (schema, mut request): (Schema<_, _, _>, Request)| async move {
+    //                 request = request.data(event_inspector);
+    //                 Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
+    //             },
+    //         ));
 
     // GraphQL playground
     let graphql_playground = if playground {

@@ -199,9 +199,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.5.0"
+version = "2.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82833e5a5a5c77b8f9ecbc003db996df7432e8afffd6ad8de2fb0dc1436d1f35"
+checksum = "bc917718d313d26782de5e538731700914d3c4eb99b13bb89ef9d8a3bbbc9d3f"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -239,9 +239,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.5.0"
+version = "2.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ddce4448d5f5f7c5a8ace5f8273725cb904011df9b8a8933345aad333fcbfbd"
+checksum = "bbdda3212f54a78f3785a4c26f45994aaa2fc3ea54ce18a89123ffd851fe449c"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -278,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "2.5.0"
+version = "2.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e05242b044bfb1bebf1a3f7e980f8f408d421a60df1d3fd6831b8fe8a2d43416"
+checksum = "ba4cee08647948549af80cf689d9664bd389d9c8a30e033c7d71bb528e9ae3d8"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -7619,6 +7619,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "parking_lot 0.11.1",
  "percent-encoding",
  "pest",
  "pest_derive",

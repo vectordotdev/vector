@@ -48,6 +48,7 @@ pub struct Config {
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
+    pub inspect_events: bool,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }

@@ -6,7 +6,7 @@ use super::{
 use crate::{
     buffers,
     config::{DataType, SinkContext},
-    event::Event,
+    event::{Event, EventInspector},
     internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
@@ -32,6 +32,7 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
+    pub event_inspector: Option<EventInspector>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -49,6 +50,13 @@ pub async fn build_pieces(
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
+
+    // Create an event inspector, if required by config
+    let event_inspector = if config.inspect_events {
+        Some(EventInspector::new())
+    } else {
+        None
+    };
 
     // Build sources
     for (name, source) in config
@@ -75,8 +83,23 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
-        let pump = Task::new(name, typetag, pump);
+
+        let pump = if event_inspector.as_ref().is_some() {
+            Task::new(
+                name,
+                typetag,
+                rx.map(Ok)
+                    .inspect(event_inspector.as_ref().unwrap().add(name.clone()))
+                    .forward(output)
+                    .map_ok(|_| TaskOutput::Source),
+            )
+        } else {
+            Task::new(
+                name,
+                typetag,
+                rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source),
+            )
+        };
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -260,6 +283,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
+            event_inspector,
         };
 
         Ok(pieces)

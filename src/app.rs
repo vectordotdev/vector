@@ -1,4 +1,5 @@
 use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand};
+use crate::event::EventInspector;
 use crate::signal::SignalTo;
 use crate::topology::RunningTopology;
 use crate::{
@@ -34,6 +35,7 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
+    pub event_inspector: Option<EventInspector>,
 }
 
 pub struct Application {
@@ -158,13 +160,20 @@ impl Application {
                 }
                 config.healthchecks.set_require_healthy(require_healthy);
 
+                if cfg!(feature = "api") {
+                    config.inspect_events = true;
+                }
+
                 let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+                let mut pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
 
                 #[cfg(feature = "api")]
                 let api = config.api;
+
+                // Take the event inspector, to pass it to the main app. Topology doesn't need it.
+                let event_inspector = pieces.event_inspector.take();
 
                 let result = topology::start_validated(config, diff, pieces).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
@@ -175,6 +184,7 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
+                    event_inspector,
                 })
             })
         }?;
@@ -188,6 +198,7 @@ impl Application {
 
     pub fn run(self) {
         let mut rt = self.runtime;
+        let mut event_inspector = self.config.event_inspector;
 
         let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
@@ -210,12 +221,16 @@ impl Application {
             #[cfg(feature = "api")]
             // assigned to prevent the API terminating when falling out of scope
             let api_server = if api_config.enabled {
+                let event_inspector = event_inspector
+                    .take()
+                    .expect("Event inspector should be initialized");
+
                 emit!(ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config()))
+                Some(api::Server::start(topology.config(), event_inspector))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

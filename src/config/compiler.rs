@@ -35,6 +35,7 @@ pub fn compile(mut builder: ConfigBuilder, deny_warnings: bool) -> Result<Config
             transforms: builder.transforms,
             tests: builder.tests,
             expansions,
+            inspect_events: builder.inspect_events,
         })
     } else {
         Err(errors)
