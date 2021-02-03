@@ -14,7 +14,7 @@ remap: errors: "109": {
 
 	examples: [
 		{
-			"title": "\(title)"
+			"title": title
 			source: #"""
 				downcase!(.message)
 				"""#
