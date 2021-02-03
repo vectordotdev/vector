@@ -67,11 +67,21 @@ impl Expression for JoinFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
+        let separator_type = self
+            .separator
+            .as_ref()
+            .map(|separator| {
+                separator
+                    .type_def(state)
+                    .fallible_unless(Kind::Bytes)
+            });
+
         self.value
             .type_def(state)
-            // Always fallible because the `value` array could contain non-strings
-            .into_fallible(true)
+            .fallible_unless(Kind::Array)
+            .merge_optional(separator_type)
             .with_constraint(Kind::Bytes)
+            .with_inner_type(self.value.type_def(state).inner_type_def)
     }
 }
 
@@ -81,19 +91,23 @@ mod test {
     use value::Kind;
 
     test_type_def![
-        value_string_array_fallible {
+        value_string_array_infallible {
             expr: |_| JoinFn {
                 value: array!["one", "two", "three"].boxed(),
                 separator: Some(lit!(", ").boxed()),
             },
             def: TypeDef {
-                fallible: true,
+                fallible: false,
                 kind: Kind::Bytes,
-                ..Default::default()
+                inner_type_def: Some(TypeDef {
+                    fallible: false,
+                    kind: Kind::Bytes,
+                    inner_type_def: None,
+                }.boxed())
             },
         }
 
-        value_wrong_type_fallible {
+        value_literal_fallible {
             expr: |_| JoinFn {
                 value: lit!(427).boxed(),
                 separator: None,
@@ -105,7 +119,7 @@ mod test {
             },
         }
 
-        separator_wrong_type_fallible {
+        separator_integer_fallible {
             expr: |_| JoinFn {
                 value: array!["one", "two", "three"].boxed(),
                 separator: Some(lit!(427).boxed()),
@@ -113,7 +127,11 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
-                ..Default::default()
+                inner_type_def: Some(TypeDef {
+                    fallible: false,
+                    kind: Kind::Bytes,
+                    inner_type_def: None,
+                }.boxed())
             },
         }
 
