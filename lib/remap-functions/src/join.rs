@@ -77,12 +77,8 @@ impl Expression for JoinFn {
             .fallible_unless(Kind::Array)
             .merge_optional(separator_type)
             .with_constraint(Kind::Bytes)
-            .with_inner_type(
-                self.value
-                    .type_def(state)
-                    .inner_type_def,
-            )
-            .fallible_unless_inner_array_has_type(Kind::Bytes)
+            .with_inner_type(self.value.type_def(state).inner_type_def)
+            .fallible_unless_array_has_inner_type(Kind::Bytes)
     }
 }
 

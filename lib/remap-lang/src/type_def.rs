@@ -206,12 +206,15 @@ impl TypeDef {
         self
     }
 
-    pub fn fallible_unless_inner_array_has_type(mut self, kind: impl Into<value::Kind>) -> Self {
+    /// Applies a type constraint to the items in an array. If you need all items in the array to
+    /// be integers, for example, set `Kind::Integer`; if items can be either integers or Booleans,
+    /// set `Kind::Integer | Kind::Boolean`; and so on.
+    pub fn fallible_unless_array_has_inner_type(mut self, kind: impl Into<value::Kind>) -> Self {
         match &self.inner_type_def {
             Some(InnerTypeDef::Array(inner_kind)) if kind.into() != inner_kind.kind => {
                 self.fallible = true;
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         self
