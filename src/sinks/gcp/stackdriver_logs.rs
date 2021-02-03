@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     http::HttpClient,
     sinks::{
         util::{
@@ -25,8 +25,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 struct VecMap<V> {
-    keys: Vec<String>,
-    values: Vec<V>,
+    pub entries: Vec<(String, V)>,
 }
 
 impl<V> From<HashMap<String, V>> for VecMap<V> {
@@ -35,31 +34,14 @@ impl<V> From<HashMap<String, V>> for VecMap<V> {
         // keys are unique because they come from HashMap,
         // therefore no need to compare values.
         entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        let (keys, values) = entries.into_iter().unzip();
-        Self { keys, values }
-    }
-}
-
-impl<V> VecMap<V> {
-    fn keys(&self) -> &[String] {
-        &self.keys
-    }
-}
-
-impl VecMap<Template> {
-    fn render_values(&self, event: &Event) -> Result<Vec<String>, Vec<String>> {
-        let mut result = Vec::with_capacity(self.values.len());
-        for v in &self.values {
-            result.push(v.render_string(event)?);
-        }
-        Ok(result)
+        Self { entries }
     }
 }
 
 #[derive(Hash, Clone, PartialEq, Eq, Debug)]
 struct PartitionKey {
     r#type: String,
-    resource_values: Vec<String>,
+    labels: Vec<(String, String)>,
 }
 
 #[derive(Debug, Snafu)]
@@ -193,9 +175,13 @@ impl SinkConfig for StackdriverConfig {
 
 impl StackdriverSink {
     fn render_partition_key(&self, event: &Event) -> Result<PartitionKey, Vec<String>> {
+        let mut labels = Vec::with_capacity(self.resource.entries.len());
+        for (k, v) in &self.resource.entries {
+            labels.push((k.clone(), v.render_string(&event)?));
+        }
         Ok(PartitionKey {
             r#type: self.config.resource.type_.render_string(&event)?,
-            resource_values: self.resource.render_values(&event)?,
+            labels,
         })
     }
 }
@@ -245,9 +231,8 @@ impl HttpSink for StackdriverSink {
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (events, partition) = output.into_parts();
-        let labels = IterMap {
-            keys: self.resource.keys(),
-            values: &partition.resource_values,
+        let labels = SliceMap {
+            entries: &partition.labels,
         };
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
@@ -273,12 +258,11 @@ impl HttpSink for StackdriverSink {
     }
 }
 
-struct IterMap<'a, K, V> {
-    keys: &'a [K],
-    values: &'a [V],
+struct SliceMap<'a, K, V> {
+    entries: &'a [(K, V)],
 }
 
-impl<'a, K, V> Serialize for IterMap<'a, K, V>
+impl<'a, K, V> Serialize for SliceMap<'a, K, V>
 where
     K: Serialize,
     V: Serialize,
@@ -286,7 +270,7 @@ where
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(None)?;
-        for (k, v) in self.keys.iter().zip(self.values.iter()) {
+        for (k, v) in self.entries {
             map.serialize_entry(k, v)?;
         }
         map.end()
@@ -334,6 +318,12 @@ fn remap_severity(severity: Value) -> Value {
 }
 
 async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+    let key = sink
+        .render_partition_key(&Event::from(LogEvent::default()))
+        .unwrap_or_else(|_| PartitionKey {
+            r#type: "generic_node".to_owned(),
+            labels: vec![("namespace".to_owned(), "test".to_owned())],
+        });
     let body = serde_json::json!({
         "log_name": sink.config.log_name(),
         "entries": [],
