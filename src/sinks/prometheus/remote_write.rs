@@ -2,7 +2,7 @@ use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
-    http::HttpClient,
+    http::{Auth, HttpClient},
     internal_events::PrometheusTemplateRenderingError,
     sinks::{
         self,
@@ -52,6 +52,8 @@ pub(crate) struct RemoteWriteConfig {
     pub tenant_id: Option<Template>,
 
     pub tls: Option<TlsOptions>,
+
+    pub auth: Option<Auth>,
 }
 
 inventory::submit! {
@@ -83,6 +85,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let client = HttpClient::new(tls_settings)?;
         let tenant_id = self.tenant_id.clone();
+        let auth = self.auth.clone();
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
         let service = RemoteWriteService {
@@ -91,6 +94,7 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             buckets,
             quantiles,
+            auth,
         };
 
         let sink = {
@@ -159,6 +163,7 @@ struct RemoteWriteService {
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
+    auth: Option<Auth>,
 }
 
 impl RemoteWriteService {
@@ -203,7 +208,10 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
-        let request = builder.body(body.into()).unwrap();
+        let mut request = builder.body(body.into()).unwrap();
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
         let client = self.client.clone();
 
         Box::pin(async move {
@@ -255,6 +263,35 @@ mod tests {
         let (headers, req) = &outputs[0];
 
         assert!(!headers.contains_key("x-scope-orgid"));
+
+        assert_eq!(req.timeseries.len(), 1);
+        assert_eq!(
+            req.timeseries[0].labels,
+            labels!("__name__" => "gauge-2", "production" => "true", "region" => "us-west-1")
+        );
+        assert_eq!(req.timeseries[0].samples.len(), 1);
+        assert_eq!(req.timeseries[0].samples[0].value, 32.0);
+        assert_eq!(req.metadata.len(), 1);
+        assert_eq!(req.metadata[0].r#type, proto::MetricType::Gauge as i32);
+        assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
+    }
+
+    #[tokio::test]
+    async fn sends_authenticated_request() {
+        let outputs = send_request(
+            r#"
+            tenant_id = "tenant-%Y"
+            [auth]
+            strategy = "basic"
+            user = "user"
+            password = "password"
+            "#,
+            vec![create_event("gauge-2".into(), 32.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (_headers, req) = &outputs[0];
 
         assert_eq!(req.timeseries.len(), 1);
         assert_eq!(
@@ -322,6 +359,10 @@ mod tests {
             assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
             assert_eq!(headers["content-encoding"], "snappy");
             assert_eq!(headers["content-type"], "application/x-protobuf");
+
+            if config.auth.is_some() {
+                assert!(headers.contains_key("authorization"));
+            }
 
             let decoded = snap::raw::Decoder::new()
                 .decompress_vec(&body)
