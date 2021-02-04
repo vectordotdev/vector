@@ -172,7 +172,7 @@ fn render_timestamp(src: &str, event: &Event) -> String {
         Event::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp),
-        _ => None,
+        Event::Metric(metric) => metric.data.timestamp.as_ref(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -221,6 +221,7 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{Metric, MetricKind, MetricValue};
     use chrono::TimeZone;
 
     #[test]
@@ -267,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn render_static() {
+    fn render_log_static() {
         let event = Event::from("hello world");
         let template = Template::try_from("foo").unwrap();
 
@@ -275,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic() {
+    fn render_log_dynamic() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
@@ -284,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_prefix() {
+    fn render_log_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
@@ -293,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_postfix() {
+    fn render_log_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
@@ -302,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_missing_key() {
+    fn render_log_dynamic_missing_key() {
         let event = Event::from("hello world");
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
@@ -313,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_multiple_keys() {
+    fn render_log_dynamic_multiple_keys() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -326,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_weird_junk() {
+    fn render_log_dynamic_weird_junk() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -339,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_strftime_style() {
+    fn render_log_timestamp_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -351,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_multiple_strftime_style() {
+    fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -366,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_strftime() {
+    fn render_log_dynamic_with_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -382,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_nested_strftime() {
+    fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -398,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_reverse_nested_strftime() {
+    fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -411,6 +412,25 @@ mod tests {
             Ok(Bytes::from("nested foo 04:05:06")),
             template.render(&event)
         )
+    }
+
+    #[test]
+    fn render_metric_timestamp() {
+        let ts = Utc.ymd(2002, 3, 4).and_hms(5, 6, 7);
+
+        let event: Event = Metric::new(
+            "a-counter".into(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.1 },
+        )
+        .with_timestamp(Some(ts))
+        .into();
+        let template = Template::try_from("timestamp %F %T").unwrap();
+
+        assert_eq!(
+            Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
+            template.render(&event)
+        );
     }
 
     #[test]
