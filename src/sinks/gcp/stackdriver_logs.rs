@@ -320,33 +320,18 @@ fn remap_severity(severity: Value) -> Value {
 async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let key = sink
         .render_partition_key(&Event::from(LogEvent::default()))
-        .unwrap_or_else(|_| PartitionKey {
-            r#type: "generic_node".to_owned(),
-            labels: vec![("namespace".to_owned(), "test".to_owned())],
+        .unwrap_or_else(|_| {
+            warn!("Failed to render resources for healthcheck, using default.");
+            PartitionKey {
+                r#type: "generic_node".to_owned(),
+                labels: vec![("namespace".to_owned(), "test".to_owned())],
+            }
         });
-    let body = serde_json::json!({
-        "log_name": sink.config.log_name(),
-        "entries": [],
-        "resource": {
-            "type": "generic_node",
-            "labels": {
-                "namespace": "test",
-            },
-        }
-    });
-
-    let body = serde_json::to_vec(&body).unwrap();
-
-    let mut request = Request::post(URI.clone())
-        .header("Content-Type", "application/json")
-        .body(body)
-        .unwrap();
-
-    if let Some(creds) = &sink.creds {
-        creds.apply(&mut request);
-    }
-
-    let response = client.send(request.map(Into::into)).await?;
+    let request = sink
+        .build_request(PartitionInnerBuffer::new(Vec::new(), key))
+        .await?
+        .map(Into::into);
+    let response = client.send(request).await?;
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
 }
 
