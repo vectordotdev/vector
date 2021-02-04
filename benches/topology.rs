@@ -340,12 +340,14 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_sampled,
                     output_lines_200,
                     output_lines_404,
+                    output_lines_500,
                     topology,
                 ) = rt.block_on(async move {
                     let output_lines_all = CountReceiver::receive_lines(out_addr_all);
                     let output_lines_sampled = CountReceiver::receive_lines(out_addr_sampled);
                     let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
                     let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
+                    let output_lines_500 = CountReceiver::receive_lines(out_addr_500);
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr1).await;
                     wait_for_tcp(in_addr2).await;
@@ -354,6 +356,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         output_lines_sampled,
                         output_lines_200,
                         output_lines_404,
+                        output_lines_500,
                         topology,
                     )
                 });
@@ -364,6 +367,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_sampled,
                     output_lines_200,
                     output_lines_404,
+                    output_lines_500,
                 )
             },
             |(
@@ -373,6 +377,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 output_lines_sampled,
                 output_lines_200,
                 output_lines_404,
+                output_lines_500,
             )| {
                 rt.block_on(async move {
                     // One sender generates pure random lines
@@ -397,6 +402,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     let output_lines_sampled = output_lines_sampled.await.len();
                     let output_lines_200 = output_lines_200.await.len();
                     let output_lines_404 = output_lines_404.await.len();
+                    let output_lines_500 = output_lines_500.await.len();
 
                     debug_assert_eq!(output_lines_all, num_lines * 2);
                     #[cfg(debug_assertions)]
@@ -417,6 +423,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     }
                     debug_assert!(output_lines_200 > 0);
                     debug_assert!(output_lines_404 > 0);
+                    debug_assert!(output_lines_500 == 0);
                     debug_assert_eq!(output_lines_200 + output_lines_404, num_lines);
 
                     (
@@ -424,6 +431,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         output_lines_sampled,
                         output_lines_200,
                         output_lines_404,
+                        output_lines_500,
                     )
                 });
             },
