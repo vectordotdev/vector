@@ -28,54 +28,57 @@ impl DistributionStatistic {
             .cloned()
             .collect::<Vec<_>>();
 
-        if bins.is_empty() {
-            return None;
+        match bins.len() {
+            0 => None,
+            1 => Some({
+                let val = bins[0].value;
+                let count = bins[0].rate;
+                Self {
+                    min: val,
+                    max: val,
+                    median: val,
+                    avg: val,
+                    sum: val * count as f64,
+                    count: count as u64,
+                    quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
+                }
+            }),
+            _ => Some({
+                bins.sort_unstable_by(|a, b| {
+                    a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal)
+                });
+
+                let min = bins.first().unwrap().value;
+                let max = bins.last().unwrap().value;
+                let sum = bins
+                    .iter()
+                    .map(|sample| sample.value * sample.rate as f64)
+                    .sum::<f64>();
+
+                for i in 1..bins.len() {
+                    bins[i].rate += bins[i - 1].rate;
+                }
+
+                let count = bins.last().unwrap().rate;
+                let avg = sum / count as f64;
+
+                let median = find_quantile(&bins, 0.5);
+                let quantiles = quantiles
+                    .iter()
+                    .map(|&p| (p, find_quantile(&bins, p)))
+                    .collect();
+
+                Self {
+                    min,
+                    max,
+                    median,
+                    avg,
+                    sum,
+                    count: count as u64,
+                    quantiles,
+                }
+            }),
         }
-
-        if bins.len() == 1 {
-            let val = bins[0].value;
-            let count = bins[0].rate;
-            return Some(Self {
-                min: val,
-                max: val,
-                median: val,
-                avg: val,
-                sum: val * count as f64,
-                count: count as u64,
-                quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
-            });
-        }
-
-        bins.sort_unstable_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
-
-        let min = bins.first().unwrap().value;
-        let max = bins.last().unwrap().value;
-        let sum = bins
-            .iter()
-            .map(|sample| sample.value * sample.rate as f64)
-            .sum::<f64>();
-        let count = bins.iter().map(|sample| sample.rate).sum::<u32>();
-        let avg = sum / count as f64;
-
-        for i in 1..bins.len() {
-            bins[i].rate += bins[i - 1].rate;
-        }
-
-        let median = find_quantile(&bins, 0.5);
-        let quantiles = quantiles
-            .iter()
-            .map(|&p| (p, find_quantile(&bins, p)))
-            .collect();
-
-        Some(Self {
-            min,
-            max,
-            median,
-            avg,
-            sum,
-            count: count as u64,
-            quantiles,
-        })
     }
 }
 
@@ -86,7 +89,7 @@ impl DistributionStatistic {
 /// List of quantile functions:
 /// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
 fn find_quantile(bins: &[Sample], p: f64) -> f64 {
-    let count = bins.last().expect("bins is not empty").rate;
+    let count = bins.last().expect("bins is empty").rate;
     find_sample(bins, (p * count as f64).round() as u32)
 }
 
