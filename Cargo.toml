@@ -31,7 +31,7 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
-depends = ""
+depends = "libc6 (>= 2.17)"
 
 [workspace]
 members = [

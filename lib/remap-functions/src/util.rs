@@ -1,5 +1,6 @@
 use remap::{value::Kind, InnerTypeDef, Value};
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 #[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
 #[inline]
@@ -89,5 +90,43 @@ pub(crate) fn is_nullish(value: &Value) -> bool {
         }
         Value::Null => true,
         _ => false,
+    }
+}
+
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Base64Charset {
+    Standard,
+    UrlSafe,
+}
+
+impl Default for Base64Charset {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl Into<base64::CharacterSet> for Base64Charset {
+    fn into(self) -> base64::CharacterSet {
+        use Base64Charset::*;
+
+        match self {
+            Standard => base64::CharacterSet::Standard,
+            UrlSafe => base64::CharacterSet::UrlSafe,
+        }
+    }
+}
+
+impl FromStr for Base64Charset {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use Base64Charset::*;
+
+        match s {
+            "standard" => Ok(Standard),
+            "url_safe" => Ok(UrlSafe),
+            _ => Err("unknown charset"),
+        }
     }
 }

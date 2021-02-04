@@ -1,13 +1,15 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
-        metric::{Metric, MetricKind, MetricValue},
+        metric::{Metric, MetricValue},
         Event,
     },
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
-        retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
-        PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+        retries::RetryLogic,
+        BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -141,7 +143,9 @@ impl CloudWatchMetricsSvc {
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
-        let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+        let buffer = PartitionBuffer::new(MetricsBuffer::<AwsCloudwatchMetricNormalize>::new(
+            batch.size,
+        ));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
@@ -166,48 +170,55 @@ impl CloudWatchMetricsSvc {
                 let metric_name = event.name().to_string();
                 let timestamp = event.data.timestamp.map(timestamp_to_string);
                 let dimensions = event.series.tags.clone().map(tags_to_dimensions);
-                match event.data.kind {
-                    MetricKind::Incremental => match event.data.value {
-                        MetricValue::Counter { value } => Some(MetricDatum {
-                            metric_name,
-                            value: Some(value),
-                            timestamp,
-                            dimensions,
-                            ..Default::default()
-                        }),
-                        MetricValue::Distribution {
-                            samples,
-                            statistic: _,
-                        } => Some(MetricDatum {
-                            metric_name,
-                            values: Some(samples.iter().map(|s| s.value).collect()),
-                            counts: Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
-                            timestamp,
-                            dimensions,
-                            ..Default::default()
-                        }),
-                        MetricValue::Set { values } => Some(MetricDatum {
-                            metric_name,
-                            value: Some(values.len() as f64),
-                            timestamp,
-                            dimensions,
-                            ..Default::default()
-                        }),
-                        _ => None,
-                    },
-                    MetricKind::Absolute => match event.data.value {
-                        MetricValue::Gauge { value } => Some(MetricDatum {
-                            metric_name,
-                            value: Some(value),
-                            timestamp,
-                            dimensions,
-                            ..Default::default()
-                        }),
-                        _ => None,
-                    },
+                // AwsCloudwatchMetricNormalize converts these to the right MetricKind
+                match event.data.value {
+                    MetricValue::Counter { value } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(value),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::Distribution {
+                        samples,
+                        statistic: _,
+                    } => Some(MetricDatum {
+                        metric_name,
+                        values: Some(samples.iter().map(|s| s.value).collect()),
+                        counts: Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::Set { values } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(values.len() as f64),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    MetricValue::Gauge { value } => Some(MetricDatum {
+                        metric_name,
+                        value: Some(value),
+                        timestamp,
+                        dimensions,
+                        ..Default::default()
+                    }),
+                    _ => None,
                 }
             })
             .collect()
+    }
+}
+
+struct AwsCloudwatchMetricNormalize;
+
+impl MetricNormalize for AwsCloudwatchMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match &metric.data.value {
+            MetricValue::Gauge { .. } => state.make_absolute(metric),
+            _ => state.make_incremental(metric),
+        }
     }
 }
 
@@ -418,7 +429,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::metric::StatisticKind, test_util::random_string, Event};
+    use crate::{event::metric::StatisticKind, event::MetricKind, test_util::random_string, Event};
     use chrono::offset::TimeZone;
     use rand::seq::SliceRandom;
 
