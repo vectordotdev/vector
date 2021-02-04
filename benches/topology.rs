@@ -453,7 +453,12 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                 let mut config = config::Config::builder();
                 config.add_source(
                     "in",
-                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+                    sources::syslog::SyslogConfig::from_mode(sources::syslog::Mode::Tcp {
+                        address: in_addr.into(),
+                        keepalive: None,
+                        tls: None,
+                        receive_buffer_bytes: None,
+                    }),
                 );
 
                 let toml_cfg = r##"
@@ -726,7 +731,7 @@ timestamp = "time"
                     r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-admin 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
                     r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-media-proxy 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z"}"#,
                     r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-unfurler 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z", "msg": "unfurl"}"#,
-                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-admin 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com audit 2004 ID960 - qwerty"#,
                 ].iter().cycle().take(num_lines).map(|&s| s.to_owned()).collect::<Vec<_>>();
                 (
                     rt,
