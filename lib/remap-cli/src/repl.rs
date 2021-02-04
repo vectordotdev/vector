@@ -1,7 +1,7 @@
 use crate::Error;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use remap::{state, Formatter, Object, Program, Runtime, Value};
+use remap::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 use remap_functions::all as funcs;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
@@ -28,7 +28,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
-    let mut rt = Runtime::new(state::Program::default());
+    let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
@@ -135,7 +135,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
 }
 
 fn resolve(
-    object: Option<&mut impl Object>,
+    object: Option<&mut impl Target>,
     runtime: &mut Runtime,
     program: &str,
     state: &mut state::Compiler,
@@ -145,18 +145,12 @@ fn resolve(
         Some(object) => object,
     };
 
-    let program = match Program::new_with_state(
-        program.to_owned(),
-        &remap_functions::all(),
-        None,
-        true,
-        state,
-    ) {
-        Ok((program, _)) => program,
+    let program = match remap::compile_with_state(program, &remap_functions::all(), state) {
+        Ok(program) => program,
         Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };
 
-    match runtime.run(object, &program) {
+    match runtime.resolve(object, &program) {
         Ok(value) => value.to_string(),
         Err(err) => err.to_string(),
     }

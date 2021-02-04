@@ -1,5 +1,5 @@
 use super::{repl, Error};
-use remap::{state, Formatter, Object, Program, Runtime, Value};
+use remap::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -83,15 +83,15 @@ fn repl(_: Vec<Value>) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
-fn execute(object: &mut impl Object, source: String) -> Result<Value, Error> {
-    let state = state::Program::default();
+fn execute(object: &mut impl Target, source: String) -> Result<Value, Error> {
+    let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
-    let (program, _) = Program::new(source.clone(), &remap_functions::all(), None, true).map_err(
-        |diagnostics| Error::Parse(Formatter::new(&source, diagnostics).colored().to_string()),
-    )?;
+    let program = remap::compile(&source, &remap_functions::all()).map_err(|diagnostics| {
+        Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+    })?;
 
     runtime
-        .run(object, &program)
+        .resolve(object, &program)
         .map_err(|err| Error::Runtime(err.to_string()))
 }
 
@@ -112,7 +112,7 @@ fn read_into_objects(input: Option<&PathBuf>) -> Result<Vec<Value>, Error> {
     }?;
 
     match input.as_str() {
-        "" => Ok(vec![Value::Map(BTreeMap::default())]),
+        "" => Ok(vec![Value::Object(BTreeMap::default())]),
         _ => input
             .lines()
             .map(|line| Ok(serde_to_remap(serde_json::from_str(&line)?)))
@@ -150,5 +150,5 @@ fn should_open_repl(opts: &Opts) -> bool {
 }
 
 fn default_objects() -> Vec<Value> {
-    vec![Value::Map(BTreeMap::new())]
+    vec![Value::Object(BTreeMap::new())]
 }
