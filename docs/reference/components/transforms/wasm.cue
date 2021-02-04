@@ -12,6 +12,7 @@ components: transforms: wasm: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -58,11 +59,14 @@ components: transforms: wasm: {
 			description: "The directory where Vector should store the artifact it builds of this WASM module. Typically, all WASM modules share this."
 			required:    true
 			warnings: []
-			type: string: examples: [
-				"/etc/vector/artifacts",
-				"/var/lib/vector/artifacts",
-				"C:\\vector\\artifacts",
-			]
+			type: string: {
+				examples: [
+					"/etc/vector/artifacts",
+					"/var/lib/vector/artifacts",
+					"C:\\vector\\artifacts",
+				]
+				syntax: "file_system_path"
+			}
 		}
 		heap_max_size: {
 			common:      false
@@ -78,11 +82,14 @@ components: transforms: wasm: {
 			description: "The file path of the `.wasm` or `.wat` module."
 			required:    true
 			warnings: []
-			type: string: examples: [
-				"./modules/example.wasm",
-				"/example.wat",
-				"example.wasm",
-			]
+			type: string: {
+				examples: [
+					"./modules/example.wasm",
+					"/example.wat",
+					"example.wasm",
+				]
+				syntax: "file_system_path"
+			}
 		}
 	}
 

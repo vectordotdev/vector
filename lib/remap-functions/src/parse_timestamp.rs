@@ -78,8 +78,8 @@ impl Expression for ParseTimestampFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::{DateTime, Utc};
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string_fallible {
@@ -123,11 +123,11 @@ mod tests {
     fn parse_timestamp() {
         let cases = vec![
             (
-                map![
-                    "foo": DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                            .unwrap()
-                            .with_timezone(&Utc),
-                ],
+                btreemap! {
+                    "foo" => DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                              .unwrap()
+                              .with_timezone(&Utc),
+                },
                 Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
@@ -137,7 +137,7 @@ mod tests {
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "16/10/2019:12:00:00 +0000"],
+                btreemap! { "foo" => "16/10/2019:12:00:00 +0000" },
                 Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()

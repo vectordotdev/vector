@@ -113,7 +113,7 @@ impl Expression for StartsWithFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -158,47 +158,47 @@ mod tests {
     fn starts_with() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "foobar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("FOObar")), "FOO", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", false),
             ),

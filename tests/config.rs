@@ -8,8 +8,9 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
     match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
+            let c2 = config::load_from_str(config, format).unwrap();
             match (
-                config::warnings(&c),
+                config::warnings(&c2.into()),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
@@ -208,6 +209,48 @@ async fn nonexistant_input() {
             "Input \"asdf\" for sink \"out\" doesn't exist.",
             "Input \"qwerty\" for transform \"sample\" doesn't exist.",
         ]
+    );
+}
+
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-sample",
+    feature = "sinks-socket"
+))]
+#[tokio::test]
+async fn duplicate_name() {
+    let err = load(
+        r#"
+        [sources.foo]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1234"
+
+        [sources.bar]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.foo]
+        type = "sample"
+        inputs = ["bar"]
+        rate = 10
+
+        [sinks.out]
+        type = "socket"
+        mode = "tcp"
+        inputs = ["foo"]
+        encoding = "text"
+        address = "127.0.0.1:9999"
+        "#,
+        Some(Format::TOML),
+    )
+    .await
+    .unwrap_err();
+
+    assert_eq!(
+        err,
+        vec!["More than one component with name \"foo\" (source, transform).",]
     );
 }
 

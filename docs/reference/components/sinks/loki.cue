@@ -9,6 +9,7 @@ components: sinks: loki: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
+		stateful: false
 	}
 
 	features: {
@@ -33,7 +34,7 @@ components: sinks: loki: {
 			}
 			request: {
 				enabled:                    true
-				concurrency:                5
+				concurrency:                1
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -84,6 +85,7 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
+				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -110,9 +112,30 @@ components: sinks: loki: {
 						type: string: {
 							default: null
 							examples: ["vector", "{{ event_field }}"]
-							templateable: true
+							syntax: "template"
 						}
 					}
+				}
+			}
+		}
+		out_of_order_action: {
+			common: false
+			description: """
+				Some sources may generate events with timestamps that are
+				not strictly in chronological order. The Loki service cannot
+				accept a stream of such events. Vector will sort events before
+				sending it to Loki. However, some late events might arrive after
+				a batch has been sent. This option specifies what Vector should do
+				with those events.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				syntax:  "literal"
+				default: "drop"
+				enum: {
+					"drop":              "Drop the event, with a warning."
+					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
 		}
@@ -138,7 +161,7 @@ components: sinks: loki: {
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}
@@ -159,6 +182,15 @@ components: sinks: loki: {
 				either assigning each Vector instance with a unique label
 				or deploying a centralized Vector which will ensure no logs
 				will get sent out-of-order.
+				"""
+		}
+
+		concurrency: {
+			title: "Concurrency"
+			body: """
+				To make sure logs arrive at Loki in a correct order,
+				the `loki` sink only sends one request at a time.
+				Setting `request.concurrency` will not have any effects.
 				"""
 		}
 

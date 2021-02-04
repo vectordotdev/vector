@@ -122,8 +122,8 @@ impl Expression for ToUnixTimestampFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::map;
     use chrono::TimeZone;
+    use shared::btreemap;
     use value::Kind;
 
     test_type_def![
@@ -155,7 +155,7 @@ mod test {
     fn to_unix_timestamp() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(1609459200.into()),
                 ToUnixTimestampFn::new(
                     Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
@@ -163,7 +163,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1609459200000i64.into()),
                 ToUnixTimestampFn::new(
                     Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
@@ -171,7 +171,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1609459200000000000i64.into()),
                 ToUnixTimestampFn::new(
                     Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),

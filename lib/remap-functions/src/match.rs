@@ -65,7 +65,7 @@ impl Expression for MatchFn {
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -98,12 +98,12 @@ mod tests {
     fn r#match() {
         let cases = vec![
             (
-                map!["foo": "foobar"],
+                btreemap! { "foo" => "foobar" },
                 Ok(false.into()),
                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),
             ),
             (
-                map!["foo": "foo 2 bar"],
+                btreemap! { "foo" => "foo 2 bar" },
                 Ok(true.into()),
                 MatchFn::new(
                     Box::new(Path::from("foo")),

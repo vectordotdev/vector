@@ -150,7 +150,7 @@ impl Expression for ReplaceFn {
 #[allow(clippy::trivial_regex)]
 mod test {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         infallible {
@@ -253,7 +253,7 @@ mod test {
     fn check_replace_string() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -263,7 +263,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -273,7 +273,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -283,7 +283,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -293,7 +293,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -320,7 +320,7 @@ mod test {
     fn check_replace_regex() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -330,7 +330,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -340,7 +340,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -350,7 +350,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -360,7 +360,7 @@ mod test {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -387,7 +387,7 @@ mod test {
     fn check_replace_other() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
@@ -397,7 +397,7 @@ mod test {
                 ),
             ),
             (
-                map!["foo": "I like apples and bananas"],
+                btreemap! { "foo" => "I like apples and bananas" },
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
@@ -407,7 +407,7 @@ mod test {
                 ),
             ),
             (
-                map!["foo": "I like [apples] and bananas"],
+                btreemap! { "foo" => "I like [apples] and bananas" },
                 Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),

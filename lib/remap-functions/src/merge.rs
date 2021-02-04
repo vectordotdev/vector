@@ -14,7 +14,7 @@ impl Function for Merge {
         &[
             Parameter {
                 keyword: "to",
-                accepts: |_| true,
+                accepts: |v| matches!(v, Value::Map(_)),
                 required: false,
             },
             Parameter {
@@ -31,7 +31,7 @@ impl Function for Merge {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let to = arguments.required_path("to")?;
+        let to = arguments.required("to")?.boxed();
         let from = arguments.required("from")?.boxed();
         let deep = arguments.optional("deep").map(Expr::boxed);
 
@@ -41,46 +41,43 @@ impl Function for Merge {
 
 #[derive(Debug, Clone)]
 pub struct MergeFn {
-    to: Path,
+    to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Option<Box<dyn Expression>>,
 }
 
-impl MergeFn {
-    #[cfg(test)]
-    pub fn new(to: Path, from: Box<dyn Expression>, deep: Option<Box<dyn Expression>>) -> Self {
-        Self { to, from, deep }
-    }
-}
-
 impl Expression for MergeFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let mut to_value = self.to.execute(state, object)?.try_map()?;
         let from_value = self.from.execute(state, object)?.try_map()?;
         let deep = match &self.deep {
             None => false,
             Some(deep) => deep.execute(state, object)?.try_boolean()?,
         };
 
-        match object.get(&self.to.as_ref())? {
-            Some(Value::Map(mut map1)) => {
-                merge_maps(&mut map1, &from_value, deep);
-                object.insert(&self.to.as_ref(), Value::Map(map1))?;
-                Ok(Value::Null)
-            }
-            _ => Err("parameters passed to merge are non-map values".into()),
-        }
+        merge_maps(&mut to_value, &from_value, deep);
+
+        Ok(to_value.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.from
-            .type_def(state)
+        let from = self.from.type_def(state);
+
+        let to = self.to.type_def(state);
+        let from_inner = from.inner_type_def.clone();
+
+        let mut type_def = from
             .fallible_unless(value::Kind::Map)
+            .merge(to.fallible_unless(value::Kind::Map))
             .merge_optional(
                 self.deep
                     .as_ref()
                     .map(|deep| deep.type_def(state).fallible_unless(value::Kind::Boolean)),
             )
-            .with_constraint(value::Kind::Null)
+            .with_constraint(value::Kind::Map);
+
+        type_def.inner_type_def = merge_inner_type_defs(type_def.inner_type_def, from_inner);
+        type_def
     }
 }
 
@@ -116,93 +113,131 @@ where
     }
 }
 
+/// Merges the inner type defs of the two maps.
+/// The merge has to be a shallow one, since we don't necessarily know the value of the `deep`
+/// parameter at compile time.
+fn merge_inner_type_defs(
+    to: Option<InnerTypeDef>,
+    from: Option<InnerTypeDef>,
+) -> Option<InnerTypeDef> {
+    match (to, from) {
+        (Some(InnerTypeDef::Map(map1)), Some(InnerTypeDef::Map(map2)))
+        | (Some(InnerTypeDef::Both { map: map1, .. }), Some(InnerTypeDef::Map(map2)))
+        | (Some(InnerTypeDef::Map(map1)), Some(InnerTypeDef::Both { map: map2, .. }))
+        | (
+            Some(InnerTypeDef::Both { map: map1, .. }),
+            Some(InnerTypeDef::Both { map: map2, .. }),
+        ) => {
+            // Any combinations of maps, we can merge these and use as the resulting inner type def.
+            Some(InnerTypeDef::Map(
+                map1.into_iter().chain(map2.into_iter()).collect(),
+            ))
+        }
+        (None, Some(InnerTypeDef::Map(map))) | (None, Some(InnerTypeDef::Both { map, .. })) => {
+            // Otherwise, if the to inner_type_def is not known the from type_def will override
+            // any fields within the to, so we can take this on.
+            // The same does not hold if we don't know the type def of the from, these fields could
+            // override any of the known fields in the to.
+            Some(InnerTypeDef::Map(map))
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
+    use value::Kind;
 
-    #[test]
-    fn merge() {
-        let cases = vec![
-            (
-                map!["foo": Value::Boolean(true),
-                     "bar": map!["key2": "val2"]],
-                map!["foo": Value::Boolean(true),
-                     "bar": map!["key2": "val2"]],
-                MergeFn::new(Path::from("foo"), Box::new(Path::from("bar")), None),
-                Err("function call error: parameters passed to merge are non-map values".into()),
-            ),
-            (
-                map!["foo": map![ "key1": "val1" ], "bar": map![ "key2": "val2" ]],
-                map![
-                    "foo":
-                        map![ "key1": "val1",
-                              "key2": "val2" ],
-                    "bar": map![ "key2": "val2" ]
-                ],
-                MergeFn::new(Path::from("foo"), Box::new(Path::from("bar")), None),
-                Ok(Value::Null),
-            ),
-            (
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                                       "child": map! [ "grandchild1": "val1" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                                       "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                                      "key2": "val2",
-                                      "child": map! [ "grandchild2": "val2" ] ],
-                    "parent2":
-                        map! [ "key2": "val2",
-                                       "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                MergeFn::new(Path::from("parent1"), Box::new(Path::from("parent2")), None),
-                Ok(Value::Null),
-            ),
-            (
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                              "child": map! [ "grandchild1": "val1" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                              "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                map![
-                    "parent1":
-                        map![ "key1": "val1",
-                              "key2": "val2",
-                              "child": map! [ "grandchild1": "val1",
-                                              "grandchild2": "val2" ] ],
-                    "parent2":
-                        map![ "key2": "val2",
-                              "child": map! [ "grandchild2": "val2" ] ]
-                ],
-                MergeFn::new(
-                    Path::from("parent1"),
-                    Box::new(Path::from("parent2")),
-                    Some(Box::new(Literal::from(Value::Boolean(true)))),
-                ),
-                Ok(Value::Null),
-            ),
-        ];
+    test_type_def![
 
-        let mut state = state::Program::default();
-        for (input_event, exp_event, func, exp_result) in cases {
-            let mut input_event = Value::Map(input_event);
-            let exp_event = Value::Map(exp_event);
-
-            let got = func
-                .execute(&mut state, &mut input_event)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(input_event, exp_event);
-            assert_eq!(got, exp_result);
+        value_non_maps {
+            expr: |_| MergeFn {
+                to: array!["ook"].boxed(),
+                from: array!["ook"].boxed(),
+                deep: None
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Map,
+                inner_type_def: None
+            },
         }
-    }
+
+        value_maps {
+            expr: |_| MergeFn {
+                to: remap::map![ "ook" : 2,
+                                 "nork" : "oog",
+                                 "both" : 3
+                ].boxed(),
+                from: remap::map![ "ook" : 4,
+                                   "both" : "nerg"
+                ].boxed(),
+                deep: None
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Map,
+                inner_type_def: Some(inner_type_def! ({ "ook": Kind::Integer,
+                                                         "nork": Kind::Bytes,
+                                                         "both": Kind::Bytes
+                }))
+            },
+        }
+    ];
+
+    test_function! [
+        merge => Merge;
+
+        simple {
+            args: func_args![ to: btreemap! { "key1" => "val1" },
+                              from: btreemap! { "key2"=> "val2" }
+            ],
+            want: Ok(btreemap! {
+                "key1" => "val1",
+                "key2" => "val2",
+            })
+        }
+
+        shallow {
+            args: func_args![
+                to: btreemap! {
+                    "key1" => "val1",
+                    "child" => btreemap! { "grandchild1" => "val1" },
+                },
+                from: btreemap! {
+                    "key2" => "val2",
+                    "child" => btreemap! { "grandchild2" => "val2" },
+                }
+            ],
+            want: Ok(btreemap! {
+                "key1" => "val1",
+                "key2" => "val2",
+                "child" => btreemap! { "grandchild2" => "val2" },
+            })
+        }
+
+        deep {
+            args: func_args![
+                to: btreemap! {
+                    "key1" => "val1",
+                    "child" => btreemap! { "grandchild1" => "val1" },
+                },
+                from: btreemap! {
+                    "key2" => "val2",
+                    "child" => btreemap! { "grandchild2" => "val2" },
+                },
+                deep: true
+            ],
+            want: Ok(btreemap!{
+                "key1" => "val1",
+                "key2" => "val2",
+                "child" => btreemap! {
+                    "grandchild1" => "val1",
+                    "grandchild2" => "val2",
+                },
+            })
+        }
+    ];
 }

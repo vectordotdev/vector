@@ -128,7 +128,7 @@ impl Expression for TruncateFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -203,7 +203,7 @@ mod tests {
     fn truncate() {
         let cases = vec![
             (
-                map!["foo": "Super"],
+                btreemap! { "foo" => "Super" },
                 Ok("".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -212,7 +212,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Super"],
+                btreemap! { "foo" => "Super" },
                 Ok("...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -221,7 +221,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Super"],
+                btreemap! { "foo" => "Super" },
                 Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -230,7 +230,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Super"],
+                btreemap! { "foo" => "Super" },
                 Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -239,7 +239,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Supercalifragilisticexpialidocious"],
+                btreemap! { "foo" => "Supercalifragilisticexpialidocious" },
                 Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -248,7 +248,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "♔♕♖♗♘♙♚♛♜♝♞♟"],
+                btreemap! { "foo" => "♔♕♖♗♘♙♚♛♜♝♞♟" },
                 Ok("♔♕♖♗♘♙...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -257,7 +257,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Supercalifragilisticexpialidocious"],
+                btreemap! { "foo" => "Supercalifragilisticexpialidocious" },
                 Ok("Super...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
@@ -266,7 +266,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "Supercalifragilisticexpialidocious"],
+                btreemap! { "foo" => "Supercalifragilisticexpialidocious" },
                 Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),

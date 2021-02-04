@@ -1,3 +1,4 @@
+use crate::util::Base64Charset;
 use remap::prelude::*;
 use std::str::FromStr;
 
@@ -42,43 +43,6 @@ impl Function for EncodeBase64 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Charset {
-    Standard,
-    UrlSafe,
-}
-
-impl Default for Charset {
-    fn default() -> Self {
-        Self::Standard
-    }
-}
-
-impl Into<base64::CharacterSet> for Charset {
-    fn into(self) -> base64::CharacterSet {
-        use Charset::*;
-
-        match self {
-            Standard => base64::CharacterSet::Standard,
-            UrlSafe => base64::CharacterSet::UrlSafe,
-        }
-    }
-}
-
-impl FromStr for Charset {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Charset::*;
-
-        match s {
-            "standard" => Ok(Standard),
-            "url_safe" => Ok(UrlSafe),
-            _ => Err("unknown charset"),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 struct EncodeBase64Fn {
     value: Box<dyn Expression>,
@@ -108,7 +72,7 @@ impl Expression for EncodeBase64Fn {
                     .and_then(|v| Value::try_bytes(v).map_err(Into::into))
             })
             .transpose()?
-            .map(|c| Charset::from_str(&String::from_utf8_lossy(&c)))
+            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
             .transpose()?
             .unwrap_or_default();
 

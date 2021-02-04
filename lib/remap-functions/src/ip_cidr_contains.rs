@@ -75,7 +75,7 @@ impl Expression for IpCidrContainsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![value_string {
         expr: |_| IpCidrContainsFn {
@@ -93,30 +93,34 @@ mod tests {
     fn ip_cidr_contains() {
         let cases = vec![
             (
-                map!["foo": "192.168.10.32",
-                     "cidr": "192.168.0.0/16",
-                ],
+                btreemap! {
+                    "foo" => "192.168.10.32",
+                    "cidr" => "192.168.0.0/16",
+                },
                 Ok(Value::from(true)),
                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "192.168.10.32",
-                     "cidr": "192.168.0.0/24",
-                ],
+                btreemap! {
+                    "foo" => "192.168.10.32",
+                    "cidr" => "192.168.0.0/24",
+                },
                 Ok(Value::from(false)),
                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
-                     "cidr": "2001:4f8:3:ba::/64",
-                ],
+                btreemap! {
+                    "foo" => "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                    "cidr" => "2001:4f8:3:ba::/64",
+                },
                 Ok(Value::from(true)),
                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
-                     "cidr": "2001:4f8:4:ba::/64",
-                ],
+                btreemap! {
+                    "foo" => "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                    "cidr" => "2001:4f8:4:ba::/64",
+                },
                 Ok(Value::from(false)),
                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),

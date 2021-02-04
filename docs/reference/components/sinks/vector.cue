@@ -13,6 +13,7 @@ components: sinks: vector: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -24,8 +25,9 @@ components: sinks: vector: {
 				enabled: true
 				codec: enabled: false
 			}
-			keepalive: enabled: true
-			request: enabled:   false
+			send_buffer_bytes: enabled: true
+			keepalive: enabled:         true
+			request: enabled:           false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -82,6 +84,7 @@ components: sinks: vector: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 	}

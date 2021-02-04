@@ -11,7 +11,7 @@ impl InternalEvent for DecoderBomRemoval {
         trace!(
             message = "Removing initial BOM bytes from the final output while decoding to utf8.",
             from_encoding = %self.from_encoding,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -30,7 +30,7 @@ impl InternalEvent for DecoderMalformedReplacement {
         warn!(
             message = "Replaced malformed sequences with replacement character while decoding to utf8.",
             from_encoding = %self.from_encoding,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -51,7 +51,7 @@ impl InternalEvent for EncoderUnmappableReplacement {
         warn!(
             message = "Replaced unmappable characters with numeric character references while encoding from utf8.",
             to_encoding = %self.to_encoding,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
