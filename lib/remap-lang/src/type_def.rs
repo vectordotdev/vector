@@ -211,16 +211,10 @@ impl TypeDef {
     /// set `Kind::Integer | Kind::Boolean`; and so on.
     pub fn fallible_unless_array_has_inner_type(mut self, kind: impl Into<value::Kind>) -> Self {
         match &self.inner_type_def {
-            Some(InnerTypeDef::Array(inner_kind)) if kind.into() != inner_kind.kind => {
+            Some(InnerTypeDef::Array(inner_kind)) if kind.into() == inner_kind.kind => (),
+            _ => {
                 self.fallible = true;
             }
-            Some(InnerTypeDef::Map(_)) => {
-                self.fallible = true;
-            }
-            None => {
-                self.fallible = true;
-            }
-            _ => (),
         }
 
         self
