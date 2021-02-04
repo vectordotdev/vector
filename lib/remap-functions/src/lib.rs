@@ -104,6 +104,8 @@ mod slice;
 mod split;
 #[cfg(feature = "starts_with")]
 mod starts_with;
+#[cfg(feature = "string")]
+mod string;
 #[cfg(feature = "strip_ansi_escape_codes")]
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
@@ -239,6 +241,8 @@ pub use slice::Slice;
 pub use split::Split;
 #[cfg(feature = "starts_with")]
 pub use starts_with::StartsWith;
+#[cfg(feature = "string")]
+pub use string::STring;
 #[cfg(feature = "strip_ansi_escape_codes")]
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
@@ -374,6 +378,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Split),
         #[cfg(feature = "starts_with")]
         Box::new(StartsWith),
+        #[cfg(feature = "string")]
+        Box::new(STring),
         #[cfg(feature = "strip_ansi_escape_codes")]
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]

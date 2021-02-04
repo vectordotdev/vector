@@ -8,7 +8,7 @@ pub(crate) fn is_scalar_value(value: &Value) -> bool {
 
     match value {
         Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
-        Timestamp(_) | Map(_) | Array(_) | Regex(_) => false,
+        Timestamp(_) | Object(_) | Array(_) | Regex(_) => false,
     }
 }
 

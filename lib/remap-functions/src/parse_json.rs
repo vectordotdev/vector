@@ -11,27 +11,26 @@ impl Function for ParseJson {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::BYTES,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value")?;
 
         Ok(Box::new(ParseJsonFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseJsonFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
-        let bytes = value.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
         let value = serde_json::from_slice::<'_, Value>(&bytes)
             .map_err(|e| format!("unable to parse json: {}", e))?;
 
@@ -39,20 +38,14 @@ impl Expression for ParseJsonFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
-        self.value
-            .type_def(state)
-            .into_fallible(true) // JSON parsing errors
-            .with_constraint(
+        TypeDef::new().fallible().with_kind(
                 Kind::Bytes
                     | Kind::Boolean
                     | Kind::Integer
                     | Kind::Float
                     | Kind::Array
-                    | Kind::Map
-                    | Kind::Null,
-            )
+                    | Kind::Object
+                    | Kind::Null)
     }
 }
 

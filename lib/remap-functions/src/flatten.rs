@@ -12,29 +12,29 @@ impl Function for Flatten {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Array(_) | Value::Map(_)),
+            kind: kind::OBJECT | kind::ARRAY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value")?;
         Ok(Box::new(FlattenFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct FlattenFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for FlattenFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        match self.value.execute(state, object)? {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        match self.value.resolve(ctx)? {
             Value::Array(arr) => Ok(Value::Array(
                 ArrayFlatten::new(arr.iter()).cloned().collect(),
             )),
-            Value::Map(map) => Ok(Value::Map(
+            Value::Object(map) => Ok(Value::Object(
                 MapFlatten::new(map.iter())
                     .map(|(k, v)| (k, v.clone()))
                     .collect(),
@@ -44,9 +44,7 @@ impl Expression for FlattenFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Map | value::Kind::Array)
+        self.value.type_def(state).unknown_inner_types().infallible()
     }
 }
 
@@ -97,7 +95,7 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
 
         let next = self.values.next();
         match next {
-            Some((key, Value::Map(value))) => {
+            Some((key, Value::Object(value))) => {
                 self.inner = Some(Box::new(MapFlatten::new_from_parent(
                     self.new_key(key),
                     value.iter(),

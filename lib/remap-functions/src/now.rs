@@ -9,22 +9,22 @@ impl Function for Now {
         "now"
     }
 
-    fn compile(&self, _: ArgumentList) -> Result<Box<dyn Expression>> {
+    fn compile(&self, _: ArgumentList) -> Compiled {
         Ok(Box::new(NowFn))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct NowFn;
 
 impl Expression for NowFn {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(Utc::now().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            kind: value::Kind::Timestamp,
+            kind: Kind::Timestamp,
             ..Default::default()
         }
     }

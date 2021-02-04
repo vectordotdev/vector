@@ -14,50 +14,50 @@ impl Function for Compact {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Map(_) | Value::Array(_)),
+                kind: kind::OBJECT | kind::ARRAY,
                 required: true,
             },
             Parameter {
                 keyword: "recursive",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
                 keyword: "null",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
                 keyword: "string",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
                 keyword: "map",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
                 keyword: "array",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
             Parameter {
                 keyword: "nullish",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let recursive = arguments.optional("recursive").map(Expr::boxed);
-        let null = arguments.optional("null").map(Expr::boxed);
-        let string = arguments.optional("string").map(Expr::boxed);
-        let map = arguments.optional("map").map(Expr::boxed);
-        let array = arguments.optional("array").map(Expr::boxed);
-        let nullish = arguments.optional("nullish").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value")?;
+        let recursive = arguments.optional("recursive");
+        let null = arguments.optional("null");
+        let string = arguments.optional("string");
+        let map = arguments.optional("map");
+        let array = arguments.optional("array");
+        let nullish = arguments.optional("nullish");
 
         Ok(Box::new(CompactFn {
             value,
@@ -71,7 +71,7 @@ impl Function for Compact {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct CompactFn {
     value: Box<dyn Expression>,
     recursive: Option<Box<dyn Expression>>,
@@ -115,7 +115,7 @@ impl CompactOptions {
         match value {
             Value::Bytes(bytes) => self.string && bytes.len() == 0,
             Value::Null => self.null,
-            Value::Map(map) => self.map && map.is_empty(),
+            Value::Object(map) => self.map && map.is_empty(),
             Value::Array(array) => self.array && array.is_empty(),
             _ => false,
         }
@@ -123,50 +123,48 @@ impl CompactOptions {
 }
 
 impl Expression for CompactFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let options = CompactOptions {
             recursive: match &self.recursive {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => true,
             },
 
             null: match &self.null {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => true,
             },
 
             string: match &self.string {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => true,
             },
 
             map: match &self.map {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => true,
             },
 
             array: match &self.array {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => true,
             },
 
             nullish: match &self.nullish {
-                Some(expr) => expr.execute(state, object)?.try_boolean()?,
+                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
                 None => false,
             },
         };
 
-        match self.value.execute(state, object)? {
-            Value::Map(map) => Ok(Value::from(compact_map(map, &options))),
+        match self.value.resolve(ctx)? {
+            Value::Object(map) => Ok(Value::from(compact_map(map, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
             _ => unreachable!(),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Map | value::Kind::Array)
+        self.value.type_def(state).unknown_inner_types().infallible()
     }
 }
 
@@ -174,7 +172,7 @@ impl Expression for CompactFn {
 fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     match value {
         Value::Array(array) if options.recursive => Value::from(compact_array(array, options)),
-        Value::Map(map) if options.recursive => Value::from(compact_map(map, options)),
+        Value::Object(map) if options.recursive => Value::from(compact_map(map, options)),
         _ => value,
     }
 }
@@ -246,10 +244,10 @@ mod test {
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Map(map!["field2": 2]), 2.into()],
+                vec![1.into(), Value::Object(map!["field2": 2]), 2.into()],
                 vec![
                     1.into(),
-                    Value::Map(map!["field1": Value::Null,
+                    Value::Object(map!["field1": Value::Null,
                                     "field2": 2]),
                     2.into(),
                 ],
@@ -286,12 +284,12 @@ mod test {
             ),
             (
                 map!["key1": Value::from(1),
-                     "key2": Value::Map(map!["key2": Value::from(3)]),
+                     "key2": Value::Object(map!["key2": Value::from(3)]),
                      "key3": Value::from(2),
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Map(map!["key1": Value::Null,
+                    "key2": Value::Object(map!["key1": Value::Null,
                                             "key2": Value::from(3),
                                             "key3": Value::Null]),
                     "key3": Value::from(2),
@@ -300,12 +298,12 @@ mod test {
             ),
             (
                 map!["key1": Value::from(1),
-                     "key2": Value::Map(map!["key1": Value::Null,]),
+                     "key2": Value::Object(map!["key1": Value::Null,]),
                      "key3": Value::from(2),
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Map(map!["key1": Value::Null,]),
+                    "key2": Value::Object(map!["key1": Value::Null,]),
                     "key3": Value::from(2),
                 ],
                 CompactOptions {
@@ -319,7 +317,7 @@ mod test {
                 ],
                 map![
                     "key1": Value::from(1),
-                    "key2": Value::Map(map!["key1": Value::Null,]),
+                    "key2": Value::Object(map!["key1": Value::Null,]),
                     "key3": Value::from(2),
                 ],
                 Default::default(),
@@ -351,7 +349,7 @@ mod test {
                                          "key2": 1,
                                          "key3": "",
             ]],
-            want: Ok(Value::Map(map!["key2": 1])),
+            want: Ok(Value::Object(map!["key2": 1])),
         }
 
         with_array {
@@ -365,7 +363,7 @@ mod test {
                                          "key3": " "],
                              nullish: true
             ],
-            want: Ok(Value::Map(map!["key2": 1])),
+            want: Ok(Value::Object(map!["key2": 1])),
         }
     ];
 }
