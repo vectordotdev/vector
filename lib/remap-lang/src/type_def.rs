@@ -1,6 +1,6 @@
 use crate::value;
 use std::collections::{btree_map::Entry, BTreeMap};
-use std::ops::{BitAnd, BitOr};
+use std::ops::{BitAnd, BitOr, Sub};
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -127,6 +127,17 @@ impl BitAnd for TypeDef {
             inner_type_def,
         }
     }
+}
+
+impl Sub<value::Kind> for TypeDef {
+    type Output = Self;
+
+    /// Removes the given kinds from this type definition.
+    fn sub(mut self, other: value::Kind) -> Self::Output {
+        self.kind -= other;
+        self
+    }
+
 }
 
 impl From<value::Kind> for TypeDef {

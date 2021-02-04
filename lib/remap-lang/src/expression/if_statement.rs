@@ -28,7 +28,7 @@ impl From<(Span, Error)> for Diagnostic {
 ///
 /// The initializer of this type errors if the condition doesn't resolve to a
 /// boolean.
-pub struct IfCondition(Box<Expr>);
+pub struct IfCondition(pub(crate) Box<Expr>);
 
 impl IfCondition {
     pub fn new(expression: Box<Expr>, state: &state::Compiler) -> Result<Self, Error> {

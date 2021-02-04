@@ -58,7 +58,12 @@ impl Expression for Arithmetic {
 
         match self.op {
             Or if lhs_def.kind.is_null() => rhs_def,
-            Or if !lhs_def.kind.is_boolean() => lhs_def,
+            Or if !lhs_def.kind.contains(Kind::Null) => lhs_def,
+            Or if !lhs_def.kind.is_boolean() => {
+                // We can remove Null from the lhs since we know that if the lhs is Null
+                // we will be taking the rhs and only the rhs type_def will then be relevant.
+                lhs_def - Kind::Null | rhs_def
+            }
             Or => type_def,
             ErrorOr if !lhs_def.is_fallible() => lhs_def,
             ErrorOr if !rhs_def.is_fallible() => rhs_def,
@@ -87,7 +92,7 @@ impl Expression for Arithmetic {
 mod tests {
     use super::*;
     use crate::{
-        expression::{Literal, Noop},
+        expression::{if_statement::IfCondition, IfStatement, Literal, Noop},
         lit, test_type_def,
         value::Kind,
     };
@@ -113,6 +118,21 @@ mod tests {
             ),
             def: TypeDef {
                 kind: Kind::Boolean,
+                ..Default::default()
+            },
+        }
+
+        or_nullable {
+            expr: |_| Arithmetic::new(
+                Box::new(
+                IfStatement::new(IfCondition(Box::new(lit!(true).into())),
+                                 Box::new(lit!("string").into()),
+                                 Box::new(Value::Null.into())).into()),
+                Box::new(lit!("another string").into()),
+                Operator::Or,
+            ),
+            def: TypeDef {
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }
