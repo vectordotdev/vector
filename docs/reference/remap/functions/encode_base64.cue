@@ -39,7 +39,7 @@ remap: functions: encode_base64: {
 		{
 			title: "Encode to Base64 (default)"
 			source: """
-				.encoded = encode_base64("please encode me")
+				encode_base64("please encode me")
 				"""
 			return: "cGxlYXNlIGVuY29kZSBtZQ=="
 		},
