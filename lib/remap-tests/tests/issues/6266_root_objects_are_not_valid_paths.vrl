@@ -1,0 +1,4 @@
+# object: { "foo": null }
+# result: {}
+
+. = compact(.)

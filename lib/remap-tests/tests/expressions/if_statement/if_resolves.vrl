@@ -1,0 +1,5 @@
+# result: "yes"
+
+if true {
+    "yes"
+}

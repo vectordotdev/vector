@@ -1,12 +1,17 @@
-# SKIP
-#
-# This test should result in an error, because .foo is either "string" or
-# "null", because we don't know at compile-time if the downcase call succeeds
-# or not.
-#
 # object: { "foo": "bar" }
-# result: TODO
+# result:
+#
+# error: invalid argument type
+#   ┌─ :4:15
+#   │
+# 4 │ .foo = upcase(.foo) # string
+#   │               ^^^^
+#   │               │
+#   │               this expression resolves to one of "string" or "null"
+#   │               but the parameter "value" expects the exact type "string"
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
 .foo # any
-.foo, err = downcase(.foo) # string
+.foo, err = to_string(.foo) # string or null
 .foo = upcase(.foo) # string

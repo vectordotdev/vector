@@ -1,11 +1,10 @@
-# object: { "bar": "bar" }
-# result: 
+# result:
 #
 # error: function argument missing
 #   ┌─ :2:1
 #   │
 # 2 │ to_string()
-#   │ ^^^^^^^^^^^ required argument missing: value
+#   │ ^^^^^^^^^^^ required argument missing: "value" (position 0)
 #   │
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
 

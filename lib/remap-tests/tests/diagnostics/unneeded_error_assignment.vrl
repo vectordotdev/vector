@@ -1,15 +1,15 @@
-# object: { "bar": "bar" }
 # result:
 #
 # error: unneeded error assignment
-#   ┌─ :2:1
+#   ┌─ :2:5
 #   │
 # 2 │ ok, err = 5;
-#   │ ^^^^^^^   - because this expression cannot fail
-#   │ │          
-#   │ this error assignment is unneeded
+#   │ --  ^^^   - because this expression cannot fail
+#   │ │   │
+#   │ │   this error assignment is unneeded
+#   │ use: ok = 5
 #   │
-#   = hint: assign to "ok", without assigning to "err"
+#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
 ok, err = 5;

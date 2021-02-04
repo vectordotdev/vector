@@ -1,16 +1,5 @@
-# object: { "bar": "bar" }
-# result: 
+# result:
 #
-# error: program aborted
-#   ┌─ :2:1
-#   │
-# 2 │ to_string!([])
-#   │ ^^^^^^^^^^^^^^
-#   │ │
-#   │ function call error
-#   │ unable to convert value to string
-#   │
-#   = see function documentation at: https://master.vector.dev/docs/reference/remap/#to_string
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+# function call error for "to_string" at (1:15): unable to coerce array into string
 
 to_string!([])

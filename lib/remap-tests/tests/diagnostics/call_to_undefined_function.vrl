@@ -1,5 +1,4 @@
-# object: { "bar": "bar" }
-# result: 
+# result:
 #
 # error: call to undefined function
 #   ┌─ :2:1

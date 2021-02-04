@@ -49,3 +49,12 @@ in our test suite until they are fixed. Ideally this directory is empty.
 
 _See the [documentation](./fixme/README.md) inside the directory for more
 details._
+
+## Internal
+
+Contains a set of tests that validate internal workings of VRL not specific to
+a specific expression, diagnostic, etc. New tests should only be added here if
+they don't fit any other category.
+
+_See the [documentation](./internal/README.md) inside the directory for more
+details._

@@ -1,0 +1,4 @@
+# result: [null, "unable to divide by zero"]
+
+ok, err = 1 / 0
+[ok, err]

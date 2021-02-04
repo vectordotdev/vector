@@ -1,0 +1,5 @@
+# issue: https://github.com/timberio/vector/issues/6129
+# result: unable to add value type "array" to "array"
+
+ok, err = [] + []
+err
