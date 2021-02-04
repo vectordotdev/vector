@@ -471,6 +471,16 @@ mod tests {
 
         assert!(mismatched_array.is_fallible());
 
+        // Setting a required array type on a map -> fallible
+        let map_type = TypeDef {
+            kind: Kind::Map,
+            inner_type_def: Some(inner_type_def!([Kind::Map])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(map_type.is_fallible());
+
         // Any non-array should be fallible if an inner type constraint is
         // applied
         let non_array = TypeDef {
