@@ -214,6 +214,9 @@ impl TypeDef {
             Some(InnerTypeDef::Array(inner_kind)) if kind.into() != inner_kind.kind => {
                 self.fallible = true;
             }
+            Some(InnerTypeDef::Map(_)) => {
+                self.fallible = true;
+            }
             None => {
                 self.fallible = true;
             }
