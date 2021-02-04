@@ -124,16 +124,16 @@ mod tests {
 
     #[test]
     fn to_bool() {
-        use crate::map;
+        use shared::btreemap;
 
         let cases = vec![
             (
-                map!["foo": "true"],
+                btreemap! { "foo" => "true" },
                 Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": 20],
+                btreemap! { "foo" => 20 },
                 Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo"))),
             ),

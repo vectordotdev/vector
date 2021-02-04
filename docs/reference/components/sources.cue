@@ -106,6 +106,18 @@ components: sources: [Name=string]: {
 		}
 
 		if sources[Name].features.receive != _|_ {
+			if sources[Name].features.receive.receive_buffer_size != _|_ {
+				send_buffer_bytes: {
+					common:      false
+					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
+					required:    false
+					type: uint: {
+						examples: [65536]
+					}
+					relevant_when: sources[Name].features.receive.receive_buffer_bytes.relevant_when
+				}
+			}
+
 			if sources[Name].features.receive.keepalive != _|_ {
 				keepalive: {
 					common:      false

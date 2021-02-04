@@ -495,15 +495,7 @@ fn default_test_input_type() -> String {
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
     pub extract_from: String,
-    pub conditions: Option<Vec<TestCondition>>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum TestCondition {
-    Embedded(Box<dyn conditions::ConditionConfig>),
-    NoTypeEmbedded(conditions::CheckFieldsConfig),
-    String(String),
+    pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
 impl Config {

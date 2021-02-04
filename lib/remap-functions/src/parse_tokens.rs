@@ -64,7 +64,7 @@ impl Expression for ParseTokensFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn parse_tokens() {
         let cases = vec![(
-                    map![],
+                    btreemap!{},
                     Ok(vec![
                             "217.250.207.207".into(),
                             Value::Null,

@@ -42,7 +42,7 @@ impl SocketConfig {
     }
 
     pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
-        tcp::TcpConfig::new(addr.into()).into()
+        tcp::TcpConfig::from_address(addr.into()).into()
     }
 }
 
@@ -91,24 +91,28 @@ impl SourceConfig for SocketConfig {
                 let tcp = tcp::RawTcpSource {
                     config: config.clone(),
                 };
-                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
+                let tls = MaybeTlsSettings::from_config(&config.tls(), true)?;
                 tcp.run(
-                    config.address,
-                    config.keepalive,
-                    config.shutdown_timeout_secs,
+                    config.address(),
+                    config.keepalive(),
+                    config.shutdown_timeout_secs(),
                     tls,
+                    config.receive_buffer_bytes(),
                     shutdown,
                     out,
                 )
             }
             Mode::Udp(config) => {
                 let host_key = config
-                    .host_key
+                    .host_key()
+                    .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 Ok(udp::udp(
-                    config.address,
-                    config.max_length,
+                    config.address(),
+                    config.max_length(),
                     host_key,
+                    #[cfg(unix)]
+                    config.receive_buffer_bytes(),
                     shutdown,
                     out,
                 ))
@@ -152,8 +156,8 @@ impl SourceConfig for SocketConfig {
 
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
-            Mode::Tcp(tcp) => vec![tcp.address.into()],
-            Mode::Udp(udp) => vec![Resource::udp(udp.address)],
+            Mode::Tcp(tcp) => vec![tcp.address().into()],
+            Mode::Udp(udp) => vec![Resource::udp(udp.address())],
             #[cfg(unix)]
             Mode::UnixDatagram(_) => vec![],
             #[cfg(unix)]
@@ -176,7 +180,7 @@ mod test {
         Event, Pipeline,
     };
     use bytes::Bytes;
-    use futures::{compat::Future01CompatExt, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -213,7 +217,7 @@ mod test {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
-        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
             .build(
                 "default",
                 &GlobalOptions::default(),
@@ -238,7 +242,7 @@ mod test {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
-        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
             .build(
                 "default",
                 &GlobalOptions::default(),
@@ -266,8 +270,8 @@ mod test {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
-        let mut config = TcpConfig::new(addr.into());
-        config.max_length = 10;
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_max_length(10);
 
         let server = SocketConfig::from(config)
             .build(
@@ -304,9 +308,9 @@ mod test {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
-        let mut config = TcpConfig::new(addr.into());
-        config.max_length = 10;
-        config.tls = Some(TlsConfig::test_config());
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_max_length(10);
+        config.set_tls(Some(TlsConfig::test_config()));
 
         let server = SocketConfig::from(config)
             .build(
@@ -345,16 +349,16 @@ mod test {
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
-        let mut config = TcpConfig::new(addr.into());
-        config.max_length = 10;
-        config.tls = Some(TlsConfig {
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_max_length(10);
+        config.set_tls(Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
                 crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
                 key_file: Some("tests/data/Crt_from_intermediate.key".into()),
                 ..Default::default()
             },
-        });
+        }));
 
         let server = SocketConfig::from(config)
             .build(
@@ -406,7 +410,7 @@ mod test {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
-        let server = SocketConfig::from(TcpConfig::new(addr.into()))
+        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .await
             .unwrap();
@@ -424,7 +428,7 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -444,9 +448,10 @@ mod test {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
         // Start TCP Source
-        let server = SocketConfig::from(TcpConfig {
-            shutdown_timeout_secs: 1,
-            ..TcpConfig::new(addr.into())
+        let server = SocketConfig::from({
+            let mut config = TcpConfig::from_address(addr.into());
+            config.set_shutdown_timeout_secs(1);
+            config
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .await
@@ -460,7 +465,7 @@ mod test {
 
         let cx = SinkContext::new_test();
         let encode_event = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None, None);
+        let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
         let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
 
         // Spawn future that keeps sending lines to the TCP source forever.
@@ -483,7 +488,7 @@ mod test {
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
@@ -537,9 +542,9 @@ mod test {
         source_name: &str,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
-        let addr = next_addr();
+        let address = next_addr();
 
-        let server = SocketConfig::from(UdpConfig::new(addr))
+        let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(
                 source_name,
                 &GlobalOptions::default(),
@@ -553,7 +558,7 @@ mod test {
         // Wait for UDP to start listening
         tokio::time::delay_for(tokio::time::Duration::from_millis(100)).await;
 
-        (addr, source_handle)
+        (address, source_handle)
     }
 
     #[tokio::test]
@@ -653,7 +658,7 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
@@ -688,7 +693,7 @@ mod test {
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.

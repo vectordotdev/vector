@@ -427,8 +427,7 @@ impl RequestConfig {
 mod test {
     use super::*;
     use crate::{sinks::util::service::Concurrency, test_util::next_addr};
-    use futures::{compat::Future01CompatExt, future::ready};
-    use futures01::Stream;
+    use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
         Response, Server, Uri,
@@ -469,7 +468,7 @@ mod test {
             ))
         });
 
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = futures::channel::mpsc::channel(10);
 
         let new_service = make_service_fn(move |_| {
             let tx = tx.clone();
@@ -501,7 +500,7 @@ mod test {
         tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
-        let (body, _rest) = rx.into_future().compat().await.unwrap();
+        let (body, _rest) = rx.into_future().await;
         assert_eq!(body.unwrap(), "hello");
     }
 

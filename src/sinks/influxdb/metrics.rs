@@ -8,10 +8,11 @@ use crate::{
             InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+            BatchConfig, BatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -139,7 +140,7 @@ impl InfluxDBSvc {
             .batch_sink(
                 HttpRetryLogic,
                 influxdb_http_service,
-                MetricBuffer::new(batch.size),
+                MetricsBuffer::<InfluxMetricNormalize>::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
@@ -207,6 +208,22 @@ fn merge_tags(
                 .collect(),
         ),
         (None, None) => None,
+    }
+}
+
+pub struct InfluxMetricNormalize;
+
+impl MetricNormalize for InfluxMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        match (metric.data.kind, &metric.data.value) {
+            // Counters are disaggregated. We take the previous value from the state
+            // and emit the difference between previous and current as a Counter
+            (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
+            // Convert incremental gauges into absolute ones
+            (_, MetricValue::Gauge { .. }) => state.make_absolute(metric),
+            // All others are left as-is
+            _ => Some(metric),
+        }
     }
 }
 

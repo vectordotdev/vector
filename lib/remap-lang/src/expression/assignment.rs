@@ -1,11 +1,12 @@
 use super::Error as E;
 use crate::{
     expression::{Path, Variable},
-    state,
+    path, state,
     value::Kind,
-    Expr, Expression, Object, Result, TypeDef, Value,
+    Expr, Expression, Field, InnerTypeDef, Object, Result, Segment, TypeDef, Value,
 };
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -40,6 +41,33 @@ pub struct Assignment {
     value: Box<Expr>,
 }
 
+/// Add the type def for this path to the compiler state.
+/// We recurse down any inner typedefs and add those paths to the state too.
+fn path_type_def(state: &mut state::Compiler, path: &path::Path, type_def: TypeDef) {
+    let query_types = state.path_query_types_mut();
+
+    // Remove any current typedefs that start with this path.
+    query_types.retain(|key, _| !key.starts_with(&path));
+
+    // Insert the current path type def.
+    query_types.insert(path.clone(), type_def.clone());
+
+    // Recursively insert new ones from the inner type def.
+    // Note we are not handling Array inner types, since array indexing
+    // is fallible (there may not be enough elements in the array) any
+    // indexing needs to be handled.
+    // This may change in future.
+    if let Some(InnerTypeDef::Map(map)) = type_def.inner_type_def {
+        for (field, type_def) in map {
+            if let Ok(field) = Field::from_str(&field) {
+                let mut path = path.clone();
+                path.append(Segment::Field(field));
+                path_type_def(state, &path, type_def);
+            }
+        }
+    }
+}
+
 impl Assignment {
     pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Self {
         let type_def = value.type_def(state);
@@ -50,15 +78,9 @@ impl Assignment {
                 .insert(var.ident().to_owned(), type_def);
         };
 
-        let path_type_def = |state: &mut state::Compiler, path: &Path, type_def| {
-            state
-                .path_query_types_mut()
-                .insert(path.as_ref().clone(), type_def);
-        };
-
         match &target {
             Target::Variable(var) => var_type_def(state, var, type_def),
-            Target::Path(path) => path_type_def(state, path, type_def),
+            Target::Path(path) => path_type_def(state, path.as_ref(), type_def),
             Target::Infallible { ok, err } => {
                 // If the type definition of the rhs expression is infallible,
                 // then an infallible assignment is redundant.
@@ -73,7 +95,7 @@ impl Assignment {
 
                 match ok.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, type_def),
-                    Target::Path(path) => path_type_def(state, path, type_def),
+                    Target::Path(path) => path_type_def(state, path.as_ref(), type_def),
                     Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 }
 
@@ -86,7 +108,7 @@ impl Assignment {
 
                 match err.as_ref() {
                     Target::Variable(var) => var_type_def(state, var, err_type_def),
-                    Target::Path(path) => path_type_def(state, path, err_type_def),
+                    Target::Path(path) => path_type_def(state, path.as_ref(), err_type_def),
                     Target::Infallible { .. } => unimplemented!("nested infallible target"),
                 }
             }
@@ -204,8 +226,50 @@ mod tests {
     use super::*;
     use crate::{
         expression::{Arithmetic, Literal},
-        lit, test_type_def, Operator,
+        lit, path, test_type_def, Operator,
     };
+
+    #[test]
+    fn path_typedef_added_to_state() {
+        let mut state = state::Compiler::default();
+
+        // Assign a type with inner type to a path.
+        let path = path::Path::from_str(".ook").unwrap();
+        path_type_def(
+            &mut state,
+            &path,
+            TypeDef::from(Kind::Map)
+                .with_inner_type(Some(crate::inner_type_def!({ "flork": Kind::Integer }))),
+        );
+
+        assert_eq!(
+            Some(Kind::Map),
+            state
+                .path_query_type(Box::new(path))
+                .map(|typedef| typedef.kind)
+        );
+
+        let nested_path = path::Path::from_str(".ook.flork").unwrap();
+
+        assert_eq!(
+            Some(Kind::Integer),
+            state
+                .path_query_type(Box::new(nested_path.clone()))
+                .map(|typedef| typedef.kind)
+        );
+
+        // Assign a different type to this path.
+        let path = path::Path::from_str(".ook").unwrap();
+        path_type_def(&mut state, &path, Kind::Bytes.into());
+
+        // Ensure the inner type is no longer defined.
+        assert_eq!(
+            None,
+            state
+                .path_query_type(Box::new(nested_path))
+                .map(|typedef| typedef.kind)
+        );
+    }
 
     test_type_def![
         variable {

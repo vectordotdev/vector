@@ -1552,9 +1552,9 @@
   type = "remap"
   source = '''
     . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
-    .bytes_in = to_int!(.bytes_in)
-    .status = to_int!(.status)
-    .bytes_out = to_int!(.bytes_out)
+    .bytes_in = to_int(.bytes_in)
+    .status = to_int(.status)
+    .bytes_out = to_int(.bytes_out)
   '''
 [[tests]]
   name = "remap_function_parse_regex"

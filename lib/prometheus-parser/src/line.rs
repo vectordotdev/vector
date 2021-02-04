@@ -379,19 +379,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                #[allow(unused_mut)]
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
-    }
+    use shared::btreemap;
 
     #[test]
     fn test_parse_escaped_string() {
@@ -577,30 +565,30 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! {});
+        assert_eq!(r, btreemap! {});
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! { "name" => "value" });
+        assert_eq!(r, btreemap! { "name" => "value" });
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! { "name" => "value" });
+        assert_eq!(r, btreemap! { "name" => "value" });
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(
             r,
-            map! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
+            btreemap! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
         );
         assert_eq!(left, tail);
 
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, map! {});
+        assert_eq!(r, btreemap! {});
 
         // We don't allow these values
 

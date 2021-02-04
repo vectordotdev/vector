@@ -6,6 +6,7 @@ use std::io::Write;
 
 pub mod compression;
 pub mod json;
+#[cfg(feature = "sinks-loki")]
 pub mod loki;
 pub mod metrics;
 pub mod partition;

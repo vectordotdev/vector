@@ -2,11 +2,11 @@ package metadata
 
 remap: {
 	#Literal: {
-		anchor:      "#\(name)"
-		name:        string
-		title:       string
-		description: string
-		characteristics: [Name=string]: remap.#Characteristic
+		anchor:          name
+		name:            string
+		title:           string
+		description:     string
+		characteristics: remap.#Characteristics
 		examples: [string, ...string]
 	}
 

@@ -189,7 +189,7 @@ impl Expression for FormatNumberFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -230,22 +230,22 @@ mod tests {
     fn format_number() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok("1234.567".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), None, None, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("1234.56".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), None, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("1234,56".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), Some(","), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("1 234,56".into()),
                 FormatNumberFn::new(
                     Box::new(Literal::from(1234.567)),
@@ -255,7 +255,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("11.222.333.444,567".into()),
                 FormatNumberFn::new(
                     Box::new(Literal::from(11222333444.56789)),
@@ -265,22 +265,22 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("100".into()),
                 FormatNumberFn::new(Box::new(Literal::from(100.0)), None, None, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("100.00".into()),
                 FormatNumberFn::new(Box::new(Literal::from(100.0)), Some(2), None, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("123".into()),
                 FormatNumberFn::new(Box::new(Literal::from(123.45)), Some(0), None, None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("12345.00".into()),
                 FormatNumberFn::new(Box::new(Literal::from(12345)), Some(2), None, None),
             ),

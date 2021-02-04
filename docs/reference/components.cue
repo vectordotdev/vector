@@ -240,6 +240,16 @@ components: {
 	#FeaturesGenerate: {
 	}
 
+	#FeaturesSendBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
+	#FeaturesReceiveBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
 	#FeaturesKeepalive: {
 		enabled: bool
 	}
@@ -271,6 +281,8 @@ components: {
 		}
 
 		keepalive?: #FeaturesKeepalive
+
+		receive_buffer_bytes?: #FeaturesReceiveBufferBytes
 
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
@@ -332,6 +344,8 @@ components: {
 				}
 			}
 		}
+
+		send_buffer_bytes?: #FeaturesSendBufferBytes
 
 		keepalive?: #FeaturesKeepalive
 
