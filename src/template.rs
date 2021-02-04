@@ -150,10 +150,13 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                Event::Metric(_) => None, // See issue #5985
-                Event::Log(log) => log.get(&key),
+                Event::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                Event::Metric(metric) => metric
+                    .series
+                    .tags
+                    .as_ref()
+                    .and_then(|tags| tags.get(key).cloned()),
             }
-            .map(|val| val.to_string_lossy())
             .unwrap_or_else(|| {
                 missing_fields.push(key.to_owned());
                 String::new()
@@ -223,6 +226,7 @@ mod tests {
     use super::*;
     use crate::event::{Metric, MetricKind, MetricValue};
     use chrono::TimeZone;
+    use shared::btreemap;
 
     #[test]
     fn get_fields() {
@@ -416,21 +420,47 @@ mod tests {
 
     #[test]
     fn render_metric_timestamp() {
-        let ts = Utc.ymd(2002, 3, 4).and_hms(5, 6, 7);
-
-        let event: Event = Metric::new(
-            "a-counter".into(),
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 1.1 },
-        )
-        .with_timestamp(Some(ts))
-        .into();
         let template = Template::try_from("timestamp %F %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
-            template.render(&event)
+            template.render(&sample_metric(false))
         );
+    }
+
+    #[test]
+    fn render_metric_with_tags() {
+        let template = Template::try_from("component={{component}}").unwrap();
+        assert_eq!(
+            Ok(Bytes::from("component=template")),
+            template.render(&sample_metric(true))
+        );
+    }
+
+    #[test]
+    fn render_metric_without_tags() {
+        let template = Template::try_from("component={{component}}").unwrap();
+        assert_eq!(
+            Err(vec!["component".into()]),
+            template.render(&sample_metric(false))
+        );
+    }
+
+    fn sample_metric(with_tags: bool) -> Event {
+        let ts = Utc.ymd(2002, 3, 4).and_hms(5, 6, 7);
+
+        let mut metric = Metric::new(
+            "a-counter".into(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.1 },
+        )
+        .with_timestamp(Some(ts));
+        if with_tags {
+            metric = metric.with_tags(Some(
+                btreemap! { "test" => "true", "component" => "template" },
+            ));
+        }
+        metric.into()
     }
 
     #[test]
