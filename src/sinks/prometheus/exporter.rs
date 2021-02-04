@@ -424,7 +424,7 @@ mod tests {
         let mut sink = PrometheusExporter::new(config, cx.acker());
 
         let m1 = Metric::new(
-            "absolute".to_string(),
+            "absolute",
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
         )

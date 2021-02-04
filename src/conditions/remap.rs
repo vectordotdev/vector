@@ -160,7 +160,7 @@ mod test {
             (
                 Event::Metric(
                     Metric::new(
-                        "zork".into(),
+                        "zork",
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
