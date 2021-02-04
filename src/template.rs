@@ -1,4 +1,8 @@
-use crate::{config::log_schema, event::Value, Event};
+use crate::{
+    config::log_schema,
+    event::{Metric, Value},
+    Event,
+};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -151,11 +155,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .expect("src should match regex");
             match event {
                 Event::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
-                Event::Metric(metric) => metric
-                    .series
-                    .tags
-                    .as_ref()
-                    .and_then(|tags| tags.get(key).cloned()),
+                Event::Metric(metric) => render_metric_field(key, metric),
             }
             .unwrap_or_else(|| {
                 missing_fields.push(key.to_owned());
@@ -167,6 +167,19 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
         Ok(out)
     } else {
         Err(missing_fields)
+    }
+}
+
+fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+    match key {
+        "name" => Some(metric.name().into()),
+        "namespace" => metric.namespace().map(Into::into),
+        _ if key.starts_with("tags.") => metric
+            .series
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ => None,
     }
 }
 
@@ -224,7 +237,7 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Metric, MetricKind, MetricValue};
+    use crate::event::{MetricKind, MetricValue};
     use chrono::TimeZone;
     use shared::btreemap;
 
@@ -424,43 +437,58 @@ mod tests {
 
         assert_eq!(
             Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
-            template.render(&sample_metric(false))
+            template.render(&sample_metric().into())
         );
     }
 
     #[test]
     fn render_metric_with_tags() {
-        let template = Template::try_from("component={{component}}").unwrap();
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        let metric = sample_metric().with_tags(Some(
+            btreemap! { "test" => "true", "component" => "template" },
+        ));
         assert_eq!(
-            Ok(Bytes::from("component=template")),
-            template.render(&sample_metric(true))
+            Ok(Bytes::from("name=a-counter component=template")),
+            template.render(&metric.into())
         );
     }
 
     #[test]
     fn render_metric_without_tags() {
-        let template = Template::try_from("component={{component}}").unwrap();
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
         assert_eq!(
-            Err(vec!["component".into()]),
-            template.render(&sample_metric(false))
+            Err(vec!["tags.component".into()]),
+            template.render(&sample_metric().into())
         );
     }
 
-    fn sample_metric(with_tags: bool) -> Event {
-        let ts = Utc.ymd(2002, 3, 4).and_hms(5, 6, 7);
+    #[test]
+    fn render_metric_with_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric().with_namespace(Some("vector-test".into()));
+        assert_eq!(
+            Ok(Bytes::from("namespace=vector-test name=a-counter")),
+            template.render(&metric.into())
+        );
+    }
 
-        let mut metric = Metric::new(
+    #[test]
+    fn render_metric_without_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric();
+        assert_eq!(
+            Err(vec!["namespace".into()]),
+            template.render(&metric.into())
+        );
+    }
+
+    fn sample_metric() -> Metric {
+        Metric::new(
             "a-counter".into(),
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.1 },
         )
-        .with_timestamp(Some(ts));
-        if with_tags {
-            metric = metric.with_tags(Some(
-                btreemap! { "test" => "true", "component" => "template" },
-            ));
-        }
-        metric.into()
+        .with_timestamp(Some(Utc.ymd(2002, 3, 4).and_hms(5, 6, 7)))
     }
 
     #[test]
