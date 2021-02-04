@@ -25,7 +25,7 @@ impl DistributionStatistic {
         let mut bins = source
             .iter()
             .filter(|sample| sample.rate > 0)
-            .cloned()
+            .copied()
             .collect::<Vec<_>>();
 
         match bins.len() {
