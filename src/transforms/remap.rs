@@ -5,7 +5,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef};
+use vrl::{value, Program, Runtime, TypeConstraint, TypeDef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -61,12 +61,12 @@ impl Remap {
 
         let (program, _) = Program::new(
             config.source.clone(),
-            &remap_functions::all(),
+            &vrl_stdlib::all(),
             Some(accepts),
             false,
         )
         .map_err(|diagnostics| {
-            remap::Formatter::new(&config.source, diagnostics)
+            vrl::Formatter::new(&config.source, diagnostics)
                 .colored()
                 .to_string()
         })?;

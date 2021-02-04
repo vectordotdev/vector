@@ -1,5 +1,5 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
-use remap::{Object, Path};
+use vrl::{Object, Path};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -245,7 +245,7 @@ impl Serialize for LogEvent {
 }
 
 impl Object for LogEvent {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let iter = self
                 .as_map()
@@ -253,7 +253,7 @@ impl Object for LogEvent {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()));
 
-            return Ok(Some(remap::Value::from_iter(iter)));
+            return Ok(Some(vrl::Value::from_iter(iter)));
         }
 
         let value = path
@@ -266,7 +266,7 @@ impl Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
+    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Ok(Some(
                 std::mem::take(&mut self.fields)
@@ -289,10 +289,10 @@ impl Object for LogEvent {
         Ok(None)
     }
 
-    fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
-                remap::Value::Map(map) => {
+                vrl::Value::Map(map) => {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))
@@ -421,7 +421,7 @@ mod test {
     #[test]
     fn object_get() {
         use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use vrl::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (map![], vec![], Ok(Some(map![].into()))),
@@ -475,7 +475,7 @@ mod test {
     #[test]
     fn object_insert() {
         use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use vrl::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (
@@ -570,19 +570,19 @@ mod test {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: remap::Value = value;
+            let value: vrl::Value = value;
             let path = Path::new_unchecked(segments);
 
             assert_eq!(Object::insert(&mut event, &path, value.clone()), result);
             assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+            assert_eq!(vrl::Object::get(&event, &path), Ok(Some(value)));
         }
     }
 
     #[test]
     fn object_remove() {
         use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use vrl::{Field::*, Object, Path, Segment::*};
 
         let cases = vec![
             (

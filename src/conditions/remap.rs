@@ -4,7 +4,7 @@ use crate::{
     internal_events::RemapConditionExecutionError,
     Event,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
+use vrl::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -34,7 +34,7 @@ impl ConditionConfig for RemapConfig {
         //
         // TODO(jean): expose this as a method on the `Function` trait, so we
         // don't need to do this manually.
-        let functions = remap_functions::all()
+        let functions = vrl_stdlib::all()
             .into_iter()
             .filter(|f| f.identifier() != "del")
             .filter(|f| f.identifier() != "only_fields")
@@ -42,7 +42,7 @@ impl ConditionConfig for RemapConfig {
 
         let (program, _) = Program::new(self.source.clone(), &functions, Some(constraint), false)
             .map_err(|diagnostics| {
-            remap::Formatter::new(&self.source, diagnostics)
+            vrl::Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()
         })?;
@@ -59,11 +59,11 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn run(&self, event: &Event) -> remap::RuntimeResult {
-        // TODO(jean): This clone exists until remap-lang has an "immutable"
+    fn run(&self, event: &Event) -> vrl::RuntimeResult {
+        // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
         //
-        // For now, mutability in reduce "remap ends-when conditions" is
+        // For now, mutability in reduce "vrl ends-when conditions" is
         // allowed, but it won't mutate the original event, since we cloned it
         // here.
         //
