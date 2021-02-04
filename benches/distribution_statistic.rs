@@ -2,18 +2,18 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
+use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use rand::rngs::SmallRng;
 
 use vector::event::metric::Sample;
 use vector::sinks::util::statistic::DistributionStatistic;
 
-fn generate_samples(mut size: u32) -> Vec<Sample> {
+fn generate_samples(mut size: u32, max_bin_count: u32) -> Vec<Sample> {
     // generate random samples, but we also want to use
     // the same samples set on each run.
     let mut rng = SmallRng::seed_from_u64(1234);
-    let range = Uniform::from(1u32..=3u32);
+    let range = Uniform::from(1..=max_bin_count);
     let mut value = 1.0;
     let mut samples = Vec::new();
     while size > 0 {
@@ -30,12 +30,27 @@ fn generate_samples(mut size: u32) -> Vec<Sample> {
 }
 
 fn bench_statistic(c: &mut Criterion) {
-    let mut group = c.benchmark_group("statistic");
+    let mut group = c.benchmark_group("distribution_statistic");
 
     let sizes = [5, 10, 50, 100, 200, 500, 1000];
     for &size in &sizes {
-        group.bench_function(format!("samples-{}", size), |b| {
-            let samples = generate_samples(size);
+        group.bench_function(format!("small-bin-{}", size), |b| {
+            let samples = generate_samples(size, 3);
+
+            b.iter_batched(
+                || samples.clone(),
+                |samples| {
+                    DistributionStatistic::from_samples(&samples, &[0.5, 0.75, 0.9, 0.95, 0.99])
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+
+    let sizes = [50, 100, 200, 500, 1000];
+    for &size in &sizes {
+        group.bench_function(format!("large-bin-{}", size), |b| {
+            let samples = generate_samples(size, 20);
 
             b.iter_batched(
                 || samples.clone(),
