@@ -44,6 +44,7 @@ members = [
   "lib/prometheus-parser",
   "lib/remap-cli",
   "lib/remap-compiler",
+  "lib/remap-diagnostic",
   "lib/remap-functions",
   "lib/remap-lang",
   "lib/remap-parser",
