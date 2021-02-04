@@ -413,7 +413,7 @@ mod test {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.5 },
                 )
-                .with_namespace(Some("vector".into()))
+                .with_namespace(Some("vector"))
                 .with_tags(Some(tags())),
             ),
             Event::Metric(
@@ -425,7 +425,7 @@ mod test {
                         statistic: StatisticKind::Histogram,
                     },
                 )
-                .with_namespace(Some("vector".into())),
+                .with_namespace(Some("vector")),
             ),
         ];
         let (mut tx, rx) = mpsc::channel(1);

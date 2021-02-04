@@ -242,8 +242,8 @@ impl Metric {
         }
     }
 
-    pub fn with_namespace(mut self, namespace: Option<String>) -> Self {
-        self.series.name.namespace = namespace;
+    pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
+        self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
@@ -307,7 +307,7 @@ impl Metric {
             .collect::<MetricTags>();
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
-            .with_namespace(Some("vector".to_string()))
+            .with_namespace(Some("vector"))
             .with_timestamp(Some(Utc::now()))
             .with_tags(if labels.is_empty() {
                 None
@@ -908,7 +908,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -936,7 +936,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Gauge { value: -2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -968,7 +968,7 @@ mod test {
                 values: vec!["new".into()].into_iter().collect(),
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -1004,7 +1004,7 @@ mod test {
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -1058,7 +1058,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector".to_string()))
+                .with_namespace(Some("vector"))
             ),
             r#"vector_namespace{} = 1.23"#
         );
@@ -1071,7 +1071,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector host".to_string()))
+                .with_namespace(Some("vector host"))
             ),
             r#""vector host"_namespace{} = 1.23"#
         );
@@ -1144,7 +1144,7 @@ mod test {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_namespace(Some("zoob".into()))
+        .with_namespace(Some("zoob"))
         .with_tags(Some({
             let mut map = MetricTags::new();
             map.insert("tig".to_string(), "tog".to_string());

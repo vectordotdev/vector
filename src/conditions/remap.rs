@@ -164,7 +164,7 @@ mod test {
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
-                    .with_namespace(Some("zerk".into()))
+                    .with_namespace(Some("zerk"))
                     .with_tags(Some({
                         let mut tags = BTreeMap::new();
                         tags.insert("host".into(), "zoobub".into());

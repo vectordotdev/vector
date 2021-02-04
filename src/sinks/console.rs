@@ -196,7 +196,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 100.0 },
             )
-            .with_namespace(Some("vector".into()))
+            .with_namespace(Some("vector"))
             .with_tags(Some(
                 vec![
                     ("key2".to_owned(), "value2".to_owned()),

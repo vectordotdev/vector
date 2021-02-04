@@ -366,14 +366,14 @@ mod tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_timestamp(Some(ts())),
             Metric::new(
                 "check",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
@@ -393,7 +393,7 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Gauge { value: -1.5 },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -413,7 +413,7 @@ mod tests {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -435,7 +435,7 @@ mod tests {
                 sum: 12.5,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -474,7 +474,7 @@ mod tests {
                 sum: 12.5,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -513,7 +513,7 @@ mod tests {
                 sum: 12.0,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -552,7 +552,7 @@ mod tests {
                 sum: 12.0,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -591,7 +591,7 @@ mod tests {
                     statistic: StatisticKind::Histogram,
                 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
             Metric::new(
@@ -607,7 +607,7 @@ mod tests {
                     statistic: StatisticKind::Histogram,
                 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_timestamp(Some(ts())),
             Metric::new(
                 "sparse_stats",
@@ -622,7 +622,7 @@ mod tests {
                     statistic: StatisticKind::Histogram,
                 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_timestamp(Some(ts())),
         ];
 
@@ -698,7 +698,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -716,7 +716,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -734,7 +734,7 @@ mod tests {
                 statistic: StatisticKind::Summary,
             },
         )
-        .with_namespace(Some("ns".into()))
+        .with_namespace(Some("ns"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()))];
 
@@ -784,14 +784,14 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 2.5 },
             )
-            .with_namespace(Some("vector".into()))
+            .with_namespace(Some("vector"))
             .with_timestamp(Some(ts())),
             Metric::new(
                 "mem",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 1000.0 },
             )
-            .with_namespace(Some("vector".into()))
+            .with_namespace(Some("vector"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
@@ -938,7 +938,7 @@ mod integration_tests {
                     MetricKind::Incremental,
                     MetricValue::Counter { value: i as f64 },
                 )
-                .with_namespace(Some("ns".to_string()))
+                .with_namespace(Some("ns"))
                 .with_tags(Some(
                     vec![
                         ("region".to_owned(), "us-west-1".to_owned()),
@@ -1023,7 +1023,7 @@ mod integration_tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )
-            .with_namespace(Some("ns".to_string()))
+            .with_namespace(Some("ns"))
             .with_tags(Some(
                 vec![
                     ("region".to_owned(), "us-west-1".to_owned()),

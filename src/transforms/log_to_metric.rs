@@ -449,7 +449,7 @@ mod tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("app".into()))
+            .with_namespace(Some("app"))
             .with_tags(Some(
                 vec![
                     ("method".to_owned(), "post".to_owned()),
@@ -680,7 +680,7 @@ mod tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("local".into()))
+            .with_namespace(Some("local"))
             .with_timestamp(Some(ts()))
         );
         assert_eq!(

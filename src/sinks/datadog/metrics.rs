@@ -550,13 +550,13 @@ mod tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
             )
-            .with_namespace(Some("test".into())),
+            .with_namespace(Some("test")),
             Metric::new(
                 "check",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("test".into()))
+            .with_namespace(Some("test"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
             Metric::new(
@@ -564,7 +564,7 @@ mod tests {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("test".into()))
+            .with_namespace(Some("test"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
@@ -602,14 +602,14 @@ mod tests {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_timestamp(Some(ts())),
             Metric::new(
                 "check",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
