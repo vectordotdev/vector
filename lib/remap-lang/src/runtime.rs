@@ -1,11 +1,11 @@
-use crate::{state, Expression, Object, Program, Value};
+use crate::{state, Context, Path, Program, Target, Value};
 use std::{error::Error, fmt};
 
 pub type RuntimeResult = Result<Value, Abort>;
 
 #[derive(Debug, Default)]
 pub struct Runtime {
-    state: state::Program,
+    state: state::Runtime,
 }
 
 /// The error raised if the runtime is aborted.
@@ -25,18 +25,36 @@ impl Error for Abort {
 }
 
 impl Runtime {
-    pub fn new(state: state::Program) -> Self {
+    pub fn new(state: state::Runtime) -> Self {
         Self { state }
     }
 
-    /// Given the provided [`Object`], run the provided [`Program`] to
+    /// Given the provided [`Target`], resolve the provided [`Program`] to
     /// completion.
-    pub fn run<'a>(&mut self, object: &mut impl Object, program: &'a Program) -> RuntimeResult {
+    pub fn resolve(&mut self, target: &mut dyn Target, program: &Program) -> RuntimeResult {
+        // Validate that the path is an object.
+        //
+        // VRL technically supports any `Value` object as the root, but the
+        // assumption is people are expected to use it to query objects.
+        match target.get(&Path::root()) {
+            Ok(Some(Value::Object(_))) => {}
+            Ok(Some(value)) => {
+                return Err(Abort(format!(
+                    "target must be a valid object, got {}: {}",
+                    value.kind(),
+                    value
+                )))
+            }
+            Ok(None) => return Err(Abort("expected target object, got nothing".to_owned())),
+            Err(err) => return Err(Abort(format!("error querying target object: {}", err))),
+        };
+
+        let mut context = Context::new(target, &mut self.state);
+
         let mut values = program
-            .expressions
             .iter()
             .map(|expr| {
-                expr.execute(&mut self.state, object)
+                expr.resolve(&mut context)
                     .map_err(|err| Abort(err.to_string()))
             })
             .collect::<Result<Vec<_>, _>>()?;

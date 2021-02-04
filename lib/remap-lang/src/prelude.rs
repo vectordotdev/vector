@@ -1,17 +1,28 @@
 // commonly used modules
-pub use crate::{expression, function, state, value};
+pub use compiler::{state, value, value::kind};
+
+// pub use crate::{expression, function, state, value};
 
 // commonly used top-level crate types
-pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
+pub use compiler::{value::Kind, Context, Expression, Function, Resolved, Target, TypeDef, Value};
+
+pub use diagnostic::DiagnosticError;
+
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+
+// pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
 // commonly used expressions
-pub use crate::expression::{Array, Literal, Map, Noop, Path, Variable};
+
+// pub use compiler::expression::Resolved;
 
 // commonly used function types
-pub use crate::function::{ArgumentList, Parameter};
+
+pub use compiler::function::{ArgumentList, Parameter};
 
 // commonly used macros
-pub use crate::generate_param_list;
+
+// pub use crate::generate_param_list;
 
 // test helpers
-pub use crate::{array, bench_function, func_args, lit, map, test_function, test_type_def};
+// pub use crate::{array, bench_function, func_args, lit, map, test_function, test_type_def};

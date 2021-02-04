@@ -1,15 +1,13 @@
 use crate::{Path, Value};
 
-/// Any object you want to map through the remap language has to implement this
-/// trait.
-pub trait Object: std::fmt::Debug {
-    /// Insert a given [`Value`] in the provided [`Object`].
+/// Any target object you want to remap using VRL has to implement this trait.
+pub trait Target: std::fmt::Debug {
+    /// Insert a given [`Value`] in the provided [`Target`].
     ///
-    /// The `path` parameter determines _where_ in the given object the value
+    /// The `path` parameter determines _where_ in the given target the value
     /// should be inserted.
     ///
-    /// A path contains dot-delimited segments, and can contain a combination
-    /// of:
+    /// A path consists of "path segments". Each segment can be one of:
     ///
     /// * regular path segments:
     ///
@@ -32,7 +30,7 @@ pub trait Object: std::fmt::Debug {
     /// * path indices:
     ///
     ///   ```txt
-    ///   .foo[2]
+    ///   .foo[2][-1]
     ///   ```
     ///
     /// When inserting into a coalesced path, the implementor is encouraged to
@@ -40,15 +38,16 @@ pub trait Object: std::fmt::Debug {
     /// error if needed.
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String>;
 
-    /// Get a value for a given path, or `None` if no value exists for the given
-    /// path.
+    /// Get a value for a given path, or `None` if no value is found.
     ///
     /// See [`Object::insert`] for more details.
     fn get(&self, path: &Path) -> Result<Option<Value>, String>;
 
     /// Remove the given path from the object.
     ///
+    /// Returns the removed object, if any.
+    ///
     /// If `compact` is true, after deletion, if an empty object or array is
-    /// left behind, it should be removed as well.
+    /// left behind, it should be removed as well, cascading up to the root.
     fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String>;
 }
