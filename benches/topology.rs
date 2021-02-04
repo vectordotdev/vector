@@ -453,7 +453,12 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                 let mut config = config::Config::builder();
                 config.add_source(
                     "in",
-                    sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+                    sources::syslog::SyslogConfig::from_mode(sources::syslog::Mode::Tcp {
+                        address: in_addr.into(),
+                        keepalive: None,
+                        tls: None,
+                        receive_buffer_bytes: None,
+                    }),
                 );
 
                 let toml_cfg = r##"
