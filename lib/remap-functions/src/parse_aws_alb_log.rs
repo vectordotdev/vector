@@ -8,6 +8,7 @@ use nom::{
 };
 use remap::prelude::*;
 use std::collections::BTreeMap;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
@@ -54,8 +55,46 @@ impl Expression for ParseAwsAlbLogFn {
         self.value
             .type_def(state)
             .into_fallible(true) // Log parsing error
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
+        "type": Kind::Bytes,
+        "timestamp": Kind::Bytes,
+        "elb": Kind::Bytes,
+        "client_host": Kind::Bytes,
+        "target_host": Kind::Bytes,
+        "request_processing_time": Kind::Float,
+        "target_processing_time": Kind::Float,
+        "response_processing_time": Kind::Float,
+        "elb_status_code": Kind::Bytes,
+        "target_status_code": Kind::Bytes,
+        "received_bytes": Kind::Integer,
+        "sent_bytes": Kind::Integer,
+        "request_method": Kind::Bytes,
+        "request_protocol": Kind::Bytes,
+        "request_url": Kind::Bytes,
+        "user_agent": Kind::Bytes,
+        "ssl_cipher": Kind::Bytes,
+        "ssl_protocol": Kind::Bytes,
+        "target_group_arn": Kind::Bytes,
+        "trace_id": Kind::Bytes,
+        "domain_name": Kind::Bytes,
+        "chosen_cert_arn": Kind::Bytes,
+        "matched_rule_priority": Kind::Bytes,
+        "request_creation_time": Kind::Bytes,
+        "actions_executed": Kind::Bytes,
+        "redirect_url": Kind::Bytes,
+        "error_reason": Kind::Bytes,
+        "target_port_list": Kind::Bytes,
+        "target_status_code_list": Kind::Bytes,
+        "classification": Kind::Bytes,
+        "classification_reason": Kind::Bytes
+    }))
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {
@@ -201,12 +240,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseAwsAlbLogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_optional {
             expr: |_| ParseAwsAlbLogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 

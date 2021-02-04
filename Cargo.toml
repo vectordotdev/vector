@@ -31,7 +31,7 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
-depends = ""
+depends = "libc6 (>= 2.17)"
 
 [workspace]
 members = [
@@ -193,7 +193,7 @@ pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runti
 cidr-utils = "0.5.0"
 pin-project = "1.0.1"
 nats = { version = "0.8.6", optional = true }
-k8s-openapi = { version = "0.10.0", features = ["v1_16"], optional = true }
+k8s-openapi = { version = "0.11.0", features = ["v1_16"], optional = true }
 sha-1 = "0.9.2"
 sha2 = "0.9"
 sha3 = "0.9"
@@ -268,6 +268,7 @@ default-cmake = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks
 default-msvc = ["api", "api-client", "vrl-cli", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 default-no-api-client = ["api", "sources", "vrl-cli", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 default-no-vrl-cli = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+docs = ["api", "sources", "transforms", "sinks"]
 
 all-logs = ["sources-logs", "transforms-logs", "sinks-logs"]
 all-metrics = ["sources-metrics", "transforms-metrics", "sinks-metrics"]

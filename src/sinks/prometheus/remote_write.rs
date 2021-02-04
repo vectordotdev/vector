@@ -7,8 +7,10 @@ use crate::{
     sinks::{
         self,
         util::{
-            http::HttpRetryLogic, BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+            http::HttpRetryLogic,
+            BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            TowerRequestConfig,
         },
     },
     template::Template,
@@ -94,7 +96,8 @@ impl SinkConfig for RemoteWriteConfig {
         let sink = {
             let service = request.service(HttpRetryLogic, service);
             let service = ServiceBuilder::new().service(service);
-            let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+            let buffer =
+                PartitionBuffer::new(MetricsBuffer::<PrometheusMetricNormalize>::new(batch.size));
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let tenant_id = tenant_id.as_ref().and_then(|template| {
@@ -139,6 +142,13 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
     match response.status() {
         http::StatusCode::OK => Ok(()),
         other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
+    }
+}
+pub struct PrometheusMetricNormalize;
+
+impl MetricNormalize for PrometheusMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        state.make_absolute(metric)
     }
 }
 
