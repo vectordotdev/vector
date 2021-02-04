@@ -62,7 +62,7 @@ impl Expression for Arithmetic {
             Or if !lhs_def.kind.is_boolean() => {
                 // We can remove Null from the lhs since we know that if the lhs is Null
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
-                lhs_def - Kind::Null | rhs_def
+                (lhs_def - Kind::Null) | rhs_def
             }
             Or => type_def,
             ErrorOr if !lhs_def.is_fallible() => lhs_def,
