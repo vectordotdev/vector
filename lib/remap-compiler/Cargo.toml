@@ -1,0 +1,20 @@
+[package]
+name = "remap-compiler"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+bitflags = "1"
+bytes = "0.5.6"
+chrono = "0.4"
+diagnostic = { package = "remap-diagnostic", path = "../remap-diagnostic" }
+lalrpop-util = "0.19"
+ngrammatic = "0.3"
+ordered-float = "2"
+parser = { package = "remap-parser", path = "../remap-parser" }
+paste = "1"
+regex = "1"
+serde = "1"
+thiserror = "1"

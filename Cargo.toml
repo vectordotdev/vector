@@ -43,6 +43,7 @@ members = [
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/remap-cli",
+  "lib/remap-compiler",
   "lib/remap-functions",
   "lib/remap-lang",
   "lib/remap-parser",
