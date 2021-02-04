@@ -137,6 +137,21 @@ mod tests {
             },
         }
 
+        or_not_nullable {
+            expr: |_| Arithmetic::new(
+                Box::new(
+                IfStatement::new(IfCondition(Box::new(lit!(true).into())),
+                                 Box::new(lit!("string").into()),
+                                 Box::new(lit!(42).into())).into()),
+                Box::new(lit!("another string").into()),
+                Operator::Or,
+            ),
+            def: TypeDef {
+                kind: Kind::Bytes | Kind::Integer,
+                ..Default::default()
+            },
+        }
+
         multiply {
             expr: |_| Arithmetic::new(
                 Box::new(Noop.into()),

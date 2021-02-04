@@ -137,7 +137,6 @@ impl Sub<value::Kind> for TypeDef {
         self.kind -= other;
         self
     }
-
 }
 
 impl From<value::Kind> for TypeDef {
