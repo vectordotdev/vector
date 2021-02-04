@@ -45,6 +45,7 @@ members = [
   "lib/remap-cli",
   "lib/remap-functions",
   "lib/remap-lang",
+  "lib/remap-parser",
   "lib/remap-tests",
   "lib/shared",
   "lib/tracing-limit",
