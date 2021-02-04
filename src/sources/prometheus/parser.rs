@@ -359,7 +359,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "msdos_file_access_time_seconds".into(),
+                "msdos_file_access_time_seconds",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: 1458255915.0

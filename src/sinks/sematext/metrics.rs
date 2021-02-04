@@ -365,11 +365,11 @@ mod tests {
         for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(
                 Metric::new(
-                    metric,
+                    *metric,
                     MetricKind::Incremental,
                     MetricValue::Counter { value: *val as f64 },
                 )
-                .with_namespace(Some(namespace))
+                .with_namespace(Some(*namespace))
                 .with_tags(Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]
                         .into_iter()

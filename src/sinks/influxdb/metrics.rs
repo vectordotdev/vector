@@ -934,7 +934,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(
                 Metric::new(
-                    metric,
+                    metric.clone(),
                     MetricKind::Incremental,
                     MetricValue::Counter { value: i as f64 },
                 )

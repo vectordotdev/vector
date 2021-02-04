@@ -526,7 +526,7 @@ mod integration_tests {
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
-                    .with_namespace(Some(namespace)),
+                    .with_namespace(Some(*namespace)),
                 );
                 events.push(event);
             }
