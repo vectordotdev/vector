@@ -3,12 +3,16 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
 use rand::seq::SliceRandom;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 
 use vector::event::metric::Sample;
 use vector::sinks::util::statistic::DistributionStatistic;
 
 fn generate_samples(mut size: u32) -> Vec<Sample> {
-    let mut rng = rand::thread_rng();
+    // generate random samples, but we also want to use
+    // the same samples set on each run.
+    let mut rng = SmallRng::seed_from_u64(1234);
     let range = Uniform::from(1u32..=3u32);
     let mut value = 1.0;
     let mut samples = Vec::new();
@@ -48,7 +52,7 @@ fn bench_statistic(c: &mut Criterion) {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().noise_threshold(0.02);
+    config = Criterion::default().noise_threshold(0.05);
     targets = bench_statistic
 );
 criterion_main!(benches);
