@@ -198,7 +198,7 @@ impl Application {
 
     pub fn run(self) {
         let mut rt = self.runtime;
-        let mut event_inspector = self.config.event_inspector;
+        let event_inspector = self.config.event_inspector;
 
         let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
