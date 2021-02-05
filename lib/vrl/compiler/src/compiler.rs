@@ -88,6 +88,7 @@ impl<'a> Compiler<'a> {
             Query(node) => self.compile_query(node).into(),
             FunctionCall(node) => self.compile_function_call(node).into(),
             Variable(node) => self.compile_variable(node).into(),
+            Unary(node) => self.compile_unary(node).into(),
         }
     }
 
@@ -294,6 +295,27 @@ impl<'a> Compiler<'a> {
 
     fn compile_variable(&mut self, node: Node<ast::Ident>) -> Variable {
         Variable::new(node.into_inner())
+    }
+
+    fn compile_unary(&mut self, node: Node<ast::Unary>) -> Unary {
+        use ast::Unary::*;
+
+        let variant = match node.into_inner() {
+            Not(node) => self.compile_not(node).into(),
+        };
+
+        Unary::new(variant)
+    }
+
+    fn compile_not(&mut self, node: Node<ast::Not>) -> Not {
+        let (not, expr) = node.into_inner().take();
+
+        let node = Node::new(expr.span(), self.compile_expr(*expr));
+
+        Not::new(node, not.span(), &self.state).unwrap_or_else(|err| {
+            self.errors.push(Box::new(err));
+            Not::noop()
+        })
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

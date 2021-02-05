@@ -473,6 +473,10 @@ impl<'input> Iterator for Lexer<'input> {
                     '_' if self.test_peek(char::is_alphabetic) => Some(self.internal_test(start)),
                     '_' => self.token(start, Underscore),
 
+                    '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
+                        self.token(start, Bang)
+                    }
+
                     '#' => {
                         self.take_until(start, |ch| ch == '\n');
                         continue;
@@ -855,7 +859,6 @@ impl<'input> Lexer<'input> {
         let token = match op {
             "=" => Token::Equals,
             "|" => Token::Pipe,
-            "!" => Token::Bang,
             "?" => Token::Question,
             op => Token::Operator(op),
         };

@@ -202,6 +202,7 @@ pub enum Expr {
     Query(Node<Query>),
     FunctionCall(Node<FunctionCall>),
     Variable(Node<Ident>),
+    Unary(Node<Unary>),
 }
 
 impl fmt::Debug for Expr {
@@ -217,6 +218,7 @@ impl fmt::Debug for Expr {
             Query(v) => format!("{:?}", v),
             FunctionCall(v) => format!("{:?}", v),
             Variable(v) => format!("{:?}", v),
+            Unary(v) => format!("{:?}", v),
         };
 
         write!(f, "Expr({})", value)
@@ -236,6 +238,7 @@ impl fmt::Display for Expr {
             Query(v) => v.fmt(f),
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
+            Unary(v) => v.fmt(f),
         }
     }
 }
@@ -1001,6 +1004,62 @@ impl fmt::Debug for FunctionArgument {
         } else {
             write!(f, "Argument({:?})", self.expr)
         }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// unary
+// -----------------------------------------------------------------------------
+
+#[derive(PartialEq)]
+pub enum Unary {
+    Not(Node<Not>),
+}
+
+impl fmt::Display for Unary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Unary::*;
+
+        match self {
+            Not(v) => v.fmt(f),
+        }
+    }
+}
+
+impl fmt::Debug for Unary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Unary::*;
+
+        let value = match self {
+            Not(v) => format!("{:?}", v),
+        };
+
+        write!(f, "Unary({})", value)
+    }
+}
+
+// -----------------------------------------------------------------------------
+// not
+// -----------------------------------------------------------------------------
+
+#[derive(PartialEq)]
+pub struct Not(pub(crate) Node<()>, pub(crate) Box<Node<Expr>>);
+
+impl Not {
+    pub fn take(self) -> (Node<()>, Box<Node<Expr>>) {
+        (self.0, self.1)
+    }
+}
+
+impl fmt::Display for Not {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "!{}", self.1)
+    }
+}
+
+impl fmt::Debug for Not {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Not({:?})", self.1)
     }
 }
 

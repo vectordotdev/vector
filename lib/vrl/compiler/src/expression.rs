@@ -9,8 +9,10 @@ mod function_argument;
 mod group;
 mod if_statement;
 mod noop;
+mod not;
 mod object;
 mod op;
+mod unary;
 mod variable;
 
 pub(crate) mod assignment;
@@ -29,10 +31,12 @@ pub use group::Group;
 pub use if_statement::IfStatement;
 pub use literal::Literal;
 pub use noop::Noop;
+pub use not::Not;
 pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
 pub use query::Query;
+pub use unary::Unary;
 pub use variable::Variable;
 
 pub type Resolved = Result<Value, ExpressionError>;
@@ -61,6 +65,8 @@ pub enum Expr {
     Query(Query),
     FunctionCall(FunctionCall),
     Variable(Variable),
+    Noop(Noop),
+    Unary(Unary),
 }
 
 impl Expression for Expr {
@@ -76,6 +82,8 @@ impl Expression for Expr {
             Query(v) => v.resolve(ctx),
             FunctionCall(v) => v.resolve(ctx),
             Variable(v) => v.resolve(ctx),
+            Noop(v) => v.resolve(ctx),
+            Unary(v) => v.resolve(ctx),
         }
     }
 
@@ -91,6 +99,8 @@ impl Expression for Expr {
             Query(v) => v.type_def(state),
             FunctionCall(v) => v.type_def(state),
             Variable(v) => v.type_def(state),
+            Noop(v) => v.type_def(state),
+            Unary(v) => v.type_def(state),
         }
     }
 }
@@ -108,6 +118,8 @@ impl fmt::Display for Expr {
             Query(v) => v.fmt(f),
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
+            Noop(v) => v.fmt(f),
+            Unary(v) => v.fmt(f),
         }
     }
 }
@@ -157,6 +169,18 @@ impl From<FunctionCall> for Expr {
 impl From<Variable> for Expr {
     fn from(variable: Variable) -> Self {
         Expr::Variable(variable)
+    }
+}
+
+impl From<Noop> for Expr {
+    fn from(noop: Noop) -> Self {
+        Expr::Noop(noop)
+    }
+}
+
+impl From<Unary> for Expr {
+    fn from(unary: Unary) -> Self {
+        Expr::Unary(unary)
     }
 }
 

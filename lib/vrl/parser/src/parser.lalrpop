@@ -293,9 +293,18 @@ Add: Expr = {
 };
 
 Factor: Expr = {
-    Op<Factor, "%", Term>,
-    Op<Factor, "*", Term>,
-    Op<Factor, "/", Term>,
+    Op<Factor, "%", Not>,
+    Op<Factor, "*", Not>,
+    Op<Factor, "/", Not>,
+    Not,
+};
+
+Not: Expr = {
+    <bang: Sp<"!">> <expr: Box<Sp<Not>>> => {
+        let span = span(bang.span().start(), expr.span().end());
+        let not = Unary::Not(Node::new(span, Not(bang.map(|_| ()), expr)));
+        Expr::Unary(Node::new(span, not))
+    },
     Term,
 };
 
