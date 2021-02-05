@@ -217,15 +217,12 @@ impl HttpSink for StackdriverSink {
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (events, partition) = output.into_parts();
-        let labels = SliceMap {
-            entries: &partition.labels,
-        };
         let events = serde_json::json!({
             "log_name": self.config.log_name(),
             "entries": events,
             "resource": {
                 "type": partition.r#type,
-                "labels": labels,
+                "labels": SliceMap::new(&partition.labels),
             }
         });
 

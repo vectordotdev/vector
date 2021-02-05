@@ -42,3 +42,9 @@ where
         map.end()
     }
 }
+
+impl<'a, K, V> SliceMap<'a, K, V> {
+    pub fn new(entries: &'a [(K, V)]) -> Self {
+        Self { entries }
+    }
+}
