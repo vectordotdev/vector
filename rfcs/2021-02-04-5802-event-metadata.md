@@ -1,6 +1,7 @@
 # RFC 5802 - 2021-02-04 - Event Metadata
 
-This RFC introduces a plan to associate persistent metadata with every Vector event, both logs and metrics.
+This RFC introduces a plan to associate persistent metadata with every
+Vector event, both logs and metrics.
 
 ## Scope
 
@@ -110,10 +111,6 @@ This metadata will not be visible to users, either through remap or JSON
 transforms, unless a use case can demonstrate the need for it. Given the
 above structure of the metadata, there are no user-modifiable parts.
 
-## Doc-level Proposal
-
-N/A
-
 ## Rationale
 
 This addition is required to support the two features mentioned in the
@@ -137,10 +134,6 @@ the assumption that most events will have a single source throughout
 their lifetime. `SmallVec` is a data structure that can inline a (fixed)
 number of elements before allocating memory. By using this feature, this
 common case can avoid an extra allocation and improve data locality.
-
-## Prior Art
-
-N/A
 
 ## Drawbacks
 
@@ -175,16 +168,6 @@ The following alternative components have been considered and discarded:
    of an extra allocation and reference counting for the `Arc`
    box. Since common usage patterns do not duplicate events, the costs
    outweigh the benefits on this one.
-
-## Outstanding Questions
-
-- What is the best way of uniquely identifying the source? Is a simple
-  name adequate (since no two components may have the same name) or is a
-  new unique identifier or serial number required to prevent confusion
-  when configuration is reloaded?
-- What data is needed to uniquely identify source messages in order to
-  acknowledge them? The above provides for a `String`, into which any
-  other data may be encoded, but this is likely less than ideal.
 
 ## Plan Of Attack
 
