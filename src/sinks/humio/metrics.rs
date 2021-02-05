@@ -171,7 +171,7 @@ mod tests {
         let metrics = vec![
             Event::from(
                 Metric::new(
-                    "metric1".to_string(),
+                    "metric1",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 42.0 },
                 )
@@ -184,7 +184,7 @@ mod tests {
             ),
             Event::from(
                 Metric::new(
-                    "metric2".to_string(),
+                    "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
                         samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],

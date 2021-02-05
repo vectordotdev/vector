@@ -268,11 +268,11 @@ mod tests {
     #[test]
     fn test_encode_counter_event() {
         let events = vec![Metric::new(
-            "pool.used".into(),
+            "pool.used",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
         )
-        .with_namespace(Some("jvm".into()))
+        .with_namespace(Some("jvm"))
         .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)))];
 
         assert_eq!(
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_encode_counter_event_no_namespace() {
         let events = vec![Metric::new(
-            "used".into(),
+            "used",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
         )
@@ -300,18 +300,18 @@ mod tests {
     fn test_encode_counter_multiple_events() {
         let events = vec![
             Metric::new(
-                "pool.used".into(),
+                "pool.used",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 42.0 },
             )
-            .with_namespace(Some("jvm".into()))
+            .with_namespace(Some("jvm"))
             .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0))),
             Metric::new(
-                "pool.committed".into(),
+                "pool.committed",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 18874368.0 },
             )
-            .with_namespace(Some("jvm".into()))
+            .with_namespace(Some("jvm"))
             .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1))),
         ];
 
@@ -365,11 +365,11 @@ mod tests {
         for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(
                 Metric::new(
-                    metric.to_string(),
+                    *metric,
                     MetricKind::Incremental,
                     MetricValue::Counter { value: *val as f64 },
                 )
-                .with_namespace(Some(namespace.to_string()))
+                .with_namespace(Some(*namespace))
                 .with_tags(Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]
                         .into_iter()

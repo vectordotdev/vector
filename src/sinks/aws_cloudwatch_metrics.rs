@@ -309,12 +309,12 @@ mod tests {
     fn encode_events_basic_counter() {
         let events = vec![
             Metric::new(
-                "exception_total".into(),
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             ),
             Metric::new(
-                "bytes_out".into(),
+                "bytes_out",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 2.5 },
             )
@@ -322,7 +322,7 @@ mod tests {
                 Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
             )),
             Metric::new(
-                "healthcheck".into(),
+                "healthcheck",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn encode_events_absolute_gauge() {
         let events = vec![Metric::new(
-            "temperature".into(),
+            "temperature",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         )];
@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn encode_events_distribution() {
         let events = vec![Metric::new(
-            "latency".into(),
+            "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![11.0 => 100, 12.0 => 50],
@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn encode_events_set() {
         let events = vec![Metric::new(
-            "users".into(),
+            "users",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
@@ -522,11 +522,11 @@ mod integration_tests {
             for _ in 0..100 {
                 let event = Event::Metric(
                     Metric::new(
-                        "counter".to_string(),
+                        "counter",
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
-                    .with_namespace(Some(namespace.to_string())),
+                    .with_namespace(Some(*namespace)),
                 );
                 events.push(event);
             }
