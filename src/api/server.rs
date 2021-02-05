@@ -87,19 +87,6 @@ fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter
             )),
     );
 
-    // GraphQL query and subscription handler
-    // let graphql_handler = warp::path("graphql")
-    //     .and(graphql_subscription(schema.clone()))
-    //     .or(warp::any()
-    //         .map(move || Arc::clone(&event_inspector))
-    //         .and(async_graphql_warp::graphql(schema))
-    //         .and_then(
-    //             |event_inspector, (schema, mut request): (Schema<_, _, _>, Request)| async move {
-    //                 request = request.data(event_inspector);
-    //                 Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
-    //             },
-    //         ));
-
     // GraphQL playground
     let graphql_playground = if playground {
         warp::path("playground")
