@@ -85,13 +85,13 @@ pub async fn build_pieces(
         let (output, control) = Fanout::new();
 
         // Pass events through the inspector if enabled
-        let pump = if event_inspector.as_ref().is_some() {
-            rx.map(Ok)
+        let mut pump = rx.map(Ok).boxed();
+
+        if event_inspector.as_ref().is_some() {
+            pump = pump
                 .inspect(event_inspector.as_ref().unwrap().result_adder(name.clone()))
                 .boxed()
-        } else {
-            rx.map(Ok).boxed()
-        };
+        }
 
         let pump = Task::new(
             name,
