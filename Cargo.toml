@@ -165,7 +165,7 @@ num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.3.0"
 grok = "~1.0.1"
-nom = "6.0.1"
+nom = { version = "6.0.1", optional = true }
 pest = "2.1.3"
 pest_derive = "2.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -373,7 +373,7 @@ sources-kafka = ["rdkafka"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
-sources-nginx_metrics = []
+sources-nginx_metrics = ["nom"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix"]
