@@ -62,7 +62,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
-    rl.set_helper(Some(Repl::new()));
+    rl.set_helper(Some(Repl::new("$ ")));
 
     println!("{}", INTRO_BANNER);
 

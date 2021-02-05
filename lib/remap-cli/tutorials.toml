@@ -1,0 +1,29 @@
+[[tutorials]]
+number = "1.1"
+title = "Assigning values to fields"
+help_text = """
+In VRL, you can assign values to fields like this:
+
+.field = "value"
+
+TASK:
+- Assign the string "hello" to the field `message`
+"""
+
+correct_answer = { message = "hello" }
+initial_event = {}
+
+[[tutorials]]
+number = "1.2"
+title = "Deleting fields"
+help_text = """
+You can delete fields from events using the `del` function:
+
+del(.field)
+
+TASK:
+- Delete fields `one` and `two`
+"""
+
+correct_answer = { three = 3 }
+initial_event = { one = 1, two = 2, three = 3 }

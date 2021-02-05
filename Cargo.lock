@@ -5322,9 +5322,11 @@ dependencies = [
  "remap-functions",
  "remap-lang",
  "rustyline",
+ "serde",
  "serde_json",
  "structopt 0.3.21",
  "thiserror",
+ "toml",
  "webbrowser",
 ]
 

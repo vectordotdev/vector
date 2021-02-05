@@ -1,14 +1,25 @@
-use super::{array, map, Error, Repl};
+use super::{Error, Repl};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::all as funcs;
 use rustyline::{error::ReadlineError, Editor};
+use serde::Deserialize;
+use std::fs::File;
+use std::io::Read;
 
+const TUTORIALS_TOML_FILE: &str = "./tutorials.toml";
+
+#[derive(Deserialize)]
 struct Tutorial {
-    number: &'static str, // Making this a string allows for 1.1, 2.5, etc.
-    title: &'static str,
-    help_text: &'static str,
+    number: String, // Making this a string allows for 1.1, 2.5, etc.
+    title: String,
+    help_text: String,
     correct_answer: Value,
     initial_event: Value,
+}
+
+#[derive(Deserialize)]
+struct Tutorials {
+    tutorials: Vec<Tutorial>,
 }
 
 pub fn tutorial() -> Result<(), Error> {
@@ -16,9 +27,9 @@ pub fn tutorial() -> Result<(), Error> {
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Program::default());
     let mut rl = Editor::<Repl>::new();
-    rl.set_helper(Some(Repl::new()));
+    rl.set_helper(Some(Repl::new("> ")));
 
-    let mut tutorials = tutorial_list();
+    let mut tutorials = load_tutorials_from_json()?.tutorials;
 
     println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
 
@@ -64,6 +75,7 @@ pub fn tutorial() -> Result<(), Error> {
                                         println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                                         break;
                                     } else {
+                                        println!("You've completed tutorial {} out of {}\n", index + 1, tutorials.len());
                                         println!("Moving on to the next exercise...\n\n");
                                         index = index.saturating_add(1);
                                         print_tutorial_help_text(index, &tutorials);
@@ -104,6 +116,16 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     );
 }
 
+fn load_tutorials_from_json() -> Result<Tutorials, Error> {
+    let mut buf = String::new();
+    let _ = File::open(TUTORIALS_TOML_FILE)?.read_to_string(&mut buf)?;
+
+    match toml::from_str(&buf) {
+        Ok(tuts) => Ok(tuts),
+        Err(err) => Err(Error::Toml(err))
+    }
+}
+
 // This function reworks the resolve function in repl.rs to return a Result rather than a String. If the Result is
 // Ok, the value is used to check whether the current event is equal to the "correct" answer.
 pub fn resolve_to_value(
@@ -126,69 +148,10 @@ pub fn resolve_to_value(
     }
 }
 
-fn tutorial_list() -> Vec<Tutorial> {
-    let assignment_tut = Tutorial {
-        number: "1.1",
-        title: "Assigning values to event fields",
-        help_text: ASSIGNMENT_TEXT,
-        correct_answer: map!["severity": "info", "status": 200, "temperature": 98.6, "is_critical": false, "plans": array!["pro"], "url": map!["host": "acmecorp.io"]],
-        initial_event: map![],
-    };
-
-    let deletion_tut = Tutorial {
-        number: "1.2",
-        title: "Deleting fields",
-        help_text: DELETION_TEXT,
-        correct_answer: map!["three": 3],
-        initial_event: map!["one": 1, "two": 2, "three": 3],
-    };
-
-    let rename_tut = Tutorial {
-        number: "1.3",
-        title: "Renaming fields",
-        help_text: RENAME_TEXT,
-        correct_answer: map!["new_field": "old value"],
-        initial_event: map!["old_field": "old value"],
-    };
-
-    vec![assignment_tut, deletion_tut, rename_tut]
-}
-
 // Help text
 const HELP_TEXT: &str = r#"
 Tutorial commands:
   next     Load the next tutorial
   prev     Load the previous tutorial
   exit     Exit the VRL interactive tutorial
-"#;
-
-const ASSIGNMENT_TEXT: &str = r#"In VRL, you can assign values to fields like this:
-
-.field = "value"
-
-TASKS:
-- Assign the string `"info"` to the `severity` field
-- Assign the float `98.6` to the `temperature` field
-- Assign the integer `200` to the `status` field
-- Assign the Boolean `false` to the `is_critical` field
-- Assign the array `["pro"]` to the `plans` field
-- Assign the map `{"host": "acmecorp.io"}` to the `url` field
-"#;
-
-const DELETION_TEXT: &str = r#"You can delete fields using the `del` function:
-
-del(.field)
-
-TASKS:
-- Use the `del` function to get rid of fields `one` and `two`.
-"#;
-
-const RENAME_TEXT: &str = r#"When you delete a field, the `del` function returns the value of the
-deleted field. You can change the names of fields by assigning the value of the
-deleted field to the new field:
-
-.new = del(.old)
-
-TASKS:
-- Use the `del` function to rename `old_field` to `new_field`.
 "#;

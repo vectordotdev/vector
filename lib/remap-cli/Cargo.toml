@@ -22,8 +22,10 @@ rustyline = { version = "7.0.0", default-features = false, optional = true }
 exitcode = "1.1.2"
 prettytable-rs = { version = "0.8.0", default-features = false, optional = true }
 webbrowser = { version = "0.5.5", default-features = false, optional = true }
+serde = { version = "1.0.117", features = ["derive"], optional = true }
+toml = { version = "0.5.8", optional = true }
 
 [features]
 default = ["repl", "tutorial"]
 repl = ["prettytable-rs", "regex", "rustyline", "webbrowser"]
-tutorial = ["rustyline"]
+tutorial = ["rustyline", "serde", "toml"]
