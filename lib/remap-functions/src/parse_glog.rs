@@ -114,7 +114,21 @@ impl Expression for ParseGlogFn {
             .type_def(state)
             .into_fallible(true)
             .with_constraint(value::Kind::Map)
+            .with_inner_type(inner_type_def())
     }
+}
+
+fn inner_type_def() -> Option<InnerTypeDef> {
+    use value::Kind;
+
+    Some(inner_type_def!({
+        "level": Kind::Bytes,
+        "timestamp": Kind::Timestamp,
+        "id": Kind::Integer,
+        "file": Kind::Bytes,
+        "line": Kind::Integer,
+        "message": Kind::Bytes,
+    }))
 }
 
 #[cfg(test)]
@@ -174,17 +188,17 @@ mod tests {
     test_type_def![
         value_string {
             expr: |_| ParseGlogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_non_string {
             expr: |_| ParseGlogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_optional {
             expr: |_| ParseGlogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 }
