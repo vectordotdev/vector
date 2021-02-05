@@ -77,7 +77,7 @@ fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter
             }),
         )
         .or(async_graphql_warp::graphql(schema).and_then(
-            |(schema, mut request): (Schema<_, _, _>, Request)| async move {
+            |(schema, request): (Schema<_, _, _>, Request)| async move {
                 Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
             },
         )),
