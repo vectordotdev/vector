@@ -219,6 +219,7 @@ pub async fn build_pieces(
         };
         let task = Task::new(name, typetag, sink);
 
+        let component_name = name.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -229,7 +230,7 @@ pub async fn build_pieces(
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
-                            error!(message = "Healthcheck: Failed Reason.", %error);
+                            error!(message = "Healthcheck: Failed Reason.", %component_name, %error);
                             Err(())
                         }
                         Err(_) => {
