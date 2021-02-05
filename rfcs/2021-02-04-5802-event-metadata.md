@@ -43,8 +43,8 @@ struct EventMetadata {
 
 struct SourceEvent {
     timestamp: DateTime,
-    source_name: String,
-    event_id: String,
+    source_name: SmolStr,
+    event_id: SmolStr,
 }
 
 enum EventDeliveryStatus {
@@ -129,11 +129,30 @@ fields, but this can be expensive for arrays. Transforms such as
 `add_fields` could build a field type cache to improve the performance
 of this feature.
 
-The introduction of `SmallVec` in the metadata structure is driven by
-the assumption that most events will have a single source throughout
-their lifetime. `SmallVec` is a data structure that can inline a (fixed)
-number of elements before allocating memory. By using this feature, this
-common case can avoid an extra allocation and improve data locality.
+## Performance Considerations
+
+The addition of metadata will necessarily impact performance, since it
+will grow the size of each event. This will in turn require extra
+operations when creating and cloning events.
+
+Since this is the key performance sensitive data structure, every step
+of this implementation will be marked with specific benchmarks to ensure
+any performance losses are minimized. For example, the initial stub
+metadata should be entirely performance neutral. Careful testing will be
+necessary to validate implementation choices against known alternatives.
+
+The introduction of `SmallVec` is driven by the assumption that most
+events will have a single source throughout their lifetime. `SmallVec`
+is a data structure that can inline a (fixed) number of elements before
+allocating memory. By using this feature, this common case can avoid an
+extra allocation and improve data locality.
+
+Similarly, the introduction of
+[`SmolStr`](https://github.com/rust-analyzer/smol_str) is driven by the
+fact that source name and event IDs are highly likely to be short, will
+never be modified. Also, in the case of the source name, it will be
+shared with the actual source and all other events originating from that
+source, and `SmolStr` provides constant-time copy.
 
 ## Drawbacks
 
@@ -174,11 +193,11 @@ The following alternative components have been considered and discarded:
 Incremental steps that execute this change. Generally this is in the form of:
 
 - [ ]  Create the new structures with an empty stub `EventMetadata`.
-- [ ]  Add optional instrumentation to full `Event` creation and cloning
-       and benchmark the result to determine the impact of clone vs
-       reference counting the metadata.
 - [ ]  Add a simple timestamp to the metadata to ensure it is propagated
        from end to end.
+- [ ]  Add instrumentation to full `Event` creation and cloning (gated
+       by a feature flag) and benchmark the result to estimate the
+       performance impact of clone vs reference counting the metadata.
 - [ ]  Rework sources that use `Utc::now()` or equivalent to set a
        default timestamp to use this new metadata (optimization,
        optional).
