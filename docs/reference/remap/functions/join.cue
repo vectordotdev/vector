@@ -37,7 +37,7 @@ remap: functions: join: {
 		{
 			title: "Comma separator"
 			source: #"""
-				join(["sources", "transforms", "sinks"], ", ")
+				join(["sources", "transforms", "sinks"], separator: ", ")
 				"""#
 			return: "sources, transforms, sinks"
 		},
