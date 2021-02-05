@@ -93,6 +93,8 @@ urls: {
 	clickhouse:                                               "https://clickhouse.yandex/"
 	clickhouse_http:                                          "https://clickhouse.yandex/docs/en/interfaces/http/"
 	cloudsmith:                                               "https://cloudsmith.io/~timber/repos/vector/packages/"
+	cloudsmith_apt:                                           "https://cloudsmith.io/~timber/repos/vector/setup/#formats-deb"
+	cloudsmith_yum:                                           "https://cloudsmith.io/~timber/repos/vector/setup/#formats-rpm"
 	console:                                                  "\(wikipedia)/wiki/System_console"
 	conventional_commits:                                     "https://www.conventionalcommits.org"
 	contributing:                                             "\(vector_repo)/blob/master/CONTRIBUTING.md#setup"
