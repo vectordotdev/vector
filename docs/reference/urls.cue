@@ -181,6 +181,7 @@ urls: {
 	github_protected_branches:                                "https://help.github.com/en/github/administering-a-repository/about-protected-branches"
 	github_sign_commits:                                      "https://help.github.com/en/github/authenticating-to-github/signing-commits"
 	globbing:                                                 "\(wikipedia)/wiki/Glob_(programming)"
+	glog:                                                     "\(github)/google/glog"
 	graphql:                                                  "https://graphql.org"
 	graphql_playground:                                       "\(github)/graphql/graphql-playground"
 	grok:                                                     "https://grokdebug.herokuapp.com/"

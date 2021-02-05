@@ -74,6 +74,7 @@ default = [
     "parse_aws_vpc_flow_log",
     "parse_common_log",
     "parse_duration",
+    "parse_glog",
     "parse_grok",
     "parse_json",
     "parse_key_value",
@@ -145,6 +146,7 @@ parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloud
 parse_aws_vpc_flow_log = []
 parse_common_log = ["chrono"]
 parse_duration = []
+parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_regex = ["regex"]
