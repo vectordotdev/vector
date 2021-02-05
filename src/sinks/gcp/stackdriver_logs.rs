@@ -341,9 +341,10 @@ mod tests {
             r#"
            project_id = "project"
            log_id = "testlogs"
-           resource.type = "generic_node"
+           resource.type = "{{ type }}"
            resource.namespace = "office"
-           encoding.except_fields = ["anumber"]
+           resource.number = "{{ anumber }}"
+           encoding.except_fields = ["anumber", "type"]
         "#,
         )
         .unwrap();
@@ -356,15 +357,29 @@ mod tests {
         };
 
         let log = LogEvent::from_iter(
-            [("message", "hello world"), ("anumber", "100")]
-                .iter()
-                .copied(),
+            [
+                ("message", "hello world"),
+                ("anumber", "100"),
+                ("type", "generic_node"),
+            ]
+            .iter()
+            .copied(),
         );
-        let json = sink.encode_event(Event::from(log)).unwrap().into_parts().0;
+        let (json, partition) = sink.encode_event(Event::from(log)).unwrap().into_parts();
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
             "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
+        assert_eq!(
+            partition,
+            PartitionKey {
+                labels: vec![
+                    ("namespace".to_owned(), "office".to_owned()),
+                    ("number".to_owned(), "100".to_owned()),
+                ],
+                r#type: "generic_node".to_owned(),
+            }
         );
     }
 
