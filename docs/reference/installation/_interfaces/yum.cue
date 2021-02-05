@@ -9,7 +9,7 @@ installation: _interfaces: yum: {
 
 		Our Yum repositories are provided by
 		[Cloudsmith](\(urls.cloudsmith)) and you
-		can find [instruction for manually adding
+		can find [instructions for manually adding
 		the repositories](\(urls.cloudsmith_yum)).
 		"""
 
