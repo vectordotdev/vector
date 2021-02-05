@@ -23,7 +23,7 @@ impl EventInspector {
     /// to `.inspect` on an upstream LogEvent receiver channel.
     pub fn adder(&self, component_name: String) -> impl FnMut(&Event) {
         let mut lock = self.components.write();
-        let tx = lock.entry(component_name.clone()).or_insert_with(|| {
+        let tx = lock.entry(component_name).or_insert_with(|| {
             let (tx, _) = broadcast::channel(100);
             tx
         });
@@ -32,19 +32,16 @@ impl EventInspector {
         let tx = tx.clone();
 
         move |ev| {
-            match ev {
-                Event::Log(ev) => {
-                    // broadcast::Sender provides an atomic count of the number of active
-                    // listeners. We're using that here to avoid a potentally expensive clone
-                    // in the (likely) event that there are no current subscribers.
-                    //
-                    // This can suffer from TOC/TOU, but the risk is minimal as the purpose
-                    // here is solely to reduce expense.
-                    if tx.receiver_count() > 0 {
-                        let _ = tx.send(ev.clone());
-                    }
+            if let Event::Log(ev) = ev {
+                // broadcast::Sender provides an atomic count of the number of active
+                // listeners. We're using that here to avoid a potentally expensive clone
+                // in the (likely) event that there are no current subscribers.
+                //
+                // This can suffer from TOC/TOU, but the risk is minimal as the purpose
+                // here is solely to reduce expense.
+                if tx.receiver_count() > 0 {
+                    let _ = tx.send(ev.clone());
                 }
-                _ => {}
             }
         }
     }
@@ -67,5 +64,11 @@ impl EventInspector {
             .read()
             .get(component_name)
             .map(|tx| tx.subscribe())
+    }
+}
+
+impl Default for EventInspector {
+    fn default() -> Self {
+        Self::new()
     }
 }
