@@ -198,7 +198,6 @@ impl Application {
 
     pub fn run(self) {
         let mut rt = self.runtime;
-        let mut event_inspector = self.config.event_inspector;
 
         let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
@@ -209,6 +208,9 @@ impl Application {
 
         #[cfg(feature = "api")]
         let api_config = self.config.api;
+
+        #[cfg(feature = "api")]
+        let mut event_inspector = self.config.event_inspector;
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
