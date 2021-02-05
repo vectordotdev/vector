@@ -1,4 +1,4 @@
-use super::{array, map, repl::Repl, Error};
+use super::{array, map, Error, Repl};
 use remap::{state, Formatter, Object, Program, Runtime, Value};
 use remap_functions::all as funcs;
 use rustyline::{error::ReadlineError, Editor};
@@ -55,7 +55,7 @@ pub fn tutorial() -> Result<(), Error> {
                     command => {
                         let tut = &mut tutorials[index];
                         let event = &mut tut.initial_event;
-                        match resolve(event, &mut rt, command, &mut compiler_state) {
+                        match resolve_to_value(event, &mut rt, command, &mut compiler_state) {
                             Ok(result) => {
                                 if event == &tut.correct_answer {
                                     println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", event);
@@ -106,7 +106,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 
 // This function reworks the resolve function in repl.rs to return a Result rather than a String. If the Result is
 // Ok, the value is used to check whether the current event is equal to the "correct" answer.
-pub fn resolve(
+pub fn resolve_to_value(
     object: &mut impl Object,
     runtime: &mut Runtime,
     program: &str,
