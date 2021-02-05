@@ -684,16 +684,29 @@ impl FromStr for Opcode {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, ()> {
+        use Opcode::*;
+
         let op = match s {
-            "*" => Opcode::Mul,
-            "/" => Opcode::Div,
-            "+" => Opcode::Add,
-            "-" => Opcode::Sub,
-            "%" => Opcode::Rem,
-            "||" => Opcode::Or,
-            "&&" => Opcode::And,
-            "??" => Opcode::Err,
-            _ => return Err(()),
+            "*" => Mul,
+            "/" => Div,
+            "+" => Add,
+            "-" => Sub,
+            "%" => Rem,
+
+            "||" => Or,
+            "&&" => And,
+
+            "??" => Err,
+
+            "!=" => Ne,
+            "==" => Eq,
+
+            ">=" => Ge,
+            ">" => Gt,
+            "<=" => Le,
+            "<" => Lt,
+
+            _ => return std::result::Result::Err(()),
         };
 
         Ok(op)
