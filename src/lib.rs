@@ -79,9 +79,9 @@ pub mod types;
 pub mod udp;
 pub mod unit_test;
 pub mod validate;
+pub mod vec_map;
 #[cfg(windows)]
 pub mod vector_windows;
-pub mod vec_map;
 
 pub use event::{Event, Value};
 pub use pipeline::Pipeline;
