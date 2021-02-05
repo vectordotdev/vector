@@ -4,7 +4,7 @@ extern crate tracing;
 #[macro_use]
 extern crate criterion;
 
-use criterion::{black_box, Criterion};
+use criterion::{black_box, BenchmarkId, Criterion};
 use std::{
     fmt,
     sync::{Mutex, MutexGuard},
@@ -16,14 +16,15 @@ use tracing_subscriber::layer::SubscriberExt;
 const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
 fn bench(c: &mut Criterion) {
-    c.bench_function_over_inputs(
-        "No Limit",
-        |b, n| {
+    let mut group = c.benchmark_group("tracing-limit");
+
+    for input in INPUTS {
+        group.bench_with_input(BenchmarkId::new("No Limit", input), input, |b, &n| {
             let sub = VisitingSubscriber(Mutex::new(String::from("")));
             let n = black_box(n);
             tracing::subscriber::with_default(sub, || {
                 b.iter(|| {
-                    for _ in 0..**n {
+                    for _ in 0..n {
                         info!(
                             message = "Hello world!",
                             foo = "foo",
@@ -34,32 +35,33 @@ fn bench(c: &mut Criterion) {
                     }
                 })
             });
-        },
-        INPUTS,
-    );
+        });
 
-    c.bench_function_over_inputs(
-        "Limit 5 seconds",
-        |b, n| {
-            let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());
-            let n = black_box(n);
-            tracing::subscriber::with_default(sub, || {
-                b.iter(|| {
-                    for _ in 0..**n {
-                        info!(
-                            message = "Hello world!",
-                            foo = "foo",
-                            bar = "bar",
-                            baz = 3,
-                            quuux = ?0.99,
-                            internal_log_rate_secs = 5
-                        )
-                    }
-                })
-            });
-        },
-        INPUTS,
-    );
+        group.bench_with_input(
+            BenchmarkId::new("Limit 5 seconds", input),
+            input,
+            |b, &n| {
+                let sub = VisitingSubscriber(Mutex::new(String::from(""))).with(Limit::default());
+                let n = black_box(n);
+                tracing::subscriber::with_default(sub, || {
+                    b.iter(|| {
+                        for _ in 0..n {
+                            info!(
+                                message = "Hello world!",
+                                foo = "foo",
+                                bar = "bar",
+                                baz = 3,
+                                quuux = ?0.99,
+                                internal_log_rate_secs = 5
+                            )
+                        }
+                    })
+                });
+            },
+        );
+    }
+
+    group.finish();
 }
 
 /// Simulates a subscriber that records span data.
