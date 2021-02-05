@@ -96,6 +96,8 @@ fn process_data(data: impl Iterator<Item = usize>) -> usize {
     data.sum()
 }
 
+// TODO: move the functions below inline when async closures are stabilized.
+
 async fn run_tokio02(
     mut tx: tokio02::sync::mpsc::Sender<Vec<usize>>,
     mut rx: tokio02::sync::mpsc::Receiver<Vec<usize>>,
