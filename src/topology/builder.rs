@@ -84,22 +84,20 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
+        // Pass events through the inspector if enabled
         let pump = if event_inspector.as_ref().is_some() {
-            Task::new(
-                name,
-                typetag,
-                rx.map(Ok)
-                    .inspect(event_inspector.as_ref().unwrap().add(name.clone()))
-                    .forward(output)
-                    .map_ok(|_| TaskOutput::Source),
-            )
+            rx.map(Ok)
+                .inspect(event_inspector.as_ref().unwrap().result_adder(name.clone()))
+                .boxed()
         } else {
-            Task::new(
-                name,
-                typetag,
-                rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source),
-            )
+            rx.map(Ok).boxed()
         };
+
+        let pump = Task::new(
+            name,
+            typetag,
+            pump.forward(output).map_ok(|_| TaskOutput::Source),
+        );
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -144,20 +142,39 @@ pub async fn build_pieces(
         let (output, control) = Fanout::new();
 
         let transform = match transform {
-            Transform::Function(mut t) => input_rx
-                .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventProcessed))
-                .flat_map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    stream::iter(buf.into_iter()).map(Ok)
-                })
-                .forward(output)
-                .boxed(),
-            Transform::Task(t) => {
-                let filtered = input_rx
+            Transform::Function(mut t) => {
+                let mut filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventProcessed));
+                    .inspect(|_| emit!(EventProcessed))
+                    .boxed();
+
+                if event_inspector.as_ref().is_some() {
+                    filtered = filtered
+                        .inspect(event_inspector.as_ref().unwrap().adder(name.clone()))
+                        .boxed()
+                }
+
+                filtered
+                    .flat_map(move |v| {
+                        let mut buf = Vec::with_capacity(1);
+                        t.transform(&mut buf, v);
+                        stream::iter(buf.into_iter()).map(Ok)
+                    })
+                    .forward(output)
+                    .boxed()
+            }
+            Transform::Task(t) => {
+                let mut filtered = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventProcessed))
+                    .boxed();
+
+                if event_inspector.as_ref().is_some() {
+                    filtered = filtered
+                        .inspect(event_inspector.as_ref().unwrap().adder(name.clone()))
+                        .boxed();
+                }
+
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output)

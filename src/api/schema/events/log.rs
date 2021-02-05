@@ -16,15 +16,15 @@ impl LogEvent {
 impl LogEvent {
     /// Log message
     async fn message(&self) -> Option<String> {
-        serde_json::to_string(self.0.get("message")?).ok()
+        serde_json::from_value(json!(self.0.get("message")?)).ok()
     }
 
-    /// Get the log event as a JSON string
+    /// Log event as a JSON string
     async fn json(&self) -> String {
         json!(self.0).to_string()
     }
 
-    /// Get the log event as a YAML string
+    /// Log event as a YAML string
     async fn yaml(&self) -> Option<String> {
         serde_yaml::to_string(&self.0).ok()
     }
