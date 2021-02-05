@@ -28,14 +28,14 @@ remap: functions: join: {
 
 	examples: [
 		{
-			title: "No separator"
+			title: "Join array (no separator)"
 			source: #"""
 				join(["bring", "us", "together"])
 				"""#
 			return: "bringustogether"
 		},
 		{
-			title: "Comma separator"
+			title: "Join array (comma separator)"
 			source: #"""
 				join(["sources", "transforms", "sinks"], separator: ", ")
 				"""#
