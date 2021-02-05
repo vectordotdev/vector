@@ -1979,3 +1979,30 @@
       source = '''
         .a != ""
       '''
+
+[transforms.remap_function_join]
+  inputs = []
+  type = "remap"
+  source = """
+    items = ["foo", "bar", "baz"]
+    .comma = join(items, ", ")
+    .space = join(items, " ")
+    .none = join(items)
+    .from_split = join!(split("big bad booper", " "), "__")
+  """
+[[tests]]
+  name = "remap_function_join"
+  [tests.input]
+    insert_at = "remap_function_join"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_join"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .comma == "foo, bar, baz" && \
+        .space == "foo bar baz" && \
+        .none == "foobarbaz" && \
+        .from_split == "big__bad__booper"
+      '''
