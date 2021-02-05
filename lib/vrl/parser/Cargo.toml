@@ -12,8 +12,10 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
-test-case = "1"
 thiserror = "1"
+
+[dev-dependencies]
+test-case = "1"
 
 [build-dependencies]
 lalrpop = "0.19"

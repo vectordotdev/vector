@@ -457,7 +457,7 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
-            AbortInfallible { .. } => vec![Note::SeeErrorDocs],
+            AbortInfallible { .. } | FallibleArgument { .. } => vec![Note::SeeErrorDocs],
             _ => vec![],
         }
     }

@@ -94,19 +94,15 @@ impl<'a> Compiler<'a> {
     fn compile_literal(&mut self, node: Node<ast::Literal>) -> Literal {
         use literal::ErrorVariant::*;
 
-        Literal::try_from(node).unwrap_or_else(|err| match &err.variant {
-            InvalidRegex(_) => {
-                self.errors.push(Box::new(err));
-                regex::Regex::new("").unwrap().into()
-            }
-            InvalidTimestamp(..) => {
-                self.errors.push(Box::new(err));
-                Utc.timestamp(0, 0).into()
-            }
-            NanFloat => {
-                self.errors.push(Box::new(err));
-                NotNan::new(0.0).unwrap().into()
-            }
+        Literal::try_from(node).unwrap_or_else(|err| {
+            let value = match &err.variant {
+                InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
+                InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
+                NanFloat => NotNan::new(0.0).unwrap().into(),
+            };
+
+            self.errors.push(Box::new(err));
+            value
         })
     }
 

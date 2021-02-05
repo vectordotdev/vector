@@ -485,15 +485,6 @@ mod tests {
             assert_eq!(result, expect)
         }
 
-        // FIXME: Make path querying whitespace-aware.
-        //
-        // This requires one of three changes:
-        //
-        // 1. Write a custom lexer so we can properly handle whitespace.
-        // 2. Enable whitespace-significance in parser and explicitly allow
-        //    whitespace.
-        // 3. Create regular expression to parse paths, and manually split them
-        //    up into segments in Rust code.
         #[test_case(".foo .bar", Ok(vec!["<error>"]))]
         #[test_case("null null", Ok(vec!["<error>"]))]
         fn multiple_exprs_per_line(source: &str, expect: Result<Vec<&str>, ()>) {

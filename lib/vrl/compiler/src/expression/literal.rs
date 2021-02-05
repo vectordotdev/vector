@@ -89,7 +89,7 @@ impl fmt::Display for Literal {
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
             Regex(v) => v.fmt(f),
-            Timestamp(v) => write!(f, "{}", v.to_rfc3339()),
+            Timestamp(v) => write!(f, "t'{}'", v.to_rfc3339()),
             Null => f.write_str("null"),
         }
     }

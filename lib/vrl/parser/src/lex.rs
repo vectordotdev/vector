@@ -1075,7 +1075,7 @@ mod test {
 
         assert_eq!(count, length);
         assert!(count > 0);
-        assert!(None, lexer.next().is_none());
+        assert!(lexer.next().is_none());
     }
 
     #[test]

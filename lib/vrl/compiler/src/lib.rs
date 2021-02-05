@@ -36,7 +36,7 @@ pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
 /// state.
 ///
 /// This is particularly useful in REPL-like environments in which you want to
-/// resolve each individual expression, but also successive expressions to use
+/// resolve each individual expression, but allow successive expressions to use
 /// the result of previous expressions.
 pub fn compile_with_state(
     ast: parser::Program,

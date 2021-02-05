@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn test_dotless() {
         let path = Path::from_str("foo.bar.baz").unwrap();
-        let mut value = value!(12);
+        let value = value!(12);
 
         let object = value!({ "foo": { "bar": { "baz": 12 } } });
 
@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn test_object() {
         let path = Path::from_str(".foo.bar.baz").unwrap();
-        let mut value = value!(12);
+        let value = value!(12);
 
         let object = value!({ "foo": { "bar": { "baz": 12 } } });
 
@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn test_root() {
         let path = Path::from_str(".").unwrap();
-        let mut value = value!(12);
+        let value = value!(12);
 
         let object = value!(12);
 
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_array() {
         let path = Path::from_str(".[2]").unwrap();
-        let mut value = value!(12);
+        let value = value!(12);
 
         let object = value!([null, null, 12]);
 
@@ -88,7 +88,7 @@ mod tests {
     #[test]
     fn test_complex() {
         let path = Path::from_str(".[2].foo.(bar | baz )[1]").unwrap();
-        let mut value = value!({ "bar": [12] });
+        let value = value!({ "bar": [12] });
 
         let object = value!([null, null, { "foo": { "baz": [null, { "bar": [12] }] } } ]);
 

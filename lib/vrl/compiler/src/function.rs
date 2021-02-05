@@ -4,8 +4,11 @@ use crate::{
     parser::Node,
     Expression,
 };
+use diagnostic::DiagnosticError;
 use std::collections::HashMap;
 use std::fmt;
+
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 
 pub trait Function: Sync + fmt::Debug {
     /// The identifier by which the function can be called.
@@ -19,19 +22,12 @@ pub trait Function: Sync + fmt::Debug {
     ///
     /// At runtime, the `Expression` returned by this function is executed and
     /// resolved to its final [`Value`].
-    fn compile(
-        &self,
-        arguments: ArgumentList,
-    ) -> Result<Box<dyn Expression>, Box<dyn diagnostic::DiagnosticError>>;
+    fn compile(&self, arguments: ArgumentList) -> Compiled;
 
     /// An optional list of parameters the function accepts.
     ///
-    /// This list is used at compile-time to check function arity and keyword
-    /// names. The parameter also defines which variants of the [`Argument`]
-    /// enum the function accepts.
-    ///
-    /// At runtime, if the parameter accepts `Argument::Expression`, the
-    /// resolved `Value` type is checked against the parameter properties.
+    /// This list is used at compile-time to check function arity, keyword names
+    /// and argument type definition.
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }

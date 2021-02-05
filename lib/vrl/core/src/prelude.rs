@@ -8,8 +8,6 @@ pub use compiler::{value::Kind, Context, Expression, Function, Resolved, Target,
 
 pub use diagnostic::DiagnosticError;
 
-pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
-
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
 // commonly used expressions
@@ -18,7 +16,7 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 
 // commonly used function types
 
-pub use compiler::function::{ArgumentList, Parameter};
+pub use compiler::function::{ArgumentList, Compiled, Parameter};
 
 // commonly used macros
 

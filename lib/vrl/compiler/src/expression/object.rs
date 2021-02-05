@@ -30,7 +30,7 @@ impl Expression for Object {
             .map(|(_, expr)| expr.type_def(state))
             .collect::<Vec<_>>();
 
-        // If any of the stored expressions is fallible, the entire array is
+        // If any of the stored expressions is fallible, the entire object is
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
