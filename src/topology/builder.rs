@@ -89,7 +89,12 @@ pub async fn build_pieces(
 
         if event_inspector.as_ref().is_some() {
             pump = pump
-                .inspect(event_inspector.as_ref().unwrap().result_adder(name.clone()))
+                .inspect(
+                    event_inspector
+                        .as_ref()
+                        .expect("Event inspector should be initialized")
+                        .result_adder(name.clone()),
+                )
                 .boxed()
         }
 
@@ -150,7 +155,12 @@ pub async fn build_pieces(
 
                 if event_inspector.as_ref().is_some() {
                     filtered = filtered
-                        .inspect(event_inspector.as_ref().unwrap().adder(name.clone()))
+                        .inspect(
+                            event_inspector
+                                .as_ref()
+                                .expect("Event inspector should be initialized")
+                                .adder(name.clone()),
+                        )
                         .boxed()
                 }
 
@@ -171,7 +181,12 @@ pub async fn build_pieces(
 
                 if event_inspector.as_ref().is_some() {
                     filtered = filtered
-                        .inspect(event_inspector.as_ref().unwrap().adder(name.clone()))
+                        .inspect(
+                            event_inspector
+                                .as_ref()
+                                .expect("Event inspector should be initialized")
+                                .adder(name.clone()),
+                        )
                         .boxed();
                 }
 
