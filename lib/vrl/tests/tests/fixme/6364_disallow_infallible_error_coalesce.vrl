@@ -1,0 +1,18 @@
+# SKIP
+# issue: https://github.com/timberio/vector/issues/6364
+#
+# result:
+#
+# error: unneeded error coalescing
+#   ┌─ :2:5
+#   │
+# 2 │ "foo" ?? "bar"
+#   │ ----- ^^
+#   │ │     this error coalescing is unneeded
+#   │ │
+#   │ because this expression cannot fail
+#   │
+#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+"foo" ?? "bar"
