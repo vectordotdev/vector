@@ -112,7 +112,7 @@ impl Expression for ParseGlogFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
             .with_constraint(value::Kind::Map)
     }
 }
@@ -174,7 +174,7 @@ mod tests {
     test_type_def![
         value_string {
             expr: |_| ParseGlogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
         }
 
         value_non_string {
