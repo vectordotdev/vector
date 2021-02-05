@@ -76,9 +76,8 @@ impl Expression for JoinFn {
             .type_def(state)
             .fallible_unless(Kind::Array)
             .merge_optional(separator_type)
-            .with_constraint(Kind::Bytes)
-            .with_inner_type(self.value.type_def(state).inner_type_def)
             .fallible_unless_array_has_inner_type(Kind::Bytes)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -96,7 +95,7 @@ mod test {
             def: TypeDef {
                 fallible: false,
                 kind: Kind::Bytes,
-                inner_type_def: Some(inner_type_def!([ Kind::Bytes ]))
+                ..Default::default()
             },
         }
 
@@ -108,7 +107,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
-                inner_type_def: Some(inner_type_def!([ Kind::Bytes | Kind::Integer ]))
+                ..Default::default()
             },
         }
 
@@ -132,7 +131,7 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
-                inner_type_def: Some(inner_type_def!([ Kind::Bytes ]))
+                ..Default::default()
             },
         }
 
