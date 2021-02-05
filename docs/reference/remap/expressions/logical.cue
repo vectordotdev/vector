@@ -1,7 +1,7 @@
 package metadata
 
 remap: expressions: logical: {
-	title: "Assignment"
+	title: "Logical"
 	description: """
 		A _logical_ expression compares two expressions (operands), short-circuiting on the last expression evaluated
 		as defined by the operator.

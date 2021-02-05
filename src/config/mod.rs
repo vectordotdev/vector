@@ -23,7 +23,7 @@ mod builder;
 mod compiler;
 pub mod component;
 mod diff;
-mod format;
+pub mod format;
 mod loading;
 mod log_schema;
 mod unit_test;

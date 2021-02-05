@@ -44,6 +44,7 @@ enum Collector {
     Disk,
     Filesystem,
     Load,
+    Host,
     Memory,
     Network,
 }
@@ -174,6 +175,9 @@ impl HostMetricsConfig {
         }
         if self.has_collector(Collector::Load) {
             metrics.extend(add_collector("load", self.loadavg_metrics().await));
+        }
+        if self.has_collector(Collector::Host) {
+            metrics.extend(add_collector("host", self.host_metrics().await));
         }
         if self.has_collector(Collector::Memory) {
             metrics.extend(add_collector("memory", self.memory_metrics().await));
@@ -406,6 +410,41 @@ impl HostMetricsConfig {
         let result = vec![];
 
         result
+    }
+
+    pub async fn host_metrics(&self) -> Vec<Metric> {
+        let mut metrics = Vec::new();
+        match heim::host::uptime().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "uptime",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        match heim::host::boot_time().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "boot_time",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        metrics
     }
 
     pub async fn network_metrics(&self) -> Vec<Metric> {
@@ -881,6 +920,7 @@ mod tests {
             Collector::Disk,
             Collector::Filesystem,
             Collector::Load,
+            Collector::Host,
             Collector::Memory,
             Collector::Network,
         ] {
@@ -1105,6 +1145,13 @@ mod tests {
         assert!(!metrics
             .iter()
             .any(|metric| !metric.name().starts_with("load")));
+    }
+
+    #[tokio::test]
+    async fn generates_host_metrics() {
+        let metrics = HostMetricsConfig::default().host_metrics().await;
+        assert_eq!(metrics.len(), 2);
+        assert!(all_gauges(&metrics));
     }
 
     fn all_counters(metrics: &[Metric]) -> bool {
