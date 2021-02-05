@@ -174,7 +174,7 @@ snafu = { version = "0.6.10", features = ["futures-01", "futures"] }
 url = "2.2.0"
 percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
-bollard = { version = "0.9.0", features = ["ssl"], optional = true }
+bollard = { version = "0.9.1", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
 socket2 = { version = "0.3.19", optional = true }
 inventory = "0.1.10"
