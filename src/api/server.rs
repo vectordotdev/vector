@@ -76,15 +76,11 @@ fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter
                 Ok(data)
             }),
         )
-        .or(async_graphql_warp::graphql(schema)
-            // .and(warp::any().map(move || Arc::clone(&event_inspector)))
-            .and(warp::any().map(move || String::from("Hello!")))
-            .and_then(
-                |(schema, mut request): (Schema<_, _, _>, Request), event_inspector| async move {
-                    request = request.data(event_inspector);
-                    Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
-                },
-            )),
+        .or(async_graphql_warp::graphql(schema).and_then(
+            |(schema, mut request): (Schema<_, _, _>, Request)| async move {
+                Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
+            },
+        )),
     );
 
     // GraphQL playground
