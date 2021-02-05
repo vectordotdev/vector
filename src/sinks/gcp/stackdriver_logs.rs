@@ -14,6 +14,7 @@ use crate::{
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
+    vec_map::{SliceMap, VecMap},
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -22,21 +23,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
-
-#[derive(Debug, Clone)]
-struct VecMap<V> {
-    pub entries: Vec<(String, V)>,
-}
-
-impl<V> From<HashMap<String, V>> for VecMap<V> {
-    fn from(map: HashMap<String, V>) -> Self {
-        let mut entries = map.into_iter().collect::<Vec<_>>();
-        // keys are unique because they come from HashMap,
-        // therefore no need to compare values.
-        entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        Self { entries }
-    }
-}
 
 #[derive(Hash, Clone, PartialEq, Eq, Debug)]
 struct PartitionKey {
@@ -255,25 +241,6 @@ impl HttpSink for StackdriverSink {
         }
 
         Ok(request)
-    }
-}
-
-struct SliceMap<'a, K, V> {
-    entries: &'a [(K, V)],
-}
-
-impl<'a, K, V> Serialize for SliceMap<'a, K, V>
-where
-    K: Serialize,
-    V: Serialize,
-{
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
-        for (k, v) in self.entries {
-            map.serialize_entry(k, v)?;
-        }
-        map.end()
     }
 }
 

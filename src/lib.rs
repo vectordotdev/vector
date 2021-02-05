@@ -81,6 +81,7 @@ pub mod unit_test;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
+pub mod vec_map;
 
 pub use event::{Event, Value};
 pub use pipeline::Pipeline;
