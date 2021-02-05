@@ -11,6 +11,7 @@ pub type Spanned<'input, Loc> = Result<(Loc, Tok<'input>, Loc), Error>;
 pub enum Error {
     #[error("syntax error")]
     ParseError {
+        span: Span,
         source: lalrpop_util::ParseError<usize, Token<String>, String>,
         dropped_tokens: Vec<(usize, Token<String>, usize)>,
     },
@@ -35,7 +36,7 @@ pub enum Error {
     #[error("invalid literal")]
     Literal { start: usize },
 
-    #[error("invalid escape character")]
+    #[error("invalid escape character: \\{}", .ch.unwrap_or_default())]
     EscapeChar { start: usize, ch: Option<char> },
 
     #[error("unexpected parse error")]
@@ -57,7 +58,7 @@ impl DiagnosticError for Error {
         }
 
         match self {
-            ParseError { source, .. } => match source {
+            ParseError { span, source, .. } => match source {
                 lalrpop_util::ParseError::InvalidToken { location } => vec![Label::primary(
                     "invalid token",
                     Span::new(*location, *location + 1),
@@ -69,10 +70,9 @@ impl DiagnosticError for Error {
                         Span::new(*start, *end),
                     )]
                 }
-                lalrpop_util::ParseError::User { error } => vec![Label::primary(
-                    format!("unexpected error: {}", error),
-                    Span::default(),
-                )],
+                lalrpop_util::ParseError::User { error } => {
+                    vec![Label::primary(format!("unexpected error: {}", error), span)]
+                }
                 lalrpop_util::ParseError::UnrecognizedToken { token, expected } => {
                     let (start, token, end) = token;
                     let span = Span::new(*start, *end);

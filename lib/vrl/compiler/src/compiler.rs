@@ -59,7 +59,6 @@ impl<'a> Compiler<'a> {
 
                         Some(expr)
                     }
-                    InvalidTokens(_) => None,
                     Error(err) => {
                         self.handle_parser_error(err);
                         None

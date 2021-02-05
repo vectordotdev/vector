@@ -14,6 +14,7 @@ pub fn parse(input: impl AsRef<str>) -> Result<Program, Error> {
     parser::ProgramParser::new()
         .parse(input.as_ref(), lexer)
         .map_err(|source| Error::ParseError {
+            span: Span::new(0, input.as_ref().len()),
             source: source
                 .map_token(|t| t.map(|s| s.to_owned()))
                 .map_error(|err| err.to_string()),
@@ -27,6 +28,7 @@ pub fn parse_path(input: impl AsRef<str>) -> Result<Path, Error> {
     parser::QueryParser::new()
         .parse(input.as_ref(), lexer)
         .map_err(|source| Error::ParseError {
+            span: Span::new(0, input.as_ref().len()),
             source: source
                 .map_token(|t| t.map(|s| s.to_owned()))
                 .map_error(|err| err.to_string()),
@@ -46,6 +48,7 @@ pub fn parse_field(input: impl AsRef<str>) -> Result<Field, Error> {
     parser::FieldParser::new()
         .parse(input.as_ref(), lexer)
         .map_err(|source| Error::ParseError {
+            span: Span::new(0, input.as_ref().len()),
             source: source
                 .map_token(|t| t.map(|s| s.to_owned()))
                 .map_error(|err| err.to_string()),

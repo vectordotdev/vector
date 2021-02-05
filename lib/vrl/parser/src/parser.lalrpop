@@ -171,6 +171,7 @@ RootExpr: Node<RootExpr> = {
             .collect();
 
         let error = Error::ParseError {
+            span,
             source,
             dropped_tokens,
         };

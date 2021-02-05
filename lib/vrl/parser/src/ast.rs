@@ -155,7 +155,6 @@ impl IntoIterator for Program {
 #[derive(PartialEq)]
 pub enum RootExpr {
     Expr(Node<Expr>),
-    InvalidTokens(Node<String>),
 
     /// A special expression that is returned if a given expression could not be
     /// parsed. This allows the parser to continue on to the next expression.
@@ -168,7 +167,6 @@ impl fmt::Debug for RootExpr {
 
         let value = match self {
             Expr(v) => format!("{:?}", v),
-            InvalidTokens(v) => format!("{:?}", v),
             Error(v) => format!("{:?}", v),
         };
 
@@ -182,7 +180,6 @@ impl fmt::Display for RootExpr {
 
         match self {
             Expr(v) => v.fmt(f),
-            InvalidTokens(v) => v.fmt(f),
             Error(v) => v.fmt(f),
         }
     }
@@ -232,7 +229,7 @@ impl fmt::Display for Expr {
         match self {
             Literal(v) => v.fmt(f),
             Container(v) => v.fmt(f),
-            Op(v) => write!(f, "{:?}", v),
+            Op(v) => v.fmt(f),
             IfStatement(v) => v.fmt(f),
             Assignment(v) => v.fmt(f),
             Query(v) => v.fmt(f),
@@ -274,7 +271,7 @@ impl fmt::Display for Ident {
 
 impl fmt::Debug for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "Ident({})", self.0)
     }
 }
 
