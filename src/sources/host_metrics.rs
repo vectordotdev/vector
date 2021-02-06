@@ -690,14 +690,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(
-            name.into(),
-            MetricKind::Absolute,
-            MetricValue::Counter { value },
-        )
-        .with_namespace(self.namespace.0.clone())
-        .with_tags(Some(tags))
-        .with_timestamp(Some(timestamp))
+        Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 
     fn gauge(
@@ -707,14 +703,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(
-            name.into(),
-            MetricKind::Absolute,
-            MetricValue::Gauge { value },
-        )
-        .with_namespace(self.namespace.0.clone())
-        .with_tags(Some(tags))
-        .with_timestamp(Some(timestamp))
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 }
 

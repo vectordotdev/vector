@@ -225,11 +225,11 @@ pub enum StatisticKind {
 }
 
 impl Metric {
-    pub fn new(name: String, kind: MetricKind, value: MetricValue) -> Self {
+    pub fn new<T: Into<String>>(name: T, kind: MetricKind, value: MetricValue) -> Self {
         Self {
             series: MetricSeries {
                 name: MetricName {
-                    name,
+                    name: name.into(),
                     namespace: None,
                 },
                 tags: None,
@@ -242,8 +242,8 @@ impl Metric {
         }
     }
 
-    pub fn with_namespace(mut self, namespace: Option<String>) -> Self {
-        self.series.name.namespace = namespace;
+    pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
+        self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
@@ -307,7 +307,7 @@ impl Metric {
             .collect::<MetricTags>();
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
-            .with_namespace(Some("vector".to_string()))
+            .with_namespace(Some("vector"))
             .with_timestamp(Some(Utc::now()))
             .with_tags(if labels.is_empty() {
                 None
@@ -898,17 +898,17 @@ mod test {
     #[test]
     fn merge_counters() {
         let mut counter = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         );
 
         let delta = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -916,7 +916,7 @@ mod test {
         assert_eq!(
             counter,
             Metric::new(
-                "counter".into(),
+                "counter",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 3.0 },
             )
@@ -926,17 +926,17 @@ mod test {
     #[test]
     fn merge_gauges() {
         let mut gauge = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: 1.0 },
         );
 
         let delta = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: -2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -944,7 +944,7 @@ mod test {
         assert_eq!(
             gauge,
             Metric::new(
-                "gauge".into(),
+                "gauge",
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -1.0 },
             )
@@ -954,7 +954,7 @@ mod test {
     #[test]
     fn merge_sets() {
         let mut set = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["old".into()].into_iter().collect(),
@@ -962,13 +962,13 @@ mod test {
         );
 
         let delta = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["new".into()].into_iter().collect(),
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -976,7 +976,7 @@ mod test {
         assert_eq!(
             set,
             Metric::new(
-                "set".into(),
+                "set",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["old".into(), "new".into()].into_iter().collect()
@@ -988,7 +988,7 @@ mod test {
     #[test]
     fn merge_histograms() {
         let mut dist = Metric::new(
-            "hist".into(),
+            "hist",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: samples![1.0 => 10],
@@ -997,14 +997,14 @@ mod test {
         );
 
         let delta = Metric::new(
-            "hist".into(),
+            "hist",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: samples![1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
@@ -1012,7 +1012,7 @@ mod test {
         assert_eq!(
             dist,
             Metric::new(
-                "hist".into(),
+                "hist",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: samples![1.0 => 10, 1.0 => 20],
@@ -1028,7 +1028,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "one".into(),
+                    "one",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
@@ -1041,7 +1041,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "two word".into(),
+                    "two word",
                     MetricKind::Incremental,
                     MetricValue::Gauge { value: 2.0 }
                 )
@@ -1054,11 +1054,11 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "namespace".into(),
+                    "namespace",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector".to_string()))
+                .with_namespace(Some("vector"))
             ),
             r#"vector_namespace{} = 1.23"#
         );
@@ -1067,11 +1067,11 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "namespace".into(),
+                    "namespace",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector host".to_string()))
+                .with_namespace(Some("vector host"))
             ),
             r#""vector host"_namespace{} = 1.23"#
         );
@@ -1084,11 +1084,7 @@ mod test {
         assert_eq!(
             format!(
                 "{}",
-                Metric::new(
-                    "three".into(),
-                    MetricKind::Absolute,
-                    MetricValue::Set { values }
-                )
+                Metric::new("three", MetricKind::Absolute, MetricValue::Set { values })
             ),
             r#"three{} = "four=4" "thrəë" v1 v2_two"#
         );
@@ -1097,7 +1093,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "four".into(),
+                    "four",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
                         samples: samples![1.0 => 3, 2.0 => 4],
@@ -1112,7 +1108,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "five".into(),
+                    "five",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
                         buckets: buckets![51.0 => 53, 52.0 => 54],
@@ -1128,7 +1124,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "six".into(),
+                    "six",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: quantiles![1.0 => 63.0, 2.0 => 64.0],
@@ -1144,11 +1140,11 @@ mod test {
     #[test]
     fn object_metric_all_fields() {
         let metric = Metric::new(
-            "zub".into(),
+            "zub",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_namespace(Some("zoob".into()))
+        .with_namespace(Some("zoob"))
         .with_tags(Some({
             let mut map = MetricTags::new();
             map.insert("tig".to_string(), "tog".to_string());
@@ -1175,7 +1171,7 @@ mod test {
     #[test]
     fn object_metric_fields() {
         let mut metric = Metric::new(
-            "name".into(),
+            "name",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
@@ -1225,7 +1221,7 @@ mod test {
     #[test]
     fn object_metric_invalid_paths() {
         let mut metric = Metric::new(
-            "name".into(),
+            "name",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         );
