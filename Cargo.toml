@@ -154,7 +154,7 @@ syslog_loose = "0.10.0"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
-rdkafka = { version = "0.24.0", features = ["libz", "ssl", "zstd"], optional = true }
+rdkafka = { version = "0.25.0", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.3.1"
 seahash = { version = "4.0.1", optional = true }
 semver = { version = "0.11.0", features = ["serde"] }
