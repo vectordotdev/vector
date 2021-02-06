@@ -230,11 +230,22 @@ pub async fn build_pieces(
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
-                            error!(message = "Healthcheck: Failed Reason.", %component_name, %error);
+                            error!(
+                                msg = "Healthcheck: Failed Reason.",
+                                %error,
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                         Err(_) => {
-                            error!("Healthcheck: timeout.");
+                            error!(
+                                msg = "Healthcheck: timeout.",
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                     })
