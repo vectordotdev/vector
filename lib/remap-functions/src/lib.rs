@@ -116,6 +116,8 @@ mod starts_with;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "tag_types_externally")]
+mod tag_types_externally;
 #[cfg(feature = "to_bool")]
 mod to_bool;
 #[cfg(feature = "to_float")]
@@ -259,6 +261,8 @@ pub use starts_with::StartsWith;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "tag_types_externally")]
+pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "to_bool")]
 pub use to_bool::ToBool;
 #[cfg(feature = "to_float")]
@@ -402,6 +406,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tag_types_externally")]
+        Box::new(TagTypesExternally),
         #[cfg(feature = "to_bool")]
         Box::new(ToBool),
         #[cfg(feature = "to_float")]

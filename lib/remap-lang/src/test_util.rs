@@ -102,6 +102,10 @@ macro_rules! lit {
     ($v:tt) => {
         $crate::expression::Literal::from($crate::value!($v))
     };
+
+    ($v:expr) => {
+        $crate::expression::Literal::from($crate::value!($v))
+    };
 }
 
 #[macro_export]
@@ -140,10 +144,8 @@ macro_rules! value {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $args:expr, $want:expr) => {{
-        let args: ::std::collections::HashMap<&str, $crate::Expr> = $args;
-
         let mut arguments = $crate::function::ArgumentList::default();
-        for (k, v) in args {
+        for (k, v) in $args {
             arguments.insert(k, v)
         }
 

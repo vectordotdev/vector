@@ -96,6 +96,7 @@ default = [
     "starts_with",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "tag_types_externally",
     "to_bool",
     "to_float",
     "to_int",
@@ -168,6 +169,7 @@ split = []
 starts_with = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
+tag_types_externally = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
