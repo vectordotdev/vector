@@ -105,11 +105,40 @@ enum EventDeliveryStatus {
 }
 ```
 
+### User Scripting
+
+Vector supports three scripting languages which need special
+consideration with regards to metadata.
+
+VRL is the simple case here. Since it currently does not support
+creating or destroying events, no metadata support is required. It may
+become desirable to give users access to read the data, but that will be
+handle as the need arises and is beyond the scope of this proposal.
+
+Scripts written in Lua and WASM, on the other hand, are complete black
+boxes to Vector. They allow users to merge, split, destroy, and create
+events completely from scratch. As such, additional support will need to
+be added to both script environments to handle the metadata.
+
+#### Lua
+
+Lua scripts, as of version 2, are passed an event structure that has log
+data in a `log` field (ie `event.log["the_field"]`), with metric data
+similar. This will make it simple to both add the metadata as a new
+field to the exposed event, and to require it when passed to the `emit`
+function parameter. Additional functions will be provided to the script
+to clone and merge the metadata.
+
+#### WASM
+
+The WASM transform exposes events to scripts as JSON… TODO
+
 ### Visibility
 
-This metadata will not be visible to users, either through remap or JSON
-transforms, unless a use case can demonstrate the need for it. Given the
-above structure of the metadata, there are no user-modifiable parts.
+Other than as described above, this metadata will not initially be
+visible to users, either through remap or JSON transforms, unless a use
+case can demonstrate the need for it. Given the above structure of the
+metadata, there are no user-modifiable parts.
 
 ## Rationale
 
@@ -159,8 +188,9 @@ source, and `SmolStr` provides constant-time copy.
 - The event data is a critical component of Vector. Any changes to this
   structure impacts virtually the entire system.
 - All transforms that combine or duplicate events will have extra
-  complications in handing the metadata. This particularly applies to
-  the Lua and WASM scripting transforms.
+  complications in handing the metadata.
+- The user scripting transforms, Lua and WASM, will require extra work
+  from script writers to handle the metadata.
 - This metadata will increase the memory required by Vector for any
   given event flow.
 - Recording, copying, and finalizing the metadata will increase the CPU
