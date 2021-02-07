@@ -22,9 +22,9 @@ pub struct TapSink {
     acker: Acker,
 }
 
-/// Tap sink is used to 'tap' into events received by uptream components, and broadcast
+/// Tap sink is used to 'tap' into events received by upstream components, and broadcast
 /// them to subscribers. Typically, this is used to expose events to the API, but is general
-/// purpose enought that it could technically be used with other mechanisms. This sink is
+/// purpose enough that it could technically be used with other mechanisms. This sink is
 /// not added to inventory; it's not intended to be user configurable.
 impl TapSink {
     pub fn new(tx: Sender, acker: Acker) -> Self {
