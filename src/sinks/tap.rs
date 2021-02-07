@@ -152,7 +152,7 @@ mod tests {
         let mut sink = TapSink::new(tx, Acker::Null);
         let count = 10;
 
-        // Assert that we received events out of the other side
+        // Assert that we received events out of the other side.
         let handle = tokio::spawn(async move {
             for _ in 0..count {
                 let event = rx.next().await.unwrap().unwrap();
