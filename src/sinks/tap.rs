@@ -109,7 +109,7 @@ impl TapController {
     }
 
     /// Returns a new `SinkOuter`, which can be inserted into sink config, mapping a component's
-    /// input name with a specific broadcast channel
+    /// input name with a specific broadcast channel.
     pub fn make_sink(&self, component_name: &str) -> SinkOuter {
         let mut lock = self.senders.write();
         let tx = lock.entry(component_name.to_string()).or_insert_with(|| {
