@@ -213,6 +213,7 @@ pub async fn build_pieces(
             sink.run(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
                     .take_until_if(tripwire),
             )
             .await
