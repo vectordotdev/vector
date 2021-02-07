@@ -25,8 +25,6 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
-    #[serde(default)]
-    pub inspect_events: bool,
 }
 
 impl Clone for ConfigBuilder {
@@ -52,7 +50,6 @@ impl From<Config> for ConfigBuilder {
             sinks: c.sinks,
             transforms: c.transforms,
             tests: c.tests,
-            inspect_events: c.inspect_events,
         }
     }
 }

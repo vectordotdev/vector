@@ -1,5 +1,5 @@
 use super::{handler, schema};
-use crate::{config, event::EventInspector};
+use crate::{config, sinks::tap::TapController};
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     Data, Request, Schema,
@@ -18,8 +18,8 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: &config::Config, event_inspector: EventInspector) -> Self {
-        let routes = make_routes(config.api.playground, event_inspector);
+    pub fn start(config: &config::Config, tap_controller: TapController) -> Self {
+        let routes = make_routes(config.api.playground, tap_controller);
 
         let (_shutdown, rx) = oneshot::channel();
         let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
@@ -51,9 +51,9 @@ impl Server {
     }
 }
 
-fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter<(impl Reply,)> {
-    // Make the event inspector thread-safe, to pass via context
-    let event_inspector = Arc::new(event_inspector);
+fn make_routes(playground: bool, tap_controller: TapController) -> BoxedFilter<(impl Reply,)> {
+    // Make the tap controller thread-safe
+    let tap_controller = Arc::new(tap_controller);
 
     // Build the GraphQL schema
     let schema = schema::build_schema().finish();
@@ -72,7 +72,7 @@ fn make_routes(playground: bool, event_inspector: EventInspector) -> BoxedFilter
             schema.clone(),
             Some(move |_| {
                 let mut data = Data::default();
-                data.insert(Arc::clone(&event_inspector));
+                data.insert(Arc::clone(&tap_controller));
                 Ok(data)
             }),
         )

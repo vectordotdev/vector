@@ -1,13 +1,14 @@
-use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand};
-use crate::event::EventInspector;
-use crate::signal::SignalTo;
-use crate::topology::RunningTopology;
 use crate::{
-    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
+    cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
+    config::{self, SinkOuter},
+    generate, heartbeat, list, metrics,
+    signal::{self, SignalTo},
+    sinks::tap::TapController,
+    topology::{self, RunningTopology},
+    trace, unit_test, validate,
 };
-use std::cmp::max;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use indexmap::IndexMap;
+use std::{cmp::max, collections::HashMap, path::PathBuf};
 
 use futures::StreamExt;
 use tokio::sync::mpsc;
@@ -35,7 +36,7 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
-    pub event_inspector: Option<EventInspector>,
+    pub tap_controller: Option<TapController>,
 }
 
 pub struct Application {
@@ -151,6 +152,23 @@ impl Application {
                 let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
+                // Conditionally wire up the 'tap' controller, based on API availability
+                let tap_controller = if cfg!(feature = "api") {
+                    let tc = TapController::new();
+
+                    let tap_sinks = config
+                        .sources
+                        .iter()
+                        .map(|(name, _)| (format!("tap_{}", &name), tc.make_sink(name)))
+                        .collect::<IndexMap<String, SinkOuter>>();
+
+                    config.sinks.extend(tap_sinks);
+
+                    Some(tc)
+                } else {
+                    None
+                };
+
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
@@ -160,20 +178,13 @@ impl Application {
                 }
                 config.healthchecks.set_require_healthy(require_healthy);
 
-                if cfg!(feature = "api") {
-                    config.inspect_events = true;
-                }
-
                 let diff = config::ConfigDiff::initial(&config);
-                let mut pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
 
                 #[cfg(feature = "api")]
                 let api = config.api;
-
-                // Take the event inspector, to pass it to the main app. Topology doesn't need it.
-                let event_inspector = pieces.event_inspector.take();
 
                 let result = topology::start_validated(config, diff, pieces).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
@@ -184,7 +195,7 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
-                    event_inspector,
+                    tap_controller,
                 })
             })
         }?;
@@ -206,11 +217,10 @@ impl Application {
 
         let opts = self.opts;
 
-        #[cfg(feature = "api")]
-        let api_config = self.config.api;
+        let mut tap_controller = self.config.tap_controller;
 
         #[cfg(feature = "api")]
-        let mut event_inspector = self.config.event_inspector;
+        let api_config = self.config.api;
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -223,16 +233,16 @@ impl Application {
             #[cfg(feature = "api")]
             // assigned to prevent the API terminating when falling out of scope
             let api_server = if api_config.enabled {
-                let event_inspector = event_inspector
+                let tap_controller = tap_controller
                     .take()
-                    .expect("Event inspector should be initialized");
+                    .expect("Expected TapController to be initialized");
 
                 emit!(ApiStarted {
                     addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), event_inspector))
+                Some(api::Server::start(topology.config(), tap_controller))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

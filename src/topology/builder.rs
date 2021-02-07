@@ -6,7 +6,7 @@ use super::{
 use crate::{
     buffers,
     config::{DataType, SinkContext},
-    event::{Event, EventInspector},
+    event::Event,
     internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
@@ -32,7 +32,6 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
-    pub event_inspector: Option<EventInspector>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
@@ -50,13 +49,6 @@ pub async fn build_pieces(
     let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
-
-    // Create an event inspector, if required by config
-    let event_inspector = if config.inspect_events {
-        Some(EventInspector::new())
-    } else {
-        None
-    };
 
     // Build sources
     for (name, source) in config
@@ -84,24 +76,10 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        // Pass events through the inspector if enabled
-        let mut pump = rx.map(Ok).boxed();
-
-        if event_inspector.as_ref().is_some() {
-            pump = pump
-                .inspect(
-                    event_inspector
-                        .as_ref()
-                        .expect("Event inspector should be initialized")
-                        .result_adder(name.clone()),
-                )
-                .boxed()
-        }
-
         let pump = Task::new(
             name,
             typetag,
-            pump.forward(output).map_ok(|_| TaskOutput::Source),
+            rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source),
         );
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -147,48 +125,20 @@ pub async fn build_pieces(
         let (output, control) = Fanout::new();
 
         let transform = match transform {
-            Transform::Function(mut t) => {
-                let mut filtered = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventProcessed))
-                    .boxed();
-
-                if event_inspector.as_ref().is_some() {
-                    filtered = filtered
-                        .inspect(
-                            event_inspector
-                                .as_ref()
-                                .expect("Event inspector should be initialized")
-                                .adder(name.clone()),
-                        )
-                        .boxed()
-                }
-
-                filtered
-                    .flat_map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        stream::iter(buf.into_iter()).map(Ok)
-                    })
-                    .forward(output)
-                    .boxed()
-            }
+            Transform::Function(mut t) => input_rx
+                .filter(move |event| ready(filter_event_type(event, input_type)))
+                .inspect(|_| emit!(EventProcessed))
+                .flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter()).map(Ok)
+                })
+                .forward(output)
+                .boxed(),
             Transform::Task(t) => {
-                let mut filtered = input_rx
+                let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventProcessed))
-                    .boxed();
-
-                if event_inspector.as_ref().is_some() {
-                    filtered = filtered
-                        .inspect(
-                            event_inspector
-                                .as_ref()
-                                .expect("Event inspector should be initialized")
-                                .adder(name.clone()),
-                        )
-                        .boxed();
-                }
+                    .inspect(|_| emit!(EventProcessed));
 
                 t.transform(Box::pin(filtered))
                     .map(Ok)
@@ -315,7 +265,6 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            event_inspector,
         };
 
         Ok(pieces)

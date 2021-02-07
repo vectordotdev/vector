@@ -1,6 +1,6 @@
 mod log;
 
-use crate::event::EventInspector;
+use crate::sinks::tap::TapController;
 use async_graphql::{Context, Subscription};
 use async_stream::stream;
 use log::LogEvent;
@@ -20,7 +20,7 @@ impl EventsSubscription {
     ) -> impl Stream<Item = LogEvent> + 'a {
         stream! {
             if let Some(mut receiver) = ctx
-                .data_unchecked::<Arc<EventInspector>>()
+                .data_unchecked::<Arc<TapController>>()
                 .subscribe(&component_name)
                 {
                     while let Ok(ev) = receiver.recv().await {
