@@ -734,7 +734,7 @@ impl PostgresqlMetrics {
         value: MetricValue,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(name.into(), MetricKind::Absolute, value)
+        Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(Utc::now()))

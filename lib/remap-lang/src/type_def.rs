@@ -206,6 +206,20 @@ impl TypeDef {
         self
     }
 
+    /// Applies a type constraint to the items in an array. If you need all items in the array to
+    /// be integers, for example, set `Kind::Integer`; if items can be either integers or Booleans,
+    /// set `Kind::Integer | Kind::Boolean`; and so on.
+    pub fn fallible_unless_array_has_inner_type(mut self, kind: impl Into<value::Kind>) -> Self {
+        match &self.inner_type_def {
+            Some(InnerTypeDef::Array(inner_kind)) if kind.into() == inner_kind.kind => (),
+            _ => {
+                self.fallible = true;
+            }
+        }
+
+        self
+    }
+
     pub fn merge(self, other: Self) -> Self {
         self | other
     }
@@ -411,5 +425,64 @@ mod tests {
         });
 
         assert_eq!(expected, type_def_a | type_def_b);
+    }
+
+    #[test]
+    fn array_inner_type() {
+        // All items are strings + all must be strings -> infallible
+        let non_mixed_array = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Bytes])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(!non_mixed_array.is_fallible());
+
+        // Items are strings or Booleans + all must be strings -> fallible
+        let mixed_array_mismatched = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Bytes | Kind::Boolean])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(mixed_array_mismatched.is_fallible());
+
+        // Items are integers or floats + all must be integers or floats -> infallible
+        let mixed_array_matched = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Integer | Kind::Float])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Integer | Kind::Float);
+
+        assert!(!mixed_array_matched.is_fallible());
+
+        // Items are Booleans or maps + must be floats -> fallible
+        let mismatched_array = TypeDef {
+            inner_type_def: Some(inner_type_def!([Kind::Boolean | Kind::Map])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Float);
+
+        assert!(mismatched_array.is_fallible());
+
+        // Setting a required array type on a map -> fallible
+        let map_type = TypeDef {
+            kind: Kind::Map,
+            inner_type_def: Some(inner_type_def!([Kind::Map])),
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(map_type.is_fallible());
+
+        // Any non-array should be fallible if an inner type constraint is
+        // applied
+        let non_array = TypeDef {
+            kind: Kind::Bytes | Kind::Float | Kind::Boolean,
+            ..Default::default()
+        }
+        .fallible_unless_array_has_inner_type(Kind::Bytes);
+
+        assert!(non_array.is_fallible());
     }
 }

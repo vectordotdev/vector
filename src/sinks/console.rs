@@ -192,11 +192,11 @@ mod test {
     fn encodes_counter() {
         let event = Event::Metric(
             Metric::new(
-                "foos".into(),
+                "foos",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 100.0 },
             )
-            .with_namespace(Some("vector".into()))
+            .with_namespace(Some("vector"))
             .with_tags(Some(
                 vec![
                     ("key2".to_owned(), "value2".to_owned()),
@@ -217,7 +217,7 @@ mod test {
     #[test]
     fn encodes_set() {
         let event = Event::Metric(Metric::new(
-            "users".into(),
+            "users",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bob".into()].into_iter().collect(),
@@ -232,7 +232,7 @@ mod test {
     #[test]
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric::new(
-            "glork".into(),
+            "glork",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![10.0 => 1],
@@ -248,7 +248,7 @@ mod test {
     #[test]
     fn encodes_metric_text() {
         let event = Event::Metric(Metric::new(
-            "users".into(),
+            "users",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bob".into()].into_iter().collect(),

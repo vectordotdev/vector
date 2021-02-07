@@ -165,7 +165,7 @@ num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.3.0"
 grok = "~1.0.1"
-nom = "6.0.1"
+nom = { version = "6.0.1", optional = true }
 pest = "2.1.3"
 pest_derive = "2.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -174,7 +174,7 @@ snafu = { version = "0.6.10", features = ["futures-01", "futures"] }
 url = "2.2.0"
 percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
-bollard = { version = "0.9.0", features = ["ssl"], optional = true }
+bollard = { version = "0.9.1", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
 socket2 = { version = "0.3.19", optional = true }
 inventory = "0.1.10"
@@ -374,7 +374,7 @@ sources-kafka = ["rdkafka"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
-sources-nginx_metrics = []
+sources-nginx_metrics = ["nom"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix"]
