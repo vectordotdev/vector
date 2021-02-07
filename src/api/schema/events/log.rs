@@ -8,8 +8,8 @@ use serde_json::json;
 pub struct LogEvent(event::LogEvent);
 
 impl LogEvent {
-    pub fn new(ev: event::LogEvent) -> Self {
-        Self(ev)
+    pub fn new(event: event::LogEvent) -> Self {
+        Self(event)
     }
 }
 
