@@ -35,12 +35,12 @@ impl TapSink {
 #[async_trait::async_trait]
 impl StreamSink for TapSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(ev) = input.next().await {
-            if let Event::Log(ev) = ev {
+        while let Some(event) = input.next().await {
+            if let Event::Log(event) = event {
                 // This can suffer from TOC/TOU, but the risk is minimal as the purpose
                 // here is solely to reduce expense.
                 if self.tx.receiver_count() > 0 {
-                    let _ = self.tx.send(ev.clone());
+                    let _ = self.tx.send(event.clone());
                 }
             }
             self.acker.ack(1);
