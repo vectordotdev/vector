@@ -159,7 +159,7 @@ impl Application {
                     let tap_sinks = config
                         .sources
                         .iter()
-                        .map(|(name, _)| (format!("tap_{}", &name), tc.make_sink(name)))
+                        .map(|(name, _)| (format!("_tap_{}", &name), tc.make_sink(name)))
                         .collect::<IndexMap<String, SinkOuter>>();
 
                     config.sinks.extend(tap_sinks);

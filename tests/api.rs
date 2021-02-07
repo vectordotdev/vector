@@ -21,8 +21,8 @@ mod tests {
         self,
         api::{self, Server},
         config::{self, Config, Format},
-        event::EventInspector,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
+        sinks::tap::TapController,
         test_util::{next_addr, retry_until},
     };
     use vector_api_client::{
@@ -90,7 +90,7 @@ mod tests {
     // Starts and returns the server
     fn start_server() -> Server {
         let config = api_enabled_config();
-        api::Server::start(&config, EventInspector::default())
+        api::Server::start(&config, TapController::default())
     }
 
     fn make_client(addr: SocketAddr) -> Client {
@@ -105,7 +105,7 @@ mod tests {
         let addr = config.api.address.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        let _server = api::Server::start(&config, EventInspector::default());
+        let _server = api::Server::start(&config, TapController::default());
 
         // Build the request
         let client = reqwest::Client::new();
@@ -292,7 +292,7 @@ mod tests {
             config_builder.api.address = Some(next_addr());
 
             let config = config_builder.build().unwrap();
-            let server = api::Server::start(&config, EventInspector::default());
+            let server = api::Server::start(&config, TapController::default());
 
             let client = make_client(server.addr());
 
@@ -473,7 +473,7 @@ mod tests {
 
                 tokio::time::delay_for(tokio::time::Duration::from_millis(500)).await;
 
-                let server = api::Server::start(topology.config(), EventInspector::default());
+                let server = api::Server::start(topology.config(), TapController::default());
                 let client = new_subscription_client(server.addr()).await;
                 let subscription = client.component_processed_events_totals_subscription(500);
 
@@ -523,7 +523,7 @@ mod tests {
 
                 let topology = from_str_config(conf).await;
 
-                let server = api::Server::start(topology.config(), EventInspector::default());
+                let server = api::Server::start(topology.config(), TapController::default());
                 let client = new_subscription_client(server.addr()).await;
                 let subscription = client.component_processed_bytes_totals_subscription(500);
 
@@ -566,7 +566,7 @@ mod tests {
 
             let mut topology = from_str_config(conf).await;
 
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = new_subscription_client(server.addr()).await;
 
             // Spawn a handler for listening to changes
@@ -656,7 +656,7 @@ mod tests {
 
             let mut topology = from_str_config(conf).await;
 
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = new_subscription_client(server.addr()).await;
 
             // Spawn a handler for listening to changes
@@ -734,7 +734,7 @@ mod tests {
 
             let topology = from_str_config(conf).await;
 
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = new_subscription_client(server.addr()).await;
 
             // Spawn a handler for listening to changes
@@ -789,7 +789,7 @@ mod tests {
 
             let topology = from_str_config(conf).await;
 
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = new_subscription_client(server.addr()).await;
 
             // Spawn a handler for listening to changes
@@ -860,7 +860,7 @@ mod tests {
             );
 
             let topology = from_str_config(&conf).await;
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
 
             // Short delay to ensure logs are picked up
             tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
@@ -903,7 +903,7 @@ mod tests {
             "#;
 
             let topology = from_str_config(&conf).await;
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = make_client(server.addr());
 
             // Retrieving a component that doesn't exist should return None
@@ -959,7 +959,7 @@ mod tests {
 
             let topology = from_str_config(&conf).await;
 
-            let server = api::Server::start(topology.config(), EventInspector::default());
+            let server = api::Server::start(topology.config(), TapController::default());
             let client = make_client(server.addr());
 
             // Test after/first with a page size of 2, exhausting all results

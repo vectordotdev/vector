@@ -24,7 +24,7 @@ pub struct TapSink {
 
 /// Tap sink is used to 'tap' into events received by uptream components, and broadcast
 /// them to subscribers. Typically, this is used to expose events to the API. This sink is
-/// not added to inventory, as it's not intended to be user configurable.
+/// not added to inventory; it's not intended to be user configurable.
 impl TapSink {
     pub fn new(tx: Sender, acker: Acker) -> Self {
         Self { tx, acker }
@@ -119,6 +119,12 @@ impl TapController {
             .read()
             .get(component_name)
             .map(|tx| tx.subscribe())
+    }
+}
+
+impl Default for TapController {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
