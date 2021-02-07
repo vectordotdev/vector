@@ -83,9 +83,13 @@ protobuf definition will need to be expanded to include the metadata by
 adding the appropriate structures.
 
 ```protobuf
-message EventWithMetadata {
-  EventWrapper data = 1;
-  EventMetadata metadata = 2;
+message EventWrapper {
+  oneof event {
+    Log log = 1;
+    Metric metric = 2;
+  }
+  # Reserve 3 for traces
+  EventMetadata metadata = 4;
 }
 
 message EventMetadata {
@@ -104,6 +108,12 @@ enum EventDeliveryStatus {
   …TBD…
 }
 ```
+
+When reading an event from a buffer written by a previous version of
+Vector, the `metadata` field of `EventWrapper` will not be present. The
+buffer reader will fill in the metadata with stub values containing the
+current time and a null source, indicating the event has no known
+source.
 
 ### User Scripting
 
