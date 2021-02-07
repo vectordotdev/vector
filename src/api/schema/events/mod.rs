@@ -23,8 +23,8 @@ impl EventsSubscription {
                 .data_unchecked::<Arc<TapController>>()
                 .subscribe(&component_name)
                 {
-                    while let Ok(ev) = receiver.recv().await {
-                        yield LogEvent::new(ev)
+                    while let Ok(event) = receiver.recv().await {
+                        yield LogEvent::new(event)
                     }
                 }
         }
