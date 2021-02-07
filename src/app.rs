@@ -154,7 +154,7 @@ impl Application {
 
                 // Conditionally wire up the 'tap' controller, based on API availability
                 let tap_controller = if cfg!(feature = "api") {
-                    let tc = TapController::new();
+                    let tap_controller = TapController::new();
 
                     let tap_sinks = config
                         .sources
