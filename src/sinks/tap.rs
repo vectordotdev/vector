@@ -23,7 +23,8 @@ pub struct TapSink {
 }
 
 /// Tap sink is used to 'tap' into events received by uptream components, and broadcast
-/// them to subscribers. Typically, this is used to expose events to the API. This sink is
+/// them to subscribers. Typically, this is used to expose events to the API, but is general
+/// purpose enought that it could technically be used with other mechanisms. This sink is
 /// not added to inventory; it's not intended to be user configurable.
 impl TapSink {
     pub fn new(tx: Sender, acker: Acker) -> Self {
@@ -49,6 +50,10 @@ impl StreamSink for TapSink {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+/// Since 'tap' isn't user configurable, we're using TapConfig as middleware to satisfy the
+/// `SinkConfig` trait, and pass along the relaying Sender to the eventual sink. This is wrapped
+/// in a RwLock for interior mutability, since `SinkConfig.build` requires an immutability borrow.
+/// The Option<Sender> wrapper is used to replace the value with `None` when taken.
 pub struct TapConfig {
     #[serde(skip_deserializing, skip_serializing, default = "default_locked_tx")]
     locked_tx: RwLock<Option<Sender>>,
@@ -90,6 +95,8 @@ impl SinkConfig for TapConfig {
     }
 }
 
+/// This controller represents the public interface to subscribe to underlying `LogEvent`s
+/// specific to a given component, identified by its name.
 pub struct TapController {
     senders: RwLock<HashMap<String, Sender>>,
 }
@@ -101,6 +108,8 @@ impl TapController {
         }
     }
 
+    /// Returns a new `SinkOuter`, which can be inserted into sink config, mapping a component's
+    /// input name with a specific broadcast channel
     pub fn make_sink(&self, component_name: &str) -> SinkOuter {
         let mut lock = self.senders.write();
         let tx = lock.entry(component_name.to_string()).or_insert_with(|| {
@@ -108,12 +117,15 @@ impl TapController {
             tx
         });
 
+        // A `SinkConfig` is required to be provided to SinkOuter, so we create one here,
+        // passing a tx clone which will in turn be 'taken' by the end sink.
         let tap_config = TapConfig::new(tx.clone());
+
         SinkOuter::new(vec![component_name.to_string()], Box::new(tap_config))
     }
 
     /// Subscribe to `LogEvent`s received against a specific component name. Any additional
-    /// filtering should be done downstream
+    /// filtering should be done by the downstream.
     pub fn subscribe(&self, component_name: &str) -> Option<Receiver> {
         self.senders
             .read()

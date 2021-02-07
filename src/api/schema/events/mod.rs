@@ -12,7 +12,7 @@ pub struct EventsSubscription;
 
 #[Subscription]
 impl EventsSubscription {
-    /// A stream of component log events
+    /// A stream of a component's log events
     pub async fn log_events<'a>(
         &'a self,
         ctx: &'a Context<'a>,

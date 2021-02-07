@@ -1,7 +1,6 @@
 use crate::event;
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
-use serde::Serialize;
 use serde_json::json;
 
 #[derive(Debug)]

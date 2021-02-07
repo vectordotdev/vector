@@ -217,6 +217,7 @@ impl Application {
 
         let opts = self.opts;
 
+        #[cfg(feature = "api")]
         let mut tap_controller = self.config.tap_controller;
 
         #[cfg(feature = "api")]
