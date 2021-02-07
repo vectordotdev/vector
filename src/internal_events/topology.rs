@@ -20,10 +20,14 @@ impl InternalEvent for EventIn {
 }
 
 #[derive(Debug)]
-pub struct EventOut;
+pub struct EventOut {
+    pub count: usize,
+}
 
 impl InternalEvent for EventOut {
     fn emit_metrics(&self) {
-        counter!("events_out_total", 1);
+        if self.count > 0 {
+            counter!("events_out_total", self.count as u64);
+        }
     }
 }

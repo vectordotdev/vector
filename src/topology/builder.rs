@@ -125,13 +125,11 @@ pub async fn build_pieces(
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
+                    emit!(EventOut { count: buf.len() });
                     emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
-                .forward(output.with(|event| async {
-                    emit!(EventOut);
-                    Ok(event)
-                }))
+                .forward(output)
                 .boxed(),
             Transform::Task(t) => {
                 let filtered = input_rx
@@ -141,7 +139,7 @@ pub async fn build_pieces(
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event| async {
-                        emit!(EventOut);
+                        emit!(EventOut { count: 1 });
                         Ok(event)
                     }))
                     .boxed()
