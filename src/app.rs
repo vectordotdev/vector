@@ -152,7 +152,7 @@ impl Application {
                 let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
-                // Conditionally wire up the 'tap' controller, based on API availability
+                // Conditionally wire up the 'tap' controller, based on API availability.
                 let tap_controller = if cfg!(feature = "api") {
                     let tap_controller = TapController::new();
 
