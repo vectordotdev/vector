@@ -2,8 +2,6 @@ use super::util::StreamSink;
 use crate::{
     buffers::Acker,
     config::{DataType, SinkContext, SinkOuter},
-};
-use crate::{
     config::SinkConfig,
     event::{Event, LogEvent},
 };
