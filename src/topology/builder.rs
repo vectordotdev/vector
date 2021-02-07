@@ -20,10 +20,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{
-    sync::mpsc,
-    time::{timeout, Duration},
-};
+use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -57,7 +54,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
-        let (tx, rx) = mpsc::channel(1000);
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
@@ -116,7 +113,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = mpsc::channel(100);
+        let (input_tx, input_rx) = futures::channel::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();

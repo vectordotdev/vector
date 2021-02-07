@@ -3,7 +3,7 @@ use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput}
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     stream::BoxStream,
-    StreamExt,
+    SinkExt, StreamExt,
 };
 use futures01::{stream, Sink, Stream};
 use tempfile::tempdir;
@@ -65,6 +65,32 @@ fn benchmark_buffers(c: &mut Criterion) {
                 drop(writer);
 
                 rt.block_on(read_handle).unwrap().unwrap();
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("channels/futures", |b| {
+        b.iter_batched(
+            || {
+                let rt = runtime();
+
+                let (writer, mut reader) = futures::channel::mpsc::channel(100);
+
+                let read_handle = rt.spawn(async move { while reader.next().await.is_some() {} });
+
+                (rt, writer, read_handle)
+            },
+            |(mut rt, mut writer, read_handle)| {
+                let write_handle = rt.spawn(async move {
+                    let mut stream = random_events(line_size).take(num_lines as u64).compat();
+                    while let Some(e) = stream.next().await {
+                        writer.send(e).await.unwrap();
+                    }
+                });
+
+                rt.block_on(write_handle).unwrap();
+                rt.block_on(read_handle).unwrap();
             },
             BatchSize::SmallInput,
         );
