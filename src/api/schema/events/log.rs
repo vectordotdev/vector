@@ -1,5 +1,7 @@
 use crate::event;
 use async_graphql::Object;
+use chrono::{DateTime, Utc};
+use serde::Serialize;
 use serde_json::json;
 
 #[derive(Debug)]
@@ -16,7 +18,12 @@ impl LogEvent {
 impl LogEvent {
     /// Log message
     async fn message(&self) -> Option<String> {
-        serde_json::from_value(json!(self.0.get("message")?)).ok()
+        Some(self.0.get("message")?.to_string_lossy())
+    }
+
+    /// Log timestamp
+    async fn timestamp(&self) -> Option<&DateTime<Utc>> {
+        self.0.get("timestamp")?.as_timestamp()
     }
 
     /// Log event as a JSON string
