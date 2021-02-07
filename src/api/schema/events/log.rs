@@ -25,7 +25,7 @@ impl LogEvent {
         self.0.get("timestamp")?.as_timestamp()
     }
 
-    /// Log event as a JSON string.
+    /// Log event as a JSON string
     async fn json(&self) -> String {
         json!(self.0).to_string()
     }
