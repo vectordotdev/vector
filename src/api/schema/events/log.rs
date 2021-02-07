@@ -30,7 +30,7 @@ impl LogEvent {
         json!(self.0).to_string()
     }
 
-    /// Log event as a YAML string.
+    /// Log event as a YAML string
     async fn yaml(&self) -> Option<String> {
         serde_yaml::to_string(&self.0).ok()
     }
