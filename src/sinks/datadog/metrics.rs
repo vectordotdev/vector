@@ -194,8 +194,8 @@ impl SinkConfig for DatadogConfig {
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|event| {
-                    let ep = DatadogEndpoint::from_metric(&event);
-                    Ok(PartitionInnerBuffer::new(event, ep))
+                    let endpoint = DatadogEndpoint::from_metric(&event);
+                    Ok(PartitionInnerBuffer::new(event, endpoint))
                 }))
             });
 
