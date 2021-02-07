@@ -7,13 +7,13 @@ use crate::{
     buffers,
     config::{DataType, SinkContext},
     event::Event,
-    internal_events::EventProcessed,
+    internal_events::{EventIn, EventOut, EventProcessed},
     shutdown::SourceShutdownCoordinator,
     stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::{
     collections::HashMap,
     future::ready,
@@ -121,21 +121,29 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
+                .inspect(|_| emit!(EventIn))
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
                     emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
-                .forward(output)
+                .forward(output.with(|event| async {
+                    emit!(EventOut);
+                    Ok(event)
+                }))
                 .boxed(),
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
                     .on_processed(|| emit!(EventProcessed));
                 t.transform(Box::pin(filtered))
                     .map(Ok)
-                    .forward(output)
+                    .forward(output.with(|event| async {
+                        emit!(EventOut);
+                        Ok(event)
+                    }))
                     .boxed()
             }
         }
