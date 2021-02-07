@@ -50,10 +50,10 @@ impl StreamSink for TapSink {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-/// Since 'tap' isn't user configurable, we're using TapConfig as middleware to satisfy the
-/// `SinkConfig` trait, and pass along the relaying Sender to the eventual sink. This is wrapped
-/// in a RwLock for interior mutability, since `SinkConfig.build` requires an immutability borrow.
-/// The Option<Sender> wrapper is used to replace the value with `None` when taken.
+/// Since 'tap' isn't user configurable, we're using `TapConfig` as middleware to satisfy the
+/// `SinkConfig` trait, and pass along the relaying `Sender` to the eventual sink. This is wrapped
+/// in a `RwLock` for interior mutability, since `SinkConfig.build` requires an immutability borrow.
+/// The `Option<Sender>` wrapper is used to replace the value with `None` when taken.
 pub struct TapConfig {
     #[serde(skip_deserializing, skip_serializing, default = "default_locked_tx")]
     locked_tx: RwLock<Option<Sender>>,
