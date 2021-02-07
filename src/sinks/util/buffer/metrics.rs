@@ -208,6 +208,8 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
         }
     }
 
+    /// This wraps `MetricNormalize::apply_state`, converting to/from
+    /// the `Event` type wrapper. See that function for return values.
     pub fn apply(&mut self, event: Event) -> Option<Event> {
         N::apply_state(&mut self.state, event.into_metric()).map(Into::into)
     }
@@ -228,6 +230,10 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
 /// source, the buffer will compare it's values with the previous known
 /// and calculate the delta.
 pub trait MetricNormalize {
+    /// Apply normalize the given `metric` using `state` to save any
+    /// persistent data between calls. The return value is `None` if the
+    /// incoming metric is only used to set a reference state, and
+    /// `Some(metric)` otherwise.
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric>;
 }
 
