@@ -3,8 +3,7 @@ use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput}
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     stream::BoxStream,
-    StreamExt,
-    SinkExt
+    SinkExt, StreamExt,
 };
 use futures01::{stream, Sink, Stream};
 use tempfile::tempdir;
@@ -77,7 +76,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 let rt = runtime();
 
                 let (writer, mut reader) = futures::channel::mpsc::channel(100);
-               
+
                 let read_handle = rt.spawn(async move { while reader.next().await.is_some() {} });
 
                 (rt, writer, read_handle)
