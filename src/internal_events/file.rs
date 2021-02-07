@@ -278,7 +278,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "globbing_errors_total", 1,
+                "glob_errors_total", 1,
                 "path" => self.path.to_string_lossy().into_owned(),
             );
         }
