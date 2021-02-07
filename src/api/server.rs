@@ -52,7 +52,7 @@ impl Server {
 }
 
 fn make_routes(playground: bool, tap_controller: TapController) -> BoxedFilter<(impl Reply,)> {
-    // Make the tap controller thread-safe
+    // Make the tap controller thread-safe.
     let tap_controller = Arc::new(tap_controller);
 
     // Build the GraphQL schema
