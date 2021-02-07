@@ -164,7 +164,7 @@ impl Application {
 
                     config.sinks.extend(tap_sinks);
 
-                    Some(tc)
+                    Some(tap_controller)
                 } else {
                     None
                 };
