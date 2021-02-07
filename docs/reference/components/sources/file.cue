@@ -552,5 +552,6 @@ components: sources: file: {
 		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
+		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
 	}
 }
