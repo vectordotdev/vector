@@ -261,6 +261,29 @@ mod source {
         }
     }
 
+    #[derive(Debug)]
+    pub struct PathGlobbingFailed<'a> {
+        pub path: &'a Path,
+        pub error: &'a Error,
+    }
+
+    impl<'a> InternalEvent for PathGlobbingFailed<'a> {
+        fn emit_logs(&self) {
+            error!(
+                message = "Failed globbing path.",
+                path = ?self.path,
+                error = ?self.error,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!(
+                "globbing_errors_total", 1,
+                "path" => self.path.to_string_lossy().into_owned(),
+            );
+        }
+    }
+
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter;
 
@@ -310,6 +333,10 @@ mod source {
 
         fn emit_files_open(&self, count: usize) {
             emit!(FileOpen { count });
+        }
+
+        fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
+            emit!(PathGlobbingFailed { path, error });
         }
     }
 }
