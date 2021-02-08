@@ -2,7 +2,7 @@ use indoc::indoc;
 use std::fs;
 use vector::api::build_schema;
 
-static INTROSPECTION_QUERY: &str = indoc! { r#"
+static INTROSPECTION_QUERY: &str = indoc! {r#"
     query IntrospectionQuery {
       __schema {
         queryType {
@@ -99,7 +99,7 @@ static INTROSPECTION_QUERY: &str = indoc! { r#"
         }
       }
     }
-"# };
+"#};
 
 #[tokio::main]
 async fn main() {

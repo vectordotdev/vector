@@ -541,7 +541,7 @@ mod test {
     #[test]
     fn default_data_dir() {
         let config = load_from_str(
-            indoc! { r#"
+            indoc! {r#"
                 [sources.in]
                   type = "file"
                   include = ["/var/log/messages"]
@@ -550,7 +550,7 @@ mod test {
                   type = "console"
                   inputs = ["in"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .unwrap();
@@ -564,7 +564,7 @@ mod test {
     #[test]
     fn default_schema() {
         let config = load_from_str(
-            indoc! { r#"
+            indoc! {r#"
                 [sources.in]
                   type = "file"
                   include = ["/var/log/messages"]
@@ -573,7 +573,7 @@ mod test {
                   type = "console"
                   inputs = ["in"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .unwrap();
@@ -592,7 +592,7 @@ mod test {
     #[test]
     fn custom_schema() {
         let config = load_from_str(
-            indoc! { r#"
+            indoc! {r#"
                 [log_schema]
                   host_key = "this"
                   message_key = "that"
@@ -606,7 +606,7 @@ mod test {
                   type = "console"
                   inputs = ["in"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .unwrap();
@@ -619,7 +619,7 @@ mod test {
     #[test]
     fn config_append() {
         let mut config: ConfigBuilder = format::deserialize(
-            indoc! { r#"
+            indoc! {r#"
                 [sources.in]
                   type = "file"
                   include = ["/var/log/messages"]
@@ -628,7 +628,7 @@ mod test {
                   type = "console"
                   inputs = ["in"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .unwrap();
@@ -636,7 +636,7 @@ mod test {
         assert_eq!(
             config.append(
                 format::deserialize(
-                    indoc! { r#"
+                    indoc! {r#"
                         data_dir = "/foobar"
 
                         [transforms.foo]
@@ -654,7 +654,7 @@ mod test {
                             [[tests.outputs.conditions]]
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
-                    "# },
+                    "#},
                     Some(Format::TOML),
                 )
                 .unwrap()
@@ -672,7 +672,7 @@ mod test {
     #[test]
     fn config_append_collisions() {
         let mut config: ConfigBuilder = format::deserialize(
-            indoc! { r#"
+            indoc! {r#"
                 [sources.in]
                   type = "file"
                   include = ["/var/log/messages"]
@@ -681,7 +681,7 @@ mod test {
                   type = "console"
                   inputs = ["in"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .unwrap();
@@ -689,7 +689,7 @@ mod test {
         assert_eq!(
             config.append(
                 format::deserialize(
-                    indoc! { r#"
+                    indoc! {r#"
                         [sources.in]
                           type = "file"
                           include = ["/var/log/messages"]
@@ -702,7 +702,7 @@ mod test {
                           type = "console"
                           inputs = ["in"]
                           encoding = "json"
-                    "# },
+                    "#},
                     Some(Format::TOML),
                 )
                 .unwrap()
@@ -835,7 +835,7 @@ mod resource_tests {
     #[test]
     fn config_conflict_detected() {
         assert!(load_from_str(
-            indoc! { r#"
+            indoc! {r#"
                 [sources.in0]
                   type = "stdin"
 
@@ -846,7 +846,7 @@ mod resource_tests {
                   type = "console"
                   inputs = ["in0","in1"]
                   encoding = "json"
-            "# },
+            "#},
             Some(Format::TOML),
         )
         .is_err());

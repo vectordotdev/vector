@@ -198,11 +198,11 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: indoc! { r#"
+                source: indoc! {r#"
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
                     .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
-                "# }
+                "#}
                 .to_owned(),
                 drop_on_err: true,
             })
@@ -233,7 +233,7 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with coercer", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
-                toml::from_str::<CoercerConfig>(indoc! { r#"
+                toml::from_str::<CoercerConfig>(indoc! {r#"
                     drop_unspecified = false
 
                     [types]

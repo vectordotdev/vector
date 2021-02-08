@@ -462,7 +462,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                     }),
                 );
 
-                let toml_cfg = indoc! { r##"
+                let toml_cfg = indoc! {r#"
                     ##
                     ## company-api
                     ##
@@ -654,7 +654,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                     host = "hostname"
                     message = "content"
                     timestamp = "time"
-                "##};
+                "#};
 
                 let parsed =
                     config::format::deserialize(toml_cfg, Some(config::Format::TOML)).unwrap();

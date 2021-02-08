@@ -6,7 +6,7 @@ use k8s_test_framework::{
 
 const HELM_CHART_VECTOR: &str = "vector";
 
-const HELM_VALUES_STDOUT_SINK: &str = indoc! { r#"
+const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
     vector-aggregator:
       vectorSource:
         sourceId: vector
@@ -17,7 +17,7 @@ const HELM_VALUES_STDOUT_SINK: &str = indoc! { r#"
           inputs: ["vector"]
           target: "stdout"
           encoding: "json"
-"# };
+"#};
 
 /// This test validates that vector picks up logs with an agent and
 /// delivers them to the aggregator out of the box.

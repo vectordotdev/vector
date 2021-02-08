@@ -29,7 +29,7 @@ pub fn protobuf(c: &mut Criterion) {
     c.bench_function("wasm/protobuf", |b| {
         let transform = Box::new(
             Wasm::new(
-                toml::from_str(indoc! { r#"
+                toml::from_str(indoc! {r#"
                     module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
                     artifact_cache = "target/artifacts/"
                 "#})
@@ -67,7 +67,7 @@ pub fn add_fields(criterion: &mut Criterion) {
                               emit(event)
                             end
                             """
-                        "# },
+                        "#},
                     )
                     .unwrap(),
                 )
@@ -78,10 +78,10 @@ pub fn add_fields(criterion: &mut Criterion) {
             "remap",
             Transform::function(
                 vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
-                    source: indoc! { r#"
+                    source: indoc! {r#"
                         .test_key = "test_value"
                         .test_key2 = "test_value2"
-                    "# }
+                    "#}
                     .to_string(),
                     drop_on_err: false,
                 })
@@ -93,10 +93,10 @@ pub fn add_fields(criterion: &mut Criterion) {
             Transform::task(
                 Wasm::new(
                     toml::from_str(
-                        indoc! { r#"
+                        indoc! {r#"
                             module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
                             artifact_cache = "target/artifacts/"
-                        "# },
+                        "#},
                     )
                     .unwrap(),
                 )

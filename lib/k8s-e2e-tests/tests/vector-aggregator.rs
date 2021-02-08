@@ -4,7 +4,7 @@ use k8s_test_framework::{lock, vector::Config as VectorConfig};
 
 const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
 
-const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! { r#"
+const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
     sources:
       dummy:
         type: "generator"
@@ -18,7 +18,7 @@ const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! { r#"
         inputs: ["dummy"]
         target: "stdout"
         encoding: "json"
-"# };
+"#};
 
 /// This test validates that vector-aggregator can deploy with the default
 /// settings and a dummy topology.

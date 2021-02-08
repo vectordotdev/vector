@@ -64,7 +64,7 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
                   artifact_cache = "target/artifacts/"
-        "#},
+            "#},
         ),
     ];
 
@@ -115,7 +115,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-        "#},
+            "#},
         ),
         (
             "wasm",
@@ -125,7 +125,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
                   artifact_cache = "target/artifacts/"
-        "#},
+            "#},
         ),
     ];
 
@@ -147,7 +147,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   source = """
                   . = parse_syslog!(.message)
                   """
-         "#},
+            "#},
         ),
         (
             "native",
@@ -165,7 +165,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   types.msgid = "string"
                   types.procid = "int"
                   types.timestamp = "timestamp|%F"
-         "#},
+            "#},
         ),
         (
             "lua",
@@ -188,7 +188,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-        "#},
+            "#},
         ),
         (
             "wasm",
@@ -250,7 +250,7 @@ fn benchmark_configs(
               type = "socket"
               mode = "tcp"
               address = "{}"
-            "#},
+        "#},
         input_name, in_addr
     );
     let sink_config = format!(

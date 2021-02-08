@@ -39,7 +39,7 @@ fn bench_add_fields(c: &mut Criterion) {
 
                       emit(event)
                     end
-                """
+                    """
                 "#},
                 key, value
             );
@@ -112,10 +112,10 @@ fn bench_field_filter(c: &mut Criterion) {
         }),
         ("v1", {
             let source = String::from(indoc! {r#"
-                    if event["the_field"] ~= "0" then
-                      event = nil
-                    end
-                "#});
+                if event["the_field"] ~= "0" then
+                    event = nil
+                end
+            "#});
             Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
@@ -127,7 +127,7 @@ fn bench_field_filter(c: &mut Criterion) {
                   end
                   emit(event)
                 end
-            """
+                """
             "#};
             Transform::task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),

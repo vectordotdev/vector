@@ -253,7 +253,7 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     }
 }
 
-const HELP_TEXT: &str = indoc! { r#"
+const HELP_TEXT: &str = indoc! {r#"
     VRL REPL commands:
       help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
       help docs         Navigate to the VRL docs on the Vector website
@@ -261,9 +261,9 @@ const HELP_TEXT: &str = indoc! { r#"
       next              Load the next object or create a new one
       prev              Load the previous object
       exit              Terminate the program
-"# };
+"#};
 
-const BANNER_TEXT: &str = indoc! { r#"
+const BANNER_TEXT: &str = indoc! {r#"
     > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
     > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
     > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
@@ -299,4 +299,4 @@ const BANNER_TEXT: &str = indoc! { r#"
     > Any other value is resolved to a VRL expression.
     >
     > Try it out now by typing `.` and hitting [enter] to see the result.
-"# };
+"#};
