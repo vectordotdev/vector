@@ -67,7 +67,7 @@ export CFLAGS="$CFLAGS -g0 -O3"
 # Strip the output binary through RUSTFLAGS
 #
 
-if [ "$KEEP_SYMBOLS" != "false" ]; then
+if [ "$KEEP_SYMBOLS" != "true" ]; then
   export RUSTFLAGS="$RUSTFLAGS -C link-arg=-s"
 fi
 
