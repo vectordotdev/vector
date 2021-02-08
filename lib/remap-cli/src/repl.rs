@@ -24,7 +24,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
-    println!(BANNER_TEXT);
+    println!("{}", BANNER_TEXT);
 
     loop {
         let readline = rl.readline("$ ");
