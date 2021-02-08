@@ -195,14 +195,11 @@ mod tests {
     }
 
     fn metric(name: &str, value: f64) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value },
-        }
+        Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
+        )
     }
 
     fn by_name(name: &'static str) -> FileSourceMetricTest {
