@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: format_number: {
+	category: "Number"
+	description: #"""
+		Formats the `value` into a string representation of the number.
+		"""#
+
 	arguments: [
 		{
 			name:        "value"
@@ -30,11 +35,8 @@ remap: functions: format_number: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "Number"
-	description: #"""
-		Formats the given `value` into a string representation of the number.
-		"""#
+	return: types: ["string"]
+
 	examples: [
 		{
 			title: "Format a number (3 decimals)"

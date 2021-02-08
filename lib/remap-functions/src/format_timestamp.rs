@@ -86,8 +86,8 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::TimeZone;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -112,7 +112,7 @@ mod tests {
     fn format_timestamp() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Err("function call error: invalid format".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
@@ -120,7 +120,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("10".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
@@ -128,7 +128,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("1970-01-01T00:00:10+00:00".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),

@@ -1,6 +1,12 @@
 package metadata
 
 remap: functions: parse_aws_cloudwatch_log_subscription_message: {
+	category: "Parse"
+	description: """
+		Parses AWS CloudWatch Logs events (configured through AWS Cloudwatch subscriptions) coming from the
+		`aws_kinesis_firehose` source.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -12,12 +18,8 @@ remap: functions: parse_aws_cloudwatch_log_subscription_message: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted AWS Cloudwatch Log subscription message",
 	]
-	return: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses AWS CloudWatch Logs events (configured through AWS Cloudwatch
-		subscriptions) coming from the `aws_kinesis_firehose` source.
-		"""#
+	return: types: ["map"]
+
 	examples: [
 		{
 			title: "Parse AWS Cloudwatch Log subscription message"

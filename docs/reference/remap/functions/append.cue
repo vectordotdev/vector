@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: append: {
+	category: "Array"
+	description: """
+		Appends the `items` to the end of the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -16,11 +21,8 @@ remap: functions: append: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["array"]
-	category: "Array"
-	description: """
-		Adds each item from an array to the end of another array.
-		"""
+	return: types: ["array"]
+
 	examples: [
 		{
 			title: "Append to an array"

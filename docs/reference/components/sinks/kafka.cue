@@ -9,6 +9,7 @@ components: sinks: kafka: {
 		development:   "stable"
 		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
+		stateful: false
 	}
 
 	features: {
@@ -58,6 +59,7 @@ components: sinks: kafka: {
 			warnings: []
 			type: string: {
 				examples: ["user_id"]
+				syntax: "literal"
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -95,6 +97,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+							syntax: "literal"
 						}
 					}
 					password: {
@@ -105,6 +108,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["password"]
+							syntax: "literal"
 						}
 					}
 					username: {
@@ -115,6 +119,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -127,6 +132,7 @@ components: sinks: kafka: {
 			warnings: []
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+				syntax: "literal"
 			}
 		}
 	}

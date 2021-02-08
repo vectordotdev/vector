@@ -5,10 +5,8 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
-    StreamExt, TryStreamExt,
+    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
-use futures01::Stream as Stream01;
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
@@ -232,25 +230,6 @@ pub fn random_maps(
 
 pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
     rx.take(n).collect().await
-}
-
-pub async fn collect_ready01<S>(rx: S) -> Result<Vec<S::Item>, ()>
-where
-    S: Stream01<Item = Event, Error = ()>,
-{
-    let mut rx = rx.compat();
-
-    let waker = noop_waker_ref();
-    let mut cx = Context::from_waker(waker);
-
-    let mut vec = Vec::new();
-    loop {
-        match rx.poll_next_unpin(&mut cx) {
-            Poll::Ready(Some(Ok(item))) => vec.push(item),
-            Poll::Ready(Some(Err(()))) => return Err(()),
-            Poll::Ready(None) | Poll::Pending => return Ok(vec),
-        }
-    }
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
@@ -532,16 +511,4 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
-}
-
-#[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
 }

@@ -1,13 +1,15 @@
 package metadata
 
 remap: functions: now: {
+	category: "Timestamp"
+	description: """
+		Returns the current timestamp in the UTC timezone with nanosecond precision.
+		"""
+
 	arguments: []
 	internal_failure_reasons: []
-	return: ["timestamp"]
-	category: "Timestamp"
-	description: #"""
-		Returns the current timestamp in the UTC timezone with nanosecond precision.
-		"""#
+	return: types: ["timestamp"]
+
 	examples: [
 		{
 			title: "Generate a current timestamp"

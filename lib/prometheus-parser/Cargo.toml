@@ -11,3 +11,6 @@ license = "MPL-2.0"
 [dependencies]
 nom = "6.0.1"
 snafu = { version = "0.6" }
+
+[dev-dependencies]
+shared = { path = "../shared", features = ["btreemap"] }

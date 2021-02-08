@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: split: {
+	category: "String"
+	description: """
+		Splits the `value` via the `pattern`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -22,13 +27,13 @@ remap: functions: split: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "String"
-	description: #"""
-		Splits the given `value` via the provided `pattern`.
+	return: {
+		types: ["string"]
+		rules: [
+			"If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.",
+		]
+	}
 
-		If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.
-		"""#
 	examples: [
 		{
 			title: "Split a string (no limit)"

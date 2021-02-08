@@ -84,7 +84,7 @@ impl Expression for FloorFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -125,22 +125,22 @@ mod tests {
     fn floor() {
         let cases = vec![
             (
-                map!["foo": 1234.2],
+                btreemap! { "foo" => 1234.2 },
                 Ok(1234.0.into()),
                 FloorFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.0.into()),
                 FloorFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.into()),
                 FloorFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.3.into()),
                 FloorFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
@@ -148,7 +148,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.5678.into()),
                 FloorFn::new(
                     Box::new(Literal::from(Value::Float(1234.56789))),
@@ -156,7 +156,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(9876543210123456789098765432101234567890987654321.98765.into()),
                 FloorFn::new(
                     Box::new(Literal::from(

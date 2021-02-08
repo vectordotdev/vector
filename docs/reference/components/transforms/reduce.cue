@@ -12,6 +12,7 @@ components: transforms: reduce: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -36,11 +37,20 @@ components: transforms: reduce: {
 
 	configuration: {
 		ends_when: {
-			common:      false
-			description: "A condition used to distinguish the final event of a transaction. If this condition resolves to `true` for an event, the current transaction is immediately flushed with this event."
-			required:    false
+			common: false
+			description: """
+				A condition used to distinguish the final event of a transaction. If this condition resolves to `true`
+				for an event, the current transaction is immediately flushed with this event.
+				"""
+			required: false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "literal"
+			}
 		}
 		expire_after_ms: {
 			common:      false
@@ -69,7 +79,10 @@ components: transforms: reduce: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["request_id", "user_id", "transaction_id"]
+				items: type: string: {
+					examples: ["request_id", "user_id", "transaction_id"]
+					syntax: "literal"
+				}
 			}
 		}
 		merge_strategies: {
@@ -114,17 +127,27 @@ components: transforms: reduce: {
 								max:            "The maximum of all numeric values."
 								min:            "The minimum of all numeric values."
 							}
+							syntax: "literal"
 						}
 					}
 				}
 			}
 		}
 		starts_when: {
-			common:      false
-			description: "A condition used to distinguish the first event of a transaction. If this condition resolves to `true` for an event, the previous transaction is flushed (without this event) and a new transaction is started."
-			required:    false
+			common: false
+			description: """
+				A condition used to distinguish the first event of a transaction. If this condition resolves to `true`
+				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
+				"""
+			required: false
 			warnings: []
-			type: object: configuration._conditions
+			type: string: {
+				default: null
+				examples: [
+					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+				]
+				syntax: "literal"
+			}
 		}
 	}
 
@@ -135,7 +158,87 @@ components: transforms: reduce: {
 
 	examples: [
 		{
-			title: "Reduce Rails Logs"
+			title: "Merge Ruby exceptions"
+			input: [
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:6:in `bar'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:2:in `foo'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message:   "    from foobar.rb:9:in `<main>'"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:22.123528Z"
+						message:   "Hello world, I am a new log"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+			]
+			configuration: {
+				group_by: ["host", "pid", "tid"]
+				marge_strategies: message: "concat_newline"
+				starts_when: #"match(.message, /^[^\s]/)"#
+			}
+			output: [
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:21.223543Z"
+						message: """
+							foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
+							    from foobar.rb:6:in `bar'
+							    from foobar.rb:2:in `foo'
+							    from foobar.rb:9:in `<main>'
+							"""
+						host: "host-1.hostname.com"
+						pid:  1234
+						tid:  5678
+					}
+				},
+				{
+					log: {
+						timestamp: "2020-10-07T12:33:22.123528Z"
+						message:   "Hello world, I am a new log"
+						host:      "host-1.hostname.com"
+						pid:       1234
+						tid:       5678
+					}
+				},
+			]
+		},
+		{
+			title: "Reduce Rails logs into a single transaction"
 			configuration: {}
 			input: [
 				{log: {timestamp: "2020-10-07T12:33:21.223543Z", message: "Received GET /path", request_id:                     "abcd1234", request_path:    "/path", request_params: {"key":          "val"}}},

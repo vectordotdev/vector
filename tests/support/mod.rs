@@ -29,7 +29,10 @@ use tracing::{error, info};
 use vector::{
     buffers::Acker,
     config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
-    event::{metric::MetricValue, Value},
+    event::{
+        metric::{self, MetricValue},
+        Value,
+    },
     shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
@@ -207,17 +210,18 @@ impl FunctionTransform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
-            Event::Metric(metric) => match metric.value {
+            Event::Metric(metric) => match metric.data.value {
                 MetricValue::Counter { ref mut value } => {
                     *value += self.increase;
                 }
                 MetricValue::Distribution {
-                    ref mut values,
-                    ref mut sample_rates,
+                    ref mut samples,
                     statistic: _,
                 } => {
-                    values.push(self.increase);
-                    sample_rates.push(1);
+                    samples.push(metric::Sample {
+                        value: self.increase,
+                        rate: 1,
+                    });
                 }
                 MetricValue::AggregatedHistogram {
                     ref mut count,

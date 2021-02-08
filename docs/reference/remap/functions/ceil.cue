@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: ceil: {
+	category: "Number"
+	description: """
+		Rounds the `value` up to the specified `precision`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,11 +22,13 @@ remap: functions: ceil: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["timestamp"]
-	category: "Number"
-	description: #"""
-		Rounds the given number up to the specified `precision`.
-		"""#
+	return: {
+		types: ["integer", "float"]
+		rules: [
+			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
+		]
+	}
+
 	examples: [
 		{
 			title: "Round a number up (without precision)"

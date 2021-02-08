@@ -54,7 +54,7 @@ impl Expression for Md5Fn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn md5() {
         let cases = vec![(
-            map!["foo": "foo"],
+            btreemap! { "foo" => "foo" },
             Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
             Md5Fn::new(Box::new(Path::from("foo"))),
         )];

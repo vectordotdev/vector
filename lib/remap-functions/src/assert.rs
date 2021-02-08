@@ -75,13 +75,13 @@ impl Expression for AssertFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     #[test]
     fn assert() {
         let cases = vec![
             (
-                map!["test": false],
+                btreemap! { "test" => false },
                 Err("assertion failed: This has not gone well".to_string()),
                 AssertFn::new(
                     Box::new(Path::from("test")),
@@ -91,12 +91,12 @@ mod tests {
                 ),
             ),
             (
-                map!["test": false],
+                btreemap! { "test" => false },
                 Err("assertion failed: evaluated to false".to_string()),
                 AssertFn::new(Box::new(Path::from("test")), None),
             ),
             (
-                map!["test": true],
+                btreemap! { "test" => true },
                 Ok(Value::Null),
                 AssertFn::new(Box::new(Path::from("test")), None),
             ),

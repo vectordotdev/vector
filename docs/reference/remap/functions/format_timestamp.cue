@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: format_timestamp: {
+	category: "Timestamp"
+	description: #"""
+		Formats the `value` into a string representation of the timestamp.
+		"""#
+
 	arguments: [
 		{
 			name:        "value"
@@ -16,11 +21,8 @@ remap: functions: format_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "Timestamp"
-	description: #"""
-		Formats the provided `value` into a `string` as described by `format`.
-		"""#
+	return: types: ["string"]
+
 	examples: [
 		{
 			title: "Format a timestamp (ISO8601/RFC 3339)"

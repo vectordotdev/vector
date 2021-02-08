@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: log: {
+	category:    "Debug"
+	description: """
+		Logs the `value` to Vector's [stdout](\(urls.stdout)) at the specified `level`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -24,12 +29,8 @@ remap: functions: log: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["null"]
-	category:    "Debug"
-	description: """
-		Logs the supplied error message to Vector's [stdout](\(urls.stdout)) at the specified log
-		level.
-		"""
+	return: types: ["null"]
+
 	examples: [
 		{
 			title: "Log a message"

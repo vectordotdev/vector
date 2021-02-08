@@ -1,5 +1,6 @@
 use remap::prelude::*;
 use std::collections::BTreeMap;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -62,9 +63,40 @@ impl Expression for ParseAwsVpcFlowLogFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .into_fallible(true) // Log parsing error
+            .into_fallible(true) // Log parsin_ error
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
+        "version": Kind::Integer | Kind::Null,
+        "account_id": Kind::Integer | Kind::Null,
+        "interface_id": Kind::Bytes | Kind::Null,
+        "srcaddr": Kind::Bytes | Kind::Null,
+        "dstaddr": Kind::Bytes | Kind::Null,
+        "srcport": Kind::Integer | Kind::Null,
+        "dstport": Kind::Integer | Kind::Null,
+        "protocol": Kind::Integer | Kind::Null,
+        "packets": Kind::Integer | Kind::Null,
+        "bytes": Kind::Integer | Kind::Null,
+        "start": Kind::Integer | Kind::Null,
+        "end": Kind::Integer | Kind::Null,
+        "action": Kind::Bytes | Kind::Null,
+        "log_status": Kind::Bytes | Kind::Null,
+        "vpc_id": Kind::Bytes | Kind::Null,
+        "subnet_id": Kind::Bytes | Kind::Null,
+        "instance_id": Kind::Bytes | Kind::Null,
+        "tcp_flags": Kind::Integer | Kind::Null,
+        "type": Kind::Bytes | Kind::Null,
+        "pkt_srcaddr": Kind::Bytes | Kind::Null,
+        "pkt_dstaddr": Kind::Bytes | Kind::Null,
+        "region": Kind::Bytes | Kind::Null,
+        "az_id": Kind::Bytes | Kind::Null,
+        "sublocation_type": Kind::Bytes | Kind::Null,
+    }))
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
@@ -132,7 +164,7 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
                     "pkt_dstaddr" => identity,
                     "region" => identity,
                     "az_id" => identity,
-                    "sublocation_type  " => identity,
+                    "sublocation_type" => identity,
                     "sublocation_id" => identity
                 );
 
@@ -153,22 +185,22 @@ mod tests {
     remap::test_type_def![
         value_noop {
             expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from(1).boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
 
         format_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 

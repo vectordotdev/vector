@@ -9,6 +9,7 @@ components: sinks: sematext_metrics: {
 		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -63,6 +64,7 @@ components: sinks: sematext_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

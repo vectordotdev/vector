@@ -11,6 +11,7 @@ components: transforms: concat: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -38,7 +39,10 @@ components: transforms: concat: {
 			description: "A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["first[..3]", "second[-5..]", "third[3..6]"]
+			type: array: items: type: string: {
+				examples: ["first[..3]", "second[-5..]", "third[3..6]"]
+				syntax: "literal"
+			}
 		}
 		joiner: {
 			common:      false
@@ -48,6 +52,7 @@ components: transforms: concat: {
 			type: string: {
 				default: " "
 				examples: [" ", ",", "_", "+"]
+				syntax: "literal"
 			}
 		}
 		target: {
@@ -56,6 +61,7 @@ components: transforms: concat: {
 			warnings: []
 			type: string: {
 				examples: ["root_field_name", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 	}

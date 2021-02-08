@@ -1,6 +1,15 @@
 package metadata
 
 remap: functions: slice: {
+	category: "String"
+	description: """
+		Returns a slice of the `value` between the `start` and `end` positions.
+
+		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the
+		string or array. If `end` refers to a position that is greater than the length of the string or array
+		a slice up to the end of the string or array is returned.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -23,15 +32,8 @@ remap: functions: slice: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "String"
-	description: #"""
-		Returns a slice of the provided `value` between the `start` and `end` positions specified.
+	return: types: ["string"]
 
-		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the
-		string or array. If `end` refers to a position that is greater than the length of the string or array
-		a slice up to the end of the string or array is returned.
-		"""#
 	examples: [
 		{
 			title: "Slice a string (positve index)"

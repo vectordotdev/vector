@@ -21,7 +21,8 @@ VRL REPL commands:
   exit              Terminate the program
 "#;
 
-const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
+const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
@@ -292,7 +293,7 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if funcs().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        let func_url = format!("{}/#{}", FUNCTIONS_ROOT_URL, func_name);
         open_url(&func_url);
     } else {
         println!("function name {} not recognized", func_name);

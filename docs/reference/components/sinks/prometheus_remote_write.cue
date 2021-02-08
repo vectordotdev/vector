@@ -9,6 +9,7 @@ components: sinks: prometheus_remote_write: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -91,8 +92,13 @@ components: sinks: prometheus_remote_write: {
 			warnings: []
 			type: string: {
 				examples: ["https://localhost:8087/"]
+				syntax: "literal"
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${HTTP_PASSWORD}"
+			username_example: "${HTTP_USERNAME}"
+		}}
 		default_namespace: {
 			common:      true
 			description: """
@@ -105,6 +111,7 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 		buckets: {
@@ -135,7 +142,7 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["my-domain"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

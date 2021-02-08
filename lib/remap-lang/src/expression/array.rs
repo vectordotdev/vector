@@ -1,5 +1,6 @@
 use crate::{
-    expression::Literal, state, value, Error, Expr, Expression, Object, Result, TypeDef, Value,
+    expression::Literal, state, type_def::InnerTypeDef, value, Error, Expr, Expression, Object,
+    Result, TypeDef, Value,
 };
 use std::convert::TryFrom;
 use std::fmt;
@@ -119,7 +120,7 @@ impl Expression for Array {
                 |type_def, expression| type_def.merge(expression.type_def(state)),
             );
 
-            Some(type_def.boxed())
+            Some(InnerTypeDef::Array(type_def.boxed()))
         };
 
         TypeDef {
@@ -154,10 +155,10 @@ mod tests {
             expr: |_| Array::new(vec![Literal::from(true).into()]),
             def: TypeDef {
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     kind: Kind::Boolean,
                     ..Default::default()
-                }.boxed()),
+                }.boxed())),
                 ..Default::default()
             },
         }
@@ -170,10 +171,10 @@ mod tests {
             ]),
             def: TypeDef {
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
                     ..Default::default()
-                }.boxed()),
+                }.boxed())),
                 ..Default::default()
             },
         }
@@ -190,11 +191,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     fallible: true,
                     kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes,
                     ..Default::default()
-                }.boxed()),
+                }.boxed())),
             },
         }
 
@@ -211,14 +212,14 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
+                inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                     fallible: true,
                     kind: Kind::Boolean | Kind::Integer | Kind::Float | Kind::Bytes | Kind::Boolean | Kind::Array,
-                    inner_type_def: Some(TypeDef {
+                    inner_type_def: Some(InnerTypeDef::Array(TypeDef {
                         kind: Kind::Integer,
                         ..Default::default()
-                    }.boxed()),
-                }.boxed()),
+                    }.boxed())),
+                }.boxed())),
             },
         }
     ];

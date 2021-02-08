@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: encode_base64: {
+	category:    "Codec"
+	description: """
+		Encodes the `value` to [Base64](\(urls.base64)).
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,28 +22,24 @@ remap: functions: encode_base64: {
 		},
 		{
 			name:        "charset"
-			description: ""
+			description: "The character set to use when encoding the data."
 			required:    false
 			type: ["string"]
 			default: "standard"
 			enum: {
 				standard: "[Standard](\(urls.base64_standard)) Base64 format."
-				url_safe: "Modified Base64 for [URL variants](\(urls.base64_url_safe)."
+				url_safe: "Modified Base64 for [URL variants](\(urls.base64_url_safe))."
 			}
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
-	category: "Codec"
-	description: #"""
-		Encodes the provided `value` to [Base64](\(urls.base64)) either padded or non-padded and
-		using the specified character set.
-		"""#
+	return: types: ["string"]
+
 	examples: [
 		{
 			title: "Encode to Base64 (default)"
 			source: """
-				.encoded = encode_base64("please encode me")
+				encode_base64("please encode me")
 				"""
 			return: "cGxlYXNlIGVuY29kZSBtZQ=="
 		},

@@ -296,6 +296,7 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {

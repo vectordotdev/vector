@@ -34,6 +34,8 @@ mod format_number;
 mod format_timestamp;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
+#[cfg(feature = "get_hostname")]
+mod get_hostname;
 #[cfg(feature = "includes")]
 mod includes;
 #[cfg(feature = "ip_cidr_contains")]
@@ -46,6 +48,8 @@ mod ip_to_ipv6;
 mod ipv6_to_ipv4;
 #[cfg(feature = "is_nullish")]
 mod is_nullish;
+#[cfg(feature = "join")]
+mod join;
 #[cfg(feature = "length")]
 mod length;
 #[cfg(feature = "log")]
@@ -64,8 +68,12 @@ mod parse_aws_alb_log;
 mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 mod parse_aws_vpc_flow_log;
+#[cfg(feature = "parse_common_log")]
+mod parse_common_log;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
+#[cfg(feature = "parse_glog")]
+mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
 #[cfg(feature = "parse_json")]
@@ -173,6 +181,8 @@ pub use format_number::FormatNumber;
 pub use format_timestamp::FormatTimestamp;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
+#[cfg(feature = "get_hostname")]
+pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
 #[cfg(feature = "ip_cidr_contains")]
@@ -185,6 +195,8 @@ pub use ip_to_ipv6::IpToIpv6;
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
 #[cfg(feature = "is_nullish")]
 pub use is_nullish::IsNullish;
+#[cfg(feature = "join")]
+pub use join::Join;
 #[cfg(feature = "length")]
 pub use length::Length;
 #[cfg(feature = "log")]
@@ -199,8 +211,12 @@ pub use parse_aws_alb_log::ParseAwsAlbLog;
 pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
+#[cfg(feature = "parse_common_log")]
+pub use parse_common_log::ParseCommonLog;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
+#[cfg(feature = "parse_glog")]
+pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
 #[cfg(feature = "parse_json")]
@@ -308,6 +324,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(FormatTimestamp),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
+        #[cfg(feature = "get_hostname")]
+        Box::new(GetHostname),
         #[cfg(feature = "includes")]
         Box::new(Includes),
         #[cfg(feature = "ip_cidr_contains")]
@@ -320,6 +338,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Ipv6ToIpV4),
         #[cfg(feature = "is_nullish")]
         Box::new(IsNullish),
+        #[cfg(feature = "join")]
+        Box::new(Join),
         #[cfg(feature = "length")]
         Box::new(Length),
         #[cfg(feature = "log")]
@@ -338,10 +358,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseAwsVpcFlowLog),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
+        #[cfg(feature = "parse_glog")]
+        Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
+        #[cfg(feature = "parse_common_log")]
+        Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_syslog")]

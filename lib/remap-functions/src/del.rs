@@ -69,7 +69,7 @@ impl Expression for DelFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use std::str::FromStr;
 
     #[test]
@@ -77,43 +77,43 @@ mod tests {
         let cases = vec![
             (
                 // String field exists
-                map!["exists": "value"],
+                btreemap! { "exists" => "value" },
                 Ok(value!("value")),
                 DelFn::new(Path::from("exists")),
             ),
             (
                 // String field doesn't exist
-                map!["exists": "value"],
+                btreemap! { "exists" => "value" },
                 Ok(value!(null)),
                 DelFn::new(Path::from("does_not_exist")),
             ),
             (
                 // Array field exists
-                map!["exists": value!([1, 2, 3])],
+                btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
                 DelFn::new(Path::from("exists")),
             ),
             (
                 // Null field exists
-                map!["exists": value!(null)],
+                btreemap! { "exists" => value!(null) },
                 Ok(value!(null)),
                 DelFn::new(Path::from("exists")),
             ),
             (
                 // Map field exists
-                map!["exists": map!["foo": "bar"]],
-                Ok(value!(map!["foo": "bar"])),
+                btreemap! { "exists" => btreemap! { "foo" => "bar" } },
+                Ok(value!(btreemap! { "foo" => "bar" })),
                 DelFn::new(Path::from("exists")),
             ),
             (
                 // Integer field exists
-                map!["exists": 127],
+                btreemap! { "exists" => 127 },
                 Ok(value!(127)),
                 DelFn::new(Path::from("exists")),
             ),
             (
                 // Array field exists
-                map!["exists": value!([1, 2, 3])],
+                btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
                 DelFn::new(remap::Path::from_str(".exists[1]").unwrap().into()),
             ),

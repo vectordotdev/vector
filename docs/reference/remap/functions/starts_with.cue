@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: starts_with: {
+	category: "String"
+	description: """
+		Determines if the `value` begins with the `substring`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -23,11 +28,8 @@ remap: functions: starts_with: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
-	category: "String"
-	description: #"""
-		Determines if a given `valuye` begins with the given `substring`.
-		"""#
+	return: types: ["boolean"]
+
 	examples: [
 		{
 			title: "String starts with (case sensitive)"
