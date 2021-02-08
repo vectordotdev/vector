@@ -230,7 +230,7 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
 /// source, the buffer will compare it's values with the previous known
 /// and calculate the delta.
 pub trait MetricNormalize {
-    /// Apply normalize the given `metric` using `state` to save any
+    /// Apply normalizes the given `metric` using `state` to save any
     /// persistent data between calls. The return value is `None` if the
     /// incoming metric is only used to set a reference state, and
     /// `Some(metric)` otherwise.
