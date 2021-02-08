@@ -217,26 +217,9 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   type = "remap"
                   inputs = ["in"]
                   source = """
-                  . = parse_syslog!(.)
+                  . = parse_syslog!(.message)
+                  .timestamp = format_timestamp!(.timestamp, format: "%c")
                   """
-            "#},
-        ),
-        (
-            "native",
-            indoc! {r#"
-                [transforms.last]
-                  type = "regex_parser"
-                  inputs = ["in"]
-                  field = "message"
-                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
-                  types.appname = "string"
-                  types.facility = "string"
-                  types.hostname = "string"
-                  types.level = "string"
-                  types.message = "string"
-                  types.msgid = "string"
-                  types.procid = "int"
-                  types.timestamp = "timestamp|%F"
             "#},
         ),
         (
@@ -273,6 +256,10 @@ fn benchmark_multifaceted(c: &mut Criterion) {
             "#},
         ),
     ];
+
+    let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
+    let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "hostname": "initech.io", "severity": "warning", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
+
 
     benchmark_configs(c, "multifaceted", configs, "in", "last", input, output);
 }
