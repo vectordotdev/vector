@@ -98,7 +98,9 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     }
 
     if let Some(timestamp) = parsed.timestamp {
-        event.insert("timestamp".to_owned(), timestamp.to_rfc3339().into());
+        let converted = timestamp.format("%c").to_string();
+
+        event.insert("timestamp".to_owned(), converted.into());
     }
 
     // As with all data, it returns to bytes in the end.
