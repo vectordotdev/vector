@@ -735,7 +735,7 @@ components: sources: internal_metrics: {
 			default:     "vector"
 		}
 		_path: {
-			description: "The path that produced the error"
+			description: "The path that produced the error."
 			required:    true
 		}
 	}
