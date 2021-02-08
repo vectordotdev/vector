@@ -230,15 +230,20 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   inputs = ["in"]
                   version = "2"
                   source = """
-                  local function parse_syslog(message)
+                  local function parse_and_transform(message)
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
-                    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
+                    local priority, version, timestamp, _host, appname, procid, msgid, _sdata, message = string.match(message, pattern)
 
-                    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
+                    local year, month, day, hour, minute, second, tz = string.match(timestamp, '(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d).(%d%d%d)(%a)')
+
+                    timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, minute=minute, second=second}))
+                    severity = "info"
+
+                    return {severity = severity, priority = priority, version = version, timestamp = timestamp, appname = appname, procid = procid, msgid = msgid, message = message}
                   end
 
                   function process(event, emit)
-                    event.log = parse_syslog(event.log.message)
+                    event.log = parse_and_transform(event.log.message)
                     emit(event)
                   end
                   """
