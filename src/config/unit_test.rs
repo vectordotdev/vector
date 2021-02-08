@@ -1004,26 +1004,26 @@ mod tests {
     #[tokio::test]
     async fn test_fail_no_outputs() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = [ "TODO" ]
-  type = "field_filter"
-  field = "not_exist"
-  value = "not_value"
+            indoc! {r#"
+                [transforms.foo]
+                  inputs = [ "TODO" ]
+                  type = "field_filter"
+                  field = "not_exist"
+                  value = "not_value"
 
-[[tests]]
-    name = "check_no_outputs"
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "test value"
+                  [[tests]]
+                    name = "check_no_outputs"
+                    [tests.input]
+                      insert_at = "foo"
+                      type = "raw"
+                      value = "test value"
 
-    [[tests.outputs]]
-        extract_from = "foo"
-        [[tests.outputs.conditions]]
-            type = "check_fields"
-            "message.equals" = "test value"
-      "#,
+                    [[tests.outputs]]
+                      extract_from = "foo"
+                      [[tests.outputs.conditions]]
+                        type = "check_fields"
+                        "message.equals" = "test value"
+            "#},
         )
         .unwrap();
 
@@ -1034,66 +1034,66 @@ mod tests {
     #[tokio::test]
     async fn test_fail_two_output_events() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = [ "TODO" ]
-  type = "add_fields"
-  [transforms.foo.fields]
-    foo = "new field 1"
+            indoc! {r#"
+                [transforms.foo]
+                  inputs = [ "TODO" ]
+                  type = "add_fields"
+                  [transforms.foo.fields]
+                    foo = "new field 1"
 
-[transforms.bar]
-  inputs = [ "foo" ]
-  type = "add_fields"
-  [transforms.bar.fields]
-    bar = "new field 2"
+                [transforms.bar]
+                  inputs = [ "foo" ]
+                  type = "add_fields"
+                  [transforms.bar.fields]
+                    bar = "new field 2"
 
-[transforms.baz]
-  inputs = [ "foo" ]
-  type = "add_fields"
-  [transforms.baz.fields]
-    baz = "new field 3"
+                [transforms.baz]
+                  inputs = [ "foo" ]
+                  type = "add_fields"
+                  [transforms.baz.fields]
+                    baz = "new field 3"
 
-[transforms.boo]
-  inputs = [ "bar", "baz" ]
-  type = "add_fields"
-  [transforms.boo.fields]
-    boo = "new field 4"
+                [transforms.boo]
+                  inputs = [ "bar", "baz" ]
+                  type = "add_fields"
+                  [transforms.boo.fields]
+                    boo = "new field 4"
 
-[[tests]]
-    name = "check_multi_payloads"
+                [[tests]]
+                  name = "check_multi_payloads"
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "first"
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "first"
 
-    [[tests.outputs]]
-        extract_from = "boo"
+                  [[tests.outputs]]
+                    extract_from = "boo"
 
-        [[tests.outputs.conditions]]
-            type = "check_fields"
-            "baz.equals" = "new field 3"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "baz.equals" = "new field 3"
 
-        [[tests.outputs.conditions]]
-            type = "check_fields"
-            "bar.equals" = "new field 2"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "bar.equals" = "new field 2"
 
-[[tests]]
-    name = "check_multi_payloads_bad"
+                [[tests]]
+                  name = "check_multi_payloads_bad"
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "first"
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "first"
 
-    [[tests.outputs]]
-        extract_from = "boo"
+                  [[tests.outputs]]
+                    extract_from = "boo"
 
-        [[tests.outputs.conditions]]
-            type = "check_fields"
-            "baz.equals" = "new field 3"
-            "bar.equals" = "new field 2"
-      "#,
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "baz.equals" = "new field 3"
+                      "bar.equals" = "new field 2"
+            "#},
         )
         .unwrap();
 
@@ -1105,31 +1105,31 @@ mod tests {
     #[tokio::test]
     async fn test_no_outputs_from() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = [ "ignored" ]
-  type = "field_filter"
-  field = "message"
-  value = "foo"
+            indoc! {r#"
+                [transforms.foo]
+                  inputs = [ "ignored" ]
+                  type = "field_filter"
+                  field = "message"
+                  value = "foo"
 
-[[tests]]
-    name = "check_no_outputs_from_succeeds"
-    no_outputs_from = [ "foo" ]
+                [[tests]]
+                  name = "check_no_outputs_from_succeeds"
+                  no_outputs_from = [ "foo" ]
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "not foo at all"
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "not foo at all"
 
-[[tests]]
-    name = "check_no_outputs_from_fails"
-    no_outputs_from = [ "foo" ]
+                [[tests]]
+                  name = "check_no_outputs_from_fails"
+                  no_outputs_from = [ "foo" ]
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "foo"
-      "#,
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "foo"
+            "# },
         )
         .unwrap();
 
@@ -1141,37 +1141,37 @@ mod tests {
     #[tokio::test]
     async fn test_no_outputs_from_chained() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = [ "ignored" ]
-  type = "field_filter"
-  field = "message"
-  value = "foo"
+            indoc! { r#"
+                [transforms.foo]
+                  inputs = [ "ignored" ]
+                  type = "field_filter"
+                  field = "message"
+                  value = "foo"
 
-[transforms.bar]
-  inputs = [ "foo" ]
-  type = "add_fields"
-  [transforms.bar.fields]
-    bar = "new field"
+                [transforms.bar]
+                  inputs = [ "foo" ]
+                  type = "add_fields"
+                  [transforms.bar.fields]
+                    bar = "new field"
 
-[[tests]]
-    name = "check_no_outputs_from_succeeds"
-    no_outputs_from = [ "bar" ]
+                [[tests]]
+                  name = "check_no_outputs_from_succeeds"
+                  no_outputs_from = [ "bar" ]
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "not foo at all"
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "not foo at all"
 
-[[tests]]
-    name = "check_no_outputs_from_fails"
-    no_outputs_from = [ "bar" ]
+                [[tests]]
+                  name = "check_no_outputs_from_fails"
+                  no_outputs_from = [ "bar" ]
 
-    [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "foo"
-      "#,
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "foo"
+            "# },
         )
         .unwrap();
 
@@ -1183,33 +1183,33 @@ mod tests {
     #[tokio::test]
     async fn test_log_input() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = ["ignored"]
-  type = "add_fields"
-  [transforms.foo.fields]
-    new_field = "string value"
+            indoc! { r#"
+                [transforms.foo]
+                  inputs = ["ignored"]
+                  type = "add_fields"
+                  [transforms.foo.fields]
+                    new_field = "string value"
 
-[[tests]]
-  name = "successful test with log event"
+                [[tests]]
+                  name = "successful test with log event"
 
-  [tests.input]
-    insert_at = "foo"
-    type = "log"
-    [tests.input.log_fields]
-      message = "this is the message"
-      int_val = 5
-      bool_val = true
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "log"
+                    [tests.input.log_fields]
+                      message = "this is the message"
+                      int_val = 5
+                      bool_val = true
 
-  [[tests.outputs]]
-    extract_from = "foo"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "new_field.equals" = "string value"
-      "message.equals" = "this is the message"
-      "bool_val.eq" = true
-      "int_val.eq" = 5
-      "#,
+                  [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "new_field.equals" = "string value"
+                      "message.equals" = "this is the message"
+                      "bool_val.eq" = true
+                      "int_val.eq" = 5
+            "# },
         )
         .unwrap();
 
@@ -1220,34 +1220,34 @@ mod tests {
     #[tokio::test]
     async fn test_metric_input() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = ["ignored"]
-  type = "add_tags"
-  [transforms.foo.tags]
-    new_tag = "new value added"
+            indoc! { r#"
+                [transforms.foo]
+                  inputs = ["ignored"]
+                  type = "add_tags"
+                  [transforms.foo.tags]
+                    new_tag = "new value added"
 
-[[tests]]
-  name = "successful test with metric event"
+                [[tests]]
+                  name = "successful test with metric event"
 
-  [tests.input]
-    insert_at = "foo"
-    type = "metric"
-    [tests.input.metric]
-      kind = "incremental"
-      name = "foometric"
-      [tests.input.metric.tags]
-        tagfoo = "valfoo"
-      [tests.input.metric.counter]
-        value = 100.0
+                  [tests.input]
+                    insert_at = "foo"
+                    type = "metric"
+                    [tests.input.metric]
+                      kind = "incremental"
+                      name = "foometric"
+                      [tests.input.metric.tags]
+                        tagfoo = "valfoo"
+                      [tests.input.metric.counter]
+                        value = 100.0
 
-  [[tests.outputs]]
-    extract_from = "foo"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "tagfoo.equals" = "valfoo"
-      "new_tag.eq" = "new value added"
-      "#,
+                  [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "tagfoo.equals" = "valfoo"
+                      "new_tag.eq" = "new value added"
+            "# },
         )
         .unwrap();
 
@@ -1258,41 +1258,41 @@ mod tests {
     #[tokio::test]
     async fn test_success_over_gap() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = ["ignored"]
-  type = "add_fields"
-  [transforms.foo.fields]
-    new_field = "string value"
+            indoc! { r#"
+                [transforms.foo]
+                  inputs = ["ignored"]
+                  type = "add_fields"
+                  [transforms.foo.fields]
+                    new_field = "string value"
 
-[transforms.bar]
-  inputs = ["foo"]
-  type = "add_fields"
-  [transforms.bar.fields]
-    second_new_field = "also a string value"
+                [transforms.bar]
+                  inputs = ["foo"]
+                  type = "add_fields"
+                  [transforms.bar.fields]
+                    second_new_field = "also a string value"
 
-[transforms.baz]
-  inputs = ["bar"]
-  type = "add_fields"
-  [transforms.baz.fields]
-    third_new_field = "also also a string value"
+                [transforms.baz]
+                  inputs = ["bar"]
+                  type = "add_fields"
+                  [transforms.baz.fields]
+                    third_new_field = "also also a string value"
 
-[[tests]]
-  name = "successful test"
+                [[tests]]
+                  name = "successful test"
 
-  [tests.input]
-    insert_at = "foo"
-    value = "nah this doesnt matter"
+                  [tests.input]
+                    insert_at = "foo"
+                    value = "nah this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "baz"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "new_field.equals" = "string value"
-      "second_new_field.equals" = "also a string value"
-      "third_new_field.equals" = "also also a string value"
-      "message.equals" = "nah this doesnt matter"
-      "#,
+                  [[tests.outputs]]
+                    extract_from = "baz"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "new_field.equals" = "string value"
+                      "second_new_field.equals" = "also a string value"
+                      "third_new_field.equals" = "also also a string value"
+                      "message.equals" = "nah this doesnt matter"
+            "# },
         )
         .unwrap();
 
@@ -1303,54 +1303,54 @@ mod tests {
     #[tokio::test]
     async fn test_success_tree() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.ignored]
-  inputs = ["also_ignored"]
-  type = "add_fields"
-  [transforms.ignored.fields]
-    not_field = "string value"
+            indoc! { r#"
+                [transforms.ignored]
+                  inputs = ["also_ignored"]
+                  type = "add_fields"
+                  [transforms.ignored.fields]
+                    not_field = "string value"
 
-[transforms.foo]
-  inputs = ["ignored"]
-  type = "add_fields"
-  [transforms.foo.fields]
-    new_field = "string value"
+                [transforms.foo]
+                  inputs = ["ignored"]
+                  type = "add_fields"
+                  [transforms.foo.fields]
+                    new_field = "string value"
 
-[transforms.bar]
-  inputs = ["foo"]
-  type = "add_fields"
-  [transforms.bar.fields]
-    second_new_field = "also a string value"
+                [transforms.bar]
+                  inputs = ["foo"]
+                  type = "add_fields"
+                  [transforms.bar.fields]
+                    second_new_field = "also a string value"
 
-[transforms.baz]
-  inputs = ["foo"]
-  type = "add_fields"
-  [transforms.baz.fields]
-    second_new_field = "also also a string value"
+                [transforms.baz]
+                  inputs = ["foo"]
+                  type = "add_fields"
+                  [transforms.baz.fields]
+                    second_new_field = "also also a string value"
 
-[[tests]]
-  name = "successful test"
+                [[tests]]
+                  name = "successful test"
 
-  [tests.input]
-    insert_at = "foo"
-    value = "nah this doesnt matter"
+                  [tests.input]
+                    insert_at = "foo"
+                    value = "nah this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "bar"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "new_field.equals" = "string value"
-      "second_new_field.equals" = "also a string value"
-      "message.equals" = "nah this doesnt matter"
+                  [[tests.outputs]]
+                    extract_from = "bar"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "new_field.equals" = "string value"
+                      "second_new_field.equals" = "also a string value"
+                      "message.equals" = "nah this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "baz"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "new_field.equals" = "string value"
-      "second_new_field.equals" = "also also a string value"
-      "message.equals" = "nah this doesnt matter"
-      "#,
+                  [[tests.outputs]]
+                    extract_from = "baz"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "new_field.equals" = "string value"
+                      "second_new_field.equals" = "also also a string value"
+                      "message.equals" = "nah this doesnt matter"
+            "# },
         )
         .unwrap();
 
@@ -1361,67 +1361,67 @@ mod tests {
     #[tokio::test]
     async fn test_fails() {
         let config: ConfigBuilder = toml::from_str(
-            r#"
-[transforms.foo]
-  inputs = ["ignored"]
-  type = "remove_fields"
-  fields = ["timestamp"]
+            indoc! { r#"
+                [transforms.foo]
+                  inputs = ["ignored"]
+                  type = "remove_fields"
+                  fields = ["timestamp"]
 
-[transforms.bar]
-  inputs = ["foo"]
-  type = "add_fields"
-  [transforms.bar.fields]
-    second_new_field = "also a string value"
+                [transforms.bar]
+                  inputs = ["foo"]
+                  type = "add_fields"
+                  [transforms.bar.fields]
+                    second_new_field = "also a string value"
 
-[transforms.baz]
-  inputs = ["bar"]
-  type = "add_fields"
-  [transforms.baz.fields]
-    third_new_field = "also also a string value"
+                [transforms.baz]
+                  inputs = ["bar"]
+                  type = "add_fields"
+                  [transforms.baz.fields]
+                    third_new_field = "also also a string value"
 
-[[tests]]
-  name = "failing test"
+                [[tests]]
+                  name = "failing test"
 
-  [tests.input]
-    insert_at = "foo"
-    value = "nah this doesnt matter"
+                  [tests.input]
+                    insert_at = "foo"
+                    value = "nah this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "foo"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "nah this doesnt matter"
+                  [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "message.equals" = "nah this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "bar"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "not this"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "second_new_field.equals" = "and not this"
+                  [[tests.outputs]]
+                    extract_from = "bar"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "message.equals" = "not this"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "second_new_field.equals" = "and not this"
 
-[[tests]]
-  name = "another failing test"
+                [[tests]]
+                  name = "another failing test"
 
-  [tests.input]
-    insert_at = "foo"
-    value = "also this doesnt matter"
+                  [tests.input]
+                    insert_at = "foo"
+                    value = "also this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "foo"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "also this doesnt matter"
+                  [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "message.equals" = "also this doesnt matter"
 
-  [[tests.outputs]]
-    extract_from = "baz"
-    [[tests.outputs.conditions]]
-      type = "check_fields"
-      "second_new_field.equals" = "nope not this"
-      "third_new_field.equals" = "and not this"
-      "message.equals" = "also this doesnt matter"
-      "#,
+                  [[tests.outputs]]
+                    extract_from = "baz"
+                    [[tests.outputs.conditions]]
+                      type = "check_fields"
+                      "second_new_field.equals" = "nope not this"
+                      "third_new_field.equals" = "and not this"
+                      "message.equals" = "also this doesnt matter"
+            "# },
         )
         .unwrap();
 
