@@ -1,73 +1,78 @@
-use indoc::indoc;
 use std::fs;
 use vector::api::build_schema;
 
-static INTROSPECTION_QUERY: &str = indoc! { r#"
-    query IntrospectionQuery {
-      __schema {
-        queryType {
-          name
-        }
-        mutationType {
-          name
-        }
-        subscriptionType {
-          name
-        }
-        types {
-          ...FullType
-        }
-        directives {
-          name
-          description
-          locations
-          args {
-            ...InputValue
-          }
-        }
-      }
+static INTROSPECTION_QUERY: &str = r#"
+query IntrospectionQuery {
+  __schema {
+    queryType {
+      name
     }
-    fragment FullType on __Type {
-      kind
+    mutationType {
+      name
+    }
+    subscriptionType {
+      name
+    }
+    types {
+      ...FullType
+    }
+    directives {
       name
       description
-      fields(includeDeprecated: true) {
-        name
-        description
-        args {
-          ...InputValue
-        }
-        type {
-          ...TypeRef
-        }
-        isDeprecated
-        deprecationReason
-      }
-      inputFields {
+      locations
+      args {
         ...InputValue
       }
-      interfaces {
-        ...TypeRef
-      }
-      enumValues(includeDeprecated: true) {
-        name
-        description
-        isDeprecated
-        deprecationReason
-      }
-      possibleTypes {
-        ...TypeRef
-      }
     }
-    fragment InputValue on __InputValue {
-      name
-      description
-      type {
-        ...TypeRef
-      }
-      defaultValue
+  }
+}
+fragment FullType on __Type {
+  kind
+  name
+  description
+  fields(includeDeprecated: true) {
+    name
+    description
+    args {
+      ...InputValue
     }
-    fragment TypeRef on __Type {
+    type {
+      ...TypeRef
+    }
+    isDeprecated
+    deprecationReason
+  }
+  inputFields {
+    ...InputValue
+  }
+  interfaces {
+    ...TypeRef
+  }
+  enumValues(includeDeprecated: true) {
+    name
+    description
+    isDeprecated
+    deprecationReason
+  }
+  possibleTypes {
+    ...TypeRef
+  }
+}
+fragment InputValue on __InputValue {
+  name
+  description
+  type {
+    ...TypeRef
+  }
+  defaultValue
+}
+fragment TypeRef on __Type {
+  kind
+  name
+  ofType {
+    kind
+    name
+    ofType {
       kind
       name
       ofType {
@@ -85,21 +90,15 @@ static INTROSPECTION_QUERY: &str = indoc! { r#"
               ofType {
                 kind
                 name
-                ofType {
-                  kind
-                  name
-                  ofType {
-                    kind
-                    name
-                  }
-                }
               }
             }
           }
         }
       }
     }
-"# };
+  }
+}
+"#;
 
 #[tokio::main]
 async fn main() {
