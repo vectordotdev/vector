@@ -274,15 +274,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
         ),
     ];
 
-    benchmark_configs(
-        c,
-        "multifaceted",
-        configs,
-        "in",
-        "last",
-        input,
-        output,
-    );
+    benchmark_configs(c, "multifaceted", configs, "in", "last", input, output);
 }
 
 /// Benches a set of transform configs for comparison
