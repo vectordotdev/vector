@@ -1,4 +1,5 @@
 use crate::Error;
+use indoc::indoc;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use remap::{state, Formatter, Object, Program, Runtime, Value};
@@ -10,16 +11,6 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
-
-const HELP_TEXT: &str = r#"
-VRL REPL commands:
-  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  help docs         Navigate to the VRL docs on the Vector website
-  help docs <func>  Navigate to the VRL docs for the specified function
-  next              Load the next object or create a new one
-  prev              Load the previous object
-  exit              Terminate the program
-"#;
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
@@ -33,45 +24,7 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
-    println!(
-        r#"
-> VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
-> V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
-> V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
-> V::::::V           V::::::VRR:::::R     R:::::RLL:::::::LL
->  V:::::V           V:::::V   R::::R     R:::::R  L:::::L
->   V:::::V         V:::::V    R::::R     R:::::R  L:::::L
->    V:::::V       V:::::V     R::::RRRRRR:::::R   L:::::L
->     V:::::V     V:::::V      R:::::::::::::RR    L:::::L
->      V:::::V   V:::::V       R::::RRRRRR:::::R   L:::::L
->       V:::::V V:::::V        R::::R     R:::::R  L:::::L
->        V:::::V:::::V         R::::R     R:::::R  L:::::L
->         V:::::::::V          R::::R     R:::::R  L:::::L         LLLLLL
->          V:::::::V         RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
->           V:::::V          R::::::R     R:::::RL::::::::::::::::::::::L
->            V:::V           R::::::R     R:::::RL::::::::::::::::::::::L
->             VVV            RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
->
->                     VECTOR    REMAP    LANGUAGE
->
->
-> Welcome!
->
-> The CLI is running in REPL (Read-eval-print loop) mode.
->
-> To run the CLI in regular mode, add a program to your command.
->
-> VRL REPL commands:
->   help              Learn more about VRL
->   next              Load the next object or create a new one
->   prev              Load the previous object
->   exit              Terminate the program
->
-> Any other value is resolved to a VRL expression.
->
-> Try it out now by typing `.` and hitting [enter] to see the result.
-"#
-    );
+    println!(BANNER_TEXT);
 
     loop {
         let readline = rl.readline("$ ");
@@ -299,3 +252,51 @@ fn show_func_docs(line: &str, pattern: &Regex) {
         println!("function name {} not recognized", func_name);
     }
 }
+
+const HELP_TEXT: &str = indoc! { r#"
+    VRL REPL commands:
+      help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+      help docs         Navigate to the VRL docs on the Vector website
+      help docs <func>  Navigate to the VRL docs for the specified function
+      next              Load the next object or create a new one
+      prev              Load the previous object
+      exit              Terminate the program
+"# };
+
+const BANNER_TEXT: &str = indoc! { r#"
+    > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
+    > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
+    > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
+    > V::::::V           V::::::VRR:::::R     R:::::RLL:::::::LL
+    >  V:::::V           V:::::V   R::::R     R:::::R  L:::::L
+    >   V:::::V         V:::::V    R::::R     R:::::R  L:::::L
+    >    V:::::V       V:::::V     R::::RRRRRR:::::R   L:::::L
+    >     V:::::V     V:::::V      R:::::::::::::RR    L:::::L
+    >      V:::::V   V:::::V       R::::RRRRRR:::::R   L:::::L
+    >       V:::::V V:::::V        R::::R     R:::::R  L:::::L
+    >        V:::::V:::::V         R::::R     R:::::R  L:::::L
+    >         V:::::::::V          R::::R     R:::::R  L:::::L         LLLLLL
+    >          V:::::::V         RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
+    >           V:::::V          R::::::R     R:::::RL::::::::::::::::::::::L
+    >            V:::V           R::::::R     R:::::RL::::::::::::::::::::::L
+    >             VVV            RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
+    >
+    >                     VECTOR    REMAP    LANGUAGE
+    >
+    >
+    > Welcome!
+    >
+    > The CLI is running in REPL (Read-eval-print loop) mode.
+    >
+    > To run the CLI in regular mode, add a program to your command.
+    >
+    > VRL REPL commands:
+    >   help              Learn more about VRL
+    >   next              Load the next object or create a new one
+    >   prev              Load the previous object
+    >   exit              Terminate the program
+    >
+    > Any other value is resolved to a VRL expression.
+    >
+    > Try it out now by typing `.` and hitting [enter] to see the result.
+"# };
