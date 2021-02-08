@@ -61,9 +61,9 @@ inventory::submit! {
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-                api_key = "${DATADOG_API_KEY_ENV_VAR}"
-                encoding.codec = "json"
-            "#})
+            api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json"
+        "#})
         .unwrap()
     }
 }
@@ -308,11 +308,11 @@ mod tests {
     #[tokio::test]
     async fn smoke_text() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-                api_key = "atoken"
-                encoding = "text"
-                compression = "none"
-                batch.max_events = 1
-            "#})
+            api_key = "atoken"
+            encoding = "text"
+            compression = "none"
+            batch.max_events = 1
+        "#})
         .unwrap();
 
         let addr = next_addr();
@@ -341,11 +341,11 @@ mod tests {
     #[tokio::test]
     async fn smoke_json() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-                api_key = "atoken"
-                encoding = "json"
-                compression = "none"
-                batch.max_events = 1
-            "#})
+            api_key = "atoken"
+            encoding = "json"
+            compression = "none"
+            batch.max_events = 1
+        "#})
         .unwrap();
 
         let addr = next_addr();

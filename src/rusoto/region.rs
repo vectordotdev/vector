@@ -112,9 +112,9 @@ mod tests {
     #[test]
     fn region_es_east_1() {
         let config: Config = toml::from_str(indoc! {r#"
-                [inner]
-                region = "us-east-1"
-            "#})
+            [inner]
+            region = "us-east-1"
+        "#})
         .unwrap();
 
         let region: Region = config.inner.region.try_into().unwrap();
@@ -124,9 +124,9 @@ mod tests {
     #[test]
     fn custom_name_endpoint_localhost() {
         let config: Config = toml::from_str(indoc! {r#"
-                [inner]
-                endpoint = "http://localhost:9000"
-            "#})
+            [inner]
+            endpoint = "http://localhost:9000"
+        "#})
         .unwrap();
 
         let expected_region = Region::Custom {
@@ -141,9 +141,9 @@ mod tests {
     #[test]
     fn region_not_provided() {
         let config: Config = toml::from_str(indoc! {r#"
-                [inner]
-                endpoint_is_spelled_wrong = "http://localhost:9000"
-            "#})
+            [inner]
+            endpoint_is_spelled_wrong = "http://localhost:9000"
+        "#})
         .unwrap();
 
         let region: Result<Region, ParseError> = config.inner.region.try_into();

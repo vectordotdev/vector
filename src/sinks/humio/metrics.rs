@@ -124,20 +124,20 @@ mod tests {
     #[test]
     fn test_endpoint_field() {
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
-                token = "atoken"
-                batch.max_events = 1
-                endpoint = "https://localhost:9200/"
-                encoding = "json"
-            "#})
+            token = "atoken"
+            batch.max_events = 1
+            endpoint = "https://localhost:9200/"
+            encoding = "json"
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
         let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
-                token = "atoken"
-                batch.max_events = 1
-                host = "https://localhost:9200/"
-                encoding = "json"
-            "#})
+            token = "atoken"
+            batch.max_events = 1
+            host = "https://localhost:9200/"
+            encoding = "json"
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
@@ -146,10 +146,10 @@ mod tests {
     #[tokio::test]
     async fn smoke_json() {
         let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
-                token = "atoken"
-                batch.max_events = 1
-                encoding = "json"
-            "#})
+            token = "atoken"
+            batch.max_events = 1
+            encoding = "json"
+        "#})
         .unwrap();
 
         let addr = test_util::next_addr();
