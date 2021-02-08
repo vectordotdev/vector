@@ -1,0 +1,8 @@
+# object: { "message": "bananas and another ant" }
+# result: "anaana"
+
+.result = parse_regex!(.message, /(?P<an>an.)/)
+a = strip_whitespace(.result.an)
+b = strip_whitespace(.result.1)
+
+a + b

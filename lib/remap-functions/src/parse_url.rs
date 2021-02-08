@@ -2,6 +2,7 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use url::Url;
+use value::Kind;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;
@@ -52,8 +53,23 @@ impl Expression for ParseUrlFn {
         self.value
             .type_def(state)
             .into_fallible(true) // URL parsing error
+            .with_inner_type(inner_type_def())
             .with_constraint(value::Kind::Map)
     }
+}
+
+/// The type defs of the fields contained by the returned map.
+fn inner_type_def() -> Option<InnerTypeDef> {
+    Some(inner_type_def! ({
+        "scheme": Kind::Bytes,
+        "username": Kind::Bytes,
+        "password": Kind::Bytes,
+        "path": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes,
+        "port": Kind::Bytes,
+        "fragment": Kind::Bytes | Kind::Null,
+        "query": Kind::Map,
+    }))
 }
 
 fn url_to_value(url: Url) -> Value {
@@ -87,17 +103,17 @@ fn url_to_value(url: Url) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
             expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
 
         value_optional {
             expr: |_| ParseUrlFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
         }
     ];
 
@@ -105,39 +121,39 @@ mod tests {
     fn parse_url() {
         let cases = vec![
             (
-                map![],
-                Ok(map![
-                        "scheme": "https",
-                        "username": "",
-                        "password": "",
-                        "host": "vector.dev",
-                        "port": Value::Null,
-                        "path": "/",
-                        "query": map![],
-                        "fragment": Value::Null,
-                ]
+                btreemap! {},
+                Ok(btreemap! {
+                        "scheme" => "https",
+                        "username" => "",
+                        "password" => "",
+                        "host" => "vector.dev",
+                        "port" => Value::Null,
+                        "path" => "/",
+                        "query" => btreemap!{},
+                        "fragment" => Value::Null,
+                }
                 .into()),
                 ParseUrlFn::new(Box::new(Literal::from("https://vector.dev"))),
             ),
             (
-                map![],
-                Ok(map![
-                        "scheme": "ftp",
-                        "username": "foo",
-                        "password": "bar",
-                        "host": "vector.dev",
-                        "port": 4343,
-                        "path": "/foobar",
-                        "query": map!["hello": "world"],
-                        "fragment": "123",
-                ]
+                btreemap! {},
+                Ok(btreemap! {
+                        "scheme" => "ftp",
+                        "username" => "foo",
+                        "password" => "bar",
+                        "host" => "vector.dev",
+                        "port" => 4343,
+                        "path" => "/foobar",
+                        "query" => btreemap!{ "hello" => "world" },
+                        "fragment" => "123",
+                }
                 .into()),
                 ParseUrlFn::new(Box::new(Literal::from(
                     "ftp://foo:bar@vector.dev:4343/foobar?hello=world#123",
                 ))),
             ),
             (
-                map![],
+                btreemap! {},
                 Err("function call error: unable to parse url: relative URL without a base".into()),
                 ParseUrlFn::new(Box::new(Literal::from("INVALID"))),
             ),

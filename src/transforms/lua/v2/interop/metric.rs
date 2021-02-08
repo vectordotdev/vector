@@ -224,7 +224,7 @@ mod test {
     #[test]
     fn to_lua_counter_full() {
         let metric = Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
@@ -256,7 +256,7 @@ mod test {
     #[test]
     fn to_lua_counter_minimal() {
         let metric = Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         );
@@ -272,7 +272,7 @@ mod test {
     #[test]
     fn to_lua_gauge() {
         let metric = Metric::new(
-            "example gauge".into(),
+            "example gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.6180339 },
         );
@@ -283,7 +283,7 @@ mod test {
     #[test]
     fn to_lua_set() {
         let metric = Metric::new(
-            "example set".into(),
+            "example set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["value".into(), "another value".into()]
@@ -304,7 +304,7 @@ mod test {
     #[test]
     fn to_lua_distribution() {
         let metric = Metric::new(
-            "example distribution".into(),
+            "example distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 1.0 => 20],
@@ -326,7 +326,7 @@ mod test {
     #[test]
     fn to_lua_aggregated_histogram() {
         let metric = Metric::new(
-            "example histogram".into(),
+            "example histogram",
             MetricKind::Incremental,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
@@ -351,7 +351,7 @@ mod test {
     #[test]
     fn to_lua_aggregated_summary() {
         let metric = Metric::new(
-            "example summary".into(),
+            "example summary",
             MetricKind::Incremental,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![
@@ -382,7 +382,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         );
@@ -412,7 +412,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
@@ -436,7 +436,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example gauge".into(),
+            "example gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.6180339 },
         );
@@ -454,7 +454,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example set".into(),
+            "example set",
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["value".into(), "another value".into()]
@@ -478,7 +478,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example distribution".into(),
+            "example distribution",
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 1.0 => 20],
@@ -501,7 +501,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example histogram".into(),
+            "example histogram",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
@@ -526,7 +526,7 @@ mod test {
             }
         }"#;
         let expected = Metric::new(
-            "example summary".into(),
+            "example summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: replace: {
+	category: "String"
+	description: """
+		Replaces all matching instances of `pattern` in the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -31,10 +36,7 @@ remap: functions: replace: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "String"
-	description: #"""
-		Replaces any matching patterns in the provided `value` via the provided `pattern`.
-		"""#
+
 	examples: [
 		{
 			title: "Replace literal text"

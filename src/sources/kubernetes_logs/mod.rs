@@ -19,7 +19,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -252,7 +252,9 @@ impl Source {
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
-            start_at_beginning: false,
+            ignore_checkpoints: false,
+            // Match the default behavior
+            read_from: ReadFrom::Beginning,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may

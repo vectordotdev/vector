@@ -136,6 +136,28 @@ impl MaybeTlsStream<TcpStream> {
 
         Ok(())
     }
+
+    pub fn set_send_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        stream.set_send_buffer_size(bytes)?;
+
+        Ok(())
+    }
+
+    pub fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        stream.set_recv_buffer_size(bytes)?;
+
+        Ok(())
+    }
 }
 
 pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {

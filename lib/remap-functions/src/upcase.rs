@@ -56,7 +56,7 @@ impl Expression for UpcaseFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn upcase() {
         let cases = vec![(
-            map!["foo": "foo 2 bar"],
+            btreemap! { "foo" => "foo 2 bar" },
             Ok(Value::from("FOO 2 BAR")),
             UpcaseFn::new(Box::new(Path::from("foo"))),
         )];

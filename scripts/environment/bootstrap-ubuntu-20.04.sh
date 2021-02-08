@@ -2,6 +2,7 @@
 set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
+export ACCEPT_EULA=Y
 
 echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 

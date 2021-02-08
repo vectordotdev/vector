@@ -18,6 +18,7 @@ components: _aws: {
 						type: string: {
 							default: null
 							examples: ["AKIAIOSFODNN7EXAMPLE"]
+							syntax: "literal"
 						}
 					}
 					secret_access_key: {
@@ -28,6 +29,7 @@ components: _aws: {
 						type: string: {
 							default: null
 							examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+							syntax: "literal"
 						}
 					}
 					assume_role: {
@@ -38,6 +40,7 @@ components: _aws: {
 						type: string: {
 							default: null
 							examples: ["arn:aws:iam::123456789098:role/my_role"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -52,6 +55,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["127.0.0.0:5000/path/to/service"]
+				syntax: "literal"
 			}
 		}
 
@@ -61,6 +65,7 @@ components: _aws: {
 			relevant_when: "endpoint = null"
 			type: string: {
 				examples: ["us-east-1"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -71,6 +76,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["AKIAIOSFODNN7EXAMPLE"]
+				syntax: "literal"
 			}
 		}
 
@@ -78,6 +84,7 @@ components: _aws: {
 			description: "Specifies the location of the file that the AWS CLI uses to store configuration profiles."
 			type: string: {
 				default: "~/.aws/config"
+				syntax:  "literal"
 			}
 		}
 
@@ -86,6 +93,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["1996-12-19T16:39:57-08:00"]
+				syntax: "literal"
 			}
 		}
 
@@ -95,6 +103,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 
@@ -103,6 +112,7 @@ components: _aws: {
 			type: string: {
 				default: "default"
 				examples: ["my-custom-profile"]
+				syntax: "literal"
 			}
 		}
 
@@ -111,6 +121,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["vector-session"]
+				syntax: "literal"
 			}
 		}
 
@@ -119,6 +130,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+				syntax: "literal"
 			}
 		}
 
@@ -126,6 +138,7 @@ components: _aws: {
 			description: "Specifies the location of the file that the AWS CLI uses to store access keys."
 			type: string: {
 				default: "~/.aws/credentials"
+				syntax:  "literal"
 			}
 		}
 
@@ -134,6 +147,7 @@ components: _aws: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 	}

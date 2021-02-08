@@ -1,7 +1,7 @@
-use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
+use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
 use crate::config::{self, TransformConfig};
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::Condition,
     event::{Event, Value},
     transforms::Transform,
 };
@@ -21,12 +21,14 @@ pub async fn build_unit_tests_main(
     build_unit_tests(config).await
 }
 
-async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut tests = vec![];
     let mut errors = vec![];
 
+    let expansions = super::compiler::expand_macros(&mut builder)?;
+
     // Don't let this escape since it's not validated
-    let mut config = Config {
+    let config = Config {
         global: builder.global,
         #[cfg(feature = "api")]
         api: builder.api,
@@ -35,10 +37,8 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
         sinks: builder.sinks,
         transforms: builder.transforms,
         tests: builder.tests,
-        expansions: Default::default(),
+        expansions,
     };
-
-    super::compiler::expand_macros(&mut config)?;
 
     for test in &config.tests {
         match build_unit_test(test, &config).await {
@@ -502,37 +502,15 @@ async fn build_unit_test(
                 .iter()
                 .enumerate()
             {
-                match cond_conf {
-                    TestCondition::Embedded(b) => match b.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::NoTypeEmbedded(n) => match n.build() {
-                        Ok(c) => {
-                            conditions.push(c);
-                        }
-                        Err(e) => {
-                            errors.push(format!(
-                                "failed to create test condition '{}': {}",
-                                index, e,
-                            ));
-                        }
-                    },
-                    TestCondition::String(_s) => {
-                        errors.push(format!(
-                            "failed to create test condition '{}': condition references are not yet supported",
-                            index
-                        ));
-                    }
+                match cond_conf.build() {
+                    Ok(c) => conditions.push(c),
+                    Err(e) => errors.push(format!(
+                        "failed to create test condition '{}': {}",
+                        index, e,
+                    )),
                 }
             }
+
             UnitTestCheck {
                 extract_from: o.extract_from.clone(),
                 conditions,

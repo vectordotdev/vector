@@ -15,7 +15,11 @@ components: sinks: statsd: {
 				codec: enabled: false
 			}
 			request: sinks.socket.features.send.request
-			tls:     sinks.socket.features.send.tls
+			send_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
+			tls: sinks.socket.features.send.tls
 			to: {
 				service: services.statsd_receiver
 
@@ -57,6 +61,7 @@ components: sinks: statsd: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -36,7 +36,7 @@ impl Expression for GetHostnameFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![static_def {
         expr: |_| GetHostnameFn,
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     fn get_hostname() {
         let mut state = state::Program::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = btreemap! {}.into();
         let value = GetHostnameFn.execute(&mut state, &mut object).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

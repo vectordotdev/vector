@@ -276,7 +276,9 @@ _values: {
 
 #SetupSteps: [#SetupStep, ...#SetupStep]
 
-#Schema: [Name=string]: {
+#Schema: [Name=string]: #SchemaField & {name: Name}
+
+#SchemaField: {
 	// `category` allows you to group options into categories.
 	//
 	// For example, all of the `*_key` options might be grouped under the
@@ -300,7 +302,7 @@ _values: {
 
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
-	name: Name
+	name: string
 
 	// `relevant_when` clarifies when an option is relevant.
 	//
@@ -462,9 +464,7 @@ _values: {
 		]
 	}
 
-	// `templateable` means that the option supports dynamic templated
-	// values.
-	templateable?: bool
+	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
 }
 
 #TypeTimestamp: {

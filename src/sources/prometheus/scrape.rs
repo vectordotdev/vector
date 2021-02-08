@@ -255,7 +255,6 @@ mod test {
         test_util::{next_addr, start_topology},
         Error,
     };
-    use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
         {Body, Client, Response, Server},
@@ -382,7 +381,7 @@ mod test {
             ],
         );
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }
 

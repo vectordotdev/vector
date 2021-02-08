@@ -54,7 +54,7 @@ impl Expression for StripWhitespaceFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![
         value_string {
@@ -72,27 +72,27 @@ mod tests {
     fn strip_whitespace() {
         let cases = vec![
             (
-                map!["foo": ""],
+                btreemap! { "foo" => "" },
                 Ok("".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "     "],
+                btreemap! { "foo" => "     " },
                 Ok("".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "hi there"],
+                btreemap! { "foo" => "hi there" },
                 Ok("hi there".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "           hi there        "],
+                btreemap! { "foo" => "           hi there        " },
                 Ok("hi there".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "],
+                btreemap! { "foo" => " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} " },
                 Ok("❤❤ hi there ❤❤".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),

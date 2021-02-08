@@ -15,6 +15,7 @@ components: transforms: "remap": {
 		commonly_used: true
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -47,9 +48,6 @@ components: transforms: "remap": {
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of expressions
-				and functions.
 				"""
 			required:    true
 			type: string: {
@@ -63,6 +61,7 @@ components: transforms: "remap": {
 						del(.old_name)
 						""",
 				]
+				syntax: "remap_program"
 			}
 		}
 	}
@@ -80,7 +79,7 @@ components: transforms: "remap": {
 	}
 
 	examples: [
-		for k, v in remap.real_world_examples if v.raises == _|_ {
+		for k, v in remap.examples if v.raises == _|_ {
 			{
 				title: v.title
 				configuration: source: v.source

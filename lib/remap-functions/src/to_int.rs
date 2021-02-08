@@ -122,25 +122,25 @@ mod tests {
 
     #[test]
     fn to_int() {
-        use crate::map;
+        use shared::btreemap;
 
         let cases = vec![
             (
-                map!["foo": "20"],
+                btreemap! { "foo" => "20" },
                 Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": 20.5],
+                btreemap! { "foo" => 20.5 },
                 Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map![
-                    "foo": DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                            .unwrap()
-                            .with_timezone(&Utc),
-                ],
+                btreemap! {
+                    "foo" => DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                              .unwrap()
+                              .with_timezone(&Utc),
+                },
                 Ok(Value::Integer(1571227200)),
                 ToIntFn::new(Box::new(Path::from("foo"))),
             ),
