@@ -396,18 +396,20 @@ impl PostgresqlMetrics {
             }
         };
 
-        let version_row = client
-            .query_one("SELECT version()", &[])
-            .await
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-        let version = version_row
-            .try_get::<&str, &str>("version")
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let version_row = client
+                .query_one("SELECT version()", &[])
+                .await
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            let version = version_row
+                .try_get::<&str, &str>("version")
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+        }
 
         self.client = Some(client);
         self.verify_version().await?;

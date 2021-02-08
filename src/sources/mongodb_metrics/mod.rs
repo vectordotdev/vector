@@ -207,11 +207,14 @@ impl MongoDBMetrics {
     }
 
     async fn print_version(&self) -> Result<(), CollectError> {
-        let node_type = self.get_node_type().await?;
-        let build_info = self.get_build_info().await?;
-        debug!(
-            message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
-        );
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let node_type = self.get_node_type().await?;
+            let build_info = self.get_build_info().await?;
+            debug!(
+                message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
+            );
+        }
+
         Ok(())
     }
 
