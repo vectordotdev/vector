@@ -1003,8 +1003,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fail_no_outputs() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! {r#"
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
                 [transforms.foo]
                   inputs = [ "TODO" ]
                   type = "field_filter"
@@ -1023,8 +1022,7 @@ mod tests {
                       [[tests.outputs.conditions]]
                         type = "check_fields"
                         "message.equals" = "test value"
-            "#},
-        )
+            "#})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1033,8 +1031,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fail_two_output_events() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! {r#"
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
                 [transforms.foo]
                   inputs = [ "TODO" ]
                   type = "add_fields"
@@ -1093,8 +1090,7 @@ mod tests {
                       type = "check_fields"
                       "baz.equals" = "new field 3"
                       "bar.equals" = "new field 2"
-            "#},
-        )
+            "#})
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1104,8 +1100,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_outputs_from() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! {r#"
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
                 [transforms.foo]
                   inputs = [ "ignored" ]
                   type = "field_filter"
@@ -1129,8 +1124,7 @@ mod tests {
                     insert_at = "foo"
                     type = "raw"
                     value = "foo"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1140,8 +1134,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_outputs_from_chained() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.foo]
                   inputs = [ "ignored" ]
                   type = "field_filter"
@@ -1171,8 +1164,7 @@ mod tests {
                     insert_at = "foo"
                     type = "raw"
                     value = "foo"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1182,8 +1174,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_log_input() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.foo]
                   inputs = ["ignored"]
                   type = "add_fields"
@@ -1209,8 +1200,7 @@ mod tests {
                       "message.equals" = "this is the message"
                       "bool_val.eq" = true
                       "int_val.eq" = 5
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1219,8 +1209,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_metric_input() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.foo]
                   inputs = ["ignored"]
                   type = "add_tags"
@@ -1247,8 +1236,7 @@ mod tests {
                       type = "check_fields"
                       "tagfoo.equals" = "valfoo"
                       "new_tag.eq" = "new value added"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1257,8 +1245,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_success_over_gap() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.foo]
                   inputs = ["ignored"]
                   type = "add_fields"
@@ -1292,8 +1279,7 @@ mod tests {
                       "second_new_field.equals" = "also a string value"
                       "third_new_field.equals" = "also also a string value"
                       "message.equals" = "nah this doesnt matter"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1302,8 +1288,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_success_tree() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.ignored]
                   inputs = ["also_ignored"]
                   type = "add_fields"
@@ -1350,8 +1335,7 @@ mod tests {
                       "new_field.equals" = "string value"
                       "second_new_field.equals" = "also also a string value"
                       "message.equals" = "nah this doesnt matter"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();
@@ -1360,8 +1344,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fails() {
-        let config: ConfigBuilder = toml::from_str(
-            indoc! { r#"
+        let config: ConfigBuilder = toml::from_str(indoc! { r#"
                 [transforms.foo]
                   inputs = ["ignored"]
                   type = "remove_fields"
@@ -1421,8 +1404,7 @@ mod tests {
                       "second_new_field.equals" = "nope not this"
                       "third_new_field.equals" = "and not this"
                       "message.equals" = "also this doesnt matter"
-            "# },
-        )
+            "# })
         .unwrap();
 
         let mut tests = build_unit_tests(config).await.unwrap();

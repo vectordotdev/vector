@@ -3094,6 +3094,7 @@ name = "k8s-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "futures 0.3.12",
+ "indoc",
  "k8s-openapi",
  "k8s-test-framework",
  "regex",
