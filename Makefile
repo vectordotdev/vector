@@ -548,6 +548,11 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-languages
+bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-metrics
 bench-metrics: ## Run metrics benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "metrics-benches" ${CARGO_BENCH_FLAGS}
@@ -556,7 +561,7 @@ bench-metrics: ## Run metrics benches
 .PHONY: bench-all
 bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches" ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
@@ -603,7 +608,7 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes

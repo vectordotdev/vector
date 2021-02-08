@@ -12,6 +12,7 @@ components: transforms: route: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -36,16 +37,27 @@ components: transforms: route: {
 
 	configuration: {
 		route: {
-			description: "A table of route identifiers to logical conditions representing the filter of the route. Each route can then be referenced as an input by other components with the name `<transform_name>.<route_id>`."
-			required:    true
+			description: """
+				A table of route identifiers to logical conditions representing the filter of the route. Each route
+				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
+				"""
+			required: true
 			warnings: []
 			type: object: {
 				options: {
 					"*": {
-						description: "test"
-						required:    true
+						description: """
+							The condition to be matched against every input event. Only messages that pass the
+							condition will be included in this route.
+							"""
+						required: true
 						warnings: []
-						type: object: configuration._conditions
+						type: string: {
+							examples: [
+								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
+							]
+							syntax: "remap_boolean_expression"
+						}
 					}
 				}
 			}
@@ -62,10 +74,10 @@ components: transforms: route: {
 			title: "Split by log level"
 			configuration: {
 				route: {
-					debug: "level.eq": "debug"
-					info: "level.eq":  "info"
-					warn: "level.eq":  "warn"
-					error: "level.eq": "error"
+					debug: #".level == "debug""#
+					info:  #".level == "info""#
+					warn:  #".level == "warn""#
+					error: #".level == "error""#
 				}
 			}
 			input: log: {

@@ -9,6 +9,7 @@ components: sinks: new_relic_logs: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["New Relic"]
+		stateful: false
 	}
 
 	features: {
@@ -86,6 +87,7 @@ components: sinks: new_relic_logs: {
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
+				syntax: "literal"
 			}
 		}
 		license_key: {
@@ -96,6 +98,7 @@ components: sinks: new_relic_logs: {
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
+				syntax: "literal"
 			}
 		}
 	}

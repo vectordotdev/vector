@@ -121,6 +121,7 @@ jobs:
       - run: make test-shutdown
       - run: make test-cli
       - run: make test-behavior
+      - run: make check-examples
 
   cross-linux:
     name: Cross - ${{ matrix.target }}

@@ -118,6 +118,16 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The Vector API.
+# Will be disabled by default.
+vectorApi:
+  # Turn the Vector API on or off.
+  enabled: false
+  # The address to listen at.
+  address: "0.0.0.0:8686"
+  # Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries).
+  playground: true
+
 # The "built-in" kubernetes logs source to collect logs from the `Pod`s running
 # on the `Node`.
 # Will be added by default, unless explicitly disabled.

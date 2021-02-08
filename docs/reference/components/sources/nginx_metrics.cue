@@ -9,6 +9,7 @@ components: sources: nginx_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -61,7 +62,10 @@ components: sources: nginx_metrics: {
 			description: "HTTP/HTTPS endpoint to Nginx server with enabled `ngx_http_stub_status_module` module."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["http://localhost:8000/basic_status"]
+				items: type: string: {
+					examples: ["http://localhost:8000/basic_status"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -77,7 +81,10 @@ components: sources: nginx_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "nginx"
+			type: string: {
+				default: "nginx"
+				syntax:  "literal"
+			}
 		}
 		tls: configuration._tls_connect & {_args: {
 			can_enable:             true

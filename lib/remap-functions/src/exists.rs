@@ -53,14 +53,18 @@ impl Expression for ExistsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     #[test]
     fn exists() {
         let cases = vec![
-            (map![], Ok(false.into()), ExistsFn::new(Path::from("foo"))),
             (
-                map!["foo": 42],
+                btreemap! {},
+                Ok(false.into()),
+                ExistsFn::new(Path::from("foo")),
+            ),
+            (
+                btreemap! { "foo" => 42 },
                 Ok(true.into()),
                 ExistsFn::new(Path::from("foo")),
             ),

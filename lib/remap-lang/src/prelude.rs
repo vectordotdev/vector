@@ -1,8 +1,8 @@
 // commonly used modules
-pub use crate::{expression, function, state, value};
+pub use crate::{expression, function, inner_type_def, state, value};
 
 // commonly used top-level crate types
-pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
+pub use crate::{Error, Expr, Expression, Function, InnerTypeDef, Object, Result, TypeDef, Value};
 
 // commonly used expressions
 pub use crate::expression::{Array, Literal, Map, Noop, Path, Variable};

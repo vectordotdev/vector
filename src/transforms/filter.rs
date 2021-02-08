@@ -1,8 +1,8 @@
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{FilterEventDiscarded, FilterEventProcessed},
+    internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct FilterConfig {
-    condition: Box<dyn ConditionConfig>,
+    condition: AnyCondition,
 }
 
 inventory::submit! {
@@ -63,7 +63,6 @@ impl Filter {
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
-            emit!(FilterEventProcessed);
             output.push(event);
         } else {
             emit!(FilterEventDiscarded);

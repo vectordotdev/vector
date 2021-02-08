@@ -148,7 +148,7 @@ mod tests {
     #[test]
     fn check_remap_metric() {
         let metric = Event::Metric(Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         ));
@@ -168,11 +168,11 @@ mod tests {
             result,
             Event::Metric(
                 Metric::new(
-                    "zork".into(),
+                    "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
                 )
-                .with_namespace(Some("zerk".into()))
+                .with_namespace(Some("zerk"))
                 .with_tags(Some({
                     let mut tags = BTreeMap::new();
                     tags.insert("host".into(), "zoobub".into());

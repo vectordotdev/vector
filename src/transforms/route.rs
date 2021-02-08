@@ -1,5 +1,5 @@
 use crate::{
-    conditions::{Condition, ConditionConfig},
+    conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::RouteEventDiscarded,
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct LaneConfig {
     #[serde(flatten)]
-    condition: Box<dyn ConditionConfig>,
+    condition: AnyCondition,
 }
 
 #[async_trait::async_trait]
@@ -67,7 +67,7 @@ impl FunctionTransform for Lane {
 pub struct RouteConfig {
     // Deprecated name
     #[serde(alias = "lanes")]
-    route: IndexMap<String, Box<dyn ConditionConfig>>,
+    route: IndexMap<String, AnyCondition>,
 }
 
 inventory::submit! {

@@ -7,9 +7,9 @@ use crate::{
 use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {
-    source: String,
+    pub source: String,
 }
 
 inventory::submit! {
@@ -160,11 +160,11 @@ mod test {
             (
                 Event::Metric(
                     Metric::new(
-                        "zork".into(),
+                        "zork",
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
-                    .with_namespace(Some("zerk".into()))
+                    .with_namespace(Some("zerk"))
                     .with_tags(Some({
                         let mut tags = BTreeMap::new();
                         tags.insert("host".into(), "zoobub".into());

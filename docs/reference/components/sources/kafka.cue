@@ -24,6 +24,7 @@ components: sources: kafka: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	support: components._kafka.support
@@ -41,6 +42,7 @@ components: sources: kafka: {
 			type: string: {
 				default: "largest"
 				examples: ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
+				syntax: "literal"
 			}
 		}
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
@@ -72,6 +74,7 @@ components: sources: kafka: {
 			warnings: []
 			type: string: {
 				examples: ["consumer-group-name"]
+				syntax: "literal"
 			}
 		}
 		key_field: {
@@ -82,6 +85,7 @@ components: sources: kafka: {
 			type: string: {
 				default: null
 				examples: ["message_key"]
+				syntax: "literal"
 			}
 		}
 		topic_key: {
@@ -92,6 +96,7 @@ components: sources: kafka: {
 			type: string: {
 				default: null
 				examples: ["topic"]
+				syntax: "literal"
 			}
 		}
 		partition_key: {
@@ -102,6 +107,7 @@ components: sources: kafka: {
 			type: string: {
 				default: null
 				examples: ["partition"]
+				syntax: "literal"
 			}
 		}
 		offset_key: {
@@ -112,6 +118,7 @@ components: sources: kafka: {
 			type: string: {
 				default: null
 				examples: ["offset"]
+				syntax: "literal"
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -138,6 +145,7 @@ components: sources: kafka: {
 						type: string: {
 							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+							syntax: "literal"
 						}
 					}
 					password: {
@@ -148,6 +156,7 @@ components: sources: kafka: {
 						type: string: {
 							default: null
 							examples: ["password"]
+							syntax: "literal"
 						}
 					}
 					username: {
@@ -158,6 +167,7 @@ components: sources: kafka: {
 						type: string: {
 							default: null
 							examples: ["username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -179,7 +189,10 @@ components: sources: kafka: {
 			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.\n"
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
+			type: array: items: type: string: {
+				examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
+				syntax: "literal"
+			}
 		}
 	}
 
@@ -189,7 +202,10 @@ components: sources: kafka: {
 			message: {
 				description: "The raw line from the Kafka record."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			offset: {
 				description: "The Kafka offset at the time the record was retrieved."
@@ -202,15 +218,21 @@ components: sources: kafka: {
 			partition: {
 				description: "The Kafka partition that the record came from."
 				required:    true
-				type: string: examples: ["partition"]
+				type: string: {
+					examples: ["partition"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp & {
-				description: "If the [Splunk HEC event endpoint](\(urls.splunk_hec_event_endpoint)) is used then the value of the `time` field will be used. If the [Splunk HEC raw endpoint](\(urls.splunk_hec_raw_endpoint)) is used, then the current time the event was received will be used."
+				description: "The timestamp encoded in the Kafka message or the current time if it cannot be fetched."
 			}
 			topic: {
 				description: "The Kafka topic that the record came from."
 				required:    true
-				type: string: examples: ["topic"]
+				type: string: {
+					examples: ["topic"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

@@ -17,6 +17,19 @@ pub use self::internal_events::FileSourceInternalEvents;
 
 type FilePosition = u64;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ReadFrom {
+    Beginning,
+    End,
+    Checkpoint(FilePosition),
+}
+
+impl Default for ReadFrom {
+    fn default() -> Self {
+        ReadFrom::Beginning
+    }
+}
+
 #[cfg(test)]
 mod test {
     use self::file_watcher::FileWatcher;
@@ -214,8 +227,14 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None, 100_000, Bytes::from("\n"))
-            .expect("must be able to create");
+        let mut fw = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            100_000,
+            Bytes::from("\n"),
+        )
+        .expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -310,8 +329,14 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None, 100_000, Bytes::from("\n"))
-            .expect("must be able to create");
+        let mut fw = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            100_000,
+            Bytes::from("\n"),
+        )
+        .expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());

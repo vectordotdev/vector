@@ -1,4 +1,9 @@
 remap: functions: to_int: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into an integer.
+		"""
+
 	arguments: [
 		{
 			name: "value"
@@ -20,10 +25,7 @@ remap: functions: to_int: {
 			"If `value` is a timestamp, a [Unix timestamp](\(urls.unix_timestamp)) (in seconds) is returned.",
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `string`.
-		"""#
+
 	examples: [
 		{
 			title: "Coerce to an int (string)"

@@ -785,7 +785,7 @@ mod tests {
         .unwrap();
 
         let event = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         ));
@@ -795,7 +795,7 @@ mod tests {
         let output = out_stream.next().await.unwrap();
 
         let expected = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 2.0 },
         ));

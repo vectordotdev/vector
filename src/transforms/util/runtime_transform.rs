@@ -81,6 +81,7 @@ where
         Box::pin(
             input_rx
                 .map(Message::Process)
+                .fuse()
                 .into_future()
                 .map(move |(first, rest)| {
                     // The first message is always `Message::Init`.
