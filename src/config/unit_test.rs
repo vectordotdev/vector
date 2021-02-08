@@ -6,7 +6,6 @@ use crate::{
     transforms::Transform,
 };
 use indexmap::IndexMap;
-use indoc::indoc;
 use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
@@ -542,6 +541,7 @@ async fn build_unit_test(
 mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
+    use indoc::indoc;
 
     #[tokio::test]
     async fn parse_no_input() {

@@ -9,7 +9,6 @@ use crate::{
 use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
@@ -536,6 +535,7 @@ fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec
 ))]
 mod test {
     use super::{builder::ConfigBuilder, format, load_from_str, Format};
+    use indoc::indoc;
     use std::path::PathBuf;
 
     #[test]
@@ -718,6 +718,7 @@ mod test {
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
     use super::{load_from_str, Format, Resource};
+    use indoc::indoc;
     use std::collections::{HashMap, HashSet};
     use std::net::{Ipv4Addr, SocketAddr};
 
