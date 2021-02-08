@@ -174,11 +174,7 @@ impl SourceConfig for MockSourceConfig {
                 }
             })
             .map(Ok)
-            .forward(
-                out.sink_map_err(
-                    |error| error!(message = "Error sending in sink..", error = ?error),
-                ),
-            )
+            .forward(out.sink_map_err(|error| error!(message = "Error sending in sink..", %error)))
             .inspect(|_| info!("Finished sending."))
             .await
         }))
@@ -366,7 +362,7 @@ where
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
-                error!(message = "Ingesting an event failed at mock sink.", ?error);
+                error!(message = "Ingesting an event failed at mock sink.", %error);
             }
 
             self.acker.ack(1);

@@ -342,7 +342,7 @@ where
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "Output channel closed.", error = ?error);
+                    error!(message = "Output channel closed.", %error);
                     return Err(error);
                 }
             }
