@@ -286,7 +286,7 @@ impl TransformConfig for MockTransformConfig {
 pub struct MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     #[serde(skip)]
     sink: Option<T>,
@@ -297,7 +297,7 @@ where
 impl<T> MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     pub fn new(sink: T, healthy: bool) -> Self {
         Self {
@@ -318,7 +318,7 @@ enum HealthcheckError {
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = MockSink {
@@ -357,7 +357,7 @@ struct MockSink<S> {
 impl<S> StreamSink for MockSink<S>
 where
     S: Sink<Event> + Send + std::marker::Unpin,
-    <S as Sink<Event>>::Error: std::fmt::Debug,
+    <S as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
