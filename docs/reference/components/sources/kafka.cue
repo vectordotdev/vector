@@ -224,7 +224,7 @@ components: sources: kafka: {
 				}
 			}
 			timestamp: fields._current_timestamp & {
-				description: "If the [Splunk HEC event endpoint](\(urls.splunk_hec_event_endpoint)) is used then the value of the `time` field will be used. If the [Splunk HEC raw endpoint](\(urls.splunk_hec_raw_endpoint)) is used, then the current time the event was received will be used."
+				description: "The timestamp encoded in the Kafka message or the current time if it cannot be fetched."
 			}
 			topic: {
 				description: "The Kafka topic that the record came from."
