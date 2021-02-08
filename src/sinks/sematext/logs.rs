@@ -43,12 +43,10 @@ inventory::submit! {
 
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            indoc! {r#"
+        toml::from_str(indoc! {r#"
                 region = "us"
                 token = "${SEMATEXT_TOKEN}"
-            "#},
-        )
+            "#})
         .unwrap()
     }
 }
@@ -130,12 +128,10 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        let (mut config, cx) = load_sink::<SematextLogsConfig>(
-            indoc! {r#"
+        let (mut config, cx) = load_sink::<SematextLogsConfig>(indoc! {r#"
                 region = "us"
                 token = "mylogtoken"
-                "#},
-        )
+                "#})
         .unwrap();
 
         // Make sure we can build the config

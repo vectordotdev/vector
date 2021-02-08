@@ -147,13 +147,11 @@ inventory::submit! {
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            indoc! {r#"
+        toml::from_str(indoc! {r#"
                 bucket = "my-bucket"
                 credentials_path = "/path/to/credentials.json"
                 encoding.codec = "ndjson"
-            "#},
-        )
+            "#})
         .unwrap()
     }
 }

@@ -449,7 +449,7 @@ mod tests {
     fn encodes_counter_text() {
         assert_eq!(
             encode_counter::<StringCollector>(),
-            indoc!{ r#"
+            indoc! { r#"
                 # HELP vector_hits hits
                 # TYPE vector_hits counter
                 vector_hits{code="200"} 10
@@ -479,7 +479,7 @@ mod tests {
     fn encodes_gauge_text() {
         assert_eq!(
             encode_gauge::<StringCollector>(),
-            indoc!{ r#"
+            indoc! { r#"
                 # HELP vector_temperature temperature
                 # TYPE vector_temperature gauge
                 vector_temperature{code="200"} -1.1
@@ -509,7 +509,7 @@ mod tests {
     fn encodes_set_text() {
         assert_eq!(
             encode_set::<StringCollector>(),
-            indoc!{ r#"
+            indoc! { r#"
                 # HELP vector_users users
                 # TYPE vector_users gauge
                 vector_users 1

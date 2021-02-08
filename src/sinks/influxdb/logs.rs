@@ -78,16 +78,14 @@ inventory::submit! {
 
 impl GenerateConfig for InfluxDBLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            indoc! {r#"
+        toml::from_str(indoc! {r#"
                 endpoint = "http://localhost:8086/"
                 namespace = "my-namespace"
                 tags = []
                 org = "my-org"
                 bucket = "my-bucket"
                 token = "${INFLUXDB_TOKEN}"
-            "#},
-        )
+            "#})
         .unwrap()
     }
 }
@@ -492,13 +490,11 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v1() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            indoc! {r#"
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
                 namespace = "ns"
                 endpoint = "http://localhost:9999"
                 database = "my-database"
-            "#},
-        )
+            "#})
         .unwrap();
 
         // Make sure we can build the config
@@ -553,15 +549,13 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v2() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            indoc! {r#"
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
                 namespace = "ns"
                 endpoint = "http://localhost:9999"
                 bucket = "my-bucket"
                 org = "my-org"
                 token = "my-token"
-            "#},
-        )
+            "#})
         .unwrap();
 
         // Make sure we can build the config
