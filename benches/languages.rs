@@ -64,7 +64,7 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
                   artifact_cache = "target/artifacts/"
-        "#},
+            "#},
         ),
     ];
 
@@ -147,7 +147,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   source = """
                   . = parse_syslog!(.message)
                   """
-         "#},
+            "#},
         ),
         (
             "native",
@@ -165,7 +165,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   types.msgid = "string"
                   types.procid = "int"
                   types.timestamp = "timestamp|%F"
-         "#},
+            "#},
         ),
         (
             "lua",
@@ -188,7 +188,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-        "#},
+            "#},
         ),
         (
             "wasm",
@@ -206,6 +206,83 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "hostname": "initech.io", "severity": "warning", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19 21:48:09.004 +00:00", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, output);
+}
+
+fn benchmark_multifaceted(c: &mut Criterion) {
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            indoc! {r#"
+                [transforms.last]
+                  type = "remap"
+                  inputs = ["in"]
+                  source = """
+                  . = parse_syslog!(.)
+                  """
+            "#},
+        ),
+        (
+            "native",
+            indoc! {r#"
+                [transforms.last]
+                  type = "regex_parser"
+                  inputs = ["in"]
+                  field = "message"
+                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
+                  types.appname = "string"
+                  types.facility = "string"
+                  types.hostname = "string"
+                  types.level = "string"
+                  types.message = "string"
+                  types.msgid = "string"
+                  types.procid = "int"
+                  types.timestamp = "timestamp|%F"
+            "#},
+        ),
+        (
+            "lua",
+            indoc! {r#"
+                [transforms.last]
+                  type = "lua"
+                  inputs = ["in"]
+                  version = "2"
+                  source = """
+                  local function parse_syslog(message)
+                    local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
+                    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
+
+                    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
+                  end
+
+                  function process(event, emit)
+                    event.log = parse_syslog(event.log.message)
+                    emit(event)
+                  end
+                  """
+                  hooks.process = "process"
+            "#},
+        ),
+        (
+            "wasm",
+            indoc! {r#"
+                [transforms.last]
+                  type = "wasm"
+                  inputs = ["in"]
+                  module = "tests/data/wasm/multifaceted/target/wasm32-wasi/release/multifaceted.wasm"
+                  artifact_cache = "target/artifacts/"
+            "#},
+        ),
+    ];
+
+    benchmark_configs(
+        c,
+        "multifaceted",
+        configs,
+        "in",
+        "last",
+        input,
+        output,
+    );
 }
 
 /// Benches a set of transform configs for comparison
@@ -250,7 +327,7 @@ fn benchmark_configs(
               type = "socket"
               mode = "tcp"
               address = "{}"
-            "#},
+        "#},
         input_name, in_addr
     );
     let sink_config = format!(
