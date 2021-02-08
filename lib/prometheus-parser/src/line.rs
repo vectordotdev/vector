@@ -379,7 +379,6 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use indoc::indoc;
     use shared::btreemap;
 
     #[test]
@@ -620,7 +619,7 @@ mod test {
 
     #[test]
     fn test_parse_line() {
-        let input = indoc! {r#"
+        let input = r##"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
@@ -657,7 +656,7 @@ mod test {
             rpc_duration_seconds{quantile="0.99"} 76656
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
-        "#};
+            "##;
         assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
     }
 }

@@ -236,11 +236,10 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use indoc::indoc;
 
     #[test]
     fn test_group_metrics() {
-        let input = indoc! {r#"
+        let input = r##"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
@@ -277,7 +276,7 @@ mod test {
             rpc_duration_seconds{quantile="0.99"} 76656
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
-        "#};
+            "##;
         group_metrics(input).unwrap();
     }
 

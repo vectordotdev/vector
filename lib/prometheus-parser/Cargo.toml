@@ -9,7 +9,6 @@ license = "MPL-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-indoc = "1.0.3"
 nom = "6.0.1"
 snafu = { version = "0.6" }
 
