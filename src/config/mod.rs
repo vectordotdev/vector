@@ -9,7 +9,6 @@ use crate::{
 use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
-use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
@@ -541,16 +540,16 @@ mod test {
     #[test]
     fn default_data_dir() {
         let config = load_from_str(
-            indoc! { r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            r#"
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .unwrap();
@@ -564,16 +563,16 @@ mod test {
     #[test]
     fn default_schema() {
         let config = load_from_str(
-            indoc! { r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            r#"
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .unwrap();
@@ -592,21 +591,21 @@ mod test {
     #[test]
     fn custom_schema() {
         let config = load_from_str(
-            indoc! { r#"
-                [log_schema]
-                  host_key = "this"
-                  message_key = "that"
-                  timestamp_key = "then"
+            r#"
+            [log_schema]
+            host_key = "this"
+            message_key = "that"
+            timestamp_key = "then"
 
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .unwrap();
@@ -619,16 +618,16 @@ mod test {
     #[test]
     fn config_append() {
         let mut config: ConfigBuilder = format::deserialize(
-            indoc! { r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            r#"
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .unwrap();
@@ -636,25 +635,25 @@ mod test {
         assert_eq!(
             config.append(
                 format::deserialize(
-                    indoc! { r#"
-                        data_dir = "/foobar"
+                    r#"
+                    data_dir = "/foobar"
 
-                        [transforms.foo]
-                          type = "json_parser"
-                          inputs = [ "in" ]
+                    [transforms.foo]
+                    type = "json_parser"
+                    inputs = [ "in" ]
 
-                        [[tests]]
-                          name = "check_simple_log"
-                          [tests.input]
-                            insert_at = "foo"
-                            type = "raw"
-                            value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
-                          [[tests.outputs]]
-                            extract_from = "foo"
-                            [[tests.outputs.conditions]]
-                              type = "check_fields"
-                              "message.equals" = "Sorry, I'm busy this week Cecil"
-                    "# },
+                    [[tests]]
+                    name = "check_simple_log"
+                    [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+                    [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                    type = "check_fields"
+                    "message.equals" = "Sorry, I'm busy this week Cecil"
+                    "#,
                     Some(Format::TOML),
                 )
                 .unwrap()
@@ -672,16 +671,16 @@ mod test {
     #[test]
     fn config_append_collisions() {
         let mut config: ConfigBuilder = format::deserialize(
-            indoc! { r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            r#"
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .unwrap();
@@ -689,20 +688,20 @@ mod test {
         assert_eq!(
             config.append(
                 format::deserialize(
-                    indoc! { r#"
-                        [sources.in]
-                          type = "file"
-                          include = ["/var/log/messages"]
+                    r#"
+                    [sources.in]
+                    type = "file"
+                    include = ["/var/log/messages"]
 
-                        [transforms.foo]
-                          type = "json_parser"
-                          inputs = [ "in" ]
+                    [transforms.foo]
+                    type = "json_parser"
+                    inputs = [ "in" ]
 
-                        [sinks.out]
-                          type = "console"
-                          inputs = ["in"]
-                          encoding = "json"
-                    "# },
+                    [sinks.out]
+                    type = "console"
+                    inputs = ["in"]
+                    encoding = "json"
+                    "#,
                     Some(Format::TOML),
                 )
                 .unwrap()
@@ -834,18 +833,18 @@ mod resource_tests {
     #[test]
     fn config_conflict_detected() {
         assert!(load_from_str(
-            indoc! { r#"
-                [sources.in0]
-                  type = "stdin"
+            r#"
+            [sources.in0]
+            type = "stdin"
 
-                [sources.in1]
-                  type = "stdin"
+            [sources.in1]
+            type = "stdin"
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in0","in1"]
-                  encoding = "json"
-            "# },
+            [sinks.out]
+            type = "console"
+            inputs = ["in0","in1"]
+            encoding = "json"
+            "#,
             Some(Format::TOML),
         )
         .is_err());
