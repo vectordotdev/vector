@@ -36,7 +36,7 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 
     let log_message = initial_event.get("message").unwrap().to_string();
 
-    // This parses the extracted log message, which is assumed to a valid JSON string, into JSON
+    // This parses the extracted log message, which is assumed to be a valid JSON string, into JSON
     let parsed_json: serde_json::Value = serde_json::from_str(&log_message).unwrap();
 
     // Covert the output into bytes
