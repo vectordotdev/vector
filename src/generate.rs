@@ -370,7 +370,6 @@ fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indoc::indoc;
 
     #[test]
     fn generate_all() {
