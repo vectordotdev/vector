@@ -1,8 +1,8 @@
 use super::util::StreamSink;
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkContext, SinkOuter},
     config::SinkConfig,
+    config::{DataType, SinkContext, SinkOuter},
     event::{Event, LogEvent},
 };
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
