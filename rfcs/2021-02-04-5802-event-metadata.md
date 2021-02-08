@@ -141,7 +141,35 @@ to clone and merge the metadata.
 
 #### WASM
 
-The WASM transform exposes events to scripts as JSON… TODO
+The WASM transform has several limitations that make it difficult to
+support either exposing or copying metadata: it only supports log
+events, and it exposes the log event data using a naïve JSON conversion
+with no prefix. It will require the addition of a wrapper layer much
+like the Lua transform. This will necessarily be a breaking change.
+
+Current event data exposed to WASM transforms and required by the `emit`
+function:
+
+```json
+{
+  "message": "Something happened",
+  "timestamp": "2021-02-08T11:11:11+00:00"
+}
+```
+
+Proposed:
+
+```json
+{
+  "log": {
+    "message": "Something happened",
+    "timestamp": "2021-02-08T11:11:11+00:00"
+  },
+  "metadata": {
+    "first_timestamp": "2021-02-08T12:23:34+00:00"
+  }
+}
+```
 
 ### Visibility
 
