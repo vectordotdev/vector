@@ -186,21 +186,21 @@ mod test {
         let timestamp = || Utc::now().trunc_subsecs(3);
         vec![
             Metric::new(
-                "counter_1".into(),
+                "counter_1",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 42.0 },
             )
             .with_timestamp(Some(timestamp()))
             .into(),
             Metric::new(
-                "gauge_2".into(),
+                "gauge_2",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 41.0 },
             )
             .with_timestamp(Some(timestamp()))
             .into(),
             Metric::new(
-                "histogram_3".into(),
+                "histogram_3",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     buckets: crate::buckets![ 2.3 => 11, 4.2 => 85 ],
@@ -211,7 +211,7 @@ mod test {
             .with_timestamp(Some(timestamp()))
             .into(),
             Metric::new(
-                "summary_4".into(),
+                "summary_4",
                 MetricKind::Absolute,
                 MetricValue::AggregatedSummary {
                     quantiles: crate::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
