@@ -16,6 +16,7 @@ use crate::{
 use futures::{future::BoxFuture, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::ready, task::Poll};
@@ -46,9 +47,11 @@ inventory::submit! {
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"region = "us"
-            default_namespace = "vector"
-            token = "${SEMATEXT_TOKEN}""#,
+            indoc! {r#"
+                region = "us"
+                default_namespace = "vector"
+                token = "${SEMATEXT_TOKEN}"
+            "#},
         )
         .unwrap()
     }
@@ -259,6 +262,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -327,12 +331,12 @@ mod tests {
         trace_init();
 
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(
-            r#"
-            region = "eu"
-            default_namespace = "ns"
-            token = "atoken"
-            batch.max_events = 1
-            "#,
+            indoc! {r#"
+                region = "eu"
+                default_namespace = "ns"
+                token = "atoken"
+                batch.max_events = 1
+            "#},
         )
         .unwrap();
 

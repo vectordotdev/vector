@@ -24,6 +24,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
 };
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -147,9 +148,11 @@ inventory::submit! {
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"bucket = "my-bucket"
-            credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson""#,
+            indoc! {r#"
+                bucket = "my-bucket"
+                credentials_path = "/path/to/credentials.json"
+                encoding.codec = "ndjson"
+            "#},
         )
         .unwrap()
     }

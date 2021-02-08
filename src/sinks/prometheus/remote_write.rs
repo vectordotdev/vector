@@ -241,6 +241,7 @@ mod tests {
     };
     use futures::StreamExt;
     use http::HeaderMap;
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -279,13 +280,13 @@ mod tests {
     #[tokio::test]
     async fn sends_authenticated_request() {
         let outputs = send_request(
-            r#"
-            tenant_id = "tenant-%Y"
-            [auth]
-            strategy = "basic"
-            user = "user"
-            password = "password"
-            "#,
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [auth]
+                strategy = "basic"
+                user = "user"
+                password = "password"
+            "#},
             vec![create_event("gauge-2".into(), 32.0)],
         )
         .await;

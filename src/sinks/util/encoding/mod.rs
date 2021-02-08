@@ -157,6 +157,7 @@ pub enum TimestampFormat {
 mod tests {
     use super::*;
     use crate::config::log_schema;
+    use indoc::indoc;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -174,9 +175,9 @@ mod tests {
         PathIter::new(a).collect()
     }
 
-    const TOML_SIMPLE_STRING: &str = r#"
+    const TOML_SIMPLE_STRING: &str = indoc! {r#"
         encoding = "Snoot"
-    "#;
+    "#};
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -184,11 +185,11 @@ mod tests {
         assert_eq!(config.encoding.codec(), &TestEncoding::Snoot);
     }
 
-    const TOML_SIMPLE_STRUCT: &str = r#"
+    const TOML_SIMPLE_STRUCT: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Boop"]
-    "#;
+    "#};
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
@@ -201,21 +202,21 @@ mod tests {
         );
     }
 
-    const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
+    const TOML_EXCLUSIVITY_VIOLATION: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Doop"]
-    "#;
+    "#};
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
         assert!(config.is_err())
     }
 
-    const TOML_EXCEPT_FIELD: &str = r#"
+    const TOML_EXCEPT_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["a.b.c", "b", "c[0].y"]
-    "#;
+    "#};
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
@@ -242,10 +243,10 @@ mod tests {
         assert!(event.as_mut_log().contains("c[0].x"));
     }
 
-    const TOML_ONLY_FIELD: &str = r#"
+    const TOML_ONLY_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.only_fields = ["a.b.c", "b", "c[0].y"]
-    "#;
+    "#};
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
@@ -272,10 +273,10 @@ mod tests {
         assert!(!event.as_mut_log().contains("c[0].x"));
     }
 
-    const TOML_TIMESTAMP_FORMAT: &str = r#"
+    const TOML_TIMESTAMP_FORMAT: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.timestamp_format = "unix"
-    "#;
+    "#};
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();

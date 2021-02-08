@@ -1,4 +1,5 @@
 use http::{uri::InvalidUri, Uri};
+use indoc::indoc;
 use rusoto_core::{region::ParseRegionError, Region};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -111,10 +112,10 @@ mod tests {
     #[test]
     fn region_es_east_1() {
         let config: Config = toml::from_str(
-            r#"
-        [inner]
-        region = "us-east-1"
-        "#,
+            indoc! {r#"
+                [inner]
+                region = "us-east-1"
+            "#},
         )
         .unwrap();
 
@@ -125,10 +126,10 @@ mod tests {
     #[test]
     fn custom_name_endpoint_localhost() {
         let config: Config = toml::from_str(
-            r#"
-        [inner]
-        endpoint = "http://localhost:9000"
-        "#,
+            indoc! {r#"
+                [inner]
+                endpoint = "http://localhost:9000"
+            "#},
         )
         .unwrap();
 
@@ -144,10 +145,10 @@ mod tests {
     #[test]
     fn region_not_provided() {
         let config: Config = toml::from_str(
-            r#"
-        [inner]
-        endpoint_is_spelled_wrong = "http://localhost:9000"
-        "#,
+            indoc! {r#"
+                [inner]
+                endpoint_is_spelled_wrong = "http://localhost:9000"
+            "#},
         )
         .unwrap();
 

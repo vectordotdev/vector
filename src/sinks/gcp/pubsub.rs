@@ -16,6 +16,7 @@ use crate::{
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
@@ -212,10 +213,10 @@ mod tests {
     #[tokio::test]
     async fn fails_missing_creds() {
         let config: PubsubConfig = toml::from_str(
-            r#"
-           project = "project"
-           topic = "topic"
-        "#,
+            indoc! {r#"
+                project = "project"
+                topic = "topic"
+            "#},
         )
         .unwrap();
         if config.build(SinkContext::new_test()).await.is_ok() {

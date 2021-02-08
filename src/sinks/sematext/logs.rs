@@ -13,6 +13,7 @@ use futures::{
     future::{self, BoxFuture},
     FutureExt, SinkExt,
 };
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -43,8 +44,10 @@ inventory::submit! {
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"region = "us"
-            token = "${SEMATEXT_TOKEN}""#,
+            indoc! {r#"
+                region = "us"
+                token = "${SEMATEXT_TOKEN}"
+            "#},
         )
         .unwrap()
     }
@@ -118,6 +121,7 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -127,10 +131,10 @@ mod tests {
     #[tokio::test]
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
-            r#"
-            region = "us"
-            token = "mylogtoken"
-        "#,
+            indoc! {r#"
+                region = "us"
+                token = "mylogtoken"
+                "#},
         )
         .unwrap();
 

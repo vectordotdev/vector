@@ -19,6 +19,7 @@ use crate::{
 };
 use futures::SinkExt;
 use http::{Request, Uri};
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -78,12 +79,14 @@ inventory::submit! {
 impl GenerateConfig for InfluxDBLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
-            r#"endpoint = "http://localhost:8086/"
-            namespace = "my-namespace"
-            tags = []
-            org = "my-org"
-            bucket = "my-bucket"
-            token = "${INFLUXDB_TOKEN}""#,
+            indoc! {r#"
+                endpoint = "http://localhost:8086/"
+                namespace = "my-namespace"
+                tags = []
+                org = "my-org"
+                bucket = "my-bucket"
+                token = "${INFLUXDB_TOKEN}"
+            "#},
         )
         .unwrap()
     }
@@ -251,6 +254,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -259,13 +263,13 @@ mod tests {
 
     #[test]
     fn test_config_without_tags() {
-        let config = r#"
+        let config = indoc! {r#"
             namespace = "vector-logs"
             endpoint = "http://localhost:9999"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
-        "#;
+        "#};
 
         toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
     }
@@ -489,11 +493,11 @@ mod tests {
     #[tokio::test]
     async fn smoke_v1() {
         let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
-            database = "my-database"
-        "#,
+            indoc! {r#"
+                namespace = "ns"
+                endpoint = "http://localhost:9999"
+                database = "my-database"
+            "#},
         )
         .unwrap();
 
@@ -550,13 +554,13 @@ mod tests {
     #[tokio::test]
     async fn smoke_v2() {
         let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            r#"
-            namespace = "ns"
-            endpoint = "http://localhost:9999"
-            bucket = "my-bucket"
-            org = "my-org"
-            token = "my-token"
-        "#,
+            indoc! {r#"
+                namespace = "ns"
+                endpoint = "http://localhost:9999"
+                bucket = "my-bucket"
+                org = "my-org"
+                token = "my-token"
+            "#},
         )
         .unwrap();
 

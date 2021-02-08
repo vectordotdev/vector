@@ -236,6 +236,7 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn test_group_metrics() {

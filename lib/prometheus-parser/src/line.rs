@@ -1,6 +1,5 @@
 //! Parse a single line of Prometheus text format.
 
-use indoc::indoc;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
@@ -380,6 +379,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
     use shared::btreemap;
 
     #[test]
@@ -620,7 +620,7 @@ mod test {
 
     #[test]
     fn test_parse_line() {
-        let input = indoc!{r#"
+        let input = indoc! {r#"
             # HELP http_requests_total The total number of HTTP requests.
             # TYPE http_requests_total counter
             http_requests_total{method="post",code="200"} 1027 1395066363000
