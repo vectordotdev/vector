@@ -33,6 +33,7 @@ url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
 
 [dev-dependencies]
+criterion = "0.3"
 shared = { path = "../shared", features = ["btreemap"] }
 anyhow = "1"
 
@@ -180,3 +181,10 @@ to_unix_timestamp = ["chrono"]
 truncate = []
 upcase = []
 uuid_v4 = ["bytes", "uuid"]
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benches"
+harness = false
