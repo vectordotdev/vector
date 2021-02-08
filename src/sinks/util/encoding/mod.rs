@@ -175,9 +175,7 @@ mod tests {
         PathIter::new(a).collect()
     }
 
-    const TOML_SIMPLE_STRING: &str = indoc! {r#"
-        encoding = "Snoot"
-    "#};
+    const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
