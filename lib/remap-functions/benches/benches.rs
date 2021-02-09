@@ -86,7 +86,6 @@ criterion_main!(benches);
 // * Decide whether to bench only_fields for completeness
 // * Ensure tracing is enabled
 // * Wire back up to `make remap-benches`
-// * Rewrite bench name format to match criterion namespacing
 
 bench_function! {
     append => remap_functions::Append;
