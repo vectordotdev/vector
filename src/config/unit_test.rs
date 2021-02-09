@@ -571,8 +571,7 @@ mod tests {
             errs,
             vec![indoc! {r#"
                 Failed to build test 'broken test':
-                  inputs[0]: unable to locate target transform 'foo'
-            "#}
+                  inputs[0]: unable to locate target transform 'foo'"#}
             .to_owned(),]
         );
 
@@ -606,8 +605,7 @@ mod tests {
             errs,
             vec![indoc! {r#"
                 Failed to build test 'broken test':
-                  inputs[1]: unable to locate target transform 'foo'
-            "#}
+                  inputs[1]: unable to locate target transform 'foo'"#}
             .to_owned(),]
         );
     }
@@ -636,8 +634,7 @@ mod tests {
             errs,
             vec![indoc! {r#"
                 Failed to build test 'broken test':
-                  must specify at least one input.
-            "#}
+                  must specify at least one input."#}
             .to_owned(),]
         );
     }
@@ -665,8 +662,7 @@ mod tests {
             errs,
             vec![indoc! {r#"
                 Failed to build test 'broken test':
-                  unit test must contain at least one of `outputs` or `no_outputs_from`.
-            "#}
+                  unit test must contain at least one of `outputs` or `no_outputs_from`."#}
             .to_owned(),]
         );
     }
@@ -803,8 +799,7 @@ mod tests {
             errs,
             vec![indoc! {r#"
                 Failed to build test 'broken test':
-                  unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'
-            "#}
+                  unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"#}
             .to_owned(),]
         );
     }

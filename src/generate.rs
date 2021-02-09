@@ -433,8 +433,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "stdin/json_parser/console", &None),
-            Ok(indoc! {r#"
-                data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -460,8 +459,7 @@ mod tests {
                 [sinks.sink0.buffer]
                 type = "memory"
                 max_events = 500
-                when_full = "block"
-            "#}
+                when_full = "block""#}
             .to_string())
         );
 
