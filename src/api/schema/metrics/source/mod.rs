@@ -1,4 +1,4 @@
-mod file;
+pub mod file;
 mod generic;
 
 use super::{ProcessedBytesTotal, ProcessedEventsTotal};

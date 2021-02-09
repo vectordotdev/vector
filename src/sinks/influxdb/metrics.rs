@@ -1,6 +1,9 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricValue, Sample, StatisticKind},
+    event::{
+        metric::{Metric, MetricValue, Sample, StatisticKind},
+        Event,
+    },
     http::HttpClient,
     sinks::{
         influxdb::{
@@ -8,7 +11,7 @@ use crate::{
             InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
-            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
@@ -19,7 +22,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, SinkExt};
+use futures::{future::BoxFuture, stream, SinkExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -135,15 +138,17 @@ impl InfluxDBSvc {
             protocol_version,
             inner: http_service,
         };
+        let mut normalizer = MetricNormalizer::<InfluxMetricNormalize>::default();
 
         let sink = request
             .batch_sink(
                 HttpRetryLogic,
                 influxdb_http_service,
-                MetricsBuffer::<InfluxMetricNormalize>::new(batch.size),
+                MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
             )
+            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
