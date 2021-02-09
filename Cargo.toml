@@ -660,5 +660,5 @@ tower-layer = "=0.3.0"
 [patch.crates-io]
 # TODO: update to next 0.12.x (after 0.12.0, if any)
 avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
-# TODO: update to the next 0.13.x (after 0.13.9, if any) or 0.14 (or higher)
-hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "a00cc20afc597cb55cbc62c70b0b25b46c82a0a6" }
+# TODO: update to the next 0.13.x (after 0.13.10, if any) or 0.14 (or higher)
+hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "d7495a75abca34646b1d6d047589c1b8110d0fa5" }
