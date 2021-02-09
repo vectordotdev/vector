@@ -1,6 +1,5 @@
 use remap::prelude::*;
 use std::collections::BTreeMap;
-use std::iter::FromIterator;
 use url::Url;
 use value::Kind;
 
@@ -73,23 +72,29 @@ fn inner_type_def() -> Option<InnerTypeDef> {
 }
 
 fn url_to_value(url: Url) -> Value {
-    let mut map = BTreeMap::<&str, Value>::new();
+    let mut map = BTreeMap::<String, Value>::new();
 
-    map.insert("scheme", url.scheme().to_owned().into());
-    map.insert("username", url.username().to_owned().into());
+    map.insert("scheme".to_owned(), url.scheme().to_owned().into());
+    map.insert("username".to_owned(), url.username().to_owned().into());
     map.insert(
-        "password",
+        "password".to_owned(),
         url.password()
             .map(ToOwned::to_owned)
             .unwrap_or_default()
             .into(),
     );
-    map.insert("path", url.path().to_owned().into());
-    map.insert("host", url.host_str().map(ToOwned::to_owned).into());
-    map.insert("port", url.port().map(|v| v as i64).into());
-    map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
+    map.insert("path".to_owned(), url.path().to_owned().into());
     map.insert(
-        "query",
+        "host".to_owned(),
+        url.host_str().map(ToOwned::to_owned).into(),
+    );
+    map.insert("port".to_owned(), url.port().map(|v| v as i64).into());
+    map.insert(
+        "fragment".to_owned(),
+        url.fragment().map(ToOwned::to_owned).into(),
+    );
+    map.insert(
+        "query".to_owned(),
         url.query_pairs()
             .into_owned()
             .map(|(k, v)| (k, v.into()))
@@ -97,7 +102,8 @@ fn url_to_value(url: Url) -> Value {
             .into(),
     );
 
-    Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
+    Value::from(map)
+    //.into_iter().map(|(k, v)| (k.to_owned(), v)))
 }
 
 #[cfg(test)]
