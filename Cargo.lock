@@ -2802,8 +2802,8 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.13.9"
-source = "git+https://github.com/hyperium/hyper?rev=a00cc20afc597cb55cbc62c70b0b25b46c82a0a6#a00cc20afc597cb55cbc62c70b0b25b46c82a0a6"
+version = "0.13.10"
+source = "git+https://github.com/hyperium/hyper?rev=d7495a75abca34646b1d6d047589c1b8110d0fa5#d7495a75abca34646b1d6d047589c1b8110d0fa5"
 dependencies = [
  "bytes 0.5.6",
  "futures-channel",
