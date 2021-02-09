@@ -2802,8 +2802,8 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.13.9"
-source = "git+https://github.com/hyperium/hyper?rev=a00cc20afc597cb55cbc62c70b0b25b46c82a0a6#a00cc20afc597cb55cbc62c70b0b25b46c82a0a6"
+version = "0.13.10"
+source = "git+https://github.com/hyperium/hyper?rev=d7495a75abca34646b1d6d047589c1b8110d0fa5#d7495a75abca34646b1d6d047589c1b8110d0fa5"
 dependencies = [
  "bytes 0.5.6",
  "futures-channel",
@@ -7582,7 +7582,6 @@ dependencies = [
  "grok",
  "headers",
  "heim",
- "hex",
  "hostname",
  "http",
  "hyper",
@@ -7605,7 +7604,6 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
- "md-5 0.9.1",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -7652,7 +7650,6 @@ dependencies = [
  "rusoto_signature",
  "rusoto_sqs",
  "rusoto_sts",
- "rust_decimal",
  "rusty-fork",
  "schannel",
  "seahash",
@@ -7661,9 +7658,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha-1 0.9.2",
- "sha2 0.9.2",
- "sha3",
  "shared",
  "smpl_jwt",
  "snafu",

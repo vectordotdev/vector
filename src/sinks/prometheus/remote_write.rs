@@ -7,7 +7,7 @@ use crate::{
     sinks::{
         self,
         util::{
-            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
@@ -100,19 +100,23 @@ impl SinkConfig for RemoteWriteConfig {
         let sink = {
             let service = request.service(HttpRetryLogic, service);
             let service = ServiceBuilder::new().service(service);
-            let buffer =
-                PartitionBuffer::new(MetricsBuffer::<PrometheusMetricNormalize>::new(batch.size));
+            let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+            let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
+
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
-                    let tenant_id = tenant_id.as_ref().and_then(|template| {
-                        template
-                            .render_string(&event)
-                            .map_err(|fields| emit!(PrometheusTemplateRenderingError { fields }))
-                            .ok()
-                    });
-                    let key = PartitionKey { tenant_id };
-                    let inner = PartitionInnerBuffer::new(event, key);
-                    stream::iter(Some(Ok(inner)))
+                    stream::iter(normalizer.apply(event).map(|event| {
+                        let tenant_id = tenant_id.as_ref().and_then(|template| {
+                            template
+                                .render_string(&event)
+                                .map_err(|fields| {
+                                    emit!(PrometheusTemplateRenderingError { fields })
+                                })
+                                .ok()
+                        });
+                        let key = PartitionKey { tenant_id };
+                        Ok(PartitionInnerBuffer::new(event, key))
+                    }))
                 })
                 .sink_map_err(
                     |error| error!(message = "Prometheus remote_write sink error.", %error),
@@ -335,6 +339,34 @@ mod tests {
         assert_eq!(orgid.len(), 11);
     }
 
+    #[tokio::test]
+    async fn retains_state_between_requests() {
+        // This sink converts all incremental events to absolute, and
+        // should accumulate their totals between batches.
+        let outputs = send_request(
+            r#"batch.max_events = 1"#,
+            vec![
+                create_inc_event("counter-1".into(), 12.0),
+                create_inc_event("counter-2".into(), 13.0),
+                create_inc_event("counter-1".into(), 14.0),
+            ],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 3);
+
+        let check_output = |index: usize, name: &str, value: f64| {
+            let (_, req) = &outputs[index];
+            assert_eq!(req.timeseries.len(), 1);
+            assert_eq!(req.timeseries[0].labels, labels!("__name__" => name));
+            assert_eq!(req.timeseries[0].samples.len(), 1);
+            assert_eq!(req.timeseries[0].samples[0].value, value);
+        };
+        check_output(0, "counter-1", 12.0);
+        check_output(1, "counter-2", 13.0);
+        check_output(2, "counter-1", 26.0);
+    }
+
     async fn send_request(
         config: &str,
         events: Vec<Event>,
@@ -376,18 +408,27 @@ mod tests {
     }
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
-        Event::Metric(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-                .with_tags(Some(
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ))
-                .with_timestamp(Some(chrono::Utc::now())),
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west-1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))
+            .with_timestamp(Some(chrono::Utc::now()))
+            .into()
+    }
+
+    fn create_inc_event(name: String, value: f64) -> Event {
+        Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
         )
+        .with_timestamp(Some(chrono::Utc::now()))
+        .into()
     }
 }
 
