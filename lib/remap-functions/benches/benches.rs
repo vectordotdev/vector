@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use remap::prelude::*;
@@ -34,27 +34,24 @@ criterion_group!(
               md5,
               merge,
               parse_aws_alb_log,
-              // TODO: Figure out how to pass timestamp as value
-              //parse_aws_cloudwatch_log_subscription_message,
+              parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
-              // TODO: Figure out how to pass timestamp as value
-              //parse_common_log,
+              parse_common_log,
               parse_duration,
-              // TODO: Figure out how to pass timestamp as value
-              //parse_glog,
+              parse_glog,
               // TODO: Figure out how to pass literal string to `parse_grok` function
-              parse_grok,
+              //parse_grok,
               parse_key_value,
               parse_json,
               parse_regex,
               parse_regex_all,
-              // TODO: Figure out how to pass timestamp as value
-              //parse_syslog,
+              parse_syslog,
               parse_timestamp,
               parse_tokens,
               parse_url,
               push,
-              redact,
+              // TODO: Figure out how to pass literal string
+              // redact,
               replace,
               round,
               sha1,
@@ -83,7 +80,6 @@ criterion_main!(benches);
 // * Bench functions that return dynamic values: now, uuidv4,
 // * Bench functions that require objects: del, exists
 // * Bench functions that require setup: get_env_var, get_hostname
-// * Figure out how to use timestamps as values in `want`; the macro wants a token tree
 // * Decide whether to bench only_fields for completeness
 // * Ensure tracing is enabled
 // * Wire back up to `make remap-benches`
@@ -552,13 +548,11 @@ bench_function! {
             "subscription_filters":  ["Destination"],
             "log_events": [{
                 "id":  "35683658089614582423604394983260738922885519999578275840",
-                // TODO
-                //"timestamp":  Utc.timestamp(1600110569, 39000000),
+                "timestamp":  (Utc.timestamp(1600110569, 39000000)),
                 "message":  r#"{"bytes":26780,"datetime":"14/Sep/2020:11:45:41 -0400","host":"157.130.216.193","method":"PUT","protocol":"HTTP/1.0","referer":"https://www.principalcross-platform.io/markets/ubiquitous","request":"/expedite/convergence","source_type":"stdin","status":301,"user-identifier":"-"}"#,
             }, {
                 "id":  "35683658089659183914001456229543810359430816722590236673",
-                // TODO
-                //"timestamp":  Utc.timestamp(1600110569, 41000000),
+                "timestamp":  (Utc.timestamp(1600110569, 41000000)),
                 "message":  r#"{"bytes":17707,"datetime":"14/Sep/2020:11:45:41 -0400","host":"109.81.244.252","method":"GET","protocol":"HTTP/2.0","referer":"http://www.investormission-critical.io/24/7/vortals","request":"/scale/functionalities/optimize","source_type":"stdin","status":502,"user-identifier":"feeney1708"}"#,
             }]
         }))
@@ -604,8 +598,7 @@ bench_function! {
             "host": "127.0.0.1",
             "identity": "bob",
             "user": "frank",
-            // TODO
-            //"timestamp": Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
+            "timestamp": (DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().with_timezone(&Utc)),
             "message": "GET /apache_pb.gif HTTP/1.0",
             "method": "GET",
             "path": "/apache_pb.gif",
@@ -632,8 +625,7 @@ bench_function! {
         args: func_args![value: "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
         want: Ok(value!({
             "level": "info",
-            // TODO
-            //"timestamp": DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap(),
+            "timestamp": (DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().with_timezone(&Utc)),
             "id": 15520,
             "file": "main.c++",
             "line": 9,
@@ -759,13 +751,12 @@ bench_function! {
 
     rfc3164 {
         args: func_args![
-            value: r#"<190>Dec 28 16:49:07 plertrood-thinkpad-x220 nginx: 127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#
+            value: r#"<190>Dec 28 2020 16:49:07 plertrood-thinkpad-x220 nginx: 127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#
         ],
         want: Ok(value!({
-            "severity": "notice",
-            "facility": "user",
-            // TODO
-            //"timestamp": Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
+            "severity": "info",
+            "facility": "local7",
+            "timestamp": (Local.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0).with_timezone(&Utc)),
             "hostname": "plertrood-thinkpad-x220",
             "appname": "nginx",
             "message": r#"127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#,
@@ -777,8 +768,7 @@ bench_function! {
         want: Ok(value!({
             "severity": "notice",
             "facility": "user",
-            // TODO
-            //"timestamp": Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
+            "timestamp": (Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119)),
             "hostname": "dynamicwireless.name",
             "appname": "non",
             "procid": 2426,
