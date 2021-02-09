@@ -160,7 +160,7 @@ service:
     #   port: 1234
     #   protocol: TCP
     #   targetPort: 1234
-    #   nodePort: 1243  (optional but useful with `service.type` is set to `NodePort`)
+    #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
