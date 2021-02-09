@@ -237,8 +237,13 @@ pub fn file_source(
         config.read_from,
     );
 
-    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
-        .expect("invalid glob patterns");
+    let paths_provider = Glob::new(
+        &config.include,
+        &config.exclude,
+        MatchOptions::default(),
+        FileSourceInternalEventsEmitter,
+    )
+    .expect("invalid glob patterns");
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
