@@ -78,7 +78,7 @@ type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
 
 type NomError<'a> = nom::Err<NomErrorType<'a>>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MetricKind {
     Counter,
     Gauge,

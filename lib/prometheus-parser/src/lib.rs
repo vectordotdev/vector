@@ -329,14 +329,16 @@ impl MetricGroupSet {
     }
 
     fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {
-        if let Some(group) = self.0.get(&name) {
-            if !group.matches_kind(kind) {
-                return Err(ParserError::MultipleMetricKinds { name });
+        match self.0.get(&name) {
+            Some(group) if !group.matches_kind(kind) => {
+                Err(ParserError::MultipleMetricKinds { name })
             }
-        } else {
-            self.0.insert(name, GroupKind::new(kind));
+            Some(_) => Ok(()), // metadata already exists and is the right type
+            None => {
+                self.0.insert(name, GroupKind::new(kind));
+                Ok(())
+            }
         }
-        Ok(())
     }
 
     fn insert_sample(
