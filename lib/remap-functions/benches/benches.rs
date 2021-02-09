@@ -86,9 +86,6 @@ criterion_group!(
 );
 criterion_main!(benches);
 
-// TODO:
-// * Wire back up to `make remap-benches`
-
 bench_function! {
     append => remap_functions::Append;
 

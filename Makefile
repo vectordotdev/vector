@@ -536,6 +536,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-remap-functions
+bench-remap-functions: ## Run remap-functions benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --manifest-path lib/remap-functions/Cargo.toml ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
@@ -558,7 +563,7 @@ bench-metrics: ## Run metrics benches
 
 .PHONY: bench-all
 bench-all: ### Run all benches
-bench-all: $(WASM_MODULE_OUTPUTS)
+bench-all: $(WASM_MODULE_OUTPUTS) bench-remap-functions
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
