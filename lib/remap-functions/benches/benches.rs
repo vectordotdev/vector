@@ -13,10 +13,14 @@ criterion_group!(
               compact,
               contains,
               decode_base64,
+              // TODO: Cannot pass a Path to bench_function
+              //del,
               downcase,
               encode_base64,
               encode_json,
               ends_with,
+              // TODO: Cannot pass a Path to bench_function
+              //exists
               flatten,
               floor,
               format_number,
@@ -39,7 +43,7 @@ criterion_group!(
               parse_common_log,
               parse_duration,
               parse_glog,
-              // TODO: Figure out how to pass literal string to `parse_grok` function
+              // TODO: Cannot pass a literal to bench_function
               //parse_grok,
               parse_key_value,
               parse_json,
@@ -50,8 +54,8 @@ criterion_group!(
               parse_tokens,
               parse_url,
               push,
-              // TODO: Figure out how to pass literal string
-              // redact,
+              // TODO: Cannot pass a literal to bench_function
+              //redact,
               replace,
               round,
               sha1,
@@ -78,7 +82,6 @@ criterion_main!(benches);
 
 // TODO:
 // * Bench functions that return dynamic values: now, uuidv4,
-// * Bench functions that require objects: del, exists
 // * Bench functions that require setup: get_env_var, get_hostname
 // * Decide whether to bench only_fields for completeness
 // * Ensure tracing is enabled
@@ -108,7 +111,7 @@ bench_function! {
 }
 
 bench_function! {
-    ceil  => remap_functions::Ceil;
+    ceil => remap_functions::Ceil;
 
     literal {
         args: func_args![value: 1234.56725, precision: 4],
