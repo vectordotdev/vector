@@ -13,7 +13,6 @@ set -euo pipefail
 #   $CHANNEL        the release channel for the build, "nightly" or "stable" (default `scripts/release-channel.sh`)
 #   $FEATURES       a list of Vector features to include when building (default "default")
 #   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
-#   $KEEP_SYMBOLS   whether to keep the any debug symbols in the binaries or not (default "true")
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
 #
@@ -23,7 +22,6 @@ set -euo pipefail
 OVERWRITE=${OVERWRITE:-"true"}
 FEATURES="${FEATURES:-"default"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
-KEEP_SYMBOLS=${KEEP_SYMBOLS:-"true"}
 TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
 CHANNEL=${CHANNEL:-"$(scripts/release-channel.sh)"}
@@ -64,14 +62,6 @@ fi
 export CFLAGS="$CFLAGS -g0 -O3"
 
 #
-# Strip the output binary through RUSTFLAGS
-#
-
-if [ "$KEEP_SYMBOLS" != "true" ]; then
-  export RUSTFLAGS="$RUSTFLAGS -C link-arg=-s"
-fi
-
-#
 # Header
 #
 
@@ -79,7 +69,6 @@ echo "Building Vector binary"
 echo "OVERWRITE: $OVERWRITE"
 echo "FEATURES: $FEATURES"
 echo "NATIVE_BUILD: $NATIVE_BUILD"
-echo "KEEP_SYMBOLS: $KEEP_SYMBOLS"
 echo "TARGET: $TARGET"
 echo "Binary path: $BINARY_PATH"
 
