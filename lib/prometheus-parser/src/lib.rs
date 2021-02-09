@@ -125,11 +125,11 @@ impl GroupKind {
 
     fn matches_kind(&self, kind: MetricKind) -> bool {
         match self {
-            GroupKind::Counter { .. } => kind == MetricKind::Counter,
-            GroupKind::Gauge { .. } => kind == MetricKind::Gauge,
-            GroupKind::Histogram { .. } => kind == MetricKind::Histogram,
-            GroupKind::Summary { .. } => kind == MetricKind::Summary,
-            GroupKind::Untyped { .. } => true,
+            Self::Counter { .. } => kind == MetricKind::Counter,
+            Self::Gauge { .. } => kind == MetricKind::Gauge,
+            Self::Histogram { .. } => kind == MetricKind::Histogram,
+            Self::Summary { .. } => kind == MetricKind::Summary,
+            Self::Untyped { .. } => true,
         }
     }
 
@@ -261,9 +261,9 @@ impl MetricGroup {
         }
     }
 
-    /// Err(_) if there are irrecoverable error.
-    /// Ok(Some(metric)) if this metric belongs to another group.
-    /// Ok(None) pushed successfully.
+    /// `Err(_)` if there are irrecoverable error.
+    /// `Ok(Some(metric))` if this metric belongs to another group.
+    /// `Ok(None)` pushed successfully.
     fn try_push(&mut self, metric: Metric) -> Result<Option<Metric>, ParserError> {
         if !metric.name.starts_with(&self.name) {
             return Ok(Some(metric));
