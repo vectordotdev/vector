@@ -103,7 +103,6 @@ fn url_to_value(url: Url) -> Value {
     );
 
     Value::from(map)
-    //.into_iter().map(|(k, v)| (k.to_owned(), v)))
 }
 
 #[cfg(test)]
