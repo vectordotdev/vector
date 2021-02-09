@@ -19,18 +19,3 @@ cat <<-EOF >> ./.cargo/config
 # so we don't need to keep these around.
 incremental = false
 EOF
-
-cat <<-EOF >> ./Cargo.toml
-[profile.dev]
-# See defaults https://doc.rust-lang.org/cargo/reference/profiles.html#dev
-opt-level = 0
-debug = true
-debug-assertions = true
-overflow-checks = true
-lto = false
-panic = 'unwind'
-# Disabled, see build.incremental
-# incremental = true
-codegen-units = 256
-rpath = false
-EOF
