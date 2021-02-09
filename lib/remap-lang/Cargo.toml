@@ -17,8 +17,8 @@ pest = "2"
 pest_derive = "2"
 regex = "1"
 serde = "1"
-thiserror = "1"
 termcolor = "1"
+thiserror = "1"
 
 [dev-dependencies]
 criterion = "0.3"

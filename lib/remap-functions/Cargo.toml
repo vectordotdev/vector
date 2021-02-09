@@ -33,8 +33,8 @@ url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
 
 [dev-dependencies]
-shared = { path = "../shared", features = ["btreemap"] }
 anyhow = "1"
+shared = { path = "../shared", features = ["btreemap"] }
 
 [features]
 default = [
@@ -78,9 +78,9 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_key_value",
-    "parse_syslog",
     "parse_regex",
     "parse_regex_all",
+    "parse_syslog",
     "parse_timestamp",
     "parse_tokens",
     "parse_url",
@@ -99,9 +99,9 @@ default = [
     "to_bool",
     "to_float",
     "to_int",
+    "to_string",
     "to_syslog_facility",
     "to_syslog_level",
-    "to_string",
     "to_syslog_severity",
     "to_timestamp",
     "to_unix_timestamp",
@@ -149,9 +149,9 @@ parse_duration = []
 parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
+parse_key_value = ["nom"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
-parse_key_value = ["nom"]
 parse_syslog = ["syslog_loose"]
 parse_timestamp = ["shared/conversion"]
 parse_tokens = ["shared/tokenize"]
