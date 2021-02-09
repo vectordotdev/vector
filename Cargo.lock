@@ -2994,7 +2994,7 @@ dependencies = [
  "crossbeam-utils 0.8.1",
  "difference",
  "futures-util",
- "hyper 0.14.2",
+ "hyper 0.14.4",
  "isahc",
  "lazy_static",
  "levenshtein",
@@ -3047,9 +3047,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.2"
+version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12219dc884514cb4a6a03737f4413c0e01c23a1b059b0156004b23f1e19dccbe"
+checksum = "e8e946c2b1349055e0b72ae281b238baf1a3ea7307c7e9f9d64673bdd9c26ac7"
 dependencies = [
  "bytes 1.0.1",
  "futures-channel",
