@@ -5,6 +5,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -27,7 +28,7 @@ impl_generate_config_from_default!(CoercerConfig);
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
     async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(&self.types, Local)?;
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,

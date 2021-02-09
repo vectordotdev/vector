@@ -5,6 +5,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -36,7 +37,7 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
     async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        let conversions = parse_conversion_map(&self.types)?;
+        let conversions = parse_conversion_map(&self.types, Local)?;
         let field = self
             .field
             .clone()

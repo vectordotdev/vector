@@ -14,23 +14,22 @@ pub enum ConversionError {
 /// from a plain `Bytes` into another type. The inner type of every `Value`
 /// variant is represented here.
 #[derive(Clone, Debug)]
-pub enum ConversionWithTz<TZ: TimeZone> {
+pub enum Conversion<TZ: TimeZone = Local> {
     Bytes,
     Integer,
     Float,
     Boolean,
     Timestamp(TZ),
-    TimestampFmt(TZ, String),
+    TimestampFmt(String, TZ),
     TimestampTZFmt(String),
 }
 
-pub type Conversion = ConversionWithTz<Local>;
-
 /// Helper function to parse a conversion map and check against a list of names
-pub fn parse_check_conversion_map(
+pub fn parse_check_conversion_map<TZ: TimeZone + Copy>(
     types: &HashMap<String, String>,
     names: &[impl AsRef<str>],
-) -> Result<HashMap<String, Conversion>, ConversionError> {
+    tz: TZ,
+) -> Result<HashMap<String, Conversion<TZ>>, ConversionError> {
     // Check if any named type references a nonexistent field
     let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
     for name in types.keys() {
@@ -42,18 +41,17 @@ pub fn parse_check_conversion_map(
         }
     }
 
-    parse_conversion_map(types)
+    parse_conversion_map(types, tz)
 }
 
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
-pub fn parse_conversion_map(
+pub fn parse_conversion_map<TZ: TimeZone + Copy>(
     types: &HashMap<String, String>,
-) -> Result<HashMap<String, Conversion>, ConversionError> {
+    tz: TZ,
+) -> Result<HashMap<String, Conversion<TZ>>, ConversionError> {
     types
         .iter()
-        .map(|(field, typename)| {
-            Conversion::parse(typename, Local).map(|conv| (field.clone(), conv))
-        })
+        .map(|(field, typename)| Conversion::parse(typename, tz).map(|conv| (field.clone(), conv)))
         .collect()
 }
 
@@ -71,7 +69,7 @@ pub enum Error {
     AutoTimestampParseError { s: String },
 }
 
-impl<TZ: TimeZone> ConversionWithTz<TZ> {
+impl<TZ: TimeZone> Conversion<TZ> {
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
@@ -100,7 +98,7 @@ impl<TZ: TimeZone> ConversionWithTz<TZ> {
                 if format_has_zone(fmt) {
                     Ok(Self::TimestampTZFmt(fmt.into()))
                 } else {
-                    Ok(Self::TimestampFmt(tz, fmt.into()))
+                    Ok(Self::TimestampFmt(fmt.into(), tz))
                 }
             }
             _ => Err(ConversionError::UnknownConversion { name: s.into() }),
@@ -128,7 +126,7 @@ impl<TZ: TimeZone> ConversionWithTz<TZ> {
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
             Self::Timestamp(tz) => parse_timestamp(tz, &String::from_utf8_lossy(&bytes))?.into(),
-            Self::TimestampFmt(tz, format) => {
+            Self::TimestampFmt(format, tz) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
                     .datetime_from_str(&s, &format)

@@ -6,6 +6,7 @@ use crate::{
     types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use shared::tokenize::parse;
 use std::collections::HashMap;
@@ -35,7 +36,7 @@ impl TransformConfig for TokenizerConfig {
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
+        let types = parse_check_conversion_map(&self.types, &self.field_names, Local)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);

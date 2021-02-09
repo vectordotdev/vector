@@ -9,6 +9,7 @@ use crate::{
     types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
+use chrono::Local;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -184,7 +185,7 @@ impl RegexParser {
             .flatten()
             .collect::<Vec<_>>();
 
-        let types = parse_check_conversion_map(&config.types, names)?;
+        let types = parse_check_conversion_map(&config.types, names, Local)?;
 
         Ok(Transform::function(RegexParser::new(
             regexset,

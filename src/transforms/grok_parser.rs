@@ -6,6 +6,7 @@ use crate::{
     types::{parse_conversion_map, Conversion},
 };
 use bytes::Bytes;
+use chrono::Local;
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -46,7 +47,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types)?;
+        let types = parse_conversion_map(&self.types, Local)?;
 
         Ok(grok
             .compile(&self.pattern, true)
