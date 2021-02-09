@@ -50,10 +50,10 @@ inventory::submit! {
 impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-                region = "us"
-                default_namespace = "vector"
-                token = "${SEMATEXT_TOKEN}"
-            "#})
+            region = "us"
+            default_namespace = "vector"
+            token = "${SEMATEXT_TOKEN}"
+        "#})
         .unwrap()
     }
 }
@@ -334,11 +334,11 @@ mod tests {
         trace_init();
 
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(indoc! {r#"
-                region = "eu"
-                default_namespace = "ns"
-                token = "atoken"
-                batch.max_events = 1
-            "#})
+            region = "eu"
+            default_namespace = "ns"
+            token = "atoken"
+            batch.max_events = 1
+        "#})
         .unwrap();
 
         let addr = next_addr();
