@@ -25,6 +25,7 @@ criterion_group!(
               floor,
               format_number,
               format_timestamp,
+              get_env_var,
               get_hostname,
               includes,
               ip_cidr_contains,
@@ -86,7 +87,6 @@ criterion_group!(
 criterion_main!(benches);
 
 // TODO:
-// * Bench functions that require setup: get_env_var
 // * Wire back up to `make remap-benches`
 
 bench_function! {
@@ -261,6 +261,16 @@ bench_function! {
     iso_6801 {
         args: func_args![value: Utc.timestamp(10, 0), format: "%+"],
         want: Ok("1970-01-01T00:00:10+00:00"),
+    }
+}
+
+bench_function! {
+    get_env_var => remap_functions::GetEnvVar;
+
+    // CARGO is set by `cargo`
+    get {
+        args: func_args![name: "CARGO"],
+        want: Ok(env!("CARGO")),
     }
 }
 
