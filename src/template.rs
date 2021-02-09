@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn render_metric_with_namespace() {
         let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
-        let metric = sample_metric().with_namespace(Some("vector-test".into()));
+        let metric = sample_metric().with_namespace(Some("vector-test"));
         assert_eq!(
             Ok(Bytes::from("namespace=vector-test name=a-counter")),
             template.render(&metric.into())
@@ -484,7 +484,7 @@ mod tests {
 
     fn sample_metric() -> Metric {
         Metric::new(
-            "a-counter".into(),
+            "a-counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.1 },
         )
