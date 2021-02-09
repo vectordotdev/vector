@@ -130,7 +130,9 @@ impl Conversion {
                     .into()
             }
             Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
-            Conversion::Timestamp => parse_timestamp(&String::from_utf8_lossy(&bytes))?.into(),
+            Conversion::Timestamp => {
+                parse_timestamp(&Local, &String::from_utf8_lossy(&bytes))?.into()
+            }
             Conversion::TimestampFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = Local
@@ -196,8 +198,8 @@ fn datetime_to_utc<TZ: TimeZone>(ts: DateTime<TZ>) -> DateTime<Utc> {
     Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
 }
 
-/// The list of allowed "automatic" timestamp formats
-const TIMESTAMP_FORMATS: &[&str] = &[
+/// The list of allowed "automatic" timestamp formats with assumed local time zone
+const TIMESTAMP_LOCAL_FORMATS: &[&str] = &[
     "%F %T",           // YYYY-MM-DD HH:MM:SS
     "%v %T",           // DD-Mmm-YYYY HH:MM:SS
     "%FT%T",           // ISO 8601 / RFC 3339 without TZ
@@ -223,9 +225,9 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
-pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, Error> {
-    for format in TIMESTAMP_FORMATS {
-        if let Ok(result) = Local.datetime_from_str(s, format) {
+fn parse_timestamp<TZ: TimeZone>(local: &TZ, s: &str) -> Result<DateTime<Utc>, Error> {
+    for format in TIMESTAMP_LOCAL_FORMATS {
+        if let Ok(result) = local.datetime_from_str(s, format) {
             return Ok(datetime_to_utc(result));
         }
     }
@@ -256,11 +258,12 @@ mod tests {
     use super::Bytes;
     #[cfg(unix)]
     use super::{Conversion, Error};
-    #[cfg(unix)]
     use chrono::prelude::*;
+    use chrono_tz::Tz;
 
     #[cfg(unix)]
-    const TIMEZONE: &str = "Australia/Brisbane";
+    const TIMEZONE_NAME: &str = "Australia/Brisbane";
+    const TIMEZONE: Tz = chrono_tz::Australia::Brisbane;
 
     #[derive(PartialEq, Debug, Clone)]
     enum StubValue {
@@ -311,7 +314,7 @@ mod tests {
     where
         T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
     {
-        std::env::set_var("TZ", TIMEZONE);
+        std::env::set_var("TZ", TIMEZONE_NAME);
         fmt.parse::<Conversion>()
             .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
             .convert(value.into())
@@ -337,19 +340,41 @@ mod tests {
 
     #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
     #[test]
-    fn parse_timestamp_auto() {
-        std::env::set_var("TZ", TIMEZONE);
-        assert_eq!(parse_timestamp("2001-02-03 14:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("02/03/2001:14:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("2001-02-03T14:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("2001-02-03T04:05:06Z"), Ok(dateref()));
-        assert_eq!(parse_timestamp("Sat, 3 Feb 2001 14:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("Sat Feb 3 14:05:06 2001"), Ok(dateref()));
-        assert_eq!(parse_timestamp("3-Feb-2001 14:05:06"), Ok(dateref()));
-        assert_eq!(parse_timestamp("2001-02-02T22:05:06-06:00"), Ok(dateref()));
+    fn parse_timestamp_auto_tz_env() {
+        std::env::set_var("TZ", TIMEZONE_NAME);
+        let good = Ok(dateref());
+        assert_eq!(parse_timestamp(&Local, "2001-02-03 14:05:06"), good);
+        assert_eq!(parse_timestamp(&Local, "02/03/2001:14:05:06"), good);
+        assert_eq!(parse_timestamp(&Local, "2001-02-03T14:05:06"), good);
+        assert_eq!(parse_timestamp(&Local, "2001-02-03T04:05:06Z"), good);
+        assert_eq!(parse_timestamp(&Local, "Sat, 3 Feb 2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(&Local, "Sat Feb 3 14:05:06 2001"), good);
+        assert_eq!(parse_timestamp(&Local, "3-Feb-2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(&Local, "2001-02-02T22:05:06-06:00"), good);
         assert_eq!(
-            parse_timestamp("Sat, 03 Feb 2001 07:05:06 +0300"),
-            Ok(dateref())
+            parse_timestamp(&Local, "Sat, 03 Feb 2001 07:05:06 +0300"),
+            good
+        );
+    }
+
+    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
+    #[test]
+    fn parse_timestamp_auto() {
+        let good = Ok(dateref());
+        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03 14:05:06"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "02/03/2001:14:05:06"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03T14:05:06"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03T04:05:06Z"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "Sat, 3 Feb 2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "Sat Feb 3 14:05:06 2001"), good);
+        assert_eq!(parse_timestamp(&TIMEZONE, "3-Feb-2001 14:05:06"), good);
+        assert_eq!(
+            parse_timestamp(&TIMEZONE, "2001-02-02T22:05:06-06:00"),
+            good
+        );
+        assert_eq!(
+            parse_timestamp(&TIMEZONE, "Sat, 03 Feb 2001 07:05:06 +0300"),
+            good
         );
     }
 
