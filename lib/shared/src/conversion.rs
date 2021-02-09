@@ -3,7 +3,6 @@ use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::num::{ParseFloatError, ParseIntError};
-use std::str::FromStr;
 
 #[derive(Debug, Snafu)]
 pub enum ConversionError {
@@ -15,52 +14,17 @@ pub enum ConversionError {
 /// from a plain `Bytes` into another type. The inner type of every `Value`
 /// variant is represented here.
 #[derive(Clone, Debug)]
-pub enum Conversion {
+pub enum ConversionWithTz<TZ: TimeZone> {
     Bytes,
     Integer,
     Float,
     Boolean,
-    Timestamp,
-    TimestampFmt(String),
+    Timestamp(TZ),
+    TimestampFmt(TZ, String),
     TimestampTZFmt(String),
 }
 
-impl FromStr for Conversion {
-    type Err = ConversionError;
-    /// Convert the string into a type conversion. The following
-    /// conversion names are supported:
-    ///
-    ///  * `"asis"`, `"bytes"`, or `"string"` => As-is (no conversion)
-    ///  * `"int"` or `"integer"` => Signed integer
-    ///  * `"float"` => Floating point number
-    ///  * `"bool"` or `"boolean"` => Boolean
-    ///  * `"timestamp"` => Timestamp, guessed using a set of formats
-    ///  * `"timestamp|FORMAT"` => Timestamp using the given format
-    ///
-    /// Timestamp parsing does not yet support time zones.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "asis" | "bytes" | "string" => Ok(Conversion::Bytes),
-            "integer" | "int" => Ok(Conversion::Integer),
-            "float" => Ok(Conversion::Float),
-            "bool" | "boolean" => Ok(Conversion::Boolean),
-            "timestamp" => Ok(Conversion::Timestamp),
-            _ if s.starts_with("timestamp|") => {
-                let fmt = &s[10..];
-                // DateTime<Utc> can only convert timestamps without
-                // time zones, and DateTime<FixedOffset> can only
-                // convert with tone zones, so this has to distinguish
-                // between the two types of formats.
-                if format_has_zone(fmt) {
-                    Ok(Conversion::TimestampTZFmt(fmt.into()))
-                } else {
-                    Ok(Conversion::TimestampFmt(fmt.into()))
-                }
-            }
-            _ => Err(ConversionError::UnknownConversion { name: s.into() }),
-        }
-    }
-}
+pub type Conversion = ConversionWithTz<Local>;
 
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
@@ -88,9 +52,7 @@ pub fn parse_conversion_map(
     types
         .iter()
         .map(|(field, typename)| {
-            typename
-                .parse::<Conversion>()
-                .map(|conv| (field.clone(), conv))
+            Conversion::parse(typename, Local).map(|conv| (field.clone(), conv))
         })
         .collect()
 }
@@ -109,39 +71,72 @@ pub enum Error {
     AutoTimestampParseError { s: String },
 }
 
-impl Conversion {
+impl<TZ: TimeZone> ConversionWithTz<TZ> {
+    /// Convert the string into a type conversion. The following
+    /// conversion names are supported:
+    ///
+    ///  * `"asis"`, `"bytes"`, or `"string"` => As-is (no conversion)
+    ///  * `"int"` or `"integer"` => Signed integer
+    ///  * `"float"` => Floating point number
+    ///  * `"bool"` or `"boolean"` => Boolean
+    ///  * `"timestamp"` => Timestamp, guessed using a set of formats
+    ///  * `"timestamp|FORMAT"` => Timestamp using the given format
+    ///
+    /// Timestamp parsing does not yet support time zones.
+    pub fn parse(s: impl AsRef<str>, tz: TZ) -> Result<Self, ConversionError> {
+        let s = s.as_ref();
+        match s {
+            "asis" | "bytes" | "string" => Ok(Self::Bytes),
+            "integer" | "int" => Ok(Self::Integer),
+            "float" => Ok(Self::Float),
+            "bool" | "boolean" => Ok(Self::Boolean),
+            "timestamp" => Ok(Self::Timestamp(tz)),
+            _ if s.starts_with("timestamp|") => {
+                let fmt = &s[10..];
+                // DateTime<Utc> can only convert timestamps without
+                // time zones, and DateTime<FixedOffset> can only
+                // convert with tone zones, so this has to distinguish
+                // between the two types of formats.
+                if format_has_zone(fmt) {
+                    Ok(Self::TimestampTZFmt(fmt.into()))
+                } else {
+                    Ok(Self::TimestampFmt(tz, fmt.into()))
+                }
+            }
+            _ => Err(ConversionError::UnknownConversion { name: s.into() }),
+        }
+    }
+
     /// Use this `Conversion` variant to turn the given `bytes` into a new `T`.
     pub fn convert<T>(&self, bytes: Bytes) -> Result<T, Error>
     where
         T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
     {
         Ok(match self {
-            Conversion::Bytes => bytes.into(),
-            Conversion::Integer => {
+            Self::Bytes => bytes.into(),
+            Self::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
                 s.parse::<i64>()
                     .with_context(|| IntParseError { s })?
                     .into()
             }
-            Conversion::Float => {
+            Self::Float => {
                 let s = String::from_utf8_lossy(&bytes);
                 s.parse::<f64>()
                     .with_context(|| FloatParseError { s })?
                     .into()
             }
-            Conversion::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
-            Conversion::Timestamp => {
-                parse_timestamp(&Local, &String::from_utf8_lossy(&bytes))?.into()
-            }
-            Conversion::TimestampFmt(format) => {
+            Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
+            Self::Timestamp(tz) => parse_timestamp(tz, &String::from_utf8_lossy(&bytes))?.into(),
+            Self::TimestampFmt(tz, format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                let dt = Local
+                let dt = tz
                     .datetime_from_str(&s, &format)
                     .with_context(|| TimestampParseError { s })?;
 
                 datetime_to_utc(dt).into()
             }
-            Conversion::TimestampTZFmt(format) => {
+            Self::TimestampTZFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = DateTime::parse_from_str(&s, &format)
                     .with_context(|| TimestampParseError { s })?;
@@ -315,7 +310,7 @@ mod tests {
         T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
     {
         std::env::set_var("TZ", TIMEZONE_NAME);
-        fmt.parse::<Conversion>()
+        Conversion::parse(fmt, Local)
             .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
             .convert(value.into())
     }
