@@ -83,8 +83,6 @@ criterion_main!(benches);
 // TODO:
 // * Bench functions that return dynamic values: now, uuidv4,
 // * Bench functions that require setup: get_env_var, get_hostname
-// * Decide whether to bench only_fields for completeness
-// * Ensure tracing is enabled
 // * Wire back up to `make remap-benches`
 
 bench_function! {
@@ -390,6 +388,7 @@ bench_function! {
     }
 }
 
+// TODO: Ensure tracing is enabled
 bench_function! {
     log => remap_functions::Log;
 
