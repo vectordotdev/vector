@@ -448,7 +448,7 @@ warn!("Failed to merge value: {}.", err);
 Yep!
 
 ```rust
-warn!(message = "Failed to merge value.", error = ?error);
+warn!(message = "Failed to merge value.", %error);
 ```
 
 #### Feature flags
