@@ -85,7 +85,7 @@ impl Condition for Remap {
         self.run(&event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => unreachable!("boolean type constraint set"),
+                _ => false,
             })
             .unwrap_or_else(|_| {
                 emit!(RemapConditionExecutionError);
@@ -101,7 +101,7 @@ impl Condition for Remap {
         match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-            _ => unreachable!("boolean type constraint set"),
+            _ => Err("source execution resolved to a non-boolean value".into()),
         }
     }
 }
