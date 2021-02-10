@@ -890,7 +890,7 @@ bench_function! {
     regex {
         args: func_args![
             value: "I like apples and bananas",
-            pattern: Regex::new("a").unwrap(),
+            pattern: Regex::new("[a]").unwrap(),
             with: "o",
         ],
         want: Ok("I like opples ond bononos")
@@ -960,7 +960,7 @@ bench_function! {
     }
 
     regex {
-        args: func_args![value: "foo,bar,baz", pattern: Regex::new(",").unwrap()],
+        args: func_args![value: "foo,bar,baz", pattern: Regex::new("[,]").unwrap()],
         want: Ok(value!(["foo", "bar", "baz"]))
     }
 }
