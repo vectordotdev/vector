@@ -182,6 +182,99 @@ impl SourceConfig for PostgresqlMetricsConfig {
     }
 }
 
+#[derive(Debug)]
+struct PostgresqlClient {
+    config: Config,
+    tls_config: Option<PostgresqlMetricsTlsConfig>,
+    client: Option<Client>,
+    version: Option<usize>,
+}
+
+impl PostgresqlClient {
+    async fn build_client(&mut self) -> Result<(), ConnectError> {
+        let client = match &self.tls_config {
+            Some(tls_config) => {
+                let mut builder =
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
+                builder
+                    .set_ca_file(tls_config.ca_file.clone())
+                    .context(TlsFailed)?;
+                let connector = MakeTlsConnector::new(builder.build());
+
+                let (client, connection) =
+                    self.config
+                        .connect(connector)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&self.config),
+                        })?;
+                tokio::spawn(connection);
+                client
+            }
+            None => {
+                let (client, connection) =
+                    self.config
+                        .connect(NoTls)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&self.config),
+                        })?;
+                tokio::spawn(connection);
+                client
+            }
+        };
+
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let version_row = client
+                .query_one("SELECT version()", &[])
+                .await
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            let version = version_row
+                .try_get::<&str, &str>("version")
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+        }
+
+        self.client = Some(client);
+        self.verify_version().await?;
+
+        Ok(())
+    }
+
+    async fn verify_version(&mut self) -> Result<(), ConnectError> {
+        let row = self
+            .client
+            .as_ref()
+            .expect("client is set above")
+            .query_one("SHOW server_version_num", &[])
+            .await
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        let version = row
+            .try_get::<&str, &str>("server_version_num")
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        self.version = Some(match version.parse::<usize>() {
+            Ok(version) if version >= 90600 => version,
+            Ok(_) | Err(_) => {
+                return Err(ConnectError::InvalidVersion {
+                    version: version.to_string(),
+                })
+            }
+        });
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct DatnameFilter {
     pg_stat_database_sql: String,
@@ -315,10 +408,7 @@ impl DatnameFilter {
 
 #[derive(Debug)]
 struct PostgresqlMetrics {
-    config: Config,
-    tls_config: Option<PostgresqlMetricsTlsConfig>,
-    client: Option<Client>,
-    version: Option<usize>,
+    client: PostgresqlClient,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
     datname_filter: DatnameFilter,
@@ -353,117 +443,33 @@ impl PostgresqlMetrics {
         tags.insert("host".into(), host);
 
         Ok(Self {
-            config,
-            tls_config,
-            client: None,
-            version: None,
+            client: PostgresqlClient {
+                config,
+                tls_config,
+                client: None,
+                version: None,
+            },
             namespace,
             tags,
             datname_filter,
         })
     }
 
-    async fn build_client(&mut self) -> Result<(), ConnectError> {
-        let client = match &self.tls_config {
-            Some(tls_config) => {
-                let mut builder =
-                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
-                builder
-                    .set_ca_file(tls_config.ca_file.clone())
-                    .context(TlsFailed)?;
-                let connector = MakeTlsConnector::new(builder.build());
-
-                let (client, connection) =
-                    self.config
-                        .connect(connector)
-                        .await
-                        .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&self.config),
-                        })?;
-                tokio::spawn(connection);
-                client
-            }
-            None => {
-                let (client, connection) =
-                    self.config
-                        .connect(NoTls)
-                        .await
-                        .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&self.config),
-                        })?;
-                tokio::spawn(connection);
-                client
-            }
-        };
-
-        if tracing::level_enabled!(tracing::Level::DEBUG) {
-            let version_row = client
-                .query_one("SELECT version()", &[])
-                .await
-                .with_context(|| SelectVersionFailed {
-                    endpoint: config_to_endpoint(&self.config),
-                })?;
-            let version = version_row
-                .try_get::<&str, &str>("version")
-                .with_context(|| SelectVersionFailed {
-                    endpoint: config_to_endpoint(&self.config),
-                })?;
-            debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
-        }
-
-        self.client = Some(client);
-        self.verify_version().await?;
-
-        Ok(())
-    }
-
-    async fn verify_version(&mut self) -> Result<(), ConnectError> {
-        let row = self
-            .client
-            .as_ref()
-            .unwrap()
-            .query_one("SHOW server_version_num", &[])
-            .await
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-
-        let version = row
-            .try_get::<&str, &str>("server_version_num")
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-
-        self.version = Some(match version.parse::<usize>() {
-            Ok(version) if version >= 90600 => version,
-            Ok(_) | Err(_) => {
-                return Err(ConnectError::InvalidVersion {
-                    version: version.to_string(),
-                })
-            }
-        });
-
-        Ok(())
-    }
-
     async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
-        let build_client = match self.client {
+        let build_client = match self.client.client {
             Some(_) => Ok(()),
-            None => self.build_client().await,
+            None => self.client.build_client().await,
         };
 
         let metrics = match build_client {
-            Ok(()) => self
-                .collect_metrics(self.client.as_ref().expect("should exists at this point"))
-                .await
-                .map_err(|err| err.to_string()),
+            Ok(()) => self.collect_metrics().await.map_err(|err| err.to_string()),
             Err(err) => Err(err.to_string()),
         };
 
         let (up_value, metrics) = match metrics {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                self.client = None;
+                self.client.client = None;
                 emit!(PostgresqlMetricsCollectFailed {
                     error,
                     endpoint: self.tags.get("endpoint"),
@@ -476,10 +482,9 @@ impl PostgresqlMetrics {
         stream::once(ready(up_metric)).chain(metrics).boxed()
     }
 
-    async fn collect_metrics(
-        &self,
-        client: &Client,
-    ) -> Result<impl Iterator<Item = Metric>, CollectError> {
+    async fn collect_metrics(&self) -> Result<impl Iterator<Item = Metric>, CollectError> {
+        let client = self.client.client.as_ref().expect("client is set above");
+
         try_join_all(vec![
             self.collect_pg_stat_database(client).boxed(),
             self.collect_pg_stat_database_conflicts(client).boxed(),
@@ -577,7 +582,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if self.version.expect("version is set above") >= 120000 {
+            if self.client.version.expect("version is set above") >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
