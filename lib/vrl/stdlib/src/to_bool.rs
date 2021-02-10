@@ -1,4 +1,3 @@
-use chrono::Local;
 use shared::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -156,7 +155,7 @@ impl Expression for ToBoolFn {
             Integer(v) => Ok(Boolean(v != 0)),
             Float(v) => Ok(Boolean(v != 0.0)),
             Null => Ok(Boolean(false)),
-            Bytes(v) => Conversion::<Local>::Boolean
+            Bytes(v) => Conversion::Boolean
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),

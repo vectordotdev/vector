@@ -7,9 +7,10 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::Conversion,
 };
-use chrono::{Local, Utc};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shared::TimeZone;
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -86,7 +87,7 @@ impl FunctionTransform for MetricToLog {
                     let timestamp = log
                         .remove(&self.timestamp_key)
                         .and_then(|value| {
-                            Conversion::Timestamp(Local)
+                            Conversion::Timestamp(TimeZone::Local)
                                 .convert(value.into_bytes())
                                 .ok()
                         })

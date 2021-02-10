@@ -9,9 +9,9 @@ use crate::{
     types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
-use chrono::Local;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
@@ -185,7 +185,7 @@ impl RegexParser {
             .flatten()
             .collect::<Vec<_>>();
 
-        let types = parse_check_conversion_map(&config.types, names, Local)?;
+        let types = parse_check_conversion_map(&config.types, names, TimeZone::Local)?;
 
         Ok(Transform::function(RegexParser::new(
             regexset,

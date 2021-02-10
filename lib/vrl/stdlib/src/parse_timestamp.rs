@@ -1,5 +1,4 @@
-use chrono::Local;
-use shared::conversion::Conversion;
+use shared::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +64,7 @@ impl Expression for ParseTimestampFn {
             Value::Bytes(v) => Conversion::parse(
                 format
                     .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?,
-                Local,
+                TimeZone::Local,
             )
             .map_err(|e| format!("{}", e))?
             .convert(v)

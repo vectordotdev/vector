@@ -1,4 +1,3 @@
-use chrono::Local;
 use shared::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -109,7 +108,7 @@ impl Expression for ToIntFn {
             Float(v) => Ok(Integer(v.into_inner().round() as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
             Null => Ok(0.into()),
-            Bytes(v) => Conversion::<Local>::Integer
+            Bytes(v) => Conversion::Integer
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             Timestamp(v) => Ok(v.timestamp().into()),

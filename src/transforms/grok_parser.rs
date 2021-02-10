@@ -6,9 +6,9 @@ use crate::{
     types::{parse_conversion_map, Conversion},
 };
 use bytes::Bytes;
-use chrono::Local;
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
@@ -47,7 +47,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types, Local)?;
+        let types = parse_conversion_map(&self.types, TimeZone::Local)?;
 
         Ok(grok
             .compile(&self.pattern, true)

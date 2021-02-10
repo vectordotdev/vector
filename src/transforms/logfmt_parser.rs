@@ -5,8 +5,8 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
-use chrono::Local;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -32,7 +32,7 @@ impl TransformConfig for LogfmtConfig {
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let conversions = parse_conversion_map(&self.types, Local)?;
+        let conversions = parse_conversion_map(&self.types, TimeZone::Local)?;
 
         Ok(Transform::function(Logfmt {
             field,

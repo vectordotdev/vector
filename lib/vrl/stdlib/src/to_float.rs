@@ -1,4 +1,3 @@
-use chrono::Local;
 use shared::conversion::Conversion;
 use vrl::prelude::*;
 
@@ -111,7 +110,7 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok((v as f64).into()),
             Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
             Null => Ok(0.0.into()),
-            Bytes(v) => Conversion::<Local>::Float
+            Bytes(v) => Conversion::Float
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),

@@ -1,7 +1,9 @@
+use super::datetime::{datetime_to_utc, TimeZone};
 use bytes::Bytes;
-use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
+use chrono::{DateTime, ParseError as ChronoParseError, TimeZone as _, Utc};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::num::{ParseFloatError, ParseIntError};
 
 #[derive(Debug, Snafu)]
@@ -14,22 +16,39 @@ pub enum ConversionError {
 /// from a plain `Bytes` into another type. The inner type of every `Value`
 /// variant is represented here.
 #[derive(Clone, Debug)]
-pub enum Conversion<TZ: TimeZone = Local> {
+pub enum Conversion {
     Bytes,
     Integer,
     Float,
     Boolean,
-    Timestamp(TZ),
-    TimestampFmt(String, TZ),
+    Timestamp(TimeZone),
+    TimestampFmt(String, TimeZone),
     TimestampTZFmt(String),
 }
 
+#[derive(Debug, Eq, PartialEq, Snafu)]
+pub enum Error {
+    #[snafu(display("Invalid boolean value {:?}", s))]
+    BoolParseError { s: String },
+    #[snafu(display("Invalid integer {:?}: {}", s, source))]
+    IntParseError { s: String, source: ParseIntError },
+    #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
+    FloatParseError { s: String, source: ParseFloatError },
+    #[snafu(
+        display("Invalid timestamp {:?}: {}", s, source),
+        visibility(pub(super))
+    )]
+    TimestampParseError { s: String, source: ChronoParseError },
+    #[snafu(display("No matching timestamp format found for {:?}", s))]
+    AutoTimestampParseError { s: String },
+}
+
 /// Helper function to parse a conversion map and check against a list of names
-pub fn parse_check_conversion_map<TZ: TimeZone + Copy>(
+pub fn parse_check_conversion_map(
     types: &HashMap<String, String>,
     names: &[impl AsRef<str>],
-    tz: TZ,
-) -> Result<HashMap<String, Conversion<TZ>>, ConversionError> {
+    tz: TimeZone,
+) -> Result<HashMap<String, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
     let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
     for name in types.keys() {
@@ -45,31 +64,17 @@ pub fn parse_check_conversion_map<TZ: TimeZone + Copy>(
 }
 
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
-pub fn parse_conversion_map<TZ: TimeZone + Copy>(
+pub fn parse_conversion_map(
     types: &HashMap<String, String>,
-    tz: TZ,
-) -> Result<HashMap<String, Conversion<TZ>>, ConversionError> {
+    tz: TimeZone,
+) -> Result<HashMap<String, Conversion>, ConversionError> {
     types
         .iter()
         .map(|(field, typename)| Conversion::parse(typename, tz).map(|conv| (field.clone(), conv)))
         .collect()
 }
 
-#[derive(Debug, Eq, PartialEq, Snafu)]
-pub enum Error {
-    #[snafu(display("Invalid boolean value {:?}", s))]
-    BoolParseError { s: String },
-    #[snafu(display("Invalid integer {:?}: {}", s, source))]
-    IntParseError { s: String, source: ParseIntError },
-    #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
-    FloatParseError { s: String, source: ParseFloatError },
-    #[snafu(display("Invalid timestamp {:?}: {}", s, source))]
-    TimestampParseError { s: String, source: ChronoParseError },
-    #[snafu(display("No matching timestamp format found for {:?}", s))]
-    AutoTimestampParseError { s: String },
-}
-
-impl<TZ: TimeZone> Conversion<TZ> {
+impl Conversion {
     /// Convert the string into a type conversion. The following
     /// conversion names are supported:
     ///
@@ -81,7 +86,7 @@ impl<TZ: TimeZone> Conversion<TZ> {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     ///
     /// Timestamp parsing does not yet support time zones.
-    pub fn parse(s: impl AsRef<str>, tz: TZ) -> Result<Self, ConversionError> {
+    pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
         match s {
             "asis" | "bytes" | "string" => Ok(Self::Bytes),
@@ -98,7 +103,7 @@ impl<TZ: TimeZone> Conversion<TZ> {
                 if format_has_zone(fmt) {
                     Ok(Self::TimestampTZFmt(fmt.into()))
                 } else {
-                    Ok(Self::TimestampFmt(fmt.into(), tz))
+                    Ok(Self::TimestampFmt(fmt.into(), tz.to_owned()))
                 }
             }
             _ => Err(ConversionError::UnknownConversion { name: s.into() }),
@@ -125,12 +130,12 @@ impl<TZ: TimeZone> Conversion<TZ> {
                     .into()
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
-            Self::Timestamp(tz) => parse_timestamp(tz, &String::from_utf8_lossy(&bytes))?.into(),
+            Self::Timestamp(tz) => parse_timestamp(*tz, &String::from_utf8_lossy(&bytes))?.into(),
             Self::TimestampFmt(format, tz) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
                     .datetime_from_str(&s, &format)
-                    .with_context(|| TimestampParseError { s })?;
+                    .context(TimestampParseError { s })?;
 
                 datetime_to_utc(dt).into()
             }
@@ -186,11 +191,6 @@ fn format_has_zone(fmt: &str) -> bool {
         || fmt.contains("%+")
 }
 
-/// Convert a timestamp with a non-UTC time zone into UTC
-fn datetime_to_utc<TZ: TimeZone>(ts: DateTime<TZ>) -> DateTime<Utc> {
-    Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos())
-}
-
 /// The list of allowed "automatic" timestamp formats with assumed local time zone
 const TIMESTAMP_LOCAL_FORMATS: &[&str] = &[
     "%F %T",           // YYYY-MM-DD HH:MM:SS
@@ -218,10 +218,10 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
-fn parse_timestamp<TZ: TimeZone>(local: &TZ, s: &str) -> Result<DateTime<Utc>, Error> {
+fn parse_timestamp(tz: TimeZone, s: &str) -> Result<DateTime<Utc>, Error> {
     for format in TIMESTAMP_LOCAL_FORMATS {
-        if let Ok(result) = local.datetime_from_str(s, format) {
-            return Ok(datetime_to_utc(result));
+        if let Ok(result) = tz.datetime_from_str(s, format) {
+            return Ok(result);
         }
     }
     for format in TIMESTAMP_UTC_FORMATS {
@@ -251,12 +251,13 @@ mod tests {
     use super::Bytes;
     #[cfg(unix)]
     use super::{Conversion, Error};
-    use chrono::prelude::*;
-    use chrono_tz::Tz;
+    use crate::datetime::TimeZone;
+    use chrono::{DateTime, NaiveDateTime, TimeZone as _, Utc};
+    use chrono_tz::{Australia, Tz};
 
     #[cfg(unix)]
     const TIMEZONE_NAME: &str = "Australia/Brisbane";
-    const TIMEZONE: Tz = chrono_tz::Australia::Brisbane;
+    const TIMEZONE: Tz = Australia::Brisbane;
 
     #[derive(PartialEq, Debug, Clone)]
     enum StubValue {
@@ -308,7 +309,7 @@ mod tests {
         T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
     {
         std::env::set_var("TZ", TIMEZONE_NAME);
-        Conversion::parse(fmt, Local)
+        Conversion::parse(fmt, TimeZone::Local)
             .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
             .convert(value.into())
     }
@@ -336,39 +337,32 @@ mod tests {
     fn parse_timestamp_auto_tz_env() {
         std::env::set_var("TZ", TIMEZONE_NAME);
         let good = Ok(dateref());
-        assert_eq!(parse_timestamp(&Local, "2001-02-03 14:05:06"), good);
-        assert_eq!(parse_timestamp(&Local, "02/03/2001:14:05:06"), good);
-        assert_eq!(parse_timestamp(&Local, "2001-02-03T14:05:06"), good);
-        assert_eq!(parse_timestamp(&Local, "2001-02-03T04:05:06Z"), good);
-        assert_eq!(parse_timestamp(&Local, "Sat, 3 Feb 2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(&Local, "Sat Feb 3 14:05:06 2001"), good);
-        assert_eq!(parse_timestamp(&Local, "3-Feb-2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(&Local, "2001-02-02T22:05:06-06:00"), good);
-        assert_eq!(
-            parse_timestamp(&Local, "Sat, 03 Feb 2001 07:05:06 +0300"),
-            good
-        );
+        let tz = TimeZone::Local;
+        assert_eq!(parse_timestamp(tz, "2001-02-03 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "02/03/2001:14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-03T14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-03T04:05:06Z"), good);
+        assert_eq!(parse_timestamp(tz, "Sat, 3 Feb 2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "Sat Feb 3 14:05:06 2001"), good);
+        assert_eq!(parse_timestamp(tz, "3-Feb-2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-02T22:05:06-06:00"), good);
+        assert_eq!(parse_timestamp(tz, "Sat, 03 Feb 2001 07:05:06 +0300"), good);
     }
 
     #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
     #[test]
     fn parse_timestamp_auto() {
         let good = Ok(dateref());
-        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03 14:05:06"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "02/03/2001:14:05:06"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03T14:05:06"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "2001-02-03T04:05:06Z"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "Sat, 3 Feb 2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "Sat Feb 3 14:05:06 2001"), good);
-        assert_eq!(parse_timestamp(&TIMEZONE, "3-Feb-2001 14:05:06"), good);
-        assert_eq!(
-            parse_timestamp(&TIMEZONE, "2001-02-02T22:05:06-06:00"),
-            good
-        );
-        assert_eq!(
-            parse_timestamp(&TIMEZONE, "Sat, 03 Feb 2001 07:05:06 +0300"),
-            good
-        );
+        let tz = TimeZone::Named(TIMEZONE);
+        assert_eq!(parse_timestamp(tz, "2001-02-03 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "02/03/2001:14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-03T14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-03T04:05:06Z"), good);
+        assert_eq!(parse_timestamp(tz, "Sat, 3 Feb 2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "Sat Feb 3 14:05:06 2001"), good);
+        assert_eq!(parse_timestamp(tz, "3-Feb-2001 14:05:06"), good);
+        assert_eq!(parse_timestamp(tz, "2001-02-02T22:05:06-06:00"), good);
+        assert_eq!(parse_timestamp(tz, "Sat, 03 Feb 2001 07:05:06 +0300"), good);
     }
 
     // These should perhaps each go into an individual test function to be
