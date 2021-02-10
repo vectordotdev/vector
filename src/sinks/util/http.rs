@@ -402,7 +402,7 @@ impl From<&hyper::Request<Vec<u8>>> for RequestDataEmpty {
 
 impl crate::sinks::util::sink::Response for (hyper::Response<bytes::Bytes>, RequestDataEmpty) {
     fn is_successful(&self) -> bool {
-        true
+        self.0.status().is_success()
     }
 
     fn emit_events(&self, _batch_size: usize) {}
