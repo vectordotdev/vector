@@ -1,11 +1,11 @@
 package metadata
 
 remap: expressions: function_call: {
-	title: "Function call"
+	title:       "Function call"
 	description: """
 		A _function call_ expression invokes built-in [VRL functions](\(urls.vrl_functions)).
 		"""
-	return: """
+	return:      """
 		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, the error must
 		be [handled](\(urls.vrl_errors_reference)) and null is returned.
 
