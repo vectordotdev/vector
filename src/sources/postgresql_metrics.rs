@@ -8,7 +8,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    stream, FutureExt, SinkExt, StreamExt,
 };
 use openssl::{
     error::ErrorStack,
@@ -190,7 +190,26 @@ struct PostgresqlClient {
 }
 
 impl PostgresqlClient {
-    async fn build_client(&mut self) -> Result<(), ConnectError> {
+    fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+        Self {
+            config,
+            tls_config,
+            client: None,
+        }
+    }
+
+    async fn take(&mut self) -> Result<(Client, usize), ConnectError> {
+        match self.client.take() {
+            Some((client, version)) => Ok((client, version)),
+            None => self.build_client().await,
+        }
+    }
+
+    fn set(&mut self, value: (Client, usize)) {
+        self.client.replace(value);
+    }
+
+    async fn build_client(&self) -> Result<(Client, usize), ConnectError> {
         // Create postgresql client
         let client = match &self.tls_config {
             Some(tls_config) => {
@@ -263,14 +282,8 @@ impl PostgresqlClient {
             }
         };
 
-        // Save client and version
-        self.client = Some((client, version));
-
-        Ok(())
-    }
-
-    fn reset(&mut self) {
-        self.client = None;
+        //
+        Ok((client, version))
     }
 }
 
@@ -442,11 +455,7 @@ impl PostgresqlMetrics {
         tags.insert("host".into(), host);
 
         Ok(Self {
-            client: PostgresqlClient {
-                config,
-                tls_config,
-                client: None,
-            },
+            client: PostgresqlClient::new(config, tls_config),
             namespace,
             tags,
             datname_filter,
@@ -470,27 +479,26 @@ impl PostgresqlMetrics {
     }
 
     async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
-        if self.client.client.is_none() {
-            self.client
-                .build_client()
-                .await
-                .map_err(|error| error.to_string())?;
-        }
+        let (client, client_version) = self
+            .client
+            .take()
+            .await
+            .map_err(|error| error.to_string())?;
 
-        let (client, version) = self.client.client.as_ref().expect("client is set above");
-        let version = *version;
-
-        try_join_all(vec![
-            self.collect_pg_stat_database(client, version).boxed(),
-            self.collect_pg_stat_database_conflicts(client).boxed(),
-            self.collect_pg_stat_bgwriter(client).boxed(),
+        match try_join_all(vec![
+            self.collect_pg_stat_database(&client, client_version)
+                .boxed(),
+            self.collect_pg_stat_database_conflicts(&client).boxed(),
+            self.collect_pg_stat_bgwriter(&client).boxed(),
         ])
-        .map_ok(|metrics| metrics.into_iter().flatten())
         .await
-        .map_err(|error| {
-            self.client.reset();
-            error.to_string()
-        })
+        {
+            Ok(metrics) => {
+                self.client.set((client, client_version));
+                Ok(metrics.into_iter().flatten())
+            }
+            Err(error) => Err(error.to_string()),
+        }
     }
 
     async fn collect_pg_stat_database(
