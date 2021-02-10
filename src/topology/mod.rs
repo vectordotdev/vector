@@ -15,6 +15,7 @@ use crate::{
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
+    sinks::tap::TapContainer,
     topology::{
         builder::Pieces,
         task::{Task, TaskOutput},
@@ -52,6 +53,7 @@ pub struct RunningTopology {
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
+    tap: TapContainer,
 }
 
 pub async fn start_validated(
@@ -70,6 +72,7 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
+        tap: pieces.tap.clone(),
     };
 
     if !running_topology
@@ -79,7 +82,8 @@ pub async fn start_validated(
         return None;
     }
     running_topology.connect_diff(&diff, &mut pieces).await;
-    running_topology.spawn_diff(&diff, pieces);
+    running_topology.spawn_diff(&diff, &mut pieces);
+    running_topology.connect_tap(&diff, pieces);
 
     Some((running_topology, abort_rx))
 }
@@ -87,9 +91,10 @@ pub async fn start_validated(
 pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
+    tap: TapContainer,
     buffers: HashMap<String, BuiltBuffer>,
 ) -> Option<Pieces> {
-    match builder::build_pieces(config, diff, buffers).await {
+    match builder::build_pieces(config, diff, tap, buffers).await {
         Err(errors) => {
             for error in errors {
                 error!(message = "Configuration error.", %error);
@@ -226,14 +231,16 @@ impl RunningTopology {
         }
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) =
+            build_or_log_errors(&new_config, &diff, self.tap.clone(), buffers.clone()).await
         {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
-                self.spawn_diff(&diff, new_pieces);
+                self.spawn_diff(&diff, &mut new_pieces);
+                self.connect_tap(&diff, new_pieces);
                 self.config = new_config;
                 // We have successfully changed to new config.
                 return Ok(true);
@@ -243,13 +250,16 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+        if let Some(mut new_pieces) =
+            build_or_log_errors(&self.config, &diff, self.tap.clone(), buffers).await
+        {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
-                self.spawn_diff(&diff, new_pieces);
+                self.spawn_diff(&diff, &mut new_pieces);
+                self.connect_tap(&diff, new_pieces);
                 // We have successfully returned to old config.
                 return Ok(false);
             }
@@ -500,38 +510,38 @@ impl RunningTopology {
     }
 
     /// Starts new and changed pieces of topology.
-    fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
+    fn spawn_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in &diff.sources.to_change {
             info!(message = "Rebuilding source.", name = ?name);
-            self.spawn_source(name, &mut new_pieces);
+            self.spawn_source(name, new_pieces);
         }
 
         for name in &diff.sources.to_add {
             info!(message = "Starting source.", name = ?name);
-            self.spawn_source(&name, &mut new_pieces);
+            self.spawn_source(&name, new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
             info!(message = "Rebuilding transform.", name = ?name);
-            self.spawn_transform(&name, &mut new_pieces);
+            self.spawn_transform(&name, new_pieces);
         }
 
         for name in &diff.transforms.to_add {
             info!(message = "Starting transform.", name = ?name);
-            self.spawn_transform(&name, &mut new_pieces);
+            self.spawn_transform(&name, new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
             info!(message = "Rebuilding sink.", name = ?name);
-            self.spawn_sink(&name, &mut new_pieces);
+            self.spawn_sink(&name, new_pieces);
         }
 
         for name in &diff.sinks.to_add {
             info!(message = "Starting sink.", name = ?name);
-            self.spawn_sink(&name, &mut new_pieces);
+            self.spawn_sink(&name, new_pieces);
         }
     }
 
@@ -657,6 +667,34 @@ impl RunningTopology {
         });
     }
 
+    fn connect_tap(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
+        if let Some(tap_controller) = self.tap.get_controller() {
+            // Remove old sinks
+            for name in diff
+                .sources
+                .to_remove
+                .iter()
+                .chain(diff.transforms.to_remove.iter())
+            {
+                info!(message = "Removing tap", component = ?name);
+                let _ = tap_controller.remove(name);
+            }
+
+            // (Re)wire components
+            for name in diff
+                .sources
+                .changed_and_added()
+                .chain(diff.transforms.changed_and_added())
+            {
+                if let Some(uuid) = tap_controller.get_sink_name(name) {
+                    info!(message = "Connecting tap", component = ?name, sink = ?uuid);
+                    self.setup_inputs(&uuid, &mut new_pieces);
+                    self.spawn_sink(&uuid, &mut new_pieces);
+                }
+            }
+        }
+    }
+
     fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
@@ -717,9 +755,14 @@ impl RunningTopology {
         }
     }
 
-    /// Borrows the Config
+    /// Borrows the Config.
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Borrows the TapContainer
+    pub fn tap(&self) -> &TapContainer {
+        &self.tap
     }
 }
 

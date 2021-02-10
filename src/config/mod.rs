@@ -42,7 +42,6 @@ pub use validation::warnings;
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
-    #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,

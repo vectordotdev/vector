@@ -1,11 +1,11 @@
 use crate::{
     config::{self, Config, ConfigDiff},
+    sinks::tap::TapContainer,
     topology::{self, builder::Pieces},
 };
 use colored::*;
 use exitcode::ExitCode;
-use std::collections::HashMap;
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -127,7 +127,9 @@ async fn validate_components(
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
+    match topology::builder::build_pieces(config, diff, TapContainer::default(), HashMap::new())
+        .await
+    {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)

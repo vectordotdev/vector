@@ -1,5 +1,6 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
+    sinks::tap::TapContainer,
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -505,9 +506,10 @@ pub async fn start_topology(
 ) -> (RunningTopology, tokio::sync::mpsc::UnboundedReceiver<()>) {
     config.healthchecks.set_require_healthy(require_healthy);
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-        .await
-        .unwrap();
+    let pieces =
+        topology::build_or_log_errors(&config, &diff, TapContainer::default(), HashMap::new())
+            .await
+            .unwrap();
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()

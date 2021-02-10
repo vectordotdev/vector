@@ -9,6 +9,7 @@ use crate::{
     event::Event,
     internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
+    sinks::tap::TapContainer,
     stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
@@ -30,12 +31,14 @@ pub struct Pieces {
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
     pub detach_triggers: HashMap<String, Trigger>,
+    pub tap: TapContainer,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
+    tap: TapContainer,
     mut buffers: HashMap<String, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
@@ -154,11 +157,15 @@ pub async fn build_pieces(
         tasks.insert(name.clone(), task);
     }
 
+    // Build tap sinks
+    let tap_sinks = tap.make_sinks(&config);
+
     // Build sinks
     for (name, sink) in config
         .sinks
         .iter()
         .filter(|(name, _)| diff.sinks.contains_new(&name))
+        .chain(tap_sinks.iter())
     {
         let sink_inputs = &sink.inputs;
         let healthcheck = sink.healthcheck();
@@ -274,6 +281,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
+            tap,
         };
 
         Ok(pieces)

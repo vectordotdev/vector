@@ -1,13 +1,11 @@
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{self, SinkOuter},
-    generate, heartbeat, list, metrics,
+    config, generate, heartbeat, list, metrics,
     signal::{self, SignalTo},
-    sinks::tap::TapController,
+    sinks::tap::TapContainer,
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use indexmap::IndexMap;
 use std::{cmp::max, collections::HashMap, path::PathBuf};
 
 use futures::StreamExt;
@@ -17,8 +15,6 @@ use tokio::sync::mpsc;
 use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
-#[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
 
 #[cfg(windows)]
 use crate::service;
@@ -27,16 +23,13 @@ use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
     VectorStarted, VectorStopped,
 };
-use tokio::runtime;
-use tokio::runtime::Runtime;
+use tokio::runtime::{self, Runtime};
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<(PathBuf, config::FormatHint)>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
-    #[cfg(feature = "api")]
     pub api: config::api::Options,
-    pub tap_controller: Option<TapController>,
 }
 
 pub struct Application {
@@ -152,25 +145,6 @@ impl Application {
                 let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
-                // Conditionally wire up the 'tap' controller, based on API availability.
-                let tap_controller = if cfg!(feature = "api") {
-                    let tap_controller = TapController::new();
-
-                    let tap_sinks = config
-                        .sources
-                        .iter()
-                        .map(|(name, _)| {
-                            (format!("_tap_{}", &name), tap_controller.make_sink(name))
-                        })
-                        .collect::<IndexMap<String, SinkOuter>>();
-
-                    config.sinks.extend(tap_sinks);
-
-                    Some(tap_controller)
-                } else {
-                    None
-                };
-
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
@@ -181,11 +155,15 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
-                    .await
-                    .ok_or(exitcode::CONFIG)?;
+                let pieces = topology::build_or_log_errors(
+                    &config,
+                    &diff,
+                    TapContainer::if_enabled(config.api.enabled),
+                    HashMap::new(),
+                )
+                .await
+                .ok_or(exitcode::CONFIG)?;
 
-                #[cfg(feature = "api")]
                 let api = config.api;
 
                 let result = topology::start_validated(config, diff, pieces).await;
@@ -195,9 +173,7 @@ impl Application {
                     config_paths,
                     topology,
                     graceful_crash,
-                    #[cfg(feature = "api")]
                     api,
-                    tap_controller,
                 })
             })
         }?;
@@ -219,11 +195,8 @@ impl Application {
 
         let opts = self.opts;
 
-        #[cfg(feature = "api")]
-        let mut tap_controller = self.config.tap_controller;
-
-        #[cfg(feature = "api")]
-        let api_config = self.config.api;
+        // Underscored to prevent warning of non-use when the `api` feature is disabled
+        let _api_config = self.config.api;
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -234,18 +207,19 @@ impl Application {
             tokio::spawn(heartbeat::heartbeat());
 
             #[cfg(feature = "api")]
-            // assigned to prevent the API terminating when falling out of scope
-            let api_server = if api_config.enabled {
-                let tap_controller = tap_controller
-                    .take()
-                    .expect("Expected TapController to be initialized");
+            // Assigned to prevent the API terminating when falling out of scope.
+            let api_server = if _api_config.enabled {
+                use crate::{api, internal_events::ApiStarted};
+                use ::std::sync::Arc;
+
+                let tap_controller = topology.tap().get_controller().expect("Expected tap controller to be initialized.");
 
                 emit!(ApiStarted {
-                    addr: api_config.address.unwrap(),
-                    playground: api_config.playground
+                    addr: _api_config.address.unwrap(),
+                    playground: _api_config.playground
                 });
 
-                Some(api::Server::start(topology.config(), tap_controller))
+                Some(api::Server::start(topology.config(), Arc::clone(&tap_controller)))
             } else {
                 info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None

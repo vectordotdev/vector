@@ -27,7 +27,6 @@ pub fn compile(mut builder: ConfigBuilder, deny_warnings: bool) -> Result<Config
     if errors.is_empty() {
         Ok(Config {
             global: builder.global,
-            #[cfg(feature = "api")]
             api: builder.api,
             healthchecks: builder.healthchecks,
             sources: builder.sources,

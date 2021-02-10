@@ -1,15 +1,16 @@
 use super::util::StreamSink;
 use crate::{
     buffers::Acker,
-    config::SinkConfig,
-    config::{DataType, SinkContext, SinkOuter},
+    config::{Config, DataType, SinkConfig, SinkContext, SinkOuter},
     event::{Event, LogEvent},
 };
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
+use indexmap::IndexMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::broadcast;
+use uuid::Uuid;
 
 type Sender = broadcast::Sender<LogEvent>;
 type Receiver = broadcast::Receiver<LogEvent>;
@@ -96,7 +97,7 @@ impl SinkConfig for TapConfig {
 /// This controller represents the public interface to subscribe to underlying `LogEvent`s
 /// specific to a given component, identified by its name.
 pub struct TapController {
-    senders: RwLock<HashMap<String, Sender>>,
+    senders: RwLock<HashMap<String, (Uuid, Sender)>>,
 }
 
 impl TapController {
@@ -106,20 +107,42 @@ impl TapController {
         }
     }
 
-    /// Returns a new `SinkOuter`, which can be inserted into sink config, mapping a component's
-    /// input name with a specific broadcast channel.
-    pub fn make_sink(&self, component_name: &str) -> SinkOuter {
-        let mut lock = self.senders.write();
-        let tx = lock.entry(component_name.to_string()).or_insert_with(|| {
-            let (tx, _) = broadcast::channel(100);
-            tx
-        });
+    /// Returns an `IndexMap` of outer sinks based on configured sources/transforms, with
+    /// UUID and senders initialized for each sink. These are used to relay `LogEvents` to
+    /// subscribers.
+    pub fn make_sinks(&self, config: &Config) -> IndexMap<String, SinkOuter> {
+        config
+            .sources
+            .keys()
+            .chain(config.transforms.keys())
+            .map(|name| {
+                let mut lock = self.senders.write();
+                let (uuid, tx) = lock
+                    .entry(name.to_string())
+                    .or_insert_with(make_uuid_sender);
 
-        // A `SinkConfig` is required to be provided to SinkOuter, so we create one here,
-        // passing a tx clone which will in turn be 'taken' by the end sink.
-        let tap_config = TapConfig::new(tx.clone());
+                // A `SinkConfig` is required to be provided to SinkOuter, so we create one here,
+                // passing a tx clone which will in turn be 'taken' by the end sink.
+                let tap_config = TapConfig::new(tx.clone());
 
-        SinkOuter::new(vec![component_name.to_string()], Box::new(tap_config))
+                let sink = SinkOuter::new(vec![name.to_string()], Box::new(tap_config));
+
+                (uuid.to_string(), sink)
+            })
+            .collect()
+    }
+
+    /// Returns the sink 'name' associated with a sender, which is its UUID string.
+    pub fn get_sink_name(&self, component_name: &str) -> Option<String> {
+        self.senders
+            .read()
+            .get(component_name)
+            .map(|(uuid, _)| uuid.to_string())
+    }
+
+    /// Attempts to remove a sink sender, identified by component name.
+    pub fn remove(&self, component_name: &str) -> Option<(Uuid, Sender)> {
+        self.senders.write().remove(component_name)
     }
 
     /// Subscribe to `LogEvent`s received against a specific component name. Any additional
@@ -128,7 +151,7 @@ impl TapController {
         self.senders
             .read()
             .get(component_name)
-            .map(|tx| tx.subscribe())
+            .map(|(_, tx)| tx.subscribe())
     }
 }
 
@@ -136,6 +159,66 @@ impl Default for TapController {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// A container that wraps a `TapController`. Provides convenience methods for operating on an
+/// underlying `Option<Arc<TapController>>`, since this sink's availability is typically based on
+/// whether the feature is available + enabled.
+pub struct TapContainer {
+    inner: Option<Arc<TapController>>,
+}
+
+impl TapContainer {
+    pub fn new() -> Self {
+        Self {
+            inner: Some(Arc::new(TapController::new())),
+        }
+    }
+
+    /// If the provided bool is true, will return a `TapContainer` with an initialized inner
+    /// `TapController`. Otherwise, the value will be `None`.
+    pub fn if_enabled(enabled: bool) -> Self {
+        if enabled {
+            Self::new()
+        } else {
+            Self::default()
+        }
+    }
+
+    /// Calls `make_sinks` on the underlying tap controller if it exists, or returns an empty
+    /// `IndexMap` that satisfies the same signature.
+    pub fn make_sinks(&self, config: &Config) -> IndexMap<String, SinkOuter> {
+        self.inner
+            .as_ref()
+            .map_or_else(IndexMap::new, |tc| tc.make_sinks(&config))
+    }
+
+    /// Returns an optional `Arc<TapController>`, if one already exists.
+    pub fn get_controller(&self) -> Option<Arc<TapController>> {
+        self.inner.as_ref().map(|tc| Arc::clone(tc))
+    }
+}
+
+/// By default, a tap container is empty, to prevent unnecessary wiring up of tap sinks.
+impl Default for TapContainer {
+    fn default() -> Self {
+        Self { inner: None }
+    }
+}
+
+/// Cloning the tap container should clone the underlying `Arc<TapController>`.
+impl Clone for TapContainer {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.get_controller(),
+        }
+    }
+}
+
+/// Make a new broadcast channel, and generate a UUID to associate it with.
+fn make_uuid_sender() -> (Uuid, Sender) {
+    let (tx, _) = broadcast::channel(100);
+    (Uuid::new_v4(), tx)
 }
 
 #[cfg(test)]

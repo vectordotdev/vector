@@ -1,8 +1,6 @@
-#[cfg(feature = "api")]
-use super::api;
 use super::{
-    compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter,
-    SourceConfig, TestDefinition, TransformConfig, TransformOuter,
+    api, compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
+    SinkOuter, SourceConfig, TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -12,7 +10,6 @@ use serde::{Deserialize, Serialize};
 pub struct ConfigBuilder {
     #[serde(flatten)]
     pub global: GlobalOptions,
-    #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
     #[serde(default)]
@@ -43,7 +40,6 @@ impl From<Config> for ConfigBuilder {
     fn from(c: Config) -> Self {
         ConfigBuilder {
             global: c.global,
-            #[cfg(feature = "api")]
             api: c.api,
             healthchecks: c.healthchecks,
             sources: c.sources,

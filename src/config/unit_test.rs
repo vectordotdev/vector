@@ -30,7 +30,6 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
     // Don't let this escape since it's not validated
     let config = Config {
         global: builder.global,
-        #[cfg(feature = "api")]
         api: builder.api,
         healthchecks: builder.healthchecks,
         sources: builder.sources,

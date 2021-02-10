@@ -18,7 +18,7 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: &config::Config, tap_controller: TapController) -> Self {
+    pub fn start(config: &config::Config, tap_controller: Arc<TapController>) -> Self {
         let routes = make_routes(config.api.playground, tap_controller);
 
         let (_shutdown, rx) = oneshot::channel();
@@ -51,10 +51,7 @@ impl Server {
     }
 }
 
-fn make_routes(playground: bool, tap_controller: TapController) -> BoxedFilter<(impl Reply,)> {
-    // Make the tap controller thread-safe.
-    let tap_controller = Arc::new(tap_controller);
-
+fn make_routes(playground: bool, tap_controller: Arc<TapController>) -> BoxedFilter<(impl Reply,)> {
     // Build the GraphQL schema
     let schema = schema::build_schema().finish();
 

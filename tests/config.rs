@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use vector::{
     config::{self, ConfigDiff, Format},
+    sinks::tap::TapContainer,
     topology,
 };
 
@@ -11,7 +12,8 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
             let c2 = config::load_from_str(config, format).unwrap();
             match (
                 config::warnings(&c2.into()),
-                topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                topology::builder::build_pieces(&c, &diff, TapContainer::default(), HashMap::new())
+                    .await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
                 (_, Err(errors)) => Err(errors),
