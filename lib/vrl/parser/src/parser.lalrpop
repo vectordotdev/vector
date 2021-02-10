@@ -45,6 +45,7 @@ extern {
         ":" => Token::Colon,
         "." => Token::Dot,
         "!" => Token::Bang,
+        "escape" => Token::Escape,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
@@ -483,7 +484,7 @@ Box<T>: Box<T> = T => Box::new(<>);
 Sp<T>: Node<T> = <l: @L> <rule: T> <r: @R> => Node::new(span(l, r), rule);
 
 #[inline]
-Op<L, Code, R>: Expr = Sp<(Sp<L> Sp<Code> Sp<R>)> => {
+Op<L, Code, R>: Expr = Sp<(<Sp<L>> <Sp<Code>> NonterminalNewline* <Sp<R>>)> => {
     let op = <>.map(|(lhs, code, rhs)| {
         let (span, code) = code.take();
         let op = match code {
