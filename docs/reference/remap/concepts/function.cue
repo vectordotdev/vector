@@ -11,7 +11,7 @@ remap: concepts: function: {
 			title:       "Fallibility"
 			description: """
 				Some VRL functions are *fallible*, meaning that they can error. Any potential errors thrown by fallible
-				functions must be handled, a requirements enforced at compile time.
+				functions must be handled, a requirement enforced at compile time.
 
 				This feature of VRL programs, which we call [fail safety](\(urls.vrl_fail_safety)), is a defining
 				characteristic of VRL and a primary source of its safety guarantees.
