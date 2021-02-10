@@ -920,7 +920,8 @@ the concepts.
 With `kubernetes_logs` source, Vector connects to the Kubernetes API doing
 a streaming watch request over the `Pod`s executing on the same `Node` that
 Vector itself runs at. Once Vector gets the list of all the `Pod`s that are
-running on the `Node`, it starts collecting logs for the logs files corresponding to each of the `Pod`. Only plaintext (as in non-gzipped) files
+running on the `Node`, it starts collecting logs for the logs files
+corresponding to each of the `Pod`. Only plaintext (as in non-gzipped) files
 are taken into consideration.
 The log files are then parsed into events, and the said events are annotated
 with the metadata from the corresponding `Pod`s, correlated via the file path
