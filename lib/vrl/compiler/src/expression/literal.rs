@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     String(Bytes),
     Integer(i64),

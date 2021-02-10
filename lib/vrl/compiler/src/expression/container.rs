@@ -2,7 +2,7 @@ use crate::expression::{Array, Block, Group, Object, Resolved};
 use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Container {
     pub(crate) variant: Variant,
 }
@@ -13,7 +13,7 @@ impl Container {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Variant {
     Group(Group),
     Block(Block),

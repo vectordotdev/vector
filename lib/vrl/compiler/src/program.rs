@@ -2,7 +2,7 @@ use crate::Expression;
 use std::iter::IntoIterator;
 use std::ops::Deref;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program(pub(crate) Vec<Box<dyn Expression>>);
 
 impl IntoIterator for Program {

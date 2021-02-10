@@ -4,8 +4,9 @@ use crate::{
     internal_events::RemapConditionExecutionError,
     Event,
 };
-use vrl::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{value, Program, Runtime, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct RemapConfig {
@@ -21,14 +22,15 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let constraint = TypeConstraint {
-            allow_any: false,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Boolean,
-                ..Default::default()
-            },
-        };
+        // TODO(jean): re-add this to VRL
+        // let constraint = TypeConstraint {
+        //     allow_any: false,
+        //     type_def: TypeDef {
+        //         fallible: true,
+        //         kind: value::Kind::Boolean,
+        //         ..Default::default()
+        //     },
+        // };
 
         // Filter out functions that directly mutate the event.
         //
@@ -40,9 +42,8 @@ impl ConditionConfig for RemapConfig {
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let (program, _) = Program::new(self.source.clone(), &functions, Some(constraint), false)
-            .map_err(|diagnostics| {
-            vrl::Formatter::new(&self.source, diagnostics)
+        let program = vrl::compile(&self.source, &functions).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()
         })?;
@@ -73,8 +74,8 @@ impl Remap {
         //
         // see: https://github.com/timberio/vector/issues/4744
         match event {
-            Event::Log(event) => Runtime::default().run(&mut event.clone(), &self.program),
-            Event::Metric(event) => Runtime::default().run(&mut event.clone(), &self.program),
+            Event::Log(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
         }
     }
 }

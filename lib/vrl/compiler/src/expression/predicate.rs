@@ -6,7 +6,7 @@ use std::fmt;
 
 pub type Result = std::result::Result<Predicate, Error>;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Predicate {
     inner: Vec<Expr>,
 }

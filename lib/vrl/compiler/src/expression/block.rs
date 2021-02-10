@@ -2,7 +2,7 @@ use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     inner: Vec<Expr>,
 }

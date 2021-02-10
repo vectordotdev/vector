@@ -1,5 +1,4 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
-use vrl::{Object, Path};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -7,6 +6,7 @@ use std::{
     fmt::{Debug, Display},
     iter::FromIterator,
 };
+use vrl::{Path, Target};
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -244,7 +244,7 @@ impl Serialize for LogEvent {
     }
 }
 
-impl Object for LogEvent {
+impl Target for LogEvent {
     fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let iter = self
@@ -292,7 +292,7 @@ impl Object for LogEvent {
     fn insert(&mut self, path: &Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
-                vrl::Value::Map(map) => {
+                vrl::Value::Object(map) => {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))

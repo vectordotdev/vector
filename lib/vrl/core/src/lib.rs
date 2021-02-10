@@ -4,10 +4,10 @@ mod runtime;
 pub use compiler::{
     function,
     path::{self, Path},
-    state, Context, Expression, Function, Program, Target, Value,
+    state, value, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
-pub use runtime::Runtime;
+pub use runtime::{Runtime, RuntimeResult};
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {

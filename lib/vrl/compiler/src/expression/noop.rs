@@ -2,7 +2,7 @@ use crate::expression::Resolved;
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Noop;
 
 impl Expression for Noop {

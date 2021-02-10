@@ -1,5 +1,6 @@
 use crate::{Context, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use dyn_clone::{clone_trait_object, DynClone};
 use std::fmt;
 
 mod array;
@@ -41,7 +42,7 @@ pub use variable::Variable;
 
 pub type Resolved = Result<Value, ExpressionError>;
 
-pub trait Expression: Send + Sync + fmt::Debug {
+pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
     ///
     /// This method is executed at runtime.
@@ -64,7 +65,9 @@ pub trait Expression: Send + Sync + fmt::Debug {
     }
 }
 
-#[derive(Debug, PartialEq)]
+clone_trait_object!(Expression);
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Literal),
     Container(Container),

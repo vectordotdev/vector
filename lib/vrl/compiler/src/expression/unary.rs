@@ -2,7 +2,7 @@ use crate::expression::{Not, Resolved};
 use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Unary {
     variant: Variant,
 }
@@ -13,7 +13,7 @@ impl Unary {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Variant {
     Not(Not),
 }
