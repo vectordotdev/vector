@@ -17,6 +17,84 @@ impl Function for ToBool {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "integer (0)",
+                source: "to_bool(0)",
+                result: Ok("false"),
+            },
+            Example {
+                title: "integer (other)",
+                source: "to_bool(2)",
+                result: Ok("true"),
+            },
+            Example {
+                title: "float (0)",
+                source: "to_bool(0.0)",
+                result: Ok("false"),
+            },
+            Example {
+                title: "float (other)",
+                source: "to_bool(5.6)",
+                result: Ok("true"),
+            },
+            Example {
+                title: "true",
+                source: "to_bool(true)",
+                result: Ok("true"),
+            },
+            Example {
+                title: "false",
+                source: "to_bool(false)",
+                result: Ok("false"),
+            },
+            Example {
+                title: "null",
+                source: "to_bool(null)",
+                result: Ok("0"),
+            },
+            Example {
+                title: "timestamp",
+                source: "to_bool(t'2020-01-01T00:00:00Z')",
+                result: Ok("1577836800"),
+            },
+            Example {
+                title: "valid string",
+                source: "to_bool!(s'5')",
+                result: Ok("5"),
+            },
+            Example {
+                title: "invalid string",
+                source: "to_bool!(s'foobar')",
+                result: Err(
+                    r#"function call error for "to_bool" at (0:18): Invalid integer "foobar": invalid digit found in string"#,
+                ),
+            },
+            Example {
+                title: "array",
+                source: "to_bool!([])",
+                result: Err(
+                    r#"function call error for "to_bool" at (0:11): unable to coerce "array" into "integer""#,
+                ),
+            },
+            Example {
+                title: "object",
+                source: "to_bool!({})",
+                result: Err(
+                    r#"function call error for "to_bool" at (0:11): unable to coerce "object" into "integer""#,
+                ),
+            },
+            Example {
+                title: "regex",
+                source: "to_bool!(r'foo')",
+                result: Err(
+                    r#"function call error for "to_bool" at (0:15): unable to coerce "regex" into "integer""#,
+                ),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
@@ -24,7 +102,7 @@ impl Function for ToBool {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToBoolFn {
     value: Box<dyn Expression>,
 }
@@ -50,14 +128,13 @@ impl Expression for ToBoolFn {
             Bytes(v) => Conversion::Boolean
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
-            Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
-                Err("unable to convert value to boolean".into())
+            Array(_) | Object(_) | Timestamp(_) | Regex(_) => {
+                Err(format!("unable to convert {} to boolean", value.kind()).into())
             }
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        
         self.value
             .type_def(state)
             .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
@@ -68,7 +145,7 @@ impl Expression for ToBoolFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     vrl::test_type_def![
         boolean_infallible {
             expr: |_| ToBoolFn { value: lit!(true).boxed() },
