@@ -54,7 +54,7 @@ remap: #Remap & {
 		[performant](\#(urls.vrl_performance)) manner. It features a simple [syntax](\#(urls.vrl_expressions)) and a
 		rich set of built-in [functions](\#(urls.vrl_functions)) tailored specifically to observability use cases.
 
-		You can use VRL in Vector via the [`remap` trasnform](\#(urls.vector_remap_transform)), and for a more in-depth
+		You can use VRL in Vector via the [`remap` transform](\#(urls.vector_remap_transform)), and for a more in-depth
 		picture, see the [announcement blog post](\#(urls.vrl_announcement)).
 		"""#
 
