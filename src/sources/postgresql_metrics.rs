@@ -186,12 +186,12 @@ impl SourceConfig for PostgresqlMetricsConfig {
 struct PostgresqlClient {
     config: Config,
     tls_config: Option<PostgresqlMetricsTlsConfig>,
-    client: Option<Client>,
-    version: Option<usize>,
+    client: Option<(Client, usize)>,
 }
 
 impl PostgresqlClient {
     async fn build_client(&mut self) -> Result<(), ConnectError> {
+        // Create postgresql client
         let client = match &self.tls_config {
             Some(tls_config) => {
                 let mut builder =
@@ -224,6 +224,7 @@ impl PostgresqlClient {
             }
         };
 
+        // Log version if required
         if tracing::level_enabled!(tracing::Level::DEBUG) {
             let version_row = client
                 .query_one("SELECT version()", &[])
@@ -239,17 +240,8 @@ impl PostgresqlClient {
             debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
         }
 
-        self.client = Some(client);
-        self.verify_version().await?;
-
-        Ok(())
-    }
-
-    async fn verify_version(&mut self) -> Result<(), ConnectError> {
-        let row = self
-            .client
-            .as_ref()
-            .expect("client is set above")
+        // Get server version and check that we support it
+        let row = client
             .query_one("SHOW server_version_num", &[])
             .await
             .with_context(|| SelectVersionFailed {
@@ -262,16 +254,23 @@ impl PostgresqlClient {
                 endpoint: config_to_endpoint(&self.config),
             })?;
 
-        self.version = Some(match version.parse::<usize>() {
+        let version = match version.parse::<usize>() {
             Ok(version) if version >= 90600 => version,
             Ok(_) | Err(_) => {
                 return Err(ConnectError::InvalidVersion {
                     version: version.to_string(),
                 })
             }
-        });
+        };
+
+        // Save client and version
+        self.client = Some((client, version));
 
         Ok(())
+    }
+
+    fn reset(&mut self) {
+        self.client = None;
     }
 }
 
@@ -447,7 +446,6 @@ impl PostgresqlMetrics {
                 config,
                 tls_config,
                 client: None,
-                version: None,
             },
             namespace,
             tags,
@@ -456,20 +454,9 @@ impl PostgresqlMetrics {
     }
 
     async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
-        let build_client = match self.client.client {
-            Some(_) => Ok(()),
-            None => self.client.build_client().await,
-        };
-
-        let metrics = match build_client {
-            Ok(()) => self.collect_metrics().await.map_err(|err| err.to_string()),
-            Err(err) => Err(err.to_string()),
-        };
-
-        let (up_value, metrics) = match metrics {
+        let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                self.client.client = None;
                 emit!(PostgresqlMetricsCollectFailed {
                     error,
                     endpoint: self.tags.get("endpoint"),
@@ -482,19 +469,35 @@ impl PostgresqlMetrics {
         stream::once(ready(up_metric)).chain(metrics).boxed()
     }
 
-    async fn collect_metrics(&self) -> Result<impl Iterator<Item = Metric>, CollectError> {
-        let client = self.client.client.as_ref().expect("client is set above");
+    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
+        if self.client.client.is_none() {
+            self.client
+                .build_client()
+                .await
+                .map_err(|error| error.to_string())?;
+        }
+
+        let (client, version) = self.client.client.as_ref().expect("client is set above");
+        let version = *version;
 
         try_join_all(vec![
-            self.collect_pg_stat_database(client).boxed(),
+            self.collect_pg_stat_database(client, version).boxed(),
             self.collect_pg_stat_database_conflicts(client).boxed(),
             self.collect_pg_stat_bgwriter(client).boxed(),
         ])
         .map_ok(|metrics| metrics.into_iter().flatten())
         .await
+        .map_err(|error| {
+            self.client.reset();
+            error.to_string()
+        })
     }
 
-    async fn collect_pg_stat_database(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_pg_stat_database(
+        &self,
+        client: &Client,
+        client_version: usize,
+    ) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
             .pg_stat_database(client)
@@ -582,7 +585,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if self.client.version.expect("version is set above") >= 120000 {
+            if client_version >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
