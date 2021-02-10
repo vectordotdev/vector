@@ -43,6 +43,7 @@ features = [
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_json",
     "replace",
+    "round",
     "sha1",
     "sha2",
     "slice",
