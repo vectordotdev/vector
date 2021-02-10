@@ -466,8 +466,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "stdin|json_parser|console", &None),
-            Ok(indoc! {r#"
-                data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -500,8 +499,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "stdin//console", &None),
-            Ok(indoc! {r#"
-                data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -528,8 +526,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "//console", &None),
-            Ok(indoc! {r#"
-                data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
                 inputs = ["component-name"]
@@ -552,8 +549,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"
-                data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
                 inputs = []
@@ -578,8 +574,7 @@ mod tests {
 
         assert_eq!(
             generate_example(false, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"
-                [transforms.transform0]
+            Ok(indoc! {r#"[transforms.transform0]
                 inputs = []
                 type = "add_fields"
 
