@@ -8,19 +8,6 @@ impl Function for Upcase {
         "upcase"
     }
 
-    fn summary(&self) -> &'static str {
-        "return the uppercase variant of a string"
-    }
-
-    fn usage(&self) -> &'static str {
-        indoc! {r#"
-            Returns a copy of `value` that is entirely uppercase.
-
-            "Uppercase" is defined according to the terms of the Unicode Derived Core Property
-            Uppercase.
-        "#}
-    }
-
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "upcase",

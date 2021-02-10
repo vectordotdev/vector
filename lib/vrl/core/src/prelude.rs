@@ -14,6 +14,7 @@ pub type Result<T> = std::result::Result<T, ExpressionError>;
 pub use diagnostic::DiagnosticError;
 
 pub use bytes::Bytes;
+pub use ordered_float::NotNan;
 pub use std::fmt;
 
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};

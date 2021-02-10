@@ -45,8 +45,11 @@ features = [
     "sha1",
     "sha2",
     "string",
+    "to_bool",
+    "to_float",
     "to_int",
     "to_string",
     "to_timestamp",
     "upcase",
+    "uuid_v4",
 ]
