@@ -219,6 +219,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   source = """
                   . = parse_syslog!(.message)
                   .timestamp = format_timestamp!(.timestamp, format: "%c")
+                  del(.hostname)
                   """
             "#},
         ),
@@ -263,7 +264,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
     ];
 
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
-    let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "hostname": "initech.io", "severity": "warning", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
+    let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "severity": "warning", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
 
 
     benchmark_configs(c, "multifaceted", configs, "in", "last", input, output);

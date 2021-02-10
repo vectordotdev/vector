@@ -64,9 +64,12 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 
     event.insert("message".to_owned(), parsed.msg.into());
 
+    // Delete the hostname field
+    /*
     if let Some(host) = parsed.hostname {
         event.insert("hostname".to_owned(), host.to_string().into());
     }
+    */
     if let Some(facility) = parsed.facility {
         event.insert("facility".to_owned(), facility.as_str().to_owned().into());
     }
