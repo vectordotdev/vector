@@ -109,7 +109,7 @@ impl<T: PartialEq> PartialEq for Node<T> {
 // -----------------------------------------------------------------------------
 
 #[derive(PartialEq)]
-pub struct Program(pub(crate) Vec<Node<RootExpr>>);
+pub struct Program(pub Vec<Node<RootExpr>>);
 
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -413,7 +413,7 @@ impl fmt::Debug for Block {
 // -----------------------------------------------------------------------------
 
 #[derive(PartialEq)]
-pub struct Group(pub(crate) Node<Expr>);
+pub struct Group(pub Node<Expr>);
 
 impl Group {
     pub fn into_inner(self) -> Node<Expr> {
@@ -854,7 +854,7 @@ impl fmt::Debug for QueryTarget {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Path(pub(crate) Vec<PathSegment>);
+pub struct Path(pub Vec<PathSegment>);
 
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

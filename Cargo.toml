@@ -53,6 +53,7 @@ members = [
   "lib/vrl/parser",
   "lib/vrl/stdlib",
   "lib/vrl/tests",
+  "lib/vrl/proptests",
 ]
 
 [dependencies]
