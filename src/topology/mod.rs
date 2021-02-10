@@ -676,7 +676,7 @@ impl RunningTopology {
                 .iter()
                 .chain(diff.transforms.to_remove.iter())
             {
-                info!(message = "Removing tap", component = ?name);
+                info!(message = "Removing tap.", component = ?name);
                 let _ = tap_controller.remove(name);
             }
 
@@ -687,7 +687,7 @@ impl RunningTopology {
                 .chain(diff.transforms.changed_and_added())
             {
                 if let Some(uuid) = tap_controller.get_sink_name(name) {
-                    info!(message = "Connecting tap", component = ?name, sink = ?uuid);
+                    info!(message = "Connecting tap.", component = ?name, sink = ?uuid);
                     self.setup_inputs(&uuid, &mut new_pieces);
                     self.spawn_sink(&uuid, &mut new_pieces);
                 }
