@@ -3,13 +3,10 @@ package metadata
 remap: errors: "100": {
 	title:       "Unhandled root runtime error"
 	description: """
-		A root expression is fallible and its [runtime error](\(urls.vrl_runtime_errors)) is not handled.
+		A root expression is fallible and its [runtime error](\(urls.vrl_runtime_errors)) isn't handled in the VRL
+		program.
 		"""
-	rationale:   """
-		VRL is [fail-safe](\(urls.vrl_fail_safety)) and requires that all possible runtime errors be handled. This
-		contributes heavily to VRL's [safety principle](\(urls.vrl_safety)), ensuring that VRL programs are reliable
-		once deployed.
-		"""
+	rationale:   remap._fail_safe_blurb
 	resolution:  """
 		[Handle](\(urls.vrl_error_handling)) the runtime error by [assigning](\(urls.vrl_error_handling_assigning)),
 		[coalescing](\(urls.vrl_error_handling_coalescing)), or [raising](\(urls.vrl_error_handling_raising)) the
