@@ -48,19 +48,17 @@ impl Expression for EncodeJsonFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .infallible()
-            .bytes()
+        self.value.type_def(state).infallible().bytes()
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{DateTime, Utc};
     use regex::Regex;
-    
+
     test_function![
         encode_json => EncodeJson;
 
@@ -162,3 +160,5 @@ mod tests {
         }
     ];
 }
+
+*/
