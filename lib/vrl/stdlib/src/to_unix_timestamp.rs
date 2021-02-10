@@ -9,19 +9,6 @@ impl Function for ToUnixTimestamp {
         "to_unix_timestamp"
     }
 
-    fn summary(&self) -> &'static str {
-        "convert a given timestamp to a Unix timestamp integer"
-    }
-
-    fn usage(&self) -> &'static str {
-        indoc! {"
-            Coerces the provided `value` into a Unix timestamp.
-
-            By default, the number of seconds since the Unix epoch is returned, but milliseconds or
-            nanoseconds can be returned via the `unit` argument.
-        "}
-    }
-
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
@@ -51,7 +38,7 @@ impl Function for ToUnixTimestamp {
             },
             Parameter {
                 keyword: "unit",
-                kind: kind::ARRAY,
+                kind: kind::BYTES,
                 required: false,
             },
         ]
@@ -61,8 +48,8 @@ impl Function for ToUnixTimestamp {
         let value = arguments.required("value");
 
         let unit = arguments
-            .optional_enum("unit", &Unit::all_str())?
-            .map(|s| Unit::from_str(&s).expect("validated enum"))
+            .optional_enum("unit", &Unit::all_value().as_slice())?
+            .map(|s| Unit::from_str(&s.unwrap_bytes_utf8_lossy()).expect("validated enum"))
             .unwrap_or_default();
 
         Ok(Box::new(ToUnixTimestampFn { value, unit }))
@@ -77,12 +64,12 @@ enum Unit {
 }
 
 impl Unit {
-    fn all_str() -> Vec<&'static str> {
+    fn all_value() -> Vec<Value> {
         use Unit::*;
 
         vec![Seconds, Milliseconds, Nanoseconds]
             .into_iter()
-            .map(|u| u.as_str())
+            .map(|u| u.as_str().into())
             .collect::<Vec<_>>()
     }
 
@@ -118,7 +105,7 @@ impl FromStr for Unit {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToUnixTimestampFn {
     value: Box<dyn Expression>,
     unit: Unit,
@@ -133,7 +120,7 @@ impl ToUnixTimestampFn {
 
 impl Expression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let ts = self.value.resolve(ctx)?.unwrap_timestamp();
 
         let time = match self.unit {
             Unit::Seconds => ts.timestamp(),
@@ -145,10 +132,7 @@ impl Expression for ToUnixTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Timestamp)
-            .with_constraint(value::Kind::Integer)
+        TypeDef::new().infallible().integer()
     }
 }
 
