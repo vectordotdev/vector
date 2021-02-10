@@ -42,7 +42,7 @@ impl Function for ParseAwsAlbLog {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseAwsAlbLogFn {
     value: Box<dyn Expression>,
 }

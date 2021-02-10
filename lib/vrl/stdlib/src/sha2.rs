@@ -59,7 +59,7 @@ impl Function for Sha2 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Sha2Fn {
     value: Box<dyn Expression>,
     variant: Bytes,

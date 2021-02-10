@@ -38,7 +38,7 @@ impl Function for Flatten {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FlattenFn {
     value: Box<dyn Expression>,
 }

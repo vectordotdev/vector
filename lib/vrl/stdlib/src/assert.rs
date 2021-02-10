@@ -51,7 +51,7 @@ impl Function for Assert {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct AssertFn {
     condition: Box<dyn Expression>,
     message: Option<Box<dyn Expression>>,
