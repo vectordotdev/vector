@@ -459,7 +459,8 @@ mod tests {
                 [sinks.sink0.buffer]
                 type = "memory"
                 max_events = 500
-                when_full = "block""#}
+                when_full = "block"
+            "#}
             .to_string())
         );
 
