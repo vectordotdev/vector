@@ -6,8 +6,9 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
+  type: {{ .Values.service.type }}
   ports:
-    {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
+  {{- include "vector-aggregator.servicePorts" . | nindent 2 }}
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}
 {{- end }}
