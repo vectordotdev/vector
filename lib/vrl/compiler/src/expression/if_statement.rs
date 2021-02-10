@@ -2,7 +2,7 @@ use crate::expression::{Block, Expr, Literal, Predicate, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
     pub predicate: Predicate,
     pub consequent: Block,

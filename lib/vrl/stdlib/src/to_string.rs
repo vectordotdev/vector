@@ -84,7 +84,7 @@ impl Function for ToString {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToStringFn {
     value: Box<dyn Expression>,
 }

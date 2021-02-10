@@ -86,7 +86,7 @@ impl Function for Compact {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CompactFn {
     value: Box<dyn Expression>,
     recursive: Option<Box<dyn Expression>>,

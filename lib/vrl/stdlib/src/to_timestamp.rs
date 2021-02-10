@@ -99,7 +99,7 @@ impl Function for ToTimestamp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToTimestampFn {
     value: Box<dyn Expression>,
 }

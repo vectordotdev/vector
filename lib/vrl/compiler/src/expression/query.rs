@@ -4,7 +4,7 @@ use crate::{Context, Expression, Path, State, TypeDef, Value};
 use std::collections::BTreeMap;
 use std::fmt;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Query {
     target: Target,
     path: Path,
@@ -111,7 +111,7 @@ impl fmt::Debug for Query {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Target {
     Internal(Variable),
     External,

@@ -18,7 +18,7 @@ impl Function for Now {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct NowFn;
 
 impl Expression for NowFn {

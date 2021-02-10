@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use vrl::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,6 +8,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use vrl::{path::Segment, Target};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
@@ -439,7 +439,7 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
-impl Object for Metric {
+impl Target for Metric {
     fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
@@ -535,11 +535,7 @@ impl Object for Metric {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &vrl::Path,
-        _compact: bool,
-    ) -> Result<Option<vrl::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, _compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -599,8 +595,8 @@ mod test {
     use super::*;
     use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use vrl::{Path, Value};
     use std::str::FromStr;
+    use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

@@ -3,7 +3,7 @@ use crate::{Context, Expression, State, TypeDef, Value};
 use std::collections::BTreeMap;
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Object {
     inner: BTreeMap<String, Expr>,
 }

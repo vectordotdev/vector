@@ -657,6 +657,36 @@ impl<'input> Lexer<'input> {
                 }
                 '[' => brackets += 1,
 
+                // literals
+                '"' => {
+                    let result = Lexer::new(&self.input[pos + 1..]).string_literal(0);
+                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
+                        Ok(_) => continue,
+                        Err(_) => break,
+                    }
+                }
+                's' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
+                    let result = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
+                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
+                        Ok(_) => continue,
+                        Err(_) => break,
+                    }
+                }
+                'r' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
+                    let result = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
+                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
+                        Ok(_) => continue,
+                        Err(_) => break,
+                    }
+                }
+                't' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
+                    let result = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
+                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
+                        Ok(_) => continue,
+                        Err(_) => break,
+                    }
+                }
+
                 '}' if braces == 0 => break,
                 '}' => braces -= 1,
 
@@ -678,8 +708,57 @@ impl<'input> Lexer<'input> {
                     };
 
                     let mut skip_delim = 0;
-                    while let Some((_, ch)) = chars.peek() {
-                        if skip_delim == 0 && ch == &end_delim {
+                    while let Some((pos, ch)) = chars.peek() {
+                        let pos = *pos;
+
+                        let literal_check = |result: Spanned<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
+                            Err(_) => Err(()),
+                            Ok((_, _, new)) => {
+                                while let Some((i, _)) = chars.next() {
+                                    if i == new + pos {
+                                        break;
+                                    }
+                                }
+                                match chars.peek().map(|(_, ch)| ch) {
+                                    Some(ch) => Ok(*ch),
+                                    None => Err(()),
+                                }
+                            }
+                        };
+
+                        let ch = match &self.input[pos..] {
+                            s if s.starts_with('"') => {
+                                let r = Lexer::new(&self.input[pos + 1..]).string_literal(0);
+                                match literal_check(r, &mut chars) {
+                                    Ok(ch) => ch,
+                                    Err(_) => continue,
+                                }
+                            }
+                            s if s.starts_with("s'") => {
+                                let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
+                                match literal_check(r, &mut chars) {
+                                    Ok(ch) => ch,
+                                    Err(_) => continue,
+                                }
+                            }
+                            s if s.starts_with("r'") => {
+                                let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
+                                match literal_check(r, &mut chars) {
+                                    Ok(ch) => ch,
+                                    Err(_) => continue,
+                                }
+                            }
+                            s if s.starts_with("t'") => {
+                                let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
+                                match literal_check(r, &mut chars) {
+                                    Ok(ch) => ch,
+                                    Err(_) => continue,
+                                }
+                            }
+                            _ => *ch,
+                        };
+
+                        if skip_delim == 0 && ch == end_delim {
                             break;
                         }
                         chars.next().map(|(i, c)| {
@@ -710,36 +789,6 @@ impl<'input> Lexer<'input> {
 
                     if !digits {
                         valid = true
-                    }
-                }
-
-                // literals
-                '"' => {
-                    let result = Lexer::new(&self.input[pos + 1..]).string_literal(0);
-                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
-                        Ok(_) => continue,
-                        Err(_) => break,
-                    }
-                }
-                's' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
-                    let result = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
-                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
-                        Ok(_) => continue,
-                        Err(_) => break,
-                    }
-                }
-                'r' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
-                    let result = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
-                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
-                        Ok(_) => continue,
-                        Err(_) => break,
-                    }
-                }
-                't' if chars.peek().map(|(_, ch)| ch) == Some(&'\'') => {
-                    let result = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
-                    match take_until_end(result, &mut last_char, &mut end, &mut chars) {
-                        Ok(_) => continue,
-                        Err(_) => break,
                     }
                 }
 

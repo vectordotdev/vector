@@ -4,7 +4,7 @@ use crate::{value, Context, Expression, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Span};
 use std::fmt;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Op {
     pub(crate) lhs: Box<Expr>,
     pub(crate) rhs: Box<Expr>,

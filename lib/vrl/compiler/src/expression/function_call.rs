@@ -5,6 +5,7 @@ use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, T
 use diagnostic::{DiagnosticError, Label, Note};
 use std::fmt;
 
+#[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,

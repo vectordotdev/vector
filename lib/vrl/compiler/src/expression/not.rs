@@ -6,7 +6,7 @@ use std::fmt;
 
 pub type Result = std::result::Result<Not, Error>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Not {
     inner: Box<Expr>,
 }

@@ -8,7 +8,7 @@ use diagnostic::{DiagnosticError, Label, Note};
 use std::convert::TryFrom;
 use std::fmt;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Assignment {
     variant: Variant<Target, Expr>,
 }
@@ -294,7 +294,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Variant<T, U> {
     Single { target: T, expr: Box<U> },
     Infallible { ok: T, err: T, expr: Box<U> },
@@ -302,7 +302,7 @@ pub enum Variant<T, U> {
 
 impl<U> Expression for Variant<Target, U>
 where
-    U: Expression,
+    U: Expression + Clone,
 {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Variant::*;

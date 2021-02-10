@@ -68,7 +68,7 @@ impl Function for Replace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ReplaceFn {
     value: Box<dyn Expression>,
     pattern: Box<dyn Expression>,

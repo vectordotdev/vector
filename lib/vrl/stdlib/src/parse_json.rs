@@ -78,7 +78,7 @@ impl Function for ParseJson {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseJsonFn {
     value: Box<dyn Expression>,
 }

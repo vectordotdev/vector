@@ -40,7 +40,7 @@ impl Function for String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StringFn {
     value: Box<dyn Expression>,
 }

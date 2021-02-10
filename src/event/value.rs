@@ -209,9 +209,9 @@ impl From<vrl::Value> for Value {
         match v {
             Bytes(v) => Value::Bytes(v),
             Integer(v) => Value::Integer(v),
-            Float(v) => Value::Float(v),
+            Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(v),
-            Map(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
             Timestamp(v) => Value::Timestamp(v),
             Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
@@ -225,14 +225,14 @@ impl From<Value> for vrl::Value {
         use vrl::Value::*;
 
         match v {
-            Value::Bytes(v) => Bytes(v),
-            Value::Integer(v) => Integer(v),
-            Value::Float(v) => Float(v),
-            Value::Boolean(v) => Boolean(v),
-            Value::Map(v) => Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Value::Bytes(v) => v.into(),
+            Value::Integer(v) => v.into(),
+            Value::Float(v) => v.into(),
+            Value::Boolean(v) => v.into(),
+            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
-            Value::Timestamp(v) => Timestamp(v),
-            Value::Null => Null,
+            Value::Timestamp(v) => v.into(),
+            Value::Null => ().into(),
         }
     }
 }

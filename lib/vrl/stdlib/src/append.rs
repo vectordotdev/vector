@@ -39,7 +39,7 @@ impl Function for Append {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct AppendFn {
     value: Box<dyn Expression>,
     items: Box<dyn Expression>,
