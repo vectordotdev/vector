@@ -10,7 +10,11 @@ impl Function for Now {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[]
+        &[Example {
+            title: "now",
+            source: r#"now() != """#,
+            result: Ok("true"),
+        }]
     }
 
     fn compile(&self, _: ArgumentList) -> Compiled {
@@ -29,17 +33,4 @@ impl Expression for NowFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().timestamp()
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    vrl::test_type_def![static_def {
-        expr: |_| NowFn,
-        def: TypeDef {
-            kind: value::Kind::Timestamp,
-            ..Default::default()
-        },
-    }];
 }

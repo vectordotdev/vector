@@ -12,4 +12,5 @@ parser = { package = "vrl-parser", path = "../parser" }
 
 bytes = "0.5.6"
 indoc = "1"
+ordered-float = "2"
 thiserror = "1"

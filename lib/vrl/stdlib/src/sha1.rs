@@ -37,13 +37,6 @@ struct Sha1Fn {
     value: Box<dyn Expression>,
 }
 
-impl Sha1Fn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>) -> Self {
-        Self { value }
-    }
-}
-
 impl Expression for Sha1Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.unwrap_bytes();
