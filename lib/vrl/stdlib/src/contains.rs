@@ -12,17 +12,17 @@ impl Function for Contains {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
                 keyword: "case_sensitive",
-                kind: kind::ANY,
+                kind: kind::BOOLEAN,
                 required: false,
             },
         ]
@@ -39,15 +39,31 @@ impl Function for Contains {
             case_sensitive,
         }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "case sensitive",
+                source: r#"contains("banana", "ana")"#,
+                result: Ok(r#"true"#),
+            },
+            Example {
+                title: "case insensitive",
+                source: r#"contains("banana", "AnA", case_sensitive: false)"#,
+                result: Ok(r#"true"#),
+            },
+        ]
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ContainsFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
     case_sensitive: Option<Box<dyn Expression>>,
 }
 
+/*
 impl ContainsFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, substring: &str, case_sensitive: bool) -> Self {
@@ -61,6 +77,7 @@ impl ContainsFn {
         }
     }
 }
+*/
 
 impl Expression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
@@ -93,23 +110,11 @@ impl Expression for ContainsFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .merge(
-                self.substring
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Bytes),
-            )
-            .merge_optional(self.case_sensitive.as_ref().map(|case_sensitive| {
-                case_sensitive
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Boolean)
-            }))
-            .with_constraint(value::Kind::Boolean)
+        TypeDef::new().boolean().infallible()
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,3 +182,4 @@ mod tests {
         }
     }
 }
+*/

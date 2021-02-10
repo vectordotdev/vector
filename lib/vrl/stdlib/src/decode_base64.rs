@@ -11,7 +11,7 @@ impl Function for DecodeBase64 {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -20,6 +20,16 @@ impl Function for DecodeBase64 {
         let value = arguments.required("value");
 
         Ok(Box::new(DecodeBase64Fn { value }))
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "demo string",
+                source: r#"decode_base64!("c29tZSBzdHJpbmcgdmFsdWU=")"#,
+                result: Ok(r#"some string value"#)
+            }
+        ]
     }
 }
 
@@ -40,13 +50,11 @@ impl Expression for DecodeBase64Fn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
-        self.value
-            .type_def(state)
-            .into_fallible(true)
-            .with_constraint(value::Kind::Bytes)
+        TypeDef::new().bytes().fallible()
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -86,3 +94,4 @@ mod test {
         }
     ];
 }
+*/

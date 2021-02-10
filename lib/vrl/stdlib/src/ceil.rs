@@ -13,12 +13,12 @@ impl Function for Ceil {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::FLOAT | kind::INTEGER,
                 required: true,
             },
             Parameter {
                 keyword: "precision",
-                kind: kind::ANY,
+                kind: kind::INTEGER,
                 required: false,
             },
         ]
@@ -30,9 +30,17 @@ impl Function for Ceil {
 
         Ok(Box::new(CeilFn { value, precision }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "ceil",
+            source: r#"ceil(5.2)"#,
+            result: Ok("6.0"),
+        }]
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct CeilFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,
@@ -53,38 +61,26 @@ impl Expression for CeilFn {
         };
 
         match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(f, precision, f64::ceil).into()),
+            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::ceil).into()),
             v @ Value::Integer(_) => Ok(v),
             _ => unreachable!(),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        
-        let value_def = self
-            .value
-            .type_def(state)
-            .fallible_unless(Kind::Integer | Kind::Float);
-        let precision_def = self
-            .precision
-            .as_ref()
-            .map(|precision| precision.type_def(state).fallible_unless(Kind::Integer));
-
-        value_def
-            .clone()
-            .merge_optional(precision_def)
-            .with_constraint(match value_def.kind {
-                v if v.is_float() || v.is_integer() => v,
-                _ => Kind::Integer | Kind::Float,
-            })
+        TypeDef::new().scalar(match self.value.type_def(state).kind() {
+            v if v.is_float() || v.is_integer() => v,
+            _ => Kind::Integer | Kind::Float,
+        })
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
-    
+
     vrl::test_type_def![
         value_float {
             expr: |_| CeilFn {
@@ -177,3 +173,4 @@ mod tests {
         }
     }
 }
+*/

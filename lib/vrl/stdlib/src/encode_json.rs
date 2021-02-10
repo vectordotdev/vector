@@ -21,9 +21,17 @@ impl Function for EncodeJson {
 
         Ok(Box::new(EncodeJsonFn { value }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "encode object",
+            source: r#"encode_json({"field": "value", "another": [1,2,3]})"#,
+            result: Ok(r#"{"another":[1,2,3],"field":"value"}"#),
+        }]
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct EncodeJsonFn {
     value: Box<dyn Expression>,
 }
@@ -42,7 +50,8 @@ impl Expression for EncodeJsonFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .with_constraint(value::Kind::Bytes)
+            .infallible()
+            .bytes()
     }
 }
 

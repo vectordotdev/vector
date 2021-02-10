@@ -30,14 +30,15 @@ impl Function for Exists {
             },
         ]
     }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let query = arguments.required_query("target")?;
+        let query = arguments.required_query("field")?;
 
         Ok(Box::new(ExistsFn { query }))
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExistsFn {
     query: expression::Query,
 }

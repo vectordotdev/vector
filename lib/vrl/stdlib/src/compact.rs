@@ -225,6 +225,7 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
         .collect()
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -388,3 +389,4 @@ mod test {
         }
     ];
 }
+*/

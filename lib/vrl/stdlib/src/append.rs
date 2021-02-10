@@ -60,6 +60,7 @@ impl Expression for AppendFn {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,3 +159,4 @@ mod tests {
         }
     ];
 }
+*/

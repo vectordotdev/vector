@@ -119,6 +119,7 @@ impl fmt::Display for DelFn {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,3 +185,4 @@ mod tests {
         }
     }
 }
+*/

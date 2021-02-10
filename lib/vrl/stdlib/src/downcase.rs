@@ -1,5 +1,4 @@
 use vrl::prelude::*;
-use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Downcase;
@@ -12,7 +11,7 @@ impl Function for Downcase {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -22,9 +21,17 @@ impl Function for Downcase {
 
         Ok(Box::new(DowncaseFn { value }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "downcase",
+            source: r#"downcase("FOO 2 BAR")"#,
+            result: Ok("foo 2 bar"),
+        }]
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DowncaseFn {
     value: Box<dyn Expression>,
 }
@@ -38,21 +45,17 @@ impl DowncaseFn {
 
 impl Expression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value
-            .resolve(ctx)
-            .and_then(|v| String::try_from(v).map_err(Into::into))
-            .map(|v| v.to_lowercase())
-            .map(Into::into)
+        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+
+        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .with_constraint(value::Kind::Bytes)
+        TypeDef::new().bytes().infallible()
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,3 +93,4 @@ mod tests {
         }
     ];
 }
+*/

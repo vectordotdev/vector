@@ -174,6 +174,7 @@ impl<'a> std::iter::Iterator for ArrayFlatten<'a> {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -281,3 +282,4 @@ mod test {
         }
     ];
 }
+*/

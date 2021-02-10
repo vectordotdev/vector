@@ -14,12 +14,12 @@ impl Function for FormatTimestamp {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::TIMESTAMP,
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
         ]
@@ -31,14 +31,23 @@ impl Function for FormatTimestamp {
 
         Ok(Box::new(FormatTimestampFn { value, format }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "format timestamp",
+            source: r#"format_timestamp!(t'2021-02-10T23:32:00+00:00', "%d %B %Y %H:%M")"#,
+            result: Ok("10 February 2021 23:32")
+        }]
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct FormatTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,
 }
 
+/*
 impl FormatTimestampFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, format: &str) -> Self {
@@ -47,6 +56,7 @@ impl FormatTimestampFn {
         Self { value, format }
     }
 }
+*/
 
 impl Expression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
@@ -58,17 +68,7 @@ impl Expression for FormatTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let format_def = self
-            .format
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes);
-
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Timestamp)
-            .merge(format_def)
-            .into_fallible(true) // due to `try_format`
-            .with_constraint(value::Kind::Bytes)
+        TypeDef::new().fallible().bytes()
     }
 }
 
@@ -83,6 +83,7 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
     Ok(dt.format_with_items(items.into_iter()).to_string())
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,3 +149,4 @@ mod tests {
         }
     }
 }
+*/
