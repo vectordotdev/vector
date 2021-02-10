@@ -22,19 +22,19 @@ package = "vrl-stdlib"
 path = "../stdlib"
 default-features = false
 features = [
-    "parse_json",
-    "now",
-    "to_string",
-    "to_timestamp",
-    "to_int",
-    "string",
-    "sha1",
-    "upcase",
-    "flatten",
+    "append",
+    "assert",
     "compact",
     "del",
-    "assert",
-    "append",
+    "flatten",
+    "now",
+    "parse_json",
+    "replace",
+    "sha1",
     "sha2",
-    "replace"
+    "string",
+    "to_int",
+    "to_string",
+    "to_timestamp",
+    "upcase",
 ]
