@@ -40,6 +40,7 @@ features = [
     "merge",
     "now",
     "parse_aws_alb_log",
+    "parse_aws_cloudwatch_log_subscription_message",
     "parse_json",
     "replace",
     "sha1",
