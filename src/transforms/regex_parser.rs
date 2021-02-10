@@ -33,6 +33,8 @@ pub struct RegexParserConfig {
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub types: HashMap<String, String>,
+    #[serde(default)]
+    pub timezone: TimeZone,
 }
 
 inventory::submit! {
@@ -185,7 +187,7 @@ impl RegexParser {
             .flatten()
             .collect::<Vec<_>>();
 
-        let types = parse_check_conversion_map(&config.types, names, TimeZone::Local)?;
+        let types = parse_check_conversion_map(&config.types, names, config.timezone)?;
 
         Ok(Transform::function(RegexParser::new(
             regexset,

@@ -12,10 +12,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use shared::TimeZone;
 
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub host_tag: Option<String>,
+    pub timezone: TimeZone,
 }
 
 inventory::submit! {
@@ -26,6 +27,7 @@ impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             host_tag: Some("host-tag".to_string()),
+            timezone: TimeZone::default(),
         })
         .unwrap()
     }
@@ -35,7 +37,10 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        Ok(Transform::function(MetricToLog::new(self.host_tag.clone())))
+        Ok(Transform::function(MetricToLog::new(
+            self.host_tag.clone(),
+            self.timezone,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -55,16 +60,18 @@ impl TransformConfig for MetricToLogConfig {
 pub struct MetricToLog {
     timestamp_key: String,
     host_tag: String,
+    timezone: TimeZone,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>) -> Self {
+    pub fn new(host_tag: Option<String>, timezone: TimeZone) -> Self {
         Self {
             timestamp_key: "timestamp".into(),
             host_tag: format!(
                 "tags.{}",
                 host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
             ),
+            timezone,
         }
     }
 }
@@ -87,7 +94,7 @@ impl FunctionTransform for MetricToLog {
                     let timestamp = log
                         .remove(&self.timestamp_key)
                         .and_then(|value| {
-                            Conversion::Timestamp(TimeZone::Local)
+                            Conversion::Timestamp(self.timezone)
                                 .convert(value.into_bytes())
                                 .ok()
                         })
@@ -124,7 +131,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()));
+        let mut transformer = MetricToLog::new(Some("host".into()), Default::default());
 
         transformer
             .transform_one(event)

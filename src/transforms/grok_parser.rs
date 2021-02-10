@@ -28,6 +28,7 @@ pub struct GrokParserConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub types: HashMap<String, String>,
+    pub timezone: TimeZone,
 }
 
 inventory::submit! {
@@ -47,7 +48,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types, TimeZone::Local)?;
+        let types = parse_conversion_map(&self.types, self.timezone)?;
 
         Ok(grok
             .compile(&self.pattern, true)
@@ -174,6 +175,7 @@ mod tests {
             field: field.map(|s| s.into()),
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
         .build(&GlobalOptions::default())
         .await

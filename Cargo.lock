@@ -6596,6 +6596,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "chrono-tz",
+ "derivative 2.2.0",
  "nom 6.1.2",
  "serde",
  "snafu",

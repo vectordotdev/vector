@@ -150,7 +150,8 @@ components: transforms: key_value_parser: {
 			}
 		}
 
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {

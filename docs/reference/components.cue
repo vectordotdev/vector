@@ -739,6 +739,18 @@ components: {
 				}
 			}
 
+			_timezone: {
+				common:      false
+				description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone."
+				required:    false
+				warnings: []
+				type: string: {
+					default: "local"
+					examples: ["local", "America/NewYork", "EST5EDT"]
+					syntax: "literal"
+				}
+			}
+
 			_types: {
 				common:      true
 				description: """
