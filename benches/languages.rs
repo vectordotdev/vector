@@ -235,7 +235,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
                     local priority, version, timestamp, _host, appname, procid, msgid, _sdata, message = string.match(message, pattern)
 
-                    local year, month, day, hour, minute, second, tz = string.match(timestamp, '(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d).(%d%d%d)(%a)')
+                    local year, month, day, hour, minute, second, tz = string.match(timestamp, '(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+).(%d+)(%a)')
 
                     timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, minute=minute, second=second}))
                     severity = "info"
