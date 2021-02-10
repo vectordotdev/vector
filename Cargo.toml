@@ -212,7 +212,7 @@ tokio-postgres = { version = "0.5.5", features = ["runtime", "with-chrono-0_4"],
 toml = "0.5.8"
 typetag = "0.1.6"
 url = "2.2.0"
-uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
+uuid = { version = "0.8", features = ["serde", "v4"] }
 warp = { version = "0.2.5", default-features = false, optional = true }
 parking_lot = "0.11.1"
 
@@ -362,7 +362,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
-sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
+sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["sources-utils-fake"]
@@ -516,7 +516,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3", "uuid"]
+sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
@@ -525,14 +525,14 @@ sinks-console = []
 sinks-datadog = ["bytesize"]
 sinks-elasticsearch = ["bytesize", "rusoto"]
 sinks-file = []
-sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
+sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
-sinks-loki = ["bytesize", "uuid"]
+sinks-loki = ["bytesize"]
 sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
