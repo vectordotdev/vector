@@ -28,6 +28,7 @@ features = [
     "del",
     "flatten",
     "now",
+    "parse_aws_alb_log",
     "parse_json",
     "replace",
     "sha1",
