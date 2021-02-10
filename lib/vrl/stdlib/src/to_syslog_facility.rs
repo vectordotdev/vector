@@ -11,26 +11,26 @@ impl Function for ToSyslogFacility {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Integer(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ToSyslogFacilityFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ToSyslogFacilityFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for ToSyslogFacilityFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?.try_integer()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?.try_integer()?;
 
         // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
         let code = match value {
@@ -65,8 +65,7 @@ impl Expression for ToSyslogFacilityFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .into_fallible(true)
@@ -77,8 +76,7 @@ impl Expression for ToSyslogFacilityFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![value_non_integer_fallible {
         expr: |_| ToSyslogFacilityFn {
             value: Literal::from("foo").boxed(),

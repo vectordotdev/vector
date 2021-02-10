@@ -12,32 +12,32 @@ impl Function for Slice {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "start",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "end",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let start = arguments.required("start")?.boxed();
-        let end = arguments.optional("end").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let start = arguments.required("start");
+        let end = arguments.optional("end");
 
         Ok(Box::new(SliceFn { value, start, end }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct SliceFn {
     value: Box<dyn Expression>,
     start: Box<dyn Expression>,
@@ -55,10 +55,10 @@ impl SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let start = self.start.execute(state, object)?.try_integer()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {
-            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
 
@@ -84,7 +84,7 @@ impl Expression for SliceFn {
             }
         };
 
-        match self.value.execute(state, object)? {
+        match self.value.resolve(ctx)? {
             Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
                 .map(Value::from),
@@ -96,8 +96,7 @@ impl Expression for SliceFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let value_def = self
             .value
             .type_def(state)
@@ -123,8 +122,7 @@ impl Expression for SliceFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_string {
             expr: |_| SliceFn {
@@ -226,7 +224,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);
@@ -276,7 +274,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);
@@ -308,7 +306,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

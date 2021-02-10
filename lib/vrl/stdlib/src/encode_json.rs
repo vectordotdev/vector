@@ -11,26 +11,26 @@ impl Function for EncodeJson {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |_| true,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(EncodeJsonFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct EncodeJsonFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for EncodeJsonFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
 
         // With `vrl::Value` it's should not be possible to get `Err`.
         match serde_json::to_string(&value) {
@@ -51,8 +51,7 @@ mod tests {
     use super::*;
     use chrono::{DateTime, Utc};
     use regex::Regex;
-    use value::Kind;
-
+    
     test_function![
         encode_json => EncodeJson;
 

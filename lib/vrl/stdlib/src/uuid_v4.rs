@@ -9,16 +9,16 @@ impl Function for UuidV4 {
         "uuid_v4"
     }
 
-    fn compile(&self, _: ArgumentList) -> Result<Box<dyn Expression>> {
+    fn compile(&self, _: ArgumentList) -> Compiled {
         Ok(Box::new(UuidV4Fn))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
@@ -51,7 +51,7 @@ mod tests {
     fn uuid_v4() {
         let mut state = state::Program::default();
         let mut object: Value = map![].into();
-        let value = UuidV4Fn.execute(&mut state, &mut object).unwrap();
+        let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));
 

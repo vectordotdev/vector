@@ -12,35 +12,35 @@ impl Function for Includes {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Array(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "item",
-                accepts: |_| true,
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let item = arguments.required("item")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let item = arguments.required("item");
 
         Ok(Box::new(IncludesFn { value, item }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct IncludesFn {
     value: Box<dyn Expression>,
     item: Box<dyn Expression>,
 }
 
 impl Expression for IncludesFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let list = self.value.execute(state, object)?.try_array()?;
-        let item = self.item.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let list = self.value.resolve(ctx)?.try_array()?;
+        let item = self.item.resolve(ctx)?;
 
         let included = list.iter().any(|i| i == &item);
 
@@ -48,8 +48,7 @@ impl Expression for IncludesFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .fallible_unless(Kind::Array)
@@ -61,8 +60,7 @@ impl Expression for IncludesFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![
         value_non_empty_array_infallible {
             expr: |_| IncludesFn {

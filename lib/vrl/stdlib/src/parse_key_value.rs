@@ -9,8 +9,8 @@ use nom::{
     sequence::{delimited, preceded, tuple},
     IResult,
 };
-use vrl::prelude::*;
 use std::iter::FromIterator;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseKeyValue;
@@ -24,32 +24,36 @@ impl Function for ParseKeyValue {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "key_value_delimiter",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "field_delimiter",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn examples(&self) -> &'static [Example] {
+        &[]
+    }
+
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+
         let key_value_delimiter = arguments
             .optional("key_value_delimiter")
-            .unwrap_or_else(|| Literal::from("=").into())
-            .boxed();
+            .unwrap_or_else(|| expr!("="));
+
         let field_delimiter = arguments
             .optional("field_delimiter")
-            .unwrap_or_else(|| Literal::from(" ").into())
-            .boxed();
+            .unwrap_or_else(|| expr!(" "));
 
         Ok(Box::new(ParseKeyValueFn {
             value,
@@ -59,7 +63,7 @@ impl Function for ParseKeyValue {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct ParseKeyValueFn {
     value: Box<dyn Expression>,
     key_value_delimiter: Box<dyn Expression>,
@@ -67,31 +71,23 @@ pub(crate) struct ParseKeyValueFn {
 }
 
 impl Expression for ParseKeyValueFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
-        let value = String::from_utf8_lossy(&bytes);
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let bytes = value.unwrap_bytes_utf8_lossy();
 
-        let bytes = self
-            .key_value_delimiter
-            .execute(state, object)?
-            .try_bytes()?;
-        let key_value_delimiter = String::from_utf8_lossy(&bytes);
+        let value = self.key_value_delimiter.resolve(ctx)?;
+        let key_value_delimiter = value.unwrap_bytes_utf8_lossy();
 
-        let bytes = self.field_delimiter.execute(state, object)?.try_bytes()?;
-        let field_delimiter = String::from_utf8_lossy(&bytes);
+        let value = self.field_delimiter.resolve(ctx)?;
+        let field_delimiter = value.unwrap_bytes_utf8_lossy();
 
-        let values = parse(&value, &key_value_delimiter, &field_delimiter)?;
+        let values = parse(&bytes, &key_value_delimiter, &field_delimiter)?;
 
         Ok(Value::from_iter(values))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .merge(self.key_value_delimiter.type_def(state))
-            .merge(self.field_delimiter.type_def(state))
-            .into_fallible(true)
-            .with_constraint(value::Kind::Map)
+        TypeDef::new().infallible().object(map! {})
     }
 }
 
@@ -215,8 +211,6 @@ fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use vrl::value;
-    use value::Kind;
 
     #[test]
     fn test_parse() {
@@ -262,34 +256,6 @@ mod test {
         );
     }
 
-    test_type_def![
-        value_string {
-            expr: |_| ParseKeyValueFn {
-                value: Literal::from("foo").boxed(),
-                key_value_delimiter: lit!("=").boxed(),
-                field_delimiter: lit!(" ").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Map,
-                ..Default::default()
-            },
-        }
-
-        value_non_string {
-            expr: |_| ParseKeyValueFn {
-                value: Literal::from(1).boxed(),
-                key_value_delimiter: lit!("=").boxed(),
-                field_delimiter: lit!(" ").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Map,
-                ..Default::default()
-            },
-        }
-    ];
-
     test_function![
         parse_key_value => ParseKeyValue;
 
@@ -309,7 +275,8 @@ mod test {
                              status: "200",
                              bytes: "13",
                              tls_version: "tls1.1",
-                             protocol: "http"}))
+                             protocol: "http"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         logfmt {
@@ -320,7 +287,8 @@ mod test {
                              msg: "Stopping all fetchers",
                              tag: "stopping_fetchers",
                              id: "ConsumerFetcherManager-1382721708341",
-                             module: "kafka.consumer.ConsumerFetcherManager"}))
+                             module: "kafka.consumer.ConsumerFetcherManager"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         // From https://github.com/timberio/vector/issues/5347
@@ -337,7 +305,8 @@ mod test {
                              DstPort: "137",
                              PolicyID: "3",
                              Action: "PERMIT",
-                             Content: "Session Backout"}))
+                             Content: "Session Backout"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         spaces {
@@ -346,7 +315,8 @@ mod test {
                 key_value_delimiter: ":",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"}))
+                             nonk: "nink"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         delimited {
@@ -356,7 +326,8 @@ mod test {
                 field_delimiter: ",",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"}))
+                             nonk: "nink"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         delimited_with_spaces {
@@ -366,7 +337,8 @@ mod test {
                 field_delimiter: ",",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"}))
+                             nonk: "nink"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         multiple_chars {
@@ -376,7 +348,8 @@ mod test {
                 field_delimiter: "||",
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"}))
+                             nonk: "nink"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
         error {
@@ -385,13 +358,14 @@ mod test {
                 key_value_delimiter: "--",
                 field_delimiter: "||",
             ],
-            want: Err("function call error: 0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n")
+            want: Err("function call error: 0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n"),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
-        // The following case demonstrates a scenario that could potentially be considered an error, but isn't.
-        // It is possible that we are missing a separator here (between nink and norgle), but it parses it
-        // successfully and just assumes all the text after the key_value_delimiter is the value since there is no terminator
-        // to stop the parsing.
+        // The following case demonstrates a scenario that could potentially be considered an
+        // error, but isn't. It is possible that we are missing a separator here (between nink and
+        // norgle), but it parses it successfully and just assumes all the text after the
+        // key_value_delimiter is the value since there is no terminator to stop the parsing.
         missing_separator {
             args: func_args! [
                 value: r#"zork: zoog, nonk: nink norgle: noog"#,
@@ -399,17 +373,20 @@ mod test {
                 field_delimiter: ",",
             ],
             want: Ok(value!({zork: r#"zoog"#,
-                             nonk: "nink norgle: noog"}))
+                             nonk: "nink norgle: noog"})),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
 
-        // If the value field is delimited, then it can't parse the rest of the line, so it raises an error.
+        // If the value field is delimited, then it can't parse the rest of the
+        // line, so it raises an error.
         missing_separator_delimited {
             args: func_args! [
                 value: r#"zork: zoog, nonk: "nink" norgle: noog"#,
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Err("function call error: could not parse whole line successfully")
+            want: Err("function call error: could not parse whole line successfully"),
+            tdef: TypeDef::new().fallible().object(map!{}),
         }
     ];
 }

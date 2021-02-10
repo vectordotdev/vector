@@ -9,6 +9,10 @@ impl Function for Now {
         "now"
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[]
+    }
+
     fn compile(&self, _: ArgumentList) -> Compiled {
         Ok(Box::new(NowFn))
     }
@@ -23,10 +27,7 @@ impl Expression for NowFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef {
-            kind: Kind::Timestamp,
-            ..Default::default()
-        }
+        TypeDef::new().timestamp()
     }
 }
 

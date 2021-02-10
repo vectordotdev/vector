@@ -1,5 +1,5 @@
-use vrl::prelude::*;
 use shared::conversion::Conversion;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToBool;
@@ -12,19 +12,19 @@ impl Function for ToBool {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: crate::util::is_scalar_value,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ToBoolFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ToBoolFn {
     value: Box<dyn Expression>,
 }
@@ -37,10 +37,10 @@ impl ToBoolFn {
 }
 
 impl Expression for ToBoolFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Value::*;
 
-        let value = self.value.execute(state, object)?;
+        let value = self.value.resolve(ctx)?;
 
         match value {
             Boolean(_) => Ok(value),
@@ -57,8 +57,7 @@ impl Expression for ToBoolFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
@@ -69,8 +68,7 @@ impl Expression for ToBoolFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         boolean_infallible {
             expr: |_| ToBoolFn { value: lit!(true).boxed() },
@@ -144,7 +142,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

@@ -13,26 +13,26 @@ impl Function for ParseAwsVpcFlowLog {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let format = arguments.optional("format").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let format = arguments.optional("format");
 
         Ok(Box::new(ParseAwsVpcFlowLogFn::new(value, format)))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseAwsVpcFlowLogFn {
     value: Box<dyn Expression>,
     format: Option<Box<dyn Expression>>,
@@ -45,13 +45,13 @@ impl ParseAwsVpcFlowLogFn {
 }
 
 impl Expression for ParseAwsVpcFlowLogFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let input = String::from_utf8_lossy(&bytes);
 
         match &self.format {
             Some(expr) => {
-                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let bytes = expr.resolve(ctx)?.try_bytes()?;
                 parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
             }
             None => parse_log(&input, None),
@@ -148,8 +148,7 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_noop {
             expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),

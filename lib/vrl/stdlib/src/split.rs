@@ -13,26 +13,26 @@ impl Function for Split {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Regex(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "limit",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let pattern = arguments.required("pattern")?.boxed();
-        let limit = arguments.optional("limit").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let pattern = arguments.required("pattern");
+        let limit = arguments.optional("limit");
 
         Ok(Box::new(SplitFn {
             value,
@@ -50,13 +50,13 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
         let limit: usize = self
             .limit
             .as_ref()
-            .map(|expr| expr.execute(state, object))
+            .map(|expr| expr.resolve(ctx))
             .transpose()?
             .map(i64::try_from)
             .transpose()?
@@ -64,7 +64,7 @@ impl Expression for SplitFn {
             .unwrap_or(usize::MAX);
 
         self.pattern
-            .execute(state, object)
+            .resolve(ctx)
             .and_then(|pattern| match pattern {
                 Value::Regex(pattern) => Ok(pattern
                     .splitn(string.as_ref(), limit as usize)
@@ -86,8 +86,7 @@ impl Expression for SplitFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let limit_def = self.limit.as_ref().map(|limit| {
             limit
                 .type_def(state)

@@ -1,4 +1,6 @@
 use super::{Error, Kind, Regex, Value};
+use crate::expression::{container, Container, Expr, Literal};
+use crate::Expression;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
@@ -6,6 +8,47 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+
+impl Value {
+    /// Convert a given [`Value`] into a [`Expression`] trait object.
+    pub fn into_expression(self) -> Box<dyn Expression> {
+        Box::new(self.into_expr())
+    }
+
+    /// Convert a given [`Value`] into an [`Expr`] enum variant.
+    ///
+    /// This is a non-public function because we want to avoid exposing internal
+    /// details about the expression variants.
+    pub(crate) fn into_expr(self) -> Expr {
+        use Value::*;
+
+        match self {
+            Bytes(v) => Literal::from(v).into(),
+            Integer(v) => Literal::from(v).into(),
+            Float(v) => Literal::from(v).into(),
+            Boolean(v) => Literal::from(v).into(),
+            Object(v) => {
+                let object = crate::expression::Object::from(
+                    v.into_iter()
+                        .map(|(k, v)| (k, v.into_expr()))
+                        .collect::<BTreeMap<_, _>>(),
+                );
+
+                Container::new(container::Variant::from(object)).into()
+            }
+            Array(v) => {
+                let array = crate::expression::Array::from(
+                    v.into_iter().map(|v| v.into_expr()).collect::<Vec<_>>(),
+                );
+
+                Container::new(container::Variant::from(array)).into()
+            }
+            Timestamp(v) => Literal::from(v).into(),
+            Regex(v) => Literal::from(v).into(),
+            Null => Literal::from(()).into(),
+        }
+    }
+}
 
 // Value::Integer --------------------------------------------------------------
 
@@ -186,6 +229,13 @@ impl Value {
         match self {
             Value::Bytes(v) => v,
             _ => panic!("not a bytes"),
+        }
+    }
+
+    pub fn unwrap_bytes_utf8_lossy<'a>(&'a self) -> Cow<'a, str> {
+        match self.as_bytes() {
+            Some(bytes) => String::from_utf8_lossy(&bytes),
+            None => panic!("not a bytes"),
         }
     }
 

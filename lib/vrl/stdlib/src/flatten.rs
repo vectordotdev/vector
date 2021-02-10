@@ -1,5 +1,5 @@
-use vrl::prelude::*;
 use std::collections::btree_map;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Flatten;
@@ -17,8 +17,23 @@ impl Function for Flatten {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "object",
+                source: r#"flatten({ "foo": { "bar": true }})"#,
+                result: Ok(r#"{ "foo.bar": true }"#),
+            },
+            Example {
+                title: "array",
+                source: r#"flatten([[true]])"#,
+                result: Ok(r#"[true]"#),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
         Ok(Box::new(FlattenFn { value }))
     }
 }
@@ -44,7 +59,13 @@ impl Expression for FlattenFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).unknown_inner_types().infallible()
+        let td = self.value.type_def(state);
+
+        if td.is_array() {
+            TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+        } else {
+            TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+        }
     }
 }
 

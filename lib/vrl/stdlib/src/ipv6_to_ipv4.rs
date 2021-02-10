@@ -13,19 +13,19 @@ impl Function for Ipv6ToIpV4 {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Ipv6ToIpV4Fn {
     value: Box<dyn Expression>,
 }
@@ -38,9 +38,9 @@ impl Ipv6ToIpV4Fn {
 }
 
 impl Expression for Ipv6ToIpV4Fn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let ip = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            let bytes = self.value.resolve(ctx)?.try_bytes()?;
             String::from_utf8_lossy(&bytes)
                 .parse()
                 .map_err(|err| format!("unable to parse IP address: {}", err))?
@@ -109,7 +109,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object = Value::Map(object);
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

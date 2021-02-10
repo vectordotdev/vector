@@ -12,26 +12,26 @@ impl Function for Truncate {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "limit",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "ellipsis",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let limit = arguments.required("limit")?.boxed();
-        let ellipsis = arguments.optional("ellipsis").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let limit = arguments.required("limit");
+        let ellipsis = arguments.optional("ellipsis");
 
         Ok(Box::new(TruncateFn {
             value,
@@ -41,7 +41,7 @@ impl Function for Truncate {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct TruncateFn {
     value: Box<dyn Expression>,
     limit: Box<dyn Expression>,
@@ -66,14 +66,14 @@ impl TruncateFn {
 }
 
 impl Expression for TruncateFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let mut value = self
             .value
-            .execute(state, object)?
+            .resolve(ctx)?
             .try_bytes_utf8_lossy()?
             .into_owned();
 
-        let limit = match self.limit.execute(state, object)? {
+        let limit = match self.limit.resolve(ctx)? {
             Value::Float(f) => f.floor() as i64,
             Value::Integer(i) => i,
             _ => unreachable!(),
@@ -81,7 +81,7 @@ impl Expression for TruncateFn {
 
         let limit = if limit < 0 { 0 } else { limit as usize };
         let ellipsis = match &self.ellipsis {
-            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => false,
         };
 
@@ -106,8 +106,7 @@ impl Expression for TruncateFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
@@ -129,8 +128,7 @@ impl Expression for TruncateFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         infallible {
             expr: |_| TruncateFn {
@@ -281,7 +279,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

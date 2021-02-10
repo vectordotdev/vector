@@ -14,19 +14,19 @@ impl Function for ParseSyslog {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ParseSyslogFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseSyslogFn {
     value: Box<dyn Expression>,
 }
@@ -100,8 +100,8 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Expression for ParseSyslogFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let message = String::from_utf8_lossy(&bytes);
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
@@ -202,7 +202,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp.map(Into::into));
@@ -229,7 +229,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap();
+        let value = query.resolve(&mut ctx).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -238,7 +238,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap();
+        let value = query.resolve(&mut ctx).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -247,7 +247,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap();
+        let value = query.resolve(&mut ctx).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -256,7 +256,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap();
+        let value = query.resolve(&mut ctx).unwrap();
         assert!(!there_is_map_called_empty(value).unwrap());
     }
 }

@@ -13,19 +13,19 @@ impl Function for Match {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |_| true,
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
 
         Ok(Box::new(MatchFn { value, pattern }))
@@ -46,8 +46,8 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
 
         Ok(self.pattern.is_match(&string).into())
@@ -66,8 +66,7 @@ impl Expression for MatchFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_string {
             expr: |_| MatchFn {
@@ -117,7 +116,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

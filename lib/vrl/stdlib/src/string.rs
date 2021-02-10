@@ -1,9 +1,9 @@
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct STring;
+pub struct String;
 
-impl Function for STring {
+impl Function for String {
     fn identifier(&self) -> &'static str {
         "string"
     }
@@ -16,8 +16,25 @@ impl Function for STring {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "valid",
+                source: r#"string("foobar")"#,
+                result: Ok("foobar"),
+            },
+            Example {
+                title: "invalid",
+                source: "string!(true)",
+                result: Err(
+                    r#"function call error for "string" at (0:13): expected "string", got "boolean""#,
+                ),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
 
         Ok(Box::new(StringFn { value }))
     }

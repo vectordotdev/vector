@@ -242,7 +242,7 @@ pub use split::Split;
 #[cfg(feature = "starts_with")]
 pub use starts_with::StartsWith;
 #[cfg(feature = "string")]
-pub use string::STring;
+pub use string::String;
 #[cfg(feature = "strip_ansi_escape_codes")]
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
@@ -379,7 +379,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "starts_with")]
         Box::new(StartsWith),
         #[cfg(feature = "string")]
-        Box::new(STring),
+        Box::new(String),
         #[cfg(feature = "strip_ansi_escape_codes")]
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]

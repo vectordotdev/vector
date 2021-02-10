@@ -11,13 +11,13 @@ impl Function for DecodeBase64 {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(DecodeBase64Fn { value }))
     }
@@ -29,8 +29,8 @@ struct DecodeBase64Fn {
 }
 
 impl Expression for DecodeBase64Fn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         base64::decode(value)
             .map(Into::into)
@@ -50,8 +50,7 @@ impl Expression for DecodeBase64Fn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![
         value_string_fallible {
             expr: |_| DecodeBase64Fn {

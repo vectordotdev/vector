@@ -20,6 +20,22 @@ pub enum Literal {
     Null,
 }
 
+impl Literal {
+    pub fn to_value(&self) -> Value {
+        use Literal::*;
+
+        match self {
+            String(v) => Value::Bytes(v.clone()),
+            Integer(v) => Value::Integer(*v),
+            Float(v) => Value::Float(v.clone()),
+            Boolean(v) => Value::Boolean(*v),
+            Regex(v) => Value::Regex(v.clone()),
+            Timestamp(v) => Value::Timestamp(v.clone()),
+            Null => Value::Null,
+        }
+    }
+}
+
 impl TryFrom<Node<ast::Literal>> for Literal {
     type Error = Error;
 
@@ -47,19 +63,7 @@ impl TryFrom<Node<ast::Literal>> for Literal {
 
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        use Literal::*;
-
-        let value = match self {
-            String(v) => Value::Bytes(v.clone()),
-            Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.clone()),
-            Boolean(v) => Value::Boolean(*v),
-            Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.clone()),
-            Null => Value::Null,
-        };
-
-        Ok(value)
+        Ok(self.to_value())
     }
 
     fn type_def(&self, _: &State) -> TypeDef {
@@ -332,4 +336,22 @@ impl From<(Span, chrono::ParseError)> for Error {
             span,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{expr, test_type_def, TypeDef};
+
+    test_type_def![
+        bytes {
+            expr: |_| expr!("foo"),
+            want: TypeDef::new().bytes(),
+        }
+
+        integer {
+            expr: |_| expr!(12),
+            want: TypeDef::new().integer(),
+        }
+    ];
 }

@@ -2,6 +2,7 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
+    function,
     path::{self, Path},
     state, Context, Expression, Function, Program, Target, Value,
 };

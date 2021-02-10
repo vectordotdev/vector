@@ -1,6 +1,6 @@
 use crate::util;
-use vrl::prelude::*;
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
@@ -50,8 +50,23 @@ impl Function for Compact {
         ]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "object",
+                source: r#"compact({ "a": {}, "b": null, "c": [null], "d": "", "e": "-", "f": true })"#,
+                result: Ok(r#"{ "e": "-", "f": true }"#),
+            },
+            Example {
+                title: "nullish",
+                source: r#"compact(["-", "   ", "\n", null, true], nullish: true)"#,
+                result: Ok(r#"[true]"#),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
         let recursive = arguments.optional("recursive");
         let null = arguments.optional("null");
         let string = arguments.optional("string");
@@ -164,7 +179,13 @@ impl Expression for CompactFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).unknown_inner_types().infallible()
+        let td = self.value.type_def(state);
+
+        if td.is_array() {
+            TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+        } else {
+            TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+        }
     }
 }
 

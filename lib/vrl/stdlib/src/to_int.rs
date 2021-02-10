@@ -1,5 +1,5 @@
-use vrl::prelude::*;
 use shared::conversion::Conversion;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToInt;
@@ -17,8 +17,76 @@ impl Function for ToInt {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "integer",
+                source: "to_int(5)",
+                result: Ok("5"),
+            },
+            Example {
+                title: "float",
+                source: "to_int(5.6)",
+                result: Ok("6"),
+            },
+            Example {
+                title: "true",
+                source: "to_int(true)",
+                result: Ok("1"),
+            },
+            Example {
+                title: "false",
+                source: "to_int(false)",
+                result: Ok("0"),
+            },
+            Example {
+                title: "null",
+                source: "to_int(null)",
+                result: Ok("0"),
+            },
+            Example {
+                title: "timestamp",
+                source: "to_int(t'2020-01-01T00:00:00Z')",
+                result: Ok("1577836800"),
+            },
+            Example {
+                title: "valid string",
+                source: "to_int!(s'5')",
+                result: Ok("5"),
+            },
+            Example {
+                title: "invalid string",
+                source: "to_int!(s'foobar')",
+                result: Err(
+                    r#"function call error for "to_int" at (0:18): Invalid integer "foobar": invalid digit found in string"#,
+                ),
+            },
+            Example {
+                title: "array",
+                source: "to_int!([])",
+                result: Err(
+                    r#"function call error for "to_int" at (0:11): unable to coerce "array" into "integer""#,
+                ),
+            },
+            Example {
+                title: "object",
+                source: "to_int!({})",
+                result: Err(
+                    r#"function call error for "to_int" at (0:11): unable to coerce "object" into "integer""#,
+                ),
+            },
+            Example {
+                title: "regex",
+                source: "to_int!(r'foo')",
+                result: Err(
+                    r#"function call error for "to_int" at (0:15): unable to coerce "regex" into "integer""#,
+                ),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
 
         Ok(Box::new(ToIntFn { value }))
     }
@@ -37,22 +105,23 @@ impl Expression for ToIntFn {
 
         match value {
             Integer(_) => Ok(value),
-            Float(v) => Ok(Integer(v.into_inner() as i64)),
+            Float(v) => Ok(Integer(v.into_inner().round() as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
             Null => Ok(0.into()),
             Bytes(v) => Conversion::Integer
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             Timestamp(v) => Ok(v.timestamp().into()),
-            Array(_) | Object(_) | Regex(_) => Err("unable to convert value to integer".into()),
+            v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()))?,
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(
-                Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null | Kind::Timestamp,
+        TypeDef::new()
+            .with_fallibility(
+                self.value
+                    .type_def(state)
+                    .has_kind(Kind::Bytes | Kind::Array | Kind::Object | Kind::Regex),
             )
             .integer()
     }
@@ -62,8 +131,7 @@ impl Expression for ToIntFn {
 // mod tests {
 //     use super::*;
 //     use chrono::{DateTime, Utc};
-//     use value::Kind;
-
+//
 //     vrl::test_type_def![
 //         boolean_infallible {
 //             expr: |_| ToIntFn { value: lit!(true).boxed() },
@@ -137,7 +205,7 @@ impl Expression for ToIntFn {
 //         for (object, exp, func) in cases {
 //             let mut object: Value = object.into();
 //             let got = func
-//                 .execute(&mut state, &mut object)
+//                 .resolve(&mut ctx)
 //                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
 //             assert_eq!(got, exp);

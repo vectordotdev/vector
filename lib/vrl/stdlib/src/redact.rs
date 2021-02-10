@@ -13,29 +13,29 @@ impl Function for Redact {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "filters",
-                accepts: |v| matches!(v, Value::Array(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "redactor",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "patterns",
-                accepts: |v| matches!(v, Value::Array(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         let filters = arguments
             .optional_enum_list("filters", &Filter::all_str())?
@@ -62,7 +62,7 @@ impl Function for Redact {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct RedactFn {
     value: Box<dyn Expression>,
     filters: Vec<Filter>,
@@ -71,8 +71,8 @@ struct RedactFn {
 }
 
 impl Expression for RedactFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let mut input = value.try_bytes_utf8_lossy()?.into_owned();
 
         for filter in &self.filters {
@@ -82,7 +82,7 @@ impl Expression for RedactFn {
                     .as_deref()
                     .unwrap_or_default()
                     .iter()
-                    .try_for_each::<_, Result<()>>(|expr| match expr.execute(state, object)? {
+                    .try_for_each::<_, Result<()>>(|expr| match expr.resolve(ctx)? {
                         Value::Bytes(bytes) => {
                             let pattern = String::from_utf8_lossy(&bytes);
 
@@ -108,8 +108,7 @@ impl Expression for RedactFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let mut typedef = self
             .value
             .type_def(state)

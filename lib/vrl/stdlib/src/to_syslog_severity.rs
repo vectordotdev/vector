@@ -11,26 +11,26 @@ impl Function for ToSyslogSeverity {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ToSyslogSeverityFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ToSyslogSeverityFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for ToSyslogSeverityFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let level_bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let level_bytes = self.value.resolve(ctx)?.try_bytes()?;
 
         let level = String::from_utf8_lossy(&level_bytes);
 
@@ -54,8 +54,7 @@ impl Expression for ToSyslogSeverityFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .into_fallible(true)
@@ -66,8 +65,7 @@ impl Expression for ToSyslogSeverityFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![value_not_string_fallible {
         expr: |_| ToSyslogSeverityFn {
             value: Literal::from(27).boxed(),

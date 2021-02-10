@@ -12,13 +12,13 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Block>, state: &mut State) -> Result {
+    pub fn new(node: Node<Block>, state: &State) -> Result {
         let (span, block) = node.take();
         let type_def = block.type_def(state);
 
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind),
+                variant: ErrorVariant::NonBoolean(type_def.kind()),
                 span,
                 labels: vec![],
             });

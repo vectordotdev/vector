@@ -13,32 +13,32 @@ impl Function for FormatNumber {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "scale",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "decimal_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "grouping_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let scale = arguments.optional("scale").map(Expr::boxed);
-        let decimal_separator = arguments.optional("decimal_separator").map(Expr::boxed);
-        let grouping_separator = arguments.optional("grouping_separator").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let scale = arguments.optional("scale");
+        let decimal_separator = arguments.optional("decimal_separator");
+        let grouping_separator = arguments.optional("grouping_separator");
 
         Ok(Box::new(FormatNumberFn {
             value,
@@ -49,7 +49,7 @@ impl Function for FormatNumber {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct FormatNumberFn {
     value: Box<dyn Expression>,
     scale: Option<Box<dyn Expression>>,
@@ -79,25 +79,25 @@ impl FormatNumberFn {
 }
 
 impl Expression for FormatNumberFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value: Decimal = match self.value.execute(state, object)? {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value: Decimal = match self.value.resolve(ctx)? {
             Value::Integer(v) => v.into(),
             Value::Float(v) => Decimal::from_f64(v).expect("not NaN"),
             _ => unreachable!(),
         };
 
         let scale = match &self.scale {
-            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
 
         let grouping_separator = match &self.grouping_separator {
-            Some(expr) => Some(expr.execute(state, object)?.try_bytes()?),
+            Some(expr) => Some(expr.resolve(ctx)?.try_bytes()?),
             None => None,
         };
 
         let decimal_separator = match &self.decimal_separator {
-            Some(expr) => expr.execute(state, object)?.try_bytes()?,
+            Some(expr) => expr.resolve(ctx)?.try_bytes()?,
             None => ".".into(),
         };
 
@@ -156,8 +156,7 @@ impl Expression for FormatNumberFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let scale_def = self
             .scale
             .as_ref()
@@ -190,8 +189,7 @@ impl Expression for FormatNumberFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_integer {
             expr: |_| FormatNumberFn {
@@ -291,7 +289,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

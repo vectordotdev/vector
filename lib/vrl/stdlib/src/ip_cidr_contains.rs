@@ -13,26 +13,26 @@ impl Function for IpCidrContains {
         &[
             Parameter {
                 keyword: "cidr",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let cidr = arguments.required("cidr")?.boxed();
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let cidr = arguments.required("cidr");
+        let value = arguments.required("value");
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct IpCidrContainsFn {
     cidr: Box<dyn Expression>,
     value: Box<dyn Expression>,
@@ -46,16 +46,16 @@ impl IpCidrContainsFn {
 }
 
 impl Expression for IpCidrContainsFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            let bytes = self.value.resolve(ctx)?.try_bytes()?;
             String::from_utf8_lossy(&bytes)
                 .parse()
                 .map_err(|err| format!("unable to parse IP address: {}", err))?
         };
 
         let cidr = {
-            let bytes = self.cidr.execute(state, object)?.try_bytes()?;
+            let bytes = self.cidr.resolve(ctx)?.try_bytes()?;
             let cidr = String::from_utf8_lossy(&bytes);
             IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
         };
@@ -127,7 +127,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object = Value::Map(object);
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

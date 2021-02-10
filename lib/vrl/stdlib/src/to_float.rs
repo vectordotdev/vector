@@ -12,19 +12,19 @@ impl Function for ToFloat {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: crate::util::is_scalar_value,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ToFloatFn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ToFloatFn {
     value: Box<dyn Expression>,
 }
@@ -37,10 +37,10 @@ impl ToFloatFn {
 }
 
 impl Expression for ToFloatFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Value::*;
 
-        let value = self.value.execute(state, object)?;
+        let value = self.value.resolve(ctx)?;
 
         match value {
             Float(_) => Ok(value),
@@ -57,8 +57,7 @@ impl Expression for ToFloatFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .fallible_unless(Kind::Float | Kind::Integer | Kind::Boolean | Kind::Null)
@@ -69,8 +68,7 @@ impl Expression for ToFloatFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         boolean_infallible {
             expr: |_| ToFloatFn { value: lit!(true).boxed() },

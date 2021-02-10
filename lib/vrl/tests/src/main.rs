@@ -1,11 +1,12 @@
 use ansi_term::Colour;
 use chrono::{DateTime, Utc};
 use glob::glob;
-use vrl::{diagnostic::Formatter, state, Runtime, Value};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use structopt::StructOpt;
+use vrl::{diagnostic::Formatter, function::Example, state, Runtime, Value};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -14,7 +15,13 @@ pub struct Cmd {
     pattern: Option<String>,
 
     #[structopt(short, long)]
+    fail_early: bool,
+
+    #[structopt(short, long)]
     verbose: bool,
+
+    #[structopt(long)]
+    skip_functions: bool,
 }
 
 fn main() {
@@ -22,43 +29,64 @@ fn main() {
 
     let mut failed_count = 0;
     let mut category = "".to_owned();
-    for entry in glob("tests/**/*.vrl").expect("valid pattern") {
-        let path = match entry {
-            Ok(path) => path,
-            Err(_) => continue,
-        };
 
-        if &path.to_string_lossy() == "tests/example.vrl" {
-            continue;
-        }
+    let tests = glob("tests/**/*.vrl")
+        .expect("valid pattern")
+        .into_iter()
+        .filter_map(|entry| {
+            let path = entry.ok()?;
 
-        if let Some(pat) = &cmd.pattern {
-            if !path.to_string_lossy().contains(pat) {
-                continue;
+            if &path.to_string_lossy() == "tests/example.vrl" {
+                return None;
             }
-        }
 
-        let test_category = test_category(&path);
-        if category != test_category {
-            category = test_category;
+            if let Some(pat) = &cmd.pattern {
+                if !path.to_string_lossy().contains(pat) {
+                    return None;
+                }
+            }
+
+            Some(Test::from_path(&path))
+        })
+        .chain({
+            let mut tests = vec![];
+            stdlib::all().into_iter().for_each(|function| {
+                function.examples().iter().for_each(|example| {
+                    let test = Test::from_example(function.identifier(), example);
+
+                    if let Some(pat) = &cmd.pattern {
+                        if !format!("{}/{}", test.category, test.name).contains(pat) {
+                            return;
+                        }
+                    }
+
+                    tests.push(test)
+                })
+            });
+
+            tests.into_iter()
+        })
+        .collect::<Vec<_>>();
+
+    for mut test in tests {
+        if category != test.category {
+            category = test.category;
             println!("{}", Colour::Fixed(3).bold().paint(format!("{}", category)));
         }
 
-        let name = test_name(&path);
-        let dots = 60 - name.len();
+        if let Some(err) = test.error {
+            println!("{}", Colour::Purple.bold().paint("INVALID"));
+            println!("{}", Colour::Red.paint(err));
+            failed_count += 1;
+            continue;
+        }
 
-        print!("  {}{}", name, Colour::Fixed(240).paint(".".repeat(dots)));
-
-        let mut test = match Test::new(&path) {
-            Ok(test) => test,
-            Err(err) => {
-                println!("{}", Colour::Purple.bold().paint("INVALID"));
-                println!("{}", Colour::Red.paint(err));
-                failed_count += 1;
-
-                continue;
-            }
-        };
+        let dots = 60 - test.name.len();
+        print!(
+            "  {}{}",
+            test.name,
+            Colour::Fixed(240).paint(".".repeat(dots))
+        );
 
         if test.skip {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
@@ -77,18 +105,20 @@ fn main() {
                 match result {
                     Ok(got) => {
                         if !test.skip {
-                            let want = if want.starts_with("r'") {
+                            let want = if want.starts_with("r'") && want.ends_with("'") {
                                 match regex::Regex::new(
                                     &want[2..want.len() - 1].replace("\\'", "'"),
                                 ) {
                                     Ok(want) => want.into(),
                                     Err(_) => want.into(),
                                 }
-                            } else if want.starts_with("t'") {
+                            } else if want.starts_with("t'") && want.ends_with("'") {
                                 match DateTime::<Utc>::from_str(&want[2..want.len() - 1]) {
                                     Ok(want) => want.into(),
                                     Err(_) => want.into(),
                                 }
+                            } else if want.starts_with("s'") && want.ends_with("'") {
+                                want[2..want.len() - 1].into()
                             } else {
                                 match serde_json::from_str::<'_, Value>(&want.trim()) {
                                     Ok(want) => want,
@@ -108,6 +138,10 @@ fn main() {
                                 let diff = prettydiff::diff_chars(&want, &got)
                                     .set_highlight_whitespace(true);
                                 println!("  {}", diff);
+
+                                if cmd.fail_early {
+                                    std::process::exit(1)
+                                }
                             }
                         }
 
@@ -130,6 +164,10 @@ fn main() {
 
                                 let diff = prettydiff::diff_lines(&want, &got);
                                 println!("{}", diff);
+
+                                if cmd.fail_early {
+                                    std::process::exit(1)
+                                }
                             }
                         }
 
@@ -155,6 +193,10 @@ fn main() {
 
                         let diff = prettydiff::diff_lines(&want, &got);
                         println!("{}", diff);
+
+                        if cmd.fail_early {
+                            std::process::exit(1)
+                        }
                     }
                 }
 
@@ -174,6 +216,8 @@ fn main() {
 #[derive(Debug)]
 struct Test {
     name: String,
+    category: String,
+    error: Option<String>,
     source: String,
     object: Value,
     result: String,
@@ -189,8 +233,9 @@ enum CaptureMode {
 }
 
 impl Test {
-    fn new(path: &Path) -> Result<Self, String> {
+    fn from_path(path: &Path) -> Self {
         let name = test_name(path);
+        let category = test_category(&path);
         let content = fs::read_to_string(path).expect("content");
 
         let mut source = String::new();
@@ -239,23 +284,50 @@ impl Test {
             }
         }
 
+        let mut error = None;
         let object = if object.is_empty() {
-            Value::Object(std::collections::BTreeMap::default())
+            Value::Object(BTreeMap::default())
         } else {
-            serde_json::from_str::<'_, Value>(&object)
-                .map_err(|err| format!("unable to parse object as JSON: {}", err))?
+            match serde_json::from_str::<'_, Value>(&object) {
+                Ok(value) => value,
+                Err(err) => {
+                    error = Some(format!("unable to parse object as JSON: {}", err));
+                    Value::Null
+                }
+            }
         };
 
         result = result.trim_end().to_owned();
 
-        Ok(Self {
+        Self {
             name,
+            category,
+            error,
             source,
             object,
             result,
             result_approx,
             skip,
-        })
+        }
+    }
+
+    fn from_example(func: &'static str, example: &Example) -> Self {
+        let object = Value::Object(BTreeMap::default());
+        let result = match example.result {
+            Ok(string) => string.to_owned(),
+            Err(err) => err.to_string(),
+        };
+
+        Self {
+            name: example.title.to_owned(),
+            category: format!("functions/{}", func),
+            error: None,
+            source: example.source.to_owned(),
+            object,
+            result,
+            result_approx: false,
+            skip: false,
+        }
     }
 }
 

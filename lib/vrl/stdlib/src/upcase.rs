@@ -1,5 +1,4 @@
 use vrl::prelude::*;
-use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Upcase;
@@ -7,6 +6,27 @@ pub struct Upcase;
 impl Function for Upcase {
     fn identifier(&self) -> &'static str {
         "upcase"
+    }
+
+    fn summary(&self) -> &'static str {
+        "return the uppercase variant of a string"
+    }
+
+    fn usage(&self) -> &'static str {
+        indoc! {r#"
+            Returns a copy of `value` that is entirely uppercase.
+
+            "Uppercase" is defined according to the terms of the Unicode Derived Core Property
+            Uppercase.
+        "#}
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "upcase",
+            source: r#"upcase("foo 2 bar")"#,
+            result: Ok("FOO 2 BAR"),
+        }]
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -18,7 +38,7 @@ impl Function for Upcase {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
 
         Ok(Box::new(UpcaseFn { value }))
     }
@@ -41,45 +61,25 @@ impl Expression for UpcaseFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//     use value::Kind;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map;
+    use std::convert::TryFrom;
 
-//     vrl::test_type_def![
-//         string {
-//             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    vrl::test_type_def![
+        string {
+            expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+        }
 
-//         non_string {
-//             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-
-//     #[test]
-//     fn upcase() {
-//         let cases = vec![(
-//             map!["foo": "foo 2 bar"],
-//             Ok(Value::from("FOO 2 BAR")),
-//             UpcaseFn::new(Box::new(Path::from("foo"))),
-//         )];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .execute(&mut state, &mut object)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        non_string {
+            expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes,
+                ..Default::default()
+            },
+        }
+    ];
+}

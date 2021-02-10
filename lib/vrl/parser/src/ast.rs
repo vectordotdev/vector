@@ -612,7 +612,7 @@ impl fmt::Debug for Predicate {
 // -----------------------------------------------------------------------------
 
 #[derive(PartialEq)]
-pub struct Op(pub Box<Node<Expr>>, pub Opcode, pub Box<Node<Expr>>);
+pub struct Op(pub Box<Node<Expr>>, pub Node<Opcode>, pub Box<Node<Expr>>);
 
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -622,7 +622,7 @@ impl fmt::Display for Op {
 
 impl fmt::Debug for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Op({} {} {})", self.0, self.1, self.2)
+        write!(f, "Op({:?} {} {:?})", self.0, self.1, self.2)
     }
 }
 
@@ -755,9 +755,10 @@ impl fmt::Debug for Assignment {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq)]
 pub enum AssignmentTarget {
     Noop,
+    Query(Query),
     Internal(Ident, Option<Path>),
     External(Option<Path>),
 }
@@ -768,6 +769,7 @@ impl fmt::Display for AssignmentTarget {
 
         match self {
             Noop => f.write_str("_"),
+            Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
             External(Some(path)) => path.fmt(f),
@@ -782,6 +784,7 @@ impl fmt::Debug for AssignmentTarget {
 
         match self {
             Noop => f.write_str("Noop"),
+            Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "Internal({}{})", ident, path),
             Internal(ident, _) => write!(f, "Internal({})", ident),
             External(Some(path)) => write!(f, "External({})", path),

@@ -13,26 +13,26 @@ impl Function for Ceil {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Float(_) | Value::Integer(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "precision",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let precision = arguments.optional("precision").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let precision = arguments.optional("precision");
 
         Ok(Box::new(CeilFn { value, precision }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct CeilFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,
@@ -46,13 +46,13 @@ impl CeilFn {
 }
 
 impl Expression for CeilFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = match &self.precision {
-            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            Some(expr) => expr.resolve(ctx)?.try_integer()?,
             None => 0,
         };
 
-        match self.value.execute(state, object)? {
+        match self.value.resolve(ctx)? {
             Value::Float(f) => Ok(round_to_precision(f, precision, f64::ceil).into()),
             v @ Value::Integer(_) => Ok(v),
             _ => unreachable!(),
@@ -60,8 +60,7 @@ impl Expression for CeilFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let value_def = self
             .value
             .type_def(state)
@@ -85,8 +84,7 @@ impl Expression for CeilFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_float {
             expr: |_| CeilFn {
@@ -172,7 +170,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

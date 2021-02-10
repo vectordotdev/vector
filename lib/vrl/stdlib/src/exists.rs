@@ -11,70 +11,62 @@ impl Function for Exists {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "field",
-            accepts: |_| true,
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let field = arguments.required_path("field")?;
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "existing field",
+                source: r#"exists({ "foo": "bar"}.foo)"#,
+                result: Ok("true"),
+            },
+            Example {
+                title: "non-existing field",
+                source: r#"exists({ "foo": "bar"}.baz)"#,
+                result: Ok("false"),
+            },
+        ]
+    }
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let query = arguments.required_query("target")?;
 
-        Ok(Box::new(ExistsFn { field }))
+        Ok(Box::new(ExistsFn { query }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ExistsFn {
-    field: Path,
-}
-
-impl ExistsFn {
-    #[cfg(test)]
-    fn new(field: Path) -> Self {
-        Self { field }
-    }
+    query: expression::Query,
 }
 
 impl Expression for ExistsFn {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let find = object.get(self.field.as_ref());
-        Ok(Value::from(!(find.is_err() || find.unwrap().is_none())))
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let path = self.query.path();
+
+        if self.query.is_external() {
+            return Ok(ctx.target_mut().get(path).ok().flatten().is_some().into());
+        }
+
+        if let Some(ident) = self.query.variable_ident() {
+            return match ctx.state().variable(ident) {
+                Some(value) => Ok(value.get_by_path(path).is_some().into()),
+                None => Ok(false.into()),
+            };
+        }
+
+        if let Some(expr) = self.query.expression_target() {
+            let value = expr.resolve(ctx)?;
+
+            return Ok(value.get_by_path(path).is_some().into());
+        }
+
+        Ok(false.into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef {
-            fallible: false,
-            kind: value::Kind::Boolean,
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::map;
-
-    #[test]
-    fn exists() {
-        let cases = vec![
-            (map![], Ok(false.into()), ExistsFn::new(Path::from("foo"))),
-            (
-                map!["foo": 42],
-                Ok(true.into()),
-                ExistsFn::new(Path::from("foo")),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object = Value::Map(object);
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
+        TypeDef::new().infallible().boolean()
     }
 }

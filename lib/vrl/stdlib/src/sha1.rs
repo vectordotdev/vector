@@ -17,8 +17,16 @@ impl Function for Sha1 {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "sha1",
+            source: r#"sha1("foobar")"#,
+            result: Ok("8843d7f92416211de9ebb963ff4ce28125932878"),
+        }]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
 
         Ok(Box::new(Sha1Fn { value }))
     }
@@ -44,7 +52,7 @@ impl Expression for Sha1Fn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().bytes().infallible()
+        TypeDef::new().infallible().bytes()
     }
 }
 
@@ -52,8 +60,7 @@ impl Expression for Sha1Fn {
 // mod tests {
 //     use super::*;
 //     use crate::map;
-//     use value::Kind;
-
+//
 //     vrl::test_type_def![
 //         value_string {
 //             expr: |_| Sha1Fn { value: Literal::from("foo").boxed() },
@@ -84,7 +91,7 @@ impl Expression for Sha1Fn {
 //         for (object, exp, func) in cases {
 //             let mut object: Value = object.into();
 //             let got = func
-//                 .execute(&mut state, &mut object)
+//                 .resolve(&mut ctx)
 //                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
 //             assert_eq!(got, exp);

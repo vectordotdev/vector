@@ -12,26 +12,46 @@ impl Function for Assert {
         &[
             Parameter {
                 keyword: "condition",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::BOOLEAN,
                 required: true,
             },
             Parameter {
                 keyword: "message",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::BYTES,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let condition = arguments.required("condition")?.boxed();
-        let message = arguments.optional("message").map(Expr::boxed);
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "success",
+                source: "assert!(true)",
+                result: Ok("true"),
+            },
+            Example {
+                title: "failure",
+                source: "assert!(true == false)",
+                result: Err(r#"function call error for "assert" at (0:22): assertion failed"#),
+            },
+            Example {
+                title: "custom message",
+                source: "assert!(false, s'custom error')",
+                result: Err(r#"function call error for "assert" at (0:31): custom error"#),
+            },
+        ]
+    }
+
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let condition = arguments.required("condition");
+        let message = arguments.optional("message");
 
         Ok(Box::new(AssertFn { condition, message }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct AssertFn {
     condition: Box<dyn Expression>,
     message: Option<Box<dyn Expression>>,
@@ -45,72 +65,32 @@ impl AssertFn {
 }
 
 impl Expression for AssertFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let condition = self.condition.execute(state, object)?.try_boolean()?;
-        if condition {
-            Ok(Value::Null)
-        } else {
-            let message = match self.message.as_ref() {
-                Some(message) => message
-                    .execute(state, object)?
-                    .try_bytes_utf8_lossy()?
-                    .into_owned(),
-                None => {
-                    // If Expression implemented Display, we could could return the expression here.
-                    "evaluated to false".to_string()
-                }
-            };
-            Err(Error::Assert(message))
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        match self.condition.resolve(ctx)?.unwrap_boolean() {
+            true => Ok(true.into()),
+            false => Err(self
+                .message
+                .as_ref()
+                .map(|m| {
+                    m.resolve(ctx)
+                        .map(|v| v.unwrap_bytes_utf8_lossy().into_owned())
+                })
+                .transpose()?
+                .unwrap_or_else(|| match self.condition.format() {
+                    Some(string) => format!("assertion failed: {}", string),
+                    None => "assertion failed".to_owned(),
+                })
+                .into()),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.condition
-            .type_def(state)
-            .into_fallible(true)
-            .with_constraint(value::Kind::Null)
+        self.condition.type_def(state).fallible().boolean()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::map;
-
-    #[test]
-    fn assert() {
-        let cases = vec![
-            (
-                map!["test": false],
-                Err("assertion failed: This has not gone well".to_string()),
-                AssertFn::new(
-                    Box::new(Path::from("test")),
-                    Some(Box::new(Literal::from(Value::from(
-                        "This has not gone well",
-                    )))),
-                ),
-            ),
-            (
-                map!["test": false],
-                Err("assertion failed: evaluated to false".to_string()),
-                AssertFn::new(Box::new(Path::from("test")), None),
-            ),
-            (
-                map!["test": true],
-                Ok(Value::Null),
-                AssertFn::new(Box::new(Path::from("test")), None),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object = Value::Map(object);
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
+impl fmt::Display for AssertFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("")
     }
 }

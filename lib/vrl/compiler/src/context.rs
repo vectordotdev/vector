@@ -12,22 +12,22 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`Target`].
-    pub(crate) fn target(&self) -> &dyn Target {
+    pub fn target(&self) -> &dyn Target {
         self.target
     }
 
     /// Get a mutable reference to the [`Target`].
-    pub(crate) fn target_mut(&mut self) -> &mut dyn Target {
+    pub fn target_mut(&mut self) -> &mut dyn Target {
         self.target
     }
 
     /// Get a reference to the [`runtime state`](Runtime).
-    pub(crate) fn state(&self) -> &Runtime {
+    pub fn state(&self) -> &Runtime {
         &self.state
     }
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
-    pub(crate) fn state_mut(&mut self) -> &mut Runtime {
+    pub fn state_mut(&mut self) -> &mut Runtime {
         &mut self.state
     }
 }

@@ -12,35 +12,35 @@ impl Function for Push {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Array(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "item",
-                accepts: |_| true,
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let item = arguments.required("item")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let item = arguments.required("item");
 
         Ok(Box::new(PushFn { value, item }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct PushFn {
     value: Box<dyn Expression>,
     item: Box<dyn Expression>,
 }
 
 impl Expression for PushFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let mut list = self.value.execute(state, object)?.try_array()?;
-        let item = self.item.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let item = self.item.resolve(ctx)?;
 
         list.push(item);
 
@@ -48,8 +48,7 @@ impl Expression for PushFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let item_type = self.item.type_def(state).into_fallible(false);
 
         self.value
@@ -69,8 +68,7 @@ impl Expression for PushFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![
         value_array_infallible {
             expr: |_| PushFn {

@@ -15,19 +15,19 @@ impl Function for Log {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |_| true,
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "level",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
         let level = arguments
             .optional_enum("level", &LEVELS)?
             .unwrap_or_else(|| "info".to_string());
@@ -36,7 +36,7 @@ impl Function for Log {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct LogFn {
     value: Box<dyn Expression>,
     level: String,
@@ -50,8 +50,8 @@ impl LogFn {
 }
 
 impl Expression for LogFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
 
         match self.level.as_ref() {
             "trace" => trace!("{}", value),
@@ -85,7 +85,7 @@ mod tests {
             "warn".to_string(),
         );
         let mut object = Value::Map(map![]);
-        let got = func.execute(&mut state, &mut object);
+        let got = func.resolve(&mut ctx);
 
         assert_eq!(Ok(Value::Null), got);
     }

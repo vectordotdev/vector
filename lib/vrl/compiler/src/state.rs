@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub struct Compiler {
     /// Keeps track of [`Variable`](crate::expression::Variable) or
     /// [`Target`](crate::Target) assignments.
-    assignments: HashMap<assignment::Target, TypeDef>,
+    assignments: HashMap<assignment::Target, assignment::Details>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -26,12 +26,16 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub(crate) fn assignment(&self, target: &assignment::Target) -> Option<&TypeDef> {
+    pub(crate) fn assignment(&self, target: &assignment::Target) -> Option<&assignment::Details> {
         self.assignments.get(target)
     }
 
-    pub(crate) fn insert_assignment(&mut self, target: assignment::Target, type_def: TypeDef) {
-        self.assignments.insert(target, type_def);
+    pub(crate) fn insert_assignment(
+        &mut self,
+        target: assignment::Target,
+        details: assignment::Details,
+    ) {
+        self.assignments.insert(target, details);
     }
 
     /// Take a snapshot of the current state of the compiler.
@@ -64,11 +68,11 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub(crate) fn variable(&self, ident: &Ident) -> Option<&Value> {
+    pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(&ident)
     }
 
-    pub(crate) fn variable_mut(&mut self, ident: &Ident) -> Option<&mut Value> {
+    pub fn variable_mut(&mut self, ident: &Ident) -> Option<&mut Value> {
         self.variables.get_mut(&ident)
     }
 

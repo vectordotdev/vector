@@ -27,20 +27,14 @@ impl Expression for Object {
         let type_defs = self
             .inner
             .iter()
-            .map(|(_, expr)| expr.type_def(state))
-            .collect::<Vec<_>>();
+            .map(|(k, expr)| (k.to_owned(), expr.type_def(state)))
+            .collect::<BTreeMap<_, _>>();
 
         // If any of the stored expressions is fallible, the entire object is
         // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
+        let fallible = type_defs.values().any(TypeDef::is_fallible);
 
-        let inner = type_defs
-            .into_iter()
-            .fold(TypeDef::empty(), |acc, td| acc.merge(td));
-
-        TypeDef::new()
-            .object(Some(inner))
-            .with_fallibility(fallible)
+        TypeDef::new().object(type_defs).with_fallibility(fallible)
     }
 }
 
@@ -54,5 +48,11 @@ impl fmt::Display for Object {
             .join(", ");
 
         write!(f, "{{ {} }}", exprs)
+    }
+}
+
+impl From<BTreeMap<String, Expr>> for Object {
+    fn from(inner: BTreeMap<String, Expr>) -> Self {
+        Self { inner }
     }
 }

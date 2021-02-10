@@ -16,19 +16,19 @@ impl Function for ParseRegex {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |_| true,
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
 
         Ok(Box::new(ParseRegexFn { value, pattern }))
@@ -42,8 +42,8 @@ pub(crate) struct ParseRegexFn {
 }
 
 impl Expression for ParseRegexFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         Ok(self
@@ -66,8 +66,7 @@ impl Expression for ParseRegexFn {
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_string {
             expr: |_| ParseRegexFn {

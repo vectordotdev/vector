@@ -1,4 +1,3 @@
-use crate::map;
 use vrl::prelude::*;
 use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 
@@ -13,13 +12,13 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ParseAwsCloudWatchLogSubscriptionMessageFn {
             value,
@@ -27,14 +26,14 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseAwsCloudWatchLogSubscriptionMessageFn {
     value: Box<dyn Expression>,
 }
 
 impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
 
         let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
             .map_err(|e| format!("unable to parse: {}", e))?;
@@ -66,7 +65,6 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use value::Kind;
 
     test_function![
         parse_aws_cloudwatch_log_subscription_message => ParseAwsCloudWatchLogSubscriptionMessage;

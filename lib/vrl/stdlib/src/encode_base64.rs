@@ -13,26 +13,26 @@ impl Function for EncodeBase64 {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "padding",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::ANY,
                 required: false,
             },
             Parameter {
                 keyword: "charset",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let padding = arguments.optional("padding").map(Expr::boxed);
-        let charset = arguments.optional("charset").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let padding = arguments.optional("padding");
+        let charset = arguments.optional("charset");
 
         Ok(Box::new(EncodeBase64Fn {
             value,
@@ -87,14 +87,14 @@ struct EncodeBase64Fn {
 }
 
 impl Expression for EncodeBase64Fn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         let padding = self
             .padding
             .as_ref()
             .map(|p| {
-                p.execute(state, object)
+                p.resolve(ctx)
                     .and_then(|v| Value::try_boolean(v).map_err(Into::into))
             })
             .transpose()?
@@ -104,7 +104,7 @@ impl Expression for EncodeBase64Fn {
             .charset
             .as_ref()
             .map(|c| {
-                c.execute(state, object)
+                c.resolve(ctx)
                     .and_then(|v| Value::try_bytes(v).map_err(Into::into))
             })
             .transpose()?
@@ -118,8 +118,7 @@ impl Expression for EncodeBase64Fn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         let padding_def = self
             .padding
             .as_ref()
@@ -142,8 +141,7 @@ impl Expression for EncodeBase64Fn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![
         value_string_padding_unspecified_charset_unspecified_infallible {
             expr: |_| EncodeBase64Fn {

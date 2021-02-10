@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use vrl::prelude::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use vrl::prelude::*;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"/(?P<subnet>\d*)").unwrap();
@@ -19,26 +19,26 @@ impl Function for IpSubnet {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "subnet",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let subnet = arguments.required("subnet")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let subnet = arguments.required("subnet");
 
         Ok(Box::new(IpSubnetFn { value, subnet }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct IpSubnetFn {
     value: Box<dyn Expression>,
     subnet: Box<dyn Expression>,
@@ -52,15 +52,15 @@ impl IpSubnetFn {
 }
 
 impl Expression for IpSubnetFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value: IpAddr = self
             .value
-            .execute(state, object)?
+            .resolve(ctx)?
             .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;
 
-        let mask = self.subnet.execute(state, object)?;
+        let mask = self.subnet.resolve(ctx)?;
         let mask = mask.try_bytes_utf8_lossy()?;
 
         let mask = if mask.starts_with('/') {
@@ -210,7 +210,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object = Value::Map(object);
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

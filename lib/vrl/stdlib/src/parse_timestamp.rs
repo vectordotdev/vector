@@ -13,26 +13,26 @@ impl Function for ParseTimestamp {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let format = arguments.required("format")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let format = arguments.required("format");
 
         Ok(Box::new(ParseTimestampFn { value, format }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,
@@ -48,9 +48,9 @@ impl ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
-        let format = self.format.execute(state, object);
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
+        let format = self.format.resolve(ctx);
 
         match value {
             Value::Bytes(v) => format
@@ -65,8 +65,7 @@ impl Expression for ParseTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             // Always fallible because the format needs to be parsed at runtime
@@ -153,7 +152,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

@@ -6,8 +6,10 @@ edition = "2018"
 publish = false
 
 [dependencies]
+parser = { package = "vrl-parser", path = "../parser" }
+# stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["parse_json", "now", "to_string", "to_timestamp", "to_int", "string", "sha1", "upcase", "flatten", "compact", "del", "assert", "append", "sha2", "replace"] }
 vrl = { path = "../core" }
-stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 
 ansi_term = "0.12"
 chrono = "0.4"

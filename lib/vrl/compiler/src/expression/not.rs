@@ -18,7 +18,7 @@ impl Not {
 
         if !type_def.is_boolean() {
             return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind),
+                variant: ErrorVariant::NonBoolean(type_def.kind()),
                 not_span,
                 expr_span,
             });
@@ -42,7 +42,7 @@ impl Expression for Not {
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
-        TypeDef::new().boolean().infallible()
+        self.inner.type_def(state).boolean()
     }
 }
 

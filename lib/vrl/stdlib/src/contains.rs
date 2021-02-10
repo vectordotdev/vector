@@ -12,26 +12,26 @@ impl Function for Contains {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "case_sensitive",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let substring = arguments.required("substring")?.boxed();
-        let case_sensitive = arguments.optional("case_sensitive").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let substring = arguments.required("substring");
+        let case_sensitive = arguments.optional("case_sensitive");
 
         Ok(Box::new(ContainsFn {
             value,
@@ -41,7 +41,7 @@ impl Function for Contains {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ContainsFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
@@ -63,14 +63,14 @@ impl ContainsFn {
 }
 
 impl Expression for ContainsFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = match &self.case_sensitive {
-            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => false,
         };
 
         let substring = {
-            let bytes = self.substring.execute(state, object)?.try_bytes()?;
+            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -80,7 +80,7 @@ impl Expression for ContainsFn {
         };
 
         let value = {
-            let value = self.value.execute(state, object)?;
+            let value = self.value.resolve(ctx)?;
             let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
@@ -170,7 +170,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

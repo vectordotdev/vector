@@ -1,5 +1,5 @@
-use vrl::prelude::*;
 use std::str::FromStr;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToUnixTimestamp;
@@ -9,23 +9,56 @@ impl Function for ToUnixTimestamp {
         "to_unix_timestamp"
     }
 
+    fn summary(&self) -> &'static str {
+        "convert a given timestamp to a Unix timestamp integer"
+    }
+
+    fn usage(&self) -> &'static str {
+        indoc! {"
+            Coerces the provided `value` into a Unix timestamp.
+
+            By default, the number of seconds since the Unix epoch is returned, but milliseconds or
+            nanoseconds can be returned via the `unit` argument.
+        "}
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "default (seconds)",
+                source: "to_unix_timestamp(t'2000-01-01T00:00:00Z')",
+                result: Ok("946684800"),
+            },
+            Example {
+                title: "milliseconds",
+                source: r#"to_unix_timestamp(t'2010-01-01T00:00:00Z', unit: "milliseconds")"#,
+                result: Ok("1262304000000"),
+            },
+            Example {
+                title: "nanoseconds",
+                source: r#"to_unix_timestamp(t'2020-01-01T00:00:00Z', unit: "nanoseconds")"#,
+                result: Ok("1577836800000000000"),
+            },
+        ]
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Timestamp(_)),
+                kind: kind::TIMESTAMP,
                 required: true,
             },
             Parameter {
                 keyword: "unit",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ARRAY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         let unit = arguments
             .optional_enum("unit", &Unit::all_str())?
@@ -85,7 +118,7 @@ impl FromStr for Unit {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct ToUnixTimestampFn {
     value: Box<dyn Expression>,
     unit: Unit,
@@ -99,8 +132,8 @@ impl ToUnixTimestampFn {
 }
 
 impl Expression for ToUnixTimestampFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let ts = self.value.execute(state, object)?.try_timestamp()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let ts = self.value.resolve(ctx)?.try_timestamp()?;
 
         let time = match self.unit {
             Unit::Seconds => ts.timestamp(),
@@ -124,7 +157,6 @@ mod test {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
-    use value::Kind;
 
     test_type_def![
         timestamp_infallible {
@@ -185,7 +217,7 @@ mod test {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

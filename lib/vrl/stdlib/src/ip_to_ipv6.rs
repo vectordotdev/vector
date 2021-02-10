@@ -13,19 +13,19 @@ impl Function for IpToIpv6 {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(IpToIpv6Fn { value }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct IpToIpv6Fn {
     value: Box<dyn Expression>,
 }
@@ -38,10 +38,10 @@ impl IpToIpv6Fn {
 }
 
 impl Expression for IpToIpv6Fn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let ip: IpAddr = self
             .value
-            .execute(state, object)?
+            .resolve(ctx)?
             .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;
@@ -104,7 +104,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object = Value::Map(object);
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

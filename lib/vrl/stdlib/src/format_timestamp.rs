@@ -14,26 +14,26 @@ impl Function for FormatTimestamp {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Timestamp(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let format = arguments.required("format")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let format = arguments.required("format");
 
         Ok(Box::new(FormatTimestampFn { value, format }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct FormatTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,
@@ -49,10 +49,10 @@ impl FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.format.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.format.resolve(ctx)?.try_bytes()?;
         let format = String::from_utf8_lossy(&bytes);
-        let ts = self.value.execute(state, object)?.try_timestamp()?;
+        let ts = self.value.resolve(ctx)?.try_timestamp()?;
 
         try_format(&ts, &format).map(Into::into)
     }
@@ -88,8 +88,7 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_and_format {
             expr: |_| FormatTimestampFn {
@@ -142,7 +141,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

@@ -12,26 +12,26 @@ impl Function for StartsWith {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "case_sensitive",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                kind: kind::ANY,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let substring = arguments.required("substring")?.boxed();
-        let case_sensitive = arguments.optional("case_sensitive").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let substring = arguments.required("substring");
+        let case_sensitive = arguments.optional("case_sensitive");
 
         Ok(Box::new(StartsWithFn {
             value,
@@ -41,7 +41,7 @@ impl Function for StartsWith {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct StartsWithFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
@@ -63,14 +63,14 @@ impl StartsWithFn {
 }
 
 impl Expression for StartsWithFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = match &self.case_sensitive {
-            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => false,
         };
 
         let substring = {
-            let bytes = self.substring.execute(state, object)?.try_bytes()?;
+            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -80,7 +80,7 @@ impl Expression for StartsWithFn {
         };
 
         let value = {
-            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            let bytes = self.value.resolve(ctx)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -114,8 +114,7 @@ impl Expression for StartsWithFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind;
-
+    
     vrl::test_type_def![
         value_string {
             expr: |_| StartsWithFn {
@@ -209,7 +208,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

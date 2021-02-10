@@ -13,13 +13,13 @@ impl Function for IsNullish {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_) | Value::Null),
+            kind: kind::ANY,
             required: true,
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(IsNullishFn { value }))
     }
@@ -31,13 +31,12 @@ struct IsNullishFn {
 }
 
 impl Expression for IsNullishFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        Ok(util::is_nullish(&self.value.execute(state, object)?).into())
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        Ok(util::is_nullish(&self.value.resolve(ctx)?).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
-
+        
         self.value
             .type_def(state)
             .into_fallible(false)
@@ -48,8 +47,7 @@ impl Expression for IsNullishFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use value::Kind;
-
+    
     test_type_def![
         string_infallible {
             expr: |_| IsNullishFn {

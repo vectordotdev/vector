@@ -1,10 +1,11 @@
-use crate::expression::{Expr, Literal, Resolved};
+use crate::expression::{Expr, Literal, Query, Resolved};
 use crate::parser::{
     ast::{self, Ident},
     Node,
 };
 use crate::{value::Kind, Context, Expression, Path, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use std::convert::TryFrom;
 use std::fmt;
 
 #[derive(PartialEq)]
@@ -49,13 +50,21 @@ impl Assignment {
                     });
                 }
 
-                let target = Target::from(target.into_inner());
+                let expr = expr.into_inner();
+                let target = Target::try_from(target.into_inner())?;
+                let details = Details {
+                    type_def,
+                    value: match &expr {
+                        Expr::Literal(v) => Some(v.to_value()),
+                        _ => None,
+                    },
+                };
 
-                state.insert_assignment(target.clone(), type_def);
+                state.insert_assignment(target.clone(), details);
 
                 let variant = Variant::Single {
                     target,
-                    expr: Box::new(expr.into_inner()),
+                    expr: Box::new(expr),
                 };
 
                 Ok(Self { variant })
@@ -96,25 +105,38 @@ impl Assignment {
                     });
                 }
 
+                let expr = expr.into_inner();
+
                 // "ok" target takes on the type definition of the value, but is
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
+                let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.fallible();
+                let details = Details {
+                    type_def,
+                    value: match &expr {
+                        Expr::Literal(v) => Some(v.to_value()),
+                        _ => None,
+                    },
+                };
+
+                state.insert_assignment(ok.clone(), details);
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
-                let err_type_def = TypeDef::new().scalar(Kind::Bytes | Kind::Null);
+                let err = Target::try_from(err.into_inner())?;
+                let type_def = TypeDef::new().scalar(Kind::Bytes | Kind::Null);
+                let details = Details {
+                    type_def,
+                    value: None,
+                };
 
-                let ok = Target::from(ok.into_inner());
-                let err = Target::from(err.into_inner());
-
-                state.insert_assignment(ok.clone(), type_def);
-                state.insert_assignment(ok.clone(), err_type_def);
+                state.insert_assignment(ok.clone(), details);
 
                 let variant = Variant::Infallible {
                     ok,
                     err,
-                    expr: Box::new(expr.into_inner()),
+                    expr: Box::new(expr),
                 };
 
                 Ok(Self { variant })
@@ -233,15 +255,40 @@ impl fmt::Debug for Target {
     }
 }
 
-impl From<ast::AssignmentTarget> for Target {
-    fn from(target: ast::AssignmentTarget) -> Self {
+impl TryFrom<ast::AssignmentTarget> for Target {
+    type Error = Error;
+
+    fn try_from(target: ast::AssignmentTarget) -> Result<Self, Error> {
         use Target::*;
 
-        match target {
+        let target = match target {
             ast::AssignmentTarget::Noop => Noop,
+            ast::AssignmentTarget::Query(query) => {
+                let ast::Query { target, path } = query;
+
+                let (target_span, target) = target.take();
+                let (path_span, path) = path.take();
+
+                let span = Span::new(target_span.start(), path_span.end());
+
+                match target {
+                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path.into())),
+                    ast::QueryTarget::External => External(Some(path.into())),
+                    _ => {
+                        return Err(Error {
+                            variant: ErrorVariant::InvalidTarget(span),
+                            span,
+                            expr_span: span,
+                            assignment_span: span,
+                        })
+                    }
+                }
+            }
             ast::AssignmentTarget::Internal(ident, path) => Internal(ident, path.map(Into::into)),
             ast::AssignmentTarget::External(path) => External(path.map(Into::into)),
-        }
+        };
+
+        Ok(target)
     }
 }
 
@@ -294,6 +341,29 @@ where
     }
 }
 
+impl<T, U> fmt::Display for Variant<T, U>
+where
+    T: fmt::Display,
+    U: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Variant::*;
+
+        match self {
+            Single { target, expr } => write!(f, "{} = {}", target, expr),
+            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub(crate) struct Details {
+    pub type_def: TypeDef,
+    pub value: Option<Value>,
+}
+
 // -----------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -314,6 +384,9 @@ pub enum ErrorVariant {
 
     #[error("unneeded error assignment")]
     InfallibleAssignment(String, String, Span, Span),
+
+    #[error("invalid assignment target")]
+    InvalidTarget(Span),
 }
 
 impl fmt::Display for Error {
@@ -352,6 +425,10 @@ impl DiagnosticError for Error {
                 Label::context("because this expression cannot fail", self.expr_span),
                 Label::context(format!("use: {} = {}", target, expr), ok_span),
             ],
+            InvalidTarget(span) => vec![
+                Label::primary("invalid assignment target", span),
+                Label::context("use one of variable or path", span),
+            ],
         }
     }
 
@@ -359,9 +436,8 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            UnneededNoop(..) => vec![],
-            FallibleAssignment(..) => vec![Note::SeeErrorDocs],
-            InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            _ => vec![],
         }
     }
 }

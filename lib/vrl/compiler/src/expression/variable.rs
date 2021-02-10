@@ -6,14 +6,28 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub struct Variable {
     ident: Ident,
+    value: Option<Value>,
 }
 
 impl Variable {
     // TODO:
     //
     // - Error if variable has not been assigned yet.
-    pub(crate) fn new(ident: Ident) -> Self {
-        Self { ident }
+    pub(crate) fn new(ident: Ident, state: &State) -> Self {
+        let target = assignment::Target::Internal(ident.clone(), None);
+        let value = state
+            .assignment(&target)
+            .and_then(|v| v.value.as_ref().cloned());
+
+        Self { ident, value }
+    }
+
+    pub(crate) fn ident(&self) -> &Ident {
+        &self.ident
+    }
+
+    pub(crate) fn value(&self) -> Option<&Value> {
+        self.value.as_ref()
     }
 }
 
@@ -32,6 +46,7 @@ impl Expression for Variable {
         state
             .assignment(&target)
             .cloned()
+            .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
 }

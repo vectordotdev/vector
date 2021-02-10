@@ -9,7 +9,7 @@ mod serde;
 mod target;
 
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -56,7 +56,9 @@ impl fmt::Display for Value {
                     .join(", ");
                 write!(f, "[{}]", joined)
             }
-            Value::Timestamp(val) => write!(f, "{}", val.to_string()),
+            Value::Timestamp(val) => {
+                write!(f, "{}", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            }
             Value::Regex(regex) => write!(f, "/{}/", regex.to_string()),
             Value::Null => write!(f, "null"),
         }

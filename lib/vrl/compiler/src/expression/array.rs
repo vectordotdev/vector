@@ -33,11 +33,7 @@ impl Expression for Array {
         // fallible.
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
-        let inner = type_defs
-            .into_iter()
-            .fold(TypeDef::empty(), |acc, td| acc.merge(td));
-
-        TypeDef::new().array(Some(inner)).with_fallibility(fallible)
+        TypeDef::new().array(type_defs).with_fallibility(fallible)
     }
 }
 
@@ -52,4 +48,46 @@ impl fmt::Display for Array {
 
         write!(f, "[{}]", exprs)
     }
+}
+
+impl From<Vec<Expr>> for Array {
+    fn from(inner: Vec<Expr>) -> Self {
+        Self { inner }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{expr, map, test_type_def, value::Kind, TypeDef};
+
+    test_type_def![
+        empty_array {
+            expr: |_| expr!([]),
+            want: TypeDef::new().array::<TypeDef>(vec![]),
+        }
+
+        scalar_array {
+            expr: |_| expr!([1, "foo", true]),
+            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: Kind::Bytes,
+                2: Kind::Boolean,
+            }),
+        }
+
+        mixed_array {
+            expr: |_| expr!([1, [true, "foo"], { "bar": null }]),
+            want: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                0: Kind::Integer,
+                1: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
+                    0: Kind::Boolean,
+                    1: Kind::Bytes,
+                }),
+                2: TypeDef::new().object::<&str, TypeDef>(map! {
+                    "bar": Kind::Null,
+                }),
+            }),
+        }
+    ];
 }

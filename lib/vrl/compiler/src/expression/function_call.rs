@@ -116,7 +116,7 @@ impl FunctionCall {
             })?;
 
             // Check if the argument is of the expected type.
-            let expr_kind = argument.type_def(state).kind;
+            let expr_kind = argument.type_def(state).kind();
             if !parameter.kind().contains(expr_kind) {
                 return Err(Error::InvalidArgumentKind {
                     keyword: parameter.keyword,
@@ -160,6 +160,7 @@ impl FunctionCall {
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         let type_def = expr.type_def(state);
+
         if abort_on_error && !type_def.is_fallible() {
             return Err(Error::AbortInfallible {
                 ident_span,

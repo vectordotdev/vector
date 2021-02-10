@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
-use vrl::prelude::*;
 use shared::conversion::Conversion;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
@@ -18,8 +18,82 @@ impl Function for ToTimestamp {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "timestamp",
+                source: "to_timestamp(t'2020-01-01T00:00:00Z')",
+                result: Ok("t'2020-01-01T00:00:00Z'"),
+            },
+            Example {
+                title: "integer",
+                source: "to_timestamp(5)",
+                result: Ok("t'1970-01-01T00:00:05Z'"),
+            },
+            Example {
+                title: "float",
+                source: "to_timestamp(5.6)",
+                result: Ok("t'1970-01-01T00:00:05.600Z'"),
+            },
+            Example {
+                title: "string valid",
+                source: "to_timestamp!(s'2020-01-01T00:00:00Z')",
+                result: Ok("t'2020-01-01T00:00:00Z'"),
+            },
+            Example {
+                title: "string invalid",
+                source: "to_timestamp!(s'foo')",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:21): No matching timestamp format found for "foo""#,
+                ),
+            },
+            Example {
+                title: "true",
+                source: "to_timestamp!(true)",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:19): unable to coerce "boolean" into "timestamp""#,
+                ),
+            },
+            Example {
+                title: "false",
+                source: "to_timestamp!(false)",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:20): unable to coerce "boolean" into "timestamp""#,
+                ),
+            },
+            Example {
+                title: "null",
+                source: "to_timestamp!(null)",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:19): unable to coerce "null" into "timestamp""#,
+                ),
+            },
+            Example {
+                title: "array",
+                source: "to_timestamp!([])",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:17): unable to coerce "array" into "timestamp""#,
+                ),
+            },
+            Example {
+                title: "object",
+                source: "to_timestamp!({})",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:17): unable to coerce "object" into "timestamp""#,
+                ),
+            },
+            Example {
+                title: "regex",
+                source: "to_timestamp!(r'foo')",
+                result: Err(
+                    r#"function call error for "to_timestamp" at (0:21): unable to coerce "regex" into "timestamp""#,
+                ),
+            },
+        ]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let value = arguments.required("value")?;
+        let value = arguments.required("value");
 
         Ok(Box::new(ToTimestampFn { value }))
     }
@@ -37,12 +111,17 @@ impl Expression for ToTimestampFn {
         let value = match self.value.resolve(ctx)? {
             v @ Timestamp(_) => v,
             Integer(v) => Utc.timestamp(v, 0).into(),
-            Float(v) => Utc.timestamp(v.round() as i64, 0).into(),
+            Float(v) => Utc
+                .timestamp(
+                    v.trunc() as i64,
+                    (v.fract() * 1_000_000_000.0).round() as u32,
+                )
+                .into(),
             Bytes(v) => Conversion::Timestamp
                 .convert::<Value>(v)
                 .map_err(|err| err.to_string())?
                 .into(),
-            v => Err(format!("unable to coerce {} into timestamp", v.kind()))?,
+            v => Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()))?,
         };
 
         Ok(value)
@@ -59,7 +138,6 @@ impl Expression for ToTimestampFn {
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
-//     use value::Kind;
 
 //     vrl::test_type_def![
 //         timestamp_infallible {
@@ -122,26 +200,4 @@ impl Expression for ToTimestampFn {
 //             },
 //         }
 //     ];
-
-//     #[test]
-//     fn to_timestamp() {
-//         use crate::map;
-
-//         let cases = vec![(
-//             map!["foo": Utc.timestamp(10, 0)],
-//             Ok(Value::Timestamp(Utc.timestamp(10, 0))),
-//             ToTimestampFn::new(Box::new(Path::from("foo"))),
-//         )];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .execute(&mut state, &mut object)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
 // }

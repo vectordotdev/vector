@@ -1,6 +1,7 @@
-use crate::expression::{Expr, Resolved};
-use crate::parser::ast;
+use crate::expression::{Expr, Noop, Resolved};
+use crate::parser::{ast, Node};
 use crate::{value, Context, Expression, State, TypeDef, Value};
+use diagnostic::{DiagnosticError, Label, Span};
 use std::fmt;
 
 #[derive(PartialEq)]
@@ -8,6 +9,40 @@ pub struct Op {
     pub(crate) lhs: Box<Expr>,
     pub(crate) rhs: Box<Expr>,
     pub(crate) opcode: ast::Opcode,
+}
+
+impl Op {
+    pub fn new(lhs: Expr, opcode: Node<ast::Opcode>, rhs: Expr) -> Result<Self, Error> {
+        use ast::Opcode::*;
+
+        let (span, opcode) = opcode.take();
+
+        if matches!(opcode, Eq | Ne | Lt | Le | Gt | Ge) {
+            if let Expr::Op(op) = &lhs {
+                if matches!(op.opcode, Eq | Ne | Lt | Le | Gt | Ge) {
+                    let error = Error::ChainedComparison { span };
+                    return std::result::Result::Err(error);
+                }
+            }
+        }
+
+        Ok(Op {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            opcode,
+        })
+    }
+
+    pub fn noop() -> Self {
+        let lhs = Box::new(Noop.into());
+        let rhs = Box::new(Noop.into());
+
+        Op {
+            lhs,
+            rhs,
+            opcode: ast::Opcode::Eq,
+        }
+    }
 }
 
 impl Expression for Op {
@@ -48,9 +83,9 @@ impl Expression for Op {
         let rhs_def = self.rhs.type_def(state);
         let merged_def = lhs_def.clone() | rhs_def.clone();
 
-        let lhs_kind = lhs_def.kind;
-        let rhs_kind = rhs_def.kind;
-        let merged_kind = merged_def.kind;
+        let lhs_kind = lhs_def.kind();
+        let rhs_kind = rhs_def.kind();
+        let merged_kind = merged_def.kind();
 
         match self.opcode {
             // null || null
@@ -157,6 +192,26 @@ impl fmt::Debug for Op {
         write!(f, "Op({} {} {})", self.lhs, self.opcode, self.rhs)
     }
 }
+
+// -----------------------------------------------------------------------------
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("comparison operators cannot be chained")]
+    ChainedComparison { span: Span },
+}
+
+impl DiagnosticError for Error {
+    fn labels(&self) -> Vec<Label> {
+        use Error::*;
+
+        match self {
+            ChainedComparison { span } => vec![Label::primary("", span)],
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

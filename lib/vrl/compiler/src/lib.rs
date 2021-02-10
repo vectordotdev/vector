@@ -1,10 +1,10 @@
 mod compiler;
 mod context;
-mod expression;
 mod program;
 mod target;
 mod test_util;
 
+pub mod expression;
 pub mod function;
 pub mod path;
 pub mod state;
@@ -22,6 +22,8 @@ pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;
 pub use value::Value;
+
+pub use paste::paste;
 
 pub type Result = std::result::Result<Program, compiler::Errors>;
 

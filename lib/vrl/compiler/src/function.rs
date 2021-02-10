@@ -1,11 +1,10 @@
+use crate::expression::{Expr, Expression, FunctionArgument, Literal, Query};
+use crate::parser::Node;
 use crate::value::Kind;
-use crate::{
-    expression::{Expr, FunctionArgument},
-    parser::Node,
-    Expression,
-};
-use diagnostic::DiagnosticError;
+use crate::{Span, Value};
+use diagnostic::{DiagnosticError, Label};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fmt;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
@@ -13,6 +12,23 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 pub trait Function: Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
+
+    /// A brief single-line description explaining what this function does.
+    fn summary(&self) -> &'static str {
+        "TODO"
+    }
+
+    /// A more elaborate multi-paragraph description on how to use the function.
+    fn usage(&self) -> &'static str {
+        "TODO"
+    }
+
+    /// One or more examples demonstrating usage of the function in VRL source
+    /// code.
+    fn examples(&self) -> &'static [Example];
+    // fn examples(&self) -> &'static [Example] {
+    //     &[/* ODO */]
+    // }
 
     /// Compile a [`Function`] into a type that can be resolved to an
     /// [`Expression`].
@@ -31,6 +47,15 @@ pub trait Function: Sync + fmt::Debug {
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }
+}
+
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Example {
+    pub title: &'static str,
+    pub source: &'static str,
+    pub result: Result<&'static str, &'static str>,
 }
 
 // -----------------------------------------------------------------------------
@@ -68,13 +93,85 @@ impl Parameter {
 pub struct ArgumentList(HashMap<&'static str, Expr>);
 
 impl ArgumentList {
-    pub fn optional(&mut self, keyword: &str) -> Option<Box<dyn Expression>> {
-        self.0.remove(keyword).map(|v| Box::new(v) as _)
+    pub fn optional(&mut self, keyword: &'static str) -> Option<Box<dyn Expression>> {
+        self.optional_expr(keyword).map(|v| Box::new(v) as _)
     }
 
-    pub fn required(&mut self, keyword: &str) -> Result<Box<dyn Expression>, Error> {
-        self.optional(keyword)
-            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    pub fn required(&mut self, keyword: &'static str) -> Box<dyn Expression> {
+        Box::new(self.required_expr(keyword)) as _
+    }
+
+    pub fn optional_literal(&mut self, keyword: &'static str) -> Result<Option<Literal>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Literal(literal) => Ok(literal),
+                Expr::Variable(var) if var.value().is_some() => {
+                    match var.value().unwrap().clone().into_expr() {
+                        Expr::Literal(literal) => Ok(literal),
+                        expr => Err(Error::UnexpectedExpression {
+                            keyword,
+                            expected: "literal",
+                            expr,
+                        }),
+                    }
+                }
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "literal",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_literal(&mut self, keyword: &'static str) -> Result<Literal, Error> {
+        Ok(required(self.optional_literal(keyword)?))
+    }
+
+    pub fn optional_enum(
+        &mut self,
+        keyword: &'static str,
+        variants: &[Value],
+    ) -> Result<Option<Value>, Error> {
+        self.optional_literal(keyword)?
+            .map(|literal| literal.to_value())
+            .map(|value| {
+                variants
+                    .iter()
+                    .find(|v| *v == &value)
+                    .cloned()
+                    .ok_or(Error::InvalidEnumVariant {
+                        keyword,
+                        value,
+                        variants: variants.to_vec(),
+                    })
+            })
+            .transpose()
+    }
+
+    pub fn required_enum(
+        &mut self,
+        keyword: &'static str,
+        variants: &[Value],
+    ) -> Result<Value, Error> {
+        Ok(required(self.optional_enum(keyword, variants)?))
+    }
+
+    pub fn optional_query(&mut self, keyword: &'static str) -> Result<Option<Query>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Query(query) => Ok(query),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "query",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_query(&mut self, keyword: &'static str) -> Result<Query, Error> {
+        Ok(required(self.optional_query(keyword)?))
     }
 
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
@@ -83,6 +180,28 @@ impl ArgumentList {
 
     pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
         self.0.insert(k, v);
+    }
+
+    fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+        self.0.remove(keyword)
+    }
+
+    fn required_expr(&mut self, keyword: &'static str) -> Expr {
+        required(self.optional_expr(keyword))
+    }
+}
+
+fn required<T>(argument: Option<T>) -> T {
+    argument.expect("invalid function signature")
+}
+
+impl From<HashMap<&'static str, Value>> for ArgumentList {
+    fn from(map: HashMap<&'static str, Value>) -> Self {
+        Self(
+            map.into_iter()
+                .map(|(k, v)| (k, v.into_expr()))
+                .collect::<HashMap<_, _>>(),
+        )
     }
 }
 
@@ -106,13 +225,66 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
 
 // -----------------------------------------------------------------------------
 
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    #[error(r#"missing required argument "{0}""#)]
-    Required(String),
+    #[error("unexpected expression type")]
+    UnexpectedExpression {
+        keyword: &'static str,
+        expected: &'static str,
+        expr: Expr,
+    },
+
+    #[error(r#"invalid enum variant""#)]
+    InvalidEnumVariant {
+        keyword: &'static str,
+        value: Value,
+        variants: Vec<Value>,
+    },
 }
 
-impl diagnostic::DiagnosticError for Error {}
+impl diagnostic::DiagnosticError for Error {
+    fn labels(&self) -> Vec<Label> {
+        use Error::*;
+
+        match self {
+            UnexpectedExpression {
+                keyword,
+                expected,
+                expr,
+            } => vec![
+                Label::primary(
+                    format!(r#"unexpected expression for argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", expr.as_str()), Span::default()),
+                Label::context(format!("expected: {}", expected), Span::default()),
+            ],
+
+            InvalidEnumVariant {
+                keyword,
+                value,
+                variants,
+            } => vec![
+                Label::primary(
+                    format!(r#"invalid enum variant for argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(
+                    format!(
+                        "expected one of: {}",
+                        variants
+                            .iter()
+                            .map(|v| v.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    Span::default(),
+                ),
+            ],
+        }
+    }
+}
 
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {

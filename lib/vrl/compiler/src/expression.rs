@@ -4,7 +4,6 @@ use std::fmt;
 
 mod array;
 mod block;
-mod container;
 mod function_argument;
 mod group;
 mod if_statement;
@@ -16,6 +15,7 @@ mod unary;
 mod variable;
 
 pub(crate) mod assignment;
+pub(crate) mod container;
 pub(crate) mod function_call;
 pub(crate) mod literal;
 pub(crate) mod predicate;
@@ -53,6 +53,15 @@ pub trait Expression: Send + Sync + fmt::Debug {
     ///
     /// This method is executed at compile-time.
     fn type_def(&self, state: &crate::State) -> TypeDef;
+
+    /// Format the expression into a consistent style.
+    ///
+    /// This defaults to not formatting, so that function implementations don't
+    /// need to care about formatting (this is handled by the internal function
+    /// call expression).
+    fn format(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -67,6 +76,31 @@ pub enum Expr {
     Variable(Variable),
     Noop(Noop),
     Unary(Unary),
+}
+
+impl Expr {
+    pub fn as_str(&self) -> &str {
+        use container::Variant::*;
+        use Expr::*;
+
+        match self {
+            Literal(..) => "literal",
+            Container(v) => match &v.variant {
+                Group(..) => "group",
+                Block(..) => "block",
+                Array(..) => "array",
+                Object(..) => "object",
+            },
+            IfStatement(..) => "if-statement",
+            Op(..) => "operation",
+            Assignment(..) => "assignment",
+            Query(..) => "query",
+            FunctionCall(..) => "function call",
+            Variable(..) => "variable call",
+            Noop(..) => "noop",
+            Unary(..) => "unary operation",
+        }
+    }
 }
 
 impl Expression for Expr {
@@ -123,6 +157,8 @@ impl fmt::Display for Expr {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
 
 impl From<Literal> for Expr {
     fn from(literal: Literal) -> Self {

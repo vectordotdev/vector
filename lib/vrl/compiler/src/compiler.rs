@@ -191,10 +191,13 @@ impl<'a> Compiler<'a> {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
-        let lhs = Box::new(self.compile_expr(*lhs));
-        let rhs = Box::new(self.compile_expr(*rhs));
+        let lhs = self.compile_expr(*lhs);
+        let rhs = self.compile_expr(*rhs);
 
-        Op { lhs, rhs, opcode }
+        Op::new(lhs, opcode, rhs).unwrap_or_else(|err| {
+            self.errors.push(Box::new(err));
+            Op::noop()
+        })
     }
 
     fn compile_assignment(&mut self, node: Node<ast::Assignment>) -> Assignment {
@@ -289,7 +292,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_variable(&mut self, node: Node<ast::Ident>) -> Variable {
-        Variable::new(node.into_inner())
+        Variable::new(node.into_inner(), &self.state)
     }
 
     fn compile_unary(&mut self, node: Node<ast::Unary>) -> Unary {

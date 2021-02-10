@@ -250,8 +250,8 @@ AssignmentInfallible: Assignment = {
 #[inline]
 AssignmentTarget: AssignmentTarget = {
     "_" => AssignmentTarget::Noop,
-    "." <Path?> => AssignmentTarget::External(<>),
-    Ident Path? => AssignmentTarget::Internal(<>),
+    Query => AssignmentTarget::Query(<>),
+    Ident => AssignmentTarget::Internal(<>, None),
 };
 
 // -----------------------------------------------------------------------------
@@ -454,7 +454,7 @@ Object: Object = {
 // literals
 // -----------------------------------------------------------------------------
 
-Literal: Literal = {
+pub Literal: Literal = {
     String => Literal::String(<>),
     Integer => Literal::Integer(<>),
     Float => Literal::Float(<>),
@@ -483,15 +483,15 @@ Box<T>: Box<T> = T => Box::new(<>);
 Sp<T>: Node<T> = <l: @L> <rule: T> <r: @R> => Node::new(span(l, r), rule);
 
 #[inline]
-Op<L, Code, R>: Expr = Sp<(Sp<L> Code Sp<R>)> => {
+Op<L, Code, R>: Expr = Sp<(Sp<L> Sp<Code> Sp<R>)> => {
     let op = <>.map(|(lhs, code, rhs)| {
-        // TODO: change this so we don't need to pattern match
-        let code = match code {
-            Token::Operator(s) => s,
+        let (span, code) = code.take();
+        let op = match code {
+            Token::Operator(s) => Opcode::from_str(s).unwrap(),
             _ => panic!("must always be an operator"),
         };
 
-        Op(Box::new(lhs), Opcode::from_str(code).unwrap(), Box::new(rhs))
+        Op(Box::new(lhs), Node::new(span, op), Box::new(rhs))
     });
 
     Expr::Op(op)

@@ -1,5 +1,7 @@
 use crate::expression::{assignment, Container, FunctionCall, Resolved, Variable};
+use crate::parser::ast::Ident;
 use crate::{Context, Expression, Path, State, TypeDef, Value};
+use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(PartialEq)]
@@ -14,6 +16,29 @@ impl Query {
     // - error when trying to path into array
     pub(crate) fn new(target: Target, path: Path) -> Self {
         Query { target, path }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn is_external(&self) -> bool {
+        matches!(self.target, Target::External)
+    }
+
+    pub fn variable_ident(&self) -> Option<&Ident> {
+        match &self.target {
+            Target::Internal(v) => Some(v.ident()),
+            _ => None,
+        }
+    }
+
+    pub fn expression_target(&self) -> Option<Box<&dyn Expression>> {
+        match &self.target {
+            Target::FunctionCall(expr) => Some(Box::new(expr)),
+            Target::Container(expr) => Some(Box::new(expr)),
+            _ => None,
+        }
     }
 }
 
@@ -50,14 +75,16 @@ impl Expression for Query {
                 //
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
-                    return TypeDef::new().object(None).infallible();
+                    return TypeDef::new()
+                        .object::<String, TypeDef>(BTreeMap::default())
+                        .infallible();
                 }
 
                 let target = assignment::Target::External(Some(self.path.clone()));
 
                 match state.assignment(&target) {
-                    None => TypeDef::new().any().infallible(),
-                    Some(type_def) => type_def.clone(),
+                    None => TypeDef::new().unknown().infallible(),
+                    Some(details) => details.clone().type_def,
                 }
             }
 

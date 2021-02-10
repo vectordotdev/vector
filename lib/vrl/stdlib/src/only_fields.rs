@@ -18,7 +18,7 @@ impl Function for OnlyFields {
         }
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let mut paths = vec![];
         paths.push(arguments.required_path("1")?);
 
@@ -38,7 +38,7 @@ pub struct OnlyFieldsFn {
 }
 
 impl Expression for OnlyFieldsFn {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
         let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 
         object

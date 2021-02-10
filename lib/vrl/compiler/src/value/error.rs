@@ -23,13 +23,13 @@ pub enum Error {
     #[error("unable to multiply value type {0} with {1}")]
     Mul(Kind, Kind),
 
-    #[error("unable to divide value type {0} with {1}")]
+    #[error("unable to divide value type {0} by {1}")]
     Div(Kind, Kind),
 
     #[error("unable to divide by zero")]
     DivideByZero,
 
-    #[error("float cannot be nan")]
+    #[error("float cannot be NaN")]
     NanFloat,
 
     #[error("unable to add value type {1} to {0}")]
@@ -59,10 +59,10 @@ pub enum Error {
 
 impl DiagnosticError for Error {}
 
-impl Into<ExpressionError> for Error {
-    fn into(self) -> ExpressionError {
+impl From<Error> for ExpressionError {
+    fn from(err: Error) -> Self {
         ExpressionError {
-            message: self.message(),
+            message: err.message(),
             ..Default::default()
         }
     }

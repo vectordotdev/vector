@@ -1,16 +1,4 @@
 use vrl::Value;
-use std::collections::BTreeMap;
-
-#[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
-#[inline]
-pub(crate) fn is_scalar_value(value: &Value) -> bool {
-    use Value::*;
-
-    match value {
-        Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
-        Timestamp(_) | Object(_) | Array(_) | Regex(_) => false,
-    }
-}
 
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
@@ -36,7 +24,7 @@ where
 pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
-) -> BTreeMap<String, Value> {
+) -> std::collections::BTreeMap<String, Value> {
     let indexed = capture
         .iter()
         .filter_map(std::convert::identity)
@@ -64,25 +52,10 @@ pub(crate) fn is_nullish(value: &Value) -> bool {
 
             match s {
                 "-" => true,
-                _ => {
-                    let has_whitespace = s.chars().all(char::is_whitespace);
-                    has_whitespace
-                }
+                _ => s.chars().all(char::is_whitespace),
             }
         }
         Value::Null => true,
         _ => false,
     }
-}
-
-#[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
 }

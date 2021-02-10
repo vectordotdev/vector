@@ -44,26 +44,26 @@ impl Function for ParseDuration {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "output",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::ANY,
                 required: true,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let output = arguments.required("output")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let output = arguments.required("output");
 
         Ok(Box::new(ParseDurationFn { value, output }))
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ParseDurationFn {
     value: Box<dyn Expression>,
     output: Box<dyn Expression>,
@@ -79,12 +79,12 @@ impl ParseDurationFn {
 }
 
 impl Expression for ParseDurationFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         let conversion_factor = {
-            let bytes = self.output.execute(state, object)?.try_bytes()?;
+            let bytes = self.output.resolve(ctx)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             UNITS
@@ -213,7 +213,7 @@ mod tests {
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
             let got = func
-                .execute(&mut state, &mut object)
+                .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
             assert_eq!(got, exp);

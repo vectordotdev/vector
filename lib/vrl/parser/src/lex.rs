@@ -666,25 +666,52 @@ impl<'input> Lexer<'input> {
                 ']' if brackets == 0 => break,
                 ']' => brackets -= 1,
 
-                ch if ch == '.' && braces == 0 && parens == 0 && brackets == 0 => match ch {
-                    '.' if last_char.is_none() => valid = true,
-                    '.' if last_char == Some(')') => valid = true,
-                    '.' if last_char == Some('}') => valid = true,
-                    '.' if last_char == Some(']') => valid = true,
-                    '.' if last_char.map(is_ident_continue) == Some(true) => {
-                        // we need to make sure we're not dealing with a float here
-                        let digits = self.input[..pos]
-                            .chars()
-                            .rev()
-                            .take_while(|ch| !ch.is_whitespace())
-                            .all(|ch| is_digit(ch) || ch == '_');
+                // the lexer doesn't care about the semantic validity inside
+                // delimited regions in a query.
+                _ if braces > 0 || brackets > 0 || parens > 0 => {
+                    let (start_delim, end_delim) = if braces > 0 {
+                        ('{', '}')
+                    } else if brackets > 0 {
+                        ('[', ']')
+                    } else {
+                        ('(', ')')
+                    };
 
-                        if !digits {
-                            valid = true
+                    let mut skip_delim = 0;
+                    while let Some((_, ch)) = chars.peek() {
+                        if skip_delim == 0 && ch == &end_delim {
+                            break;
                         }
+                        chars.next().map(|(i, c)| {
+                            if c == start_delim {
+                                skip_delim += 1;
+                            }
+                            if c == end_delim {
+                                skip_delim -= 1;
+                            }
+
+                            end = i;
+                            last_char = Some(c)
+                        });
                     }
-                    _ => {}
-                },
+                }
+
+                '.' if last_char.is_none() => valid = true,
+                '.' if last_char == Some(')') => valid = true,
+                '.' if last_char == Some('}') => valid = true,
+                '.' if last_char == Some(']') => valid = true,
+                '.' if last_char.map(is_ident_continue) == Some(true) => {
+                    // we need to make sure we're not dealing with a float here
+                    let digits = self.input[..pos]
+                        .chars()
+                        .rev()
+                        .take_while(|ch| !ch.is_whitespace())
+                        .all(|ch| is_digit(ch) || ch == '_');
+
+                    if !digits {
+                        valid = true
+                    }
+                }
 
                 // literals
                 '"' => {
@@ -716,11 +743,10 @@ impl<'input> Lexer<'input> {
                     }
                 }
 
-                '.' | '!' => {}
-                ':' if braces > 0 => {}
-                ':' if parens > 0 => {}
-                ',' if brackets > 0 || braces > 0 || parens > 0 => {}
+                // function-call-abort
+                '!' => {}
 
+                // comments
                 '#' => {
                     while let Some((pos, ch)) = chars.next() {
                         if ch == '\n' {
@@ -732,27 +758,7 @@ impl<'input> Lexer<'input> {
                     continue;
                 }
 
-                ch if is_operator(ch) => {}
-
                 ch if is_ident_continue(ch) => {}
-
-                // We accept whitespace inside enclosed collections, function
-                // calls, or coalesced paths.
-                ch if ch.is_whitespace() && (brackets > 0 || parens > 0 || braces > 0) => {}
-
-                // We're dealing with an assignment, not a query.
-                _ if self.input[pos..]
-                    .lines()
-                    .next()
-                    .unwrap()
-                    .rsplit(';')
-                    .next()
-                    .unwrap()
-                    .contains('=') =>
-                {
-                    valid = false;
-                    break;
-                }
 
                 // Any other character breaks the query chain.
                 _ => break,
@@ -962,9 +968,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn next_index(&mut self) -> usize {
-        self.peek()
-            .as_ref()
-            .map_or(self.input.chars().count(), |l| l.0)
+        self.peek().as_ref().map_or(self.input.len(), |l| l.0)
     }
 
     fn escape_code(&mut self, start: usize) -> Result<char, Error> {
@@ -1542,6 +1546,27 @@ mod test {
     }
 
     #[test]
+    fn queries_op() {
+        test(
+            data(r#".a + 3 .b == true"#),
+            vec![
+                (r#"~                "#, LQuery),
+                (r#"~                "#, Dot),
+                (r#" ~               "#, Identifier("a")),
+                (r#" ~               "#, RQuery),
+                (r#"   ~             "#, Operator("+")),
+                (r#"     ~           "#, IntegerLiteral(3)),
+                (r#"       ~         "#, LQuery),
+                (r#"       ~         "#, Dot),
+                (r#"        ~        "#, Identifier("b")),
+                (r#"        ~        "#, RQuery),
+                (r#"          ~~     "#, Operator("==")),
+                (r#"             ~~~~"#, True),
+            ],
+        );
+    }
+
+    #[test]
     fn invalid_queries() {
         test(
             data(".foo.\n"),
@@ -1566,10 +1591,72 @@ mod test {
                 (" ~~~            ", Identifier("foo")),
                 ("   ~            ", RQuery),
                 ("    ~           ", Newline),
+                ("     ~          ", LQuery),
                 ("     ~          ", Dot),
                 ("      ~~~       ", Identifier("bar")),
+                ("        ~       ", RQuery),
                 ("          ~     ", Equals),
                 ("            ~~~~", True),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_nested_delims() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data(r#"{ "foo": [true] }.foo[0]"#),
+            vec![
+                (r#"~                       "#, LQuery),
+                (r#"~                       "#, LBrace),
+                (r#"  ~~~~~                 "#, L(S::Escaped("foo"))),
+                (r#"       ~                "#, Colon),
+                (r#"         ~              "#, LBracket),
+                (r#"          ~~~~          "#, True),
+                (r#"              ~         "#, RBracket),
+                (r#"                ~       "#, RBrace),
+                (r#"                 ~      "#, Dot),
+                (r#"                  ~~~   "#, Identifier("foo")),
+                (r#"                     ~  "#, LBracket),
+                (r#"                      ~ "#, IntegerLiteral(0)),
+                (r#"                       ~"#, RBracket),
+                (r#"                       ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn multi_byte_character_1() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data("a * s'漢字' * a"),
+            vec![
+                ("~                ", Identifier("a")),
+                ("  ~              ", Operator("*")),
+                ("    ~~~~~~~~~    ", L(S::Raw("漢字"))),
+                ("              ~  ", Operator("*")),
+                ("                ~", Identifier("a")),
+            ],
+        );
+    }
+
+    #[test]
+    fn multi_byte_character_2() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data("a * s'¡' * a"),
+            vec![
+                ("~            ", Identifier("a")),
+                ("  ~          ", Operator("*")),
+                ("    ~~~~~    ", L(S::Raw("¡"))),
+                ("          ~  ", Operator("*")),
+                ("            ~", Identifier("a")),
             ],
         );
     }
