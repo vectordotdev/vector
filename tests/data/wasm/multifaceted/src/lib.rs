@@ -99,7 +99,6 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 
     if let Some(timestamp) = parsed.timestamp {
         let converted = timestamp.format("%c").to_string();
-
         event.insert("timestamp".to_owned(), converted.into());
     }
 
