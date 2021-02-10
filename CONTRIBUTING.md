@@ -60,6 +60,7 @@ expanding into more specifics.
       1. [Kubernetes E2E tests](#kubernetes-e2e-tests)
          1. [Requirements](#requirements-1)
          1. [Running the E2E tests](#running-the-e2e-tests)
+      1. [Kubernetes Architecture](#kubernetes-architecture)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
