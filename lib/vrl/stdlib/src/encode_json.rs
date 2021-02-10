@@ -26,7 +26,7 @@ impl Function for EncodeJson {
         &[Example {
             title: "encode object",
             source: r#"encode_json({"field": "value", "another": [1,2,3]})"#,
-            result: Ok(r#"{"another":[1,2,3],"field":"value"}"#),
+            result: Ok(r#"s'{"another":[1,2,3],"field":"value"}'"#),
         }]
     }
 }
