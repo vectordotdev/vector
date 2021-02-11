@@ -107,7 +107,100 @@ impl KindInfo {
         }
     }
 
-    pub fn at_path(&self, path: Path) -> KindInfo {
+    /// Insert the given [`KindInfo`] into a provided path.
+    ///
+    /// For example, given kind info:
+    ///
+    /// KindInfo {
+    ///   Object {
+    ///     "bar": KindInfo {
+    ///       Bytes
+    ///     }
+    ///   }
+    /// }
+    ///
+    /// And a path `.foo`, This would return:
+    ///
+    ///
+    /// KindInfo {
+    ///   Object {
+    ///     "foo": KindInfo {
+    ///       Object {
+    ///         "bar" : KindInfo {
+    ///           Bytes
+    ///         }
+    ///       }
+    ///     }
+    ///   }
+    /// }
+    ///
+    /// e.g., the existing [`KindInfo`] gets nested into the provided path.
+    pub fn for_path(mut self, path: Path) -> Self {
+        use path::Segment;
+
+        for segment in path.segments().into_iter().rev() {
+            match segment {
+                Segment::Field(field) => {
+                    let mut map = BTreeMap::default();
+                    map.insert(Field::Field(field.as_str().to_owned()), self);
+
+                    let mut set = BTreeSet::new();
+                    set.insert(TypeKind::Object(map));
+
+                    self = KindInfo::Known(set);
+                }
+                Segment::Coalesce(fields) => {
+                    let field = fields.last().unwrap();
+                    let mut map = BTreeMap::default();
+                    map.insert(Field::Field(field.as_str().to_owned()), self);
+
+                    let mut set = BTreeSet::new();
+                    set.insert(TypeKind::Object(map));
+
+                    self = KindInfo::Known(set);
+                }
+                Segment::Index(mut index) => {
+                    let mut index = index as usize;
+                    let mut map = BTreeMap::default();
+
+                    let mut i = 0;
+                    while i < index {
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Null);
+                        map.insert(Index::Index(i), Self::Known(set));
+                        i += 1;
+                    }
+
+                    map.insert(Index::Index(index), self);
+
+                    let mut set = BTreeSet::new();
+                    set.insert(TypeKind::Array(map));
+
+                    self = KindInfo::Known(set);
+                }
+            }
+        }
+
+        self
+    }
+
+    /// Given a [`KindInfo`], try to fetch the inner [`KindInfo`] based on the
+    /// provided path.
+    ///
+    /// For example, Given kind info:
+    ///
+    /// KindInfo {
+    ///   Object {
+    ///     "foo": KindInfo {
+    ///       Bytes
+    ///     }
+    ///   }
+    /// }
+    ///
+    /// And a path `.foo`. This would return `KindInfo::Bytes`.
+    pub fn at_path(&self, path: Path) -> Self {
+        use path::Segment;
+
         let mut iter = path.into_iter();
 
         let info = match self {
@@ -115,7 +208,7 @@ impl KindInfo {
             kind @ KindInfo::Known(_) => match iter.next() {
                 None => return kind.clone(),
                 Some(segment) => match segment {
-                    path::Segment::Coalesce(fields) => match kind.object() {
+                    Segment::Coalesce(fields) => match kind.object() {
                         None => KindInfo::Unknown,
                         Some(kind) => fields
                             .into_iter()
@@ -131,7 +224,7 @@ impl KindInfo {
                                 }
                             }),
                     },
-                    path::Segment::Field(field) => match kind.object() {
+                    Segment::Field(field) => match kind.object() {
                         None => KindInfo::Unknown,
                         Some(kind) => {
                             let field = Field::Field(field.as_str().to_owned());
@@ -145,7 +238,7 @@ impl KindInfo {
                             }
                         }
                     },
-                    path::Segment::Index(index) => match kind.array() {
+                    Segment::Index(index) => match kind.array() {
                         None => KindInfo::Unknown,
                         Some(kind) => {
                             let index = Index::Index(index as usize);
@@ -395,6 +488,13 @@ impl TypeDef {
     pub fn at_path(&self, path: Path) -> TypeDef {
         let fallible = self.fallible;
         let kind = self.kind.at_path(path);
+
+        Self { fallible, kind }
+    }
+
+    pub fn for_path(self, path: Path) -> TypeDef {
+        let fallible = self.fallible;
+        let kind = self.kind.for_path(path);
 
         Self { fallible, kind }
     }

@@ -14,9 +14,8 @@ impl Variable {
     //
     // - Error if variable has not been assigned yet.
     pub(crate) fn new(ident: Ident, state: &State) -> Self {
-        let target = assignment::Target::Internal(ident.clone(), None);
         let value = state
-            .assignment(&target)
+            .variable(&ident)
             .and_then(|v| v.value.as_ref().cloned());
 
         Self { ident, value }
@@ -41,10 +40,8 @@ impl Expression for Variable {
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
-        let target = assignment::Target::Internal(self.ident.clone(), None);
-
         state
-            .assignment(&target)
+            .variable(&self.ident)
             .cloned()
             .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::new().null().infallible())
