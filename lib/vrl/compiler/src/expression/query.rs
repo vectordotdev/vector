@@ -80,11 +80,9 @@ impl Expression for Query {
                         .infallible();
                 }
 
-                let target = assignment::Target::External(Some(self.path.clone()));
-
-                match state.assignment(&target) {
+                match state.target() {
                     None => TypeDef::new().unknown().infallible(),
-                    Some(details) => details.clone().type_def,
+                    Some(details) => details.clone().type_def.at_path(self.path.clone()),
                 }
             }
 

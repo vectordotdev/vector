@@ -52,15 +52,12 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                let details = Details {
-                    type_def,
-                    value: match &expr {
-                        Expr::Literal(v) => Some(v.to_value()),
-                        _ => None,
-                    },
+                let value = match &expr {
+                    Expr::Literal(v) => Some(v.to_value()),
+                    _ => None,
                 };
 
-                state.insert_assignment(target.clone(), details);
+                target.insert_type_def(state, type_def, value);
 
                 let variant = Variant::Single {
                     target,
@@ -111,27 +108,20 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
-                let type_def = type_def.fallible();
-                let details = Details {
-                    type_def,
-                    value: match &expr {
-                        Expr::Literal(v) => Some(v.to_value()),
-                        _ => None,
-                    },
+                let type_def = type_def.add_null().infallible();
+                let value = match &expr {
+                    Expr::Literal(v) => Some(v.to_value()),
+                    _ => None,
                 };
 
-                state.insert_assignment(ok.clone(), details);
+                ok.insert_type_def(state, type_def, value);
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
-                let type_def = TypeDef::new().scalar(Kind::Bytes | Kind::Null);
-                let details = Details {
-                    type_def,
-                    value: None,
-                };
+                let type_def = TypeDef::new().bytes().add_null().infallible();
 
-                state.insert_assignment(ok.clone(), details);
+                err.insert_type_def(state, type_def, None);
 
                 let variant = Variant::Infallible {
                     ok,
@@ -195,6 +185,45 @@ pub enum Target {
 }
 
 impl Target {
+    fn insert_type_def(&self, state: &mut State, type_def: TypeDef, value: Option<Value>) {
+        use Target::*;
+
+        match self {
+            Noop => {}
+            Internal(ident, path) => {
+                let td = match path {
+                    None => type_def,
+                    Some(path) => type_def.for_path(path.clone()),
+                };
+
+                let type_def = match state.variable(ident) {
+                    None => td,
+                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                };
+
+                let details = Details { type_def, value };
+
+                state.insert_variable(ident.clone(), details);
+            }
+
+            External(path) => {
+                let td = match path {
+                    None => type_def,
+                    Some(path) => type_def.for_path(path.clone()),
+                };
+
+                let type_def = match state.target() {
+                    None => td,
+                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                };
+
+                let details = Details { type_def, value };
+
+                state.update_target(details);
+            }
+        }
+    }
+
     fn insert(&self, value: Value, ctx: &mut Context) {
         use Target::*;
 

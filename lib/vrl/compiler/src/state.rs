@@ -1,5 +1,5 @@
 use crate::expression::assignment;
-use crate::{parser::ast::Ident, TypeDef, Value};
+use crate::{parser::ast::Ident, Value};
 use std::collections::HashMap;
 
 /// The state held by the compiler.
@@ -8,9 +8,11 @@ use std::collections::HashMap;
 /// compilation, which in turn drives our progressive type checking system.
 #[derive(Clone, Default)]
 pub struct Compiler {
-    /// Keeps track of [`Variable`](crate::expression::Variable) or
-    /// [`Target`](crate::Target) assignments.
-    assignments: HashMap<assignment::Target, assignment::Details>,
+    // stored external target type definition
+    target: Option<assignment::Details>,
+
+    // stored internal variable type definitions
+    variables: HashMap<Ident, assignment::Details>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -26,26 +28,32 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub(crate) fn assignment(&self, target: &assignment::Target) -> Option<&assignment::Details> {
-        self.assignments.get(target)
+    pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
+        self.variables.get(ident)
     }
 
-    pub(crate) fn insert_assignment(
-        &mut self,
-        target: assignment::Target,
-        details: assignment::Details,
-    ) {
-        self.assignments.insert(target, details);
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
+        self.variables.insert(ident, details);
+    }
+
+    pub(crate) fn target(&self) -> Option<&assignment::Details> {
+        self.target.as_ref()
+    }
+
+    pub(crate) fn update_target(&mut self, details: assignment::Details) {
+        self.target = Some(details);
     }
 
     /// Take a snapshot of the current state of the compiler.
     ///
     /// This overwrites any existing snapshot currently stored.
     pub(crate) fn snapshot(&mut self) {
-        let assignments = self.assignments.clone();
+        let target = self.target.clone();
+        let variables = self.variables.clone();
 
         let snapshot = Self {
-            assignments,
+            target,
+            variables,
             snapshot: None,
         };
 
