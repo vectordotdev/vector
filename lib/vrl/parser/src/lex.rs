@@ -569,7 +569,6 @@ impl<'input> Lexer<'input> {
         self.token2(start, end, token)
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn token2(
         &mut self,
         start: usize,
@@ -820,6 +819,7 @@ impl<'input> Lexer<'input> {
 
                 // comments
                 '#' => {
+                    #[allow(clippy::while_let_on_iterator)]
                     while let Some((pos, ch)) = chars.next() {
                         if ch == '\n' {
                             break;
@@ -919,7 +919,6 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn identifier_or_function_call(&mut self, start: usize) -> Spanned<'input, usize> {
         let (end, ident) = self.take_while(start, is_ident_continue);
 
@@ -929,7 +928,7 @@ impl<'input> Lexer<'input> {
             Token::ident(ident)
         };
 
-        return Ok((start, token, end));
+        Ok((start, token, end));
     }
 
     fn operator(&mut self, start: usize) -> Spanned<'input, usize> {
@@ -942,7 +941,7 @@ impl<'input> Lexer<'input> {
             op => Token::Operator(op),
         };
 
-        return Ok((start, token, end));
+        Ok((start, token, end));
     }
 
     fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
@@ -1002,7 +1001,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn peek(&mut self) -> Option<(usize, char)> {
-        self.chars.peek().map(|v| *v)
+        self.chars.peek().copied()
     }
 
     fn take_while<F>(&mut self, start: usize, mut keep_going: F) -> (usize, &'input str)
@@ -1067,10 +1066,7 @@ impl<'input> Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 fn is_ident_start(ch: char) -> bool {
-    match ch {
-        'a'..='z' => true,
-        _ => false,
-    }
+    matches!(ch, 'a'..='z')
 }
 
 fn is_ident_continue(ch: char) -> bool {
@@ -1092,10 +1088,10 @@ fn is_digit(ch: char) -> bool {
 }
 
 pub fn is_operator(ch: char) -> bool {
-    match ch {
-        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|' => true,
-        _ => false,
-    }
+    matches!(
+        ch,
+        '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
+    )
 }
 
 fn unescape_string_literal(mut s: &str) -> String {
@@ -1126,7 +1122,7 @@ mod test {
     use super::*;
     use crate::lex::Token::*;
 
-    fn lexer<'input>(input: &'input str) -> impl Iterator<Item = Spanned<'input, usize>> + 'input {
+    fn lexer(input: &str) -> impl Iterator<Item = Spanned<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
         Box::new(std::iter::from_fn(move || Some(lexer.next()?)))
     }
@@ -1143,8 +1139,8 @@ mod test {
         for (token, (expected_span, expected_tok)) in lexer.by_ref().zip(expected.into_iter()) {
             count += 1;
             println!("{:?}", token);
-            let start = expected_span.find("~").unwrap_or_default();
-            let end = expected_span.rfind("~").map(|i| i + 1).unwrap_or_default();
+            let start = expected_span.find('~').unwrap_or_default();
+            let end = expected_span.rfind('~').map(|i| i + 1).unwrap_or_default();
 
             let expect = (start, expected_tok, end);
             assert_eq!(Ok(expect), token);

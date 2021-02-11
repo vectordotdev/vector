@@ -186,10 +186,7 @@ mod tests {
             let source = format!("_a {}", source);
 
             let lexer = Lexer::new(&source);
-            let result = TestParser::new()
-                .parse(&source, lexer)
-                .map(Test::regex)
-                .map(|r| r.to_string());
+            let result = TestParser::new().parse(&source, lexer).map(Test::regex);
 
             if result.is_err() {
                 dbg!(&result);
