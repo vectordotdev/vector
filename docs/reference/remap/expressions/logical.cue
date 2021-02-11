@@ -1,7 +1,7 @@
 package metadata
 
 remap: expressions: logical: {
-	title: "Assignment"
+	title: "Logical"
 	description: """
 		A _logical_ expression compares two expressions (operands), short-circuiting on the last expression evaluated
 		as defined by the operator.
@@ -23,7 +23,7 @@ remap: expressions: logical: {
 			}
 			operator: {
 				description: """
-					The `operator` defines the operation performed on the left-hand and right-hand side operations.
+					The `operator` defines the operation performed on the left-hand- and right-hand-side operations.
 					"""
 				enum: {
 					"&&": "Conditional AND. Supports boolean expressions only."

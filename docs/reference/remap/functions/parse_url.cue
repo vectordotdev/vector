@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: parse_url: {
+	category:    "Parse"
+	description: """
+		Parses the `value` in [URL](\(urls.url)) format.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -12,19 +17,15 @@ remap: functions: parse_url: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted URL",
 	]
-	return: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` in URL format.
-		"""#
+	return: types: ["map"]
+
 	examples: [
 		{
 			title: "Parse URL"
-			input: log: url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
 			source: #"""
-				.url = parse_url(.url)
+				parse_url("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
 				"""#
-			output: log: url: {
+			return: {
 				scheme:   "ftp"
 				username: "foo"
 				password: "bar"

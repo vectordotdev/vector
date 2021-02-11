@@ -775,6 +775,32 @@
         .b == 0.1
       '''
 
+[transforms.remap_function_parse_glog]
+  inputs = []
+  type = "remap"
+  source = """
+    .glog = parse_glog!(.message)
+    """
+[[tests]]
+  name = "remap_function_parse_glog"
+  [tests.input]
+    insert_at = "remap_function_parse_glog"
+    type = "log"
+    [tests.input.log_fields]
+      message = "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_glog"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .glog.level == "info" && \
+        .glog.timestamp == to_timestamp!("2021-01-31T14:48:54.411655Z") && \
+        .glog.id == 15520 && \
+        .glog.file == "main.c++" && \
+        .glog.line == 9 && \
+        .glog.message == "Hello world!"
+      '''
+
 [transforms.remap_function_format_number]
   inputs = []
   type = "remap"
@@ -1064,6 +1090,47 @@
         .grokked2.message == "Hello world"
       '''
 
+[transforms.remap_function_parse_common_log]
+  inputs = []
+  type = "remap"
+  source = """
+    .common_log = parse_common_log!(.message)
+    .common_log_timestamp_format = parse_common_log!(.message, "%d/%b/%Y:%T %z")
+    """
+[[tests]]
+  name = "remap_function_parse_common_log"
+  [tests.input]
+    insert_at = "remap_function_parse_common_log"
+    type = "log"
+    [tests.input.log_fields]
+      message = """127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"""
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_common_log"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .common_log.host == "127.0.0.1" && \
+        .common_log.identity == "bob" && \
+        .common_log.user == "frank" && \
+        .common_log.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
+        .common_log.message == "GET /apache_pb.gif HTTP/1.0" && \
+        .common_log.method == "GET" && \
+        .common_log.path == "/apache_pb.gif" && \
+        .common_log.protocol == "HTTP/1.0" && \
+        .common_log.status == 200 && \
+        .common_log.size == 2326 && \
+        .common_log_timestamp_format.host == "127.0.0.1" && \
+        .common_log_timestamp_format.identity == "bob" && \
+        .common_log_timestamp_format.user == "frank" && \
+        .common_log_timestamp_format.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
+        .common_log_timestamp_format.message == "GET /apache_pb.gif HTTP/1.0" && \
+        .common_log_timestamp_format.method == "GET" && \
+        .common_log_timestamp_format.path == "/apache_pb.gif" && \
+        .common_log_timestamp_format.protocol == "HTTP/1.0" && \
+        .common_log_timestamp_format.status == 200 && \
+        .common_log_timestamp_format.size == 2326
+      '''
+
 [transforms.remap_function_ip_subnet]
   inputs = []
   type = "remap"
@@ -1293,7 +1360,7 @@
   source = """
     .foo = parse_json!(.foo)
     .bar = parse_json!(.bar)
-    merge!(.bar, .foo, deep: true)
+    .bar = merge!(.bar, .foo, deep: true)
   """
 [[tests]]
   name = "remap_function_merge"
@@ -1552,9 +1619,9 @@
   type = "remap"
   source = '''
     . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
-    .bytes_in = to_int!(.bytes_in)
-    .status = to_int!(.status)
-    .bytes_out = to_int!(.bytes_out)
+    .bytes_in = to_int(.bytes_in)
+    .status = to_int(.status)
+    .bytes_out = to_int(.bytes_out)
   '''
 [[tests]]
   name = "remap_function_parse_regex"
@@ -1918,3 +1985,50 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '[.a, .b, .c] == [3, 2, 3]'
+
+[transforms.remap_function_get_hostname]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = get_hostname!()
+  """
+[[tests]]
+  name = "remap_function_get_hostname"
+  [tests.input]
+    insert_at = "remap_function_get_hostname"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_get_hostname"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .a != ""
+      '''
+
+[transforms.remap_function_join]
+  inputs = []
+  type = "remap"
+  source = """
+    items = ["foo", "bar", "baz"]
+    .comma = join(items, ", ")
+    .space = join(items, " ")
+    .none = join(items)
+    .from_split = join!(split("big bad booper", " "), "__")
+  """
+[[tests]]
+  name = "remap_function_join"
+  [tests.input]
+    insert_at = "remap_function_join"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_join"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .comma == "foo, bar, baz" && \
+        .space == "foo bar baz" && \
+        .none == "foobarbaz" && \
+        .from_split == "big__bad__booper"
+      '''

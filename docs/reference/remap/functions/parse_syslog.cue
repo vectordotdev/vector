@@ -1,4 +1,19 @@
 remap: functions: parse_syslog: {
+	category:    "Parse"
+	description: """
+		Parses the `value` in [Syslog](\(urls.syslog)) format.
+		"""
+	notices: [
+		"""
+		The function makes a best effort to parse the various Syslog formats out in the wild. This includes
+		[RFC 6587](\(urls.syslog_6587)), [RFC 5424](\(urls.syslog_5424)), [RFC 3164](\(urls.syslog_3164)), and other
+		common variations (such as the Nginx Syslog style).
+		""",
+		"""
+			All structured data values are returned as strings, it is recommended to manually coerce values as you see fit.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -8,26 +23,19 @@ remap: functions: parse_syslog: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted Syslog 5424 or 3164 formatted log",
+		"`value` is not a properly formatted Syslog log",
 	]
-	return: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` in Syslog format.
+	return: types: ["map"]
 
-		The function makes a best effort to parse the various Syslog formats out in the wild. This includes
-		[RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424], [RFC 3164][urls.syslog_3164], and other
-		common variations (such as the Nginx Syslog style). If parsing fails, Vector will include the entire
-		Syslog line in the message field.
-		"""#
 	examples: [
 		{
-			title: "Parse Syslog log"
-			input: log: message: """
-				<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!
+			title: "Parse Syslog log (5424)"
+			source: """
+				parse_syslog(
+					"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut=\"3\" eventSource= \"Application\" eventID=\"1011\"] Try to override the THX port, maybe it will reboot the neural interface!"
+				)
 				"""
-			source: ". = parse_syslog(.message)"
-			output: log: {
+			return: {
 				severity:    "notice"
 				facility:    "user"
 				timestamp:   "2020-03-13T20:45:38.119Z"

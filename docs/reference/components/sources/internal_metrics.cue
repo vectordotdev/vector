@@ -14,6 +14,7 @@ components: sources: internal_metrics: {
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -345,6 +346,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
 				file: _file
+			}
+		}
+		glob_errors_total: {
+			description:       "The total number of errors encountered when globbing paths."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				path: _path
 			}
 		}
 		http_bad_requests_total: {
@@ -724,6 +733,10 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_path: {
+			description: "The path that produced the error."
+			required:    true
 		}
 	}
 }

@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn parse_tokens() {
         let cases = vec![(
-                    map![],
+                    btreemap!{},
                     Ok(vec![
                             "217.250.207.207".into(),
                             Value::Null,

@@ -1,6 +1,5 @@
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
-
-use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+use futures::{future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
@@ -64,7 +63,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                             .await;
                         future::try_join_all(sends).await.unwrap();
 
-                        topology.stop().compat().await.unwrap();
+                        topology.stop().await;
 
                         let output_lines = output_lines.await;
 
@@ -135,7 +134,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let lines2 = random_lines(line_size).take(num_lines);
                     send_lines(in_addr2, lines2).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines1 = output_lines1.await;
                     let output_lines2 = output_lines2.await;
@@ -213,7 +212,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         .take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines = output_lines.await;
 
@@ -291,9 +290,9 @@ fn benchmark_complex(c: &mut Criterion) {
                     },
                 );
                 config.add_transform(
-                    "sampler",
+                    "sample",
                     &["parser"],
-                    transforms::sampler::SamplerConfig {
+                    transforms::sample::SampleConfig {
                         rate: sample_rate,
                         key_field: None,
                         exclude: None,
@@ -308,7 +307,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 );
                 config.add_sink(
                     "out_sampled",
-                    &["sampler"],
+                    &["sample"],
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(
                         out_addr_sampled.to_string(),
                     ),
@@ -341,12 +340,14 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_sampled,
                     output_lines_200,
                     output_lines_404,
+                    output_lines_500,
                     topology,
                 ) = rt.block_on(async move {
                     let output_lines_all = CountReceiver::receive_lines(out_addr_all);
                     let output_lines_sampled = CountReceiver::receive_lines(out_addr_sampled);
                     let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
                     let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
+                    let output_lines_500 = CountReceiver::receive_lines(out_addr_500);
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr1).await;
                     wait_for_tcp(in_addr2).await;
@@ -355,6 +356,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         output_lines_sampled,
                         output_lines_200,
                         output_lines_404,
+                        output_lines_500,
                         topology,
                     )
                 });
@@ -365,6 +367,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_sampled,
                     output_lines_200,
                     output_lines_404,
+                    output_lines_500,
                 )
             },
             |(
@@ -374,6 +377,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 output_lines_sampled,
                 output_lines_200,
                 output_lines_404,
+                output_lines_500,
             )| {
                 rt.block_on(async move {
                     // One sender generates pure random lines
@@ -392,12 +396,13 @@ fn benchmark_complex(c: &mut Criterion) {
                         .take(num_lines);
                     send_lines(in_addr2, lines2).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines_all = output_lines_all.await.len();
                     let output_lines_sampled = output_lines_sampled.await.len();
                     let output_lines_200 = output_lines_200.await.len();
                     let output_lines_404 = output_lines_404.await.len();
+                    let output_lines_500 = output_lines_500.await.len();
 
                     debug_assert_eq!(output_lines_all, num_lines * 2);
                     #[cfg(debug_assertions)]
@@ -418,6 +423,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     }
                     debug_assert!(output_lines_200 > 0);
                     debug_assert!(output_lines_404 > 0);
+                    debug_assert!(output_lines_500 == 0);
                     debug_assert_eq!(output_lines_200 + output_lines_404, num_lines);
 
                     (
@@ -425,6 +431,361 @@ fn benchmark_complex(c: &mut Criterion) {
                         output_lines_sampled,
                         output_lines_200,
                         output_lines_404,
+                        output_lines_500,
+                    )
+                });
+            },
+            BatchSize::PerIteration,
+        );
+    });
+
+    group.finish();
+}
+
+fn benchmark_real_world_1(c: &mut Criterion) {
+    let num_lines: usize = 100_000;
+
+    let in_addr = next_addr();
+    let out_addr_company_api = next_addr();
+    let out_addr_company_admin = next_addr();
+    let out_addr_company_media_proxy = next_addr();
+    let out_addr_company_unfurler = next_addr();
+    let out_addr_audit = next_addr();
+
+    let mut group = c.benchmark_group("real_world_1");
+    group.sampling_mode(SamplingMode::Flat);
+    group.throughput(Throughput::Elements(num_lines as u64));
+    group.bench_function("topology", |b| {
+        b.iter_batched(
+            || {
+                let mut config = config::Config::builder();
+                config.add_source(
+                    "in",
+                    sources::syslog::SyslogConfig::from_mode(sources::syslog::Mode::Tcp {
+                        address: in_addr.into(),
+                        keepalive: None,
+                        tls: None,
+                        receive_buffer_bytes: None,
+                    }),
+                );
+
+                let toml_cfg = r##"
+##
+## company-api
+##
+
+[transforms.company_api]
+type = "field_filter"
+inputs = ["in"]
+field = "appname"
+value = "company-api"
+
+[transforms.company_api_json]
+type = "json_parser"
+inputs = ["company_api"]
+drop_invalid = true
+
+[transforms.company_api_timestamp]
+type = "split"
+inputs = ["company_api_json"]
+field = "timestamp"
+field_names = ["timestamp"]
+separator = "."
+
+[transforms.company_api_timestamp.types]
+timestamp = "timestamp|%s"
+
+[transforms.company_api_metadata]
+type = "lua"
+inputs = ["company_api_timestamp"]
+source = """
+event["metadata_trace_id"] = event["metadata.trace_id"]
+event["metadata_guild_id"] = event["metadata.guild_id"]
+event["metadata_channel_id"] = event["metadata.channel_id"]
+event["metadata_method"] = event["metadata.method"]
+"""
+
+[transforms.company_api_rename]
+type = "rename_fields"
+inputs = ["company_api_metadata"]
+
+[transforms.company_api_rename.fields]
+timestamp = "time"
+host = "hostname"
+# "metadata.trace_id" = "metadata_trace_id"
+# "metadata.guild_id" = "metadata_guild_id"
+# "metadata.channel_id" = "metadata_channel_id"
+# "metadata.method" = "metadata_method"
+
+##
+## company-admin
+##
+
+[transforms.company_admin]
+type = "field_filter"
+inputs = ["in"]
+field = "appname"
+value = "company-admin"
+
+[transforms.company_admin_json]
+type = "json_parser"
+inputs = ["company_admin"]
+drop_invalid = true
+
+[transforms.company_admin_timestamp]
+type = "split"
+inputs = ["company_admin_json"]
+field = "timestamp"
+field_names = ["timestamp"]
+separator = "."
+
+[transforms.company_admin_timestamp.types]
+timestamp = "timestamp|%s"
+
+[transforms.company_admin_metadata]
+type = "lua"
+inputs = ["company_admin_timestamp"]
+source = """
+event["metadata_trace_id"] = event["metadata.trace_id"]
+event["metadata_method"] = event["metadata.method"]
+"""
+
+[transforms.company_admin_rename]
+type = "rename_fields"
+inputs = ["company_admin_metadata"]
+
+[transforms.company_admin_rename.fields]
+timestamp = "time"
+host = "hostname"
+# "metadata.trace_id" = "metadata_trace_id"
+# "metadata.method" = "metadata_method"
+
+##
+## company-media-proxy
+##
+
+[transforms.company_media_proxy]
+type = "field_filter"
+inputs = ["in"]
+field = "appname"
+value = "company-media-proxy"
+
+[transforms.company_media_proxy_json]
+type = "json_parser"
+inputs = ["company_media_proxy"]
+drop_invalid = true
+
+[transforms.company_media_proxy_timestamp]
+type = "split"
+inputs = ["company_media_proxy_json"]
+field = "ts"
+field_names = ["ts"]
+separator = "."
+
+[transforms.company_media_proxy_timestamp.types]
+ts = "timestamp|%s"
+
+[transforms.company_media_proxy_rename]
+type = "rename_fields"
+inputs = ["company_media_proxy_timestamp"]
+
+[transforms.company_media_proxy_rename.fields]
+ts = "time"
+host = "hostname"
+
+##
+## company-unfurler
+##
+
+[transforms.company_unfurler]
+type = "field_filter"
+inputs = ["in"]
+field = "appname"
+value = "company-unfurler"
+
+[transforms.company_unfurler_hostname]
+type = "rename_fields"
+inputs = ["company_unfurler"]
+
+[transforms.company_unfurler_hostname.fields]
+host = "hostname"
+
+[transforms.company_unfurler_json]
+type = "json_parser"
+inputs = ["company_unfurler_hostname"]
+drop_invalid = true
+
+[transforms.company_unfurler_timestamp]
+type = "coercer"
+inputs = ["company_unfurler_json"]
+
+[transforms.company_unfurler_timestamp.types]
+ts = "timestamp"
+
+[transforms.company_unfurler_rename]
+type = "rename_fields"
+inputs = ["company_unfurler_timestamp"]
+
+[transforms.company_unfurler_rename.fields]
+ts = "time"
+
+[transforms.company_unfurler_filter]
+type = "field_filter"
+inputs = ["company_unfurler_rename"]
+field = "msg"
+value = "unfurl"
+
+##
+## audit
+##
+
+[transforms.audit]
+type = "field_filter"
+inputs = ["in"]
+field = "appname"
+value = "audit"
+
+[transforms.audit_timestamp]
+type = "coercer"
+inputs = ["audit"]
+
+[transforms.audit_timestamp.types]
+timestamp = "timestamp"
+
+[transforms.audit_rename]
+type = "rename_fields"
+inputs = ["audit_timestamp"]
+
+[transforms.audit_rename.fields]
+appname = "tag"
+host = "hostname"
+message = "content"
+timestamp = "time"
+"##;
+
+                let parsed =
+                    config::format::deserialize(toml_cfg, Some(config::Format::TOML)).unwrap();
+                config.append(parsed).unwrap();
+
+                config.add_sink(
+                    "company_api_sink",
+                    &["company_api_rename"],
+                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                        out_addr_company_api.to_string(),
+                    ),
+                );
+                config.add_sink(
+                    "company_admin_sink",
+                    &["company_admin_rename"],
+                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                        out_addr_company_admin.to_string(),
+                    ),
+                );
+                config.add_sink(
+                    "company_media_proxy_sink",
+                    &["company_media_proxy_rename"],
+                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                        out_addr_company_media_proxy.to_string(),
+                    ),
+                );
+                config.add_sink(
+                    "company_unfurler_sink",
+                    &["company_unfurler_filter"],
+                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                        out_addr_company_unfurler.to_string(),
+                    ),
+                );
+                config.add_sink(
+                    "audit_sink",
+                    &["audit_rename"],
+                    sinks::socket::SocketSinkConfig::make_basic_tcp_config(
+                        out_addr_audit.to_string(),
+                    ),
+                );
+
+                let mut rt = runtime();
+                let (
+                    output_lines_company_api,
+                    output_lines_company_admin,
+                    output_lines_company_media_proxy,
+                    output_lines_company_unfurler,
+                    output_lines_audit,
+                    topology,
+                ) = rt.block_on(async move {
+                    let output_lines_company_api =
+                        CountReceiver::receive_lines(out_addr_company_api);
+                    let output_lines_company_admin =
+                        CountReceiver::receive_lines(out_addr_company_admin);
+                    let output_lines_company_media_proxy =
+                        CountReceiver::receive_lines(out_addr_company_media_proxy);
+                    let output_lines_company_unfurler =
+                        CountReceiver::receive_lines(out_addr_company_unfurler);
+                    let output_lines_audit = CountReceiver::receive_lines(out_addr_audit);
+
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+                    wait_for_tcp(in_addr).await;
+                    (
+                        output_lines_company_api,
+                        output_lines_company_admin,
+                        output_lines_company_media_proxy,
+                        output_lines_company_unfurler,
+                        output_lines_audit,
+                        topology,
+                    )
+                });
+                // Generate the inputs.
+                let lines = [
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-api 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-admin 2004 ID960 - {"metadata": {"trace_id": "trace123", "guide_id": "guild123", "channel_id": "channel123", "method": "method"}}"#,
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-media-proxy 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z"}"#,
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com company-unfurler 2004 ID960 - {"ts": "2020-03-13T20:45:38.119Z", "msg": "unfurl"}"#,
+                    r#"<118>3 2020-03-13T20:45:38.119Z my.host.com audit 2004 ID960 - qwerty"#,
+                ].iter().cycle().take(num_lines).map(|&s| s.to_owned()).collect::<Vec<_>>();
+                (
+                    rt,
+                    topology,
+                    output_lines_company_api,
+                    output_lines_company_admin,
+                    output_lines_company_media_proxy,
+                    output_lines_company_unfurler,
+                    output_lines_audit,
+                    lines,
+                )
+            },
+            |(
+                mut rt,
+                topology,
+                output_lines_company_api,
+                output_lines_company_admin,
+                output_lines_company_media_proxy,
+                output_lines_company_unfurler,
+                output_lines_audit,
+                lines,
+            )| {
+                rt.block_on(async move {
+                    send_lines(in_addr, lines).await.unwrap();
+
+                    topology.stop().await;
+
+                    let output_lines_company_api = output_lines_company_api.await.len();
+                    let output_lines_company_admin = output_lines_company_admin.await.len();
+                    let output_lines_company_media_proxy =
+                        output_lines_company_media_proxy.await.len();
+                    let output_lines_company_unfurler = output_lines_company_unfurler.await.len();
+                    let output_lines_audit = output_lines_audit.await.len();
+
+                    debug_assert!(output_lines_company_api > 0);
+                    debug_assert!(output_lines_company_admin > 0);
+                    debug_assert!(output_lines_company_media_proxy > 0);
+                    debug_assert!(output_lines_company_unfurler > 0);
+                    debug_assert!(output_lines_audit > 0);
+
+                    (
+                        output_lines_company_api,
+                        output_lines_company_admin,
+                        output_lines_company_media_proxy,
+                        output_lines_company_unfurler,
+                        output_lines_audit,
                     )
                 });
             },
@@ -440,5 +801,5 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.20);
-    targets = benchmark_simple_pipes, benchmark_interconnected, benchmark_transforms, benchmark_complex
+    targets = benchmark_simple_pipes, benchmark_interconnected, benchmark_transforms, benchmark_complex, benchmark_real_world_1
 );

@@ -1,6 +1,13 @@
 package metadata
 
 remap: functions: is_nullish: {
+	category: "Type"
+	description: """
+		Determines whether the `value` is "nullish".
+
+		Nullish indicates the absence of a meaningful value.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -10,35 +17,36 @@ remap: functions: is_nullish: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["boolean"]
-	category: "Type"
-	description: #"""
-		Determines whether the provided `value` is "nullish,"
+	return: {
+		types: ["boolean"]
+		rules: [
+			#"If `value` is `null`, then `true` is returned."#,
+			#"If `value` is `"-"`, then `true` is returned."#,
+			#"If `value` is whitespace, as defined by [Unicode `White_Space` property](\#(urls.unicode_whitespace)), then `true` is returned."#,
+		]
+	}
 
-		Nullish indicates the absence of a meaningful value. The following are considered nullish in VRL:
-
-		* `null`
-		* `"-"` (A single dash)
-		* Whitespace as defined by [Unicode `White_Space` property](\(urls.unicode_whitespace))
-		"""#
 	examples: [
 		{
 			title: "Null detection (blank string)"
-			input: log: string: ""
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("")
+				"""
+			return: true
 		},
 		{
 			title: "Null detection (dash string)"
-			input: log: string: "-"
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("-")
+				"""
+			return: true
 		},
 		{
 			title: "Null detection (whitespace)"
-			input: log: string: "\n   \n"
-			source: ".is_nullish = is_nullish(.string)"
-			output: input & {log: is_nullish: true}
+			source: """
+				is_nullish("\n  \n")
+				"""
+			return: true
 		},
 	]
 }

@@ -107,6 +107,7 @@ mod tests {
         Metric, Value,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
 
     #[test]
@@ -138,14 +139,13 @@ mod tests {
 
     #[test]
     fn transform_counter() {
-        let counter = Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        };
+        let counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -165,14 +165,12 @@ mod tests {
 
     #[test]
     fn transform_gauge() {
-        let gauge = Metric {
-            name: "gauge".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 1.0 },
-        };
+        let gauge = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -190,16 +188,14 @@ mod tests {
 
     #[test]
     fn transform_set() {
-        let set = Metric {
-            name: "set".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Set {
+        let set = Metric::new(
+            "set",
+            MetricKind::Absolute,
+            MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -218,18 +214,15 @@ mod tests {
 
     #[test]
     fn transform_distribution() {
-        let distro = Metric {
-            name: "distro".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Distribution {
-                values: vec![1.0, 2.0],
-                sample_rates: vec![10, 20],
+        let distro = Metric::new(
+            "distro",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -238,19 +231,25 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("distribution.sample_rates[0]"),
+                    String::from("distribution.samples[0].rate"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("distribution.sample_rates[1]"),
+                    String::from("distribution.samples[0].value"),
+                    &Value::from(1.0)
+                ),
+                (
+                    String::from("distribution.samples[1].rate"),
                     &Value::from(20)
+                ),
+                (
+                    String::from("distribution.samples[1].value"),
+                    &Value::from(2.0)
                 ),
                 (
                     String::from("distribution.statistic"),
                     &Value::from("histogram")
                 ),
-                (String::from("distribution.values[0]"), &Value::from(1.0)),
-                (String::from("distribution.values[1]"), &Value::from(2.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("distro")),
                 (String::from("timestamp"), &Value::from(ts())),
@@ -260,19 +259,16 @@ mod tests {
 
     #[test]
     fn transform_histogram() {
-        let histo = Metric {
-            name: "histo".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0],
-                counts: vec![10, 20],
+        let histo = Metric::new(
+            "histo",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -281,22 +277,22 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0]"),
-                    &Value::from(1.0)
-                ),
-                (
-                    String::from("aggregated_histogram.buckets[1]"),
-                    &Value::from(2.0)
-                ),
-                (String::from("aggregated_histogram.count"), &Value::from(30)),
-                (
-                    String::from("aggregated_histogram.counts[0]"),
+                    String::from("aggregated_histogram.buckets[0].count"),
                     &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.counts[1]"),
+                    String::from("aggregated_histogram.buckets[0].upper_limit"),
+                    &Value::from(1.0)
+                ),
+                (
+                    String::from("aggregated_histogram.buckets[1].count"),
                     &Value::from(20)
                 ),
+                (
+                    String::from("aggregated_histogram.buckets[1].upper_limit"),
+                    &Value::from(2.0)
+                ),
+                (String::from("aggregated_histogram.count"), &Value::from(30)),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("histo")),
@@ -307,19 +303,16 @@ mod tests {
 
     #[test]
     fn transform_summary() {
-        let summary = Metric {
-            name: "summary".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
-                quantiles: vec![50.0, 90.0],
-                values: vec![10.0, 20.0],
+        let summary = Metric::new(
+            "summary",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -329,22 +322,22 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0]"),
+                    String::from("aggregated_summary.quantiles[0].upper_limit"),
                     &Value::from(50.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1]"),
-                    &Value::from(90.0)
-                ),
-                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
-                (
-                    String::from("aggregated_summary.values[0]"),
+                    String::from("aggregated_summary.quantiles[0].value"),
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.values[1]"),
+                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    &Value::from(90.0)
+                ),
+                (
+                    String::from("aggregated_summary.quantiles[1].value"),
                     &Value::from(20.0)
                 ),
+                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("summary")),
                 (String::from("timestamp"), &Value::from(ts())),

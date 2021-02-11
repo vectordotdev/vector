@@ -152,12 +152,15 @@ psp:
 
 # Configuration for both regular and headless `Service`.
 service:
+  # Service type - defaults to `ClusterIP` (only relevant for the regular service).
+  type: "ClusterIP"
   # Additional ports to expose.
   ports: []
     # - name: http
     #   port: 1234
     #   protocol: TCP
     #   targetPort: 1234
+    #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
@@ -175,6 +178,16 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The Vector API.
+# Will be disabled by default.
+vectorApi:
+  # Turn the Vector API on or off.
+  enabled: false
+  # The address to listen at.
+  address: "0.0.0.0:8686"
+  # Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries).
+  playground: true
+
 # The "built-in" vector source, for accepting logs from the vector agents.
 # Will be added by default, unless explicitly disabled.
 vectorSource:
@@ -189,6 +202,8 @@ vectorSource:
   # Additional config to embed at the vector source.
   config: {}
     # option: "value"
+  # Specific node port to bind (useful if `service.type` is set to `NodePort`).
+  nodePort: null  # 9090 (must be a number)
   # Raw TOML config to embed at the vector source (deprecated).
   rawConfig: null
 

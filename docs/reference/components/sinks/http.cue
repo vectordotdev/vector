@@ -9,6 +9,7 @@ components: sinks: http: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -102,6 +103,7 @@ components: sinks: http: {
 			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
+				syntax: "literal"
 			}
 		}
 		healthcheck: type: object: options: uri: {
@@ -115,6 +117,7 @@ components: sinks: http: {
 			type: string: {
 				default: null
 				examples: ["https://10.22.212.22:9000/health"]
+				syntax: "literal"
 			}
 		}
 	}

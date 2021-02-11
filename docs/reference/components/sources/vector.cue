@@ -15,6 +15,7 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -30,9 +31,8 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-
-			keepalive: enabled: true
-
+			receive_buffer_bytes: enabled: true
+			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -69,6 +69,7 @@ components: sources: vector: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {

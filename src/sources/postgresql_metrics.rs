@@ -8,7 +8,7 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{
     future::{join_all, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    stream, FutureExt, SinkExt, StreamExt,
 };
 use openssl::{
     error::ErrorStack,
@@ -67,6 +67,10 @@ enum BuildError {
     HostMissing,
     #[snafu(display("multiple hosts not supported: {:?}", hosts))]
     MultipleHostsNotSupported { hosts: Vec<Host> },
+}
+
+#[derive(Debug, Snafu)]
+enum ConnectError {
     #[snafu(display("failed to create tls connector: {}", source))]
     TlsFailed { source: ErrorStack },
     #[snafu(display("failed to connect ({}): {}", endpoint, source))]
@@ -178,110 +182,245 @@ impl SourceConfig for PostgresqlMetricsConfig {
     }
 }
 
+#[derive(Debug)]
+struct PostgresqlClient {
+    config: Config,
+    tls_config: Option<PostgresqlMetricsTlsConfig>,
+    client: Option<(Client, usize)>,
+}
+
+impl PostgresqlClient {
+    fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+        Self {
+            config,
+            tls_config,
+            client: None,
+        }
+    }
+
+    async fn take(&mut self) -> Result<(Client, usize), ConnectError> {
+        match self.client.take() {
+            Some((client, version)) => Ok((client, version)),
+            None => self.build_client().await,
+        }
+    }
+
+    fn set(&mut self, value: (Client, usize)) {
+        self.client.replace(value);
+    }
+
+    async fn build_client(&self) -> Result<(Client, usize), ConnectError> {
+        // Create postgresql client
+        let client = match &self.tls_config {
+            Some(tls_config) => {
+                let mut builder =
+                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
+                builder
+                    .set_ca_file(tls_config.ca_file.clone())
+                    .context(TlsFailed)?;
+                let connector = MakeTlsConnector::new(builder.build());
+
+                let (client, connection) =
+                    self.config
+                        .connect(connector)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&self.config),
+                        })?;
+                tokio::spawn(connection);
+                client
+            }
+            None => {
+                let (client, connection) =
+                    self.config
+                        .connect(NoTls)
+                        .await
+                        .with_context(|| ConnectionFailed {
+                            endpoint: config_to_endpoint(&self.config),
+                        })?;
+                tokio::spawn(connection);
+                client
+            }
+        };
+
+        // Log version if required
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let version_row = client
+                .query_one("SELECT version()", &[])
+                .await
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            let version = version_row
+                .try_get::<&str, &str>("version")
+                .with_context(|| SelectVersionFailed {
+                    endpoint: config_to_endpoint(&self.config),
+                })?;
+            debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
+        }
+
+        // Get server version and check that we support it
+        let row = client
+            .query_one("SHOW server_version_num", &[])
+            .await
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        let version = row
+            .try_get::<&str, &str>("server_version_num")
+            .with_context(|| SelectVersionFailed {
+                endpoint: config_to_endpoint(&self.config),
+            })?;
+
+        let version = match version.parse::<usize>() {
+            Ok(version) if version >= 90600 => version,
+            Ok(_) | Err(_) => {
+                return Err(ConnectError::InvalidVersion {
+                    version: version.to_string(),
+                })
+            }
+        };
+
+        //
+        Ok((client, version))
+    }
+}
+
 #[derive(Debug, Clone)]
-enum DatnameFilter {
-    Include {
-        need_null: bool,
-        databases: Vec<String>,
-    },
-    Exclude {
-        need_null: bool,
-        databases: Vec<String>,
-    },
-    None,
+struct DatnameFilter {
+    pg_stat_database_sql: String,
+    pg_stat_database_conflicts_sql: String,
+    match_params: Vec<String>,
 }
 
 impl DatnameFilter {
     fn new(include: Vec<String>, exclude: Vec<String>) -> Self {
-        let exclude = exclude.into_iter().collect::<HashSet<_>>();
-        let include = include
-            .into_iter()
-            .filter(|name| !exclude.contains(name))
-            .collect::<HashSet<_>>();
+        let (include_databases, include_null) = Self::clean_databases(include);
+        let (exclude_databases, exclude_null) = Self::clean_databases(exclude);
+        let (match_sql, match_params) =
+            Self::build_match_params(include_databases, exclude_databases);
+
+        let mut pg_stat_database_sql = "SELECT * FROM pg_stat_database".to_owned();
+        if !match_sql.is_empty() {
+            pg_stat_database_sql += " WHERE";
+            pg_stat_database_sql += &match_sql;
+        }
+        match (include_null, exclude_null) {
+            // Nothing
+            (false, false) => {}
+            // Include tracking objects not in database
+            (true, false) => {
+                pg_stat_database_sql += if match_sql.is_empty() {
+                    " WHERE"
+                } else {
+                    " OR"
+                };
+                pg_stat_database_sql += " datname IS NULL";
+            }
+            // Exclude tracking objects not in database, precedence over include
+            (false, true) | (true, true) => {
+                pg_stat_database_sql += if match_sql.is_empty() {
+                    " WHERE"
+                } else {
+                    " AND"
+                };
+                pg_stat_database_sql += " datname IS NOT NULL";
+            }
+        }
+
+        let mut pg_stat_database_conflicts_sql =
+            "SELECT * FROM pg_stat_database_conflicts".to_owned();
+        if !match_sql.is_empty() {
+            pg_stat_database_conflicts_sql += " WHERE";
+            pg_stat_database_conflicts_sql += &match_sql;
+        }
+
+        Self {
+            pg_stat_database_sql,
+            pg_stat_database_conflicts_sql,
+            match_params,
+        }
+    }
+
+    fn clean_databases(names: Vec<String>) -> (Vec<String>, bool) {
+        let mut set = names.into_iter().collect::<HashSet<_>>();
+        let null = set.remove(&"".to_owned());
+        (set.into_iter().collect(), null)
+    }
+
+    fn build_match_params(include: Vec<String>, exclude: Vec<String>) -> (String, Vec<String>) {
+        let mut query = String::new();
+        let mut params = vec![];
 
         if !include.is_empty() {
-            let (need_null, databases) = Self::remove_empty(include);
-            return Self::Include {
-                need_null,
-                databases,
-            };
+            query.push_str(" (");
+            for (i, name) in include.into_iter().enumerate() {
+                params.push(name);
+                if i > 0 {
+                    query.push_str(" OR");
+                }
+                query.push_str(&format!(" datname ~ ${}", params.len()));
+            }
+            query.push(')');
         }
 
         if !exclude.is_empty() {
-            let (need_null, databases) = Self::remove_empty(exclude);
-            return Self::Exclude {
-                need_null,
-                databases,
-            };
+            if !query.is_empty() {
+                query.push_str(" AND");
+            }
+
+            query.push_str(" NOT (");
+            for (i, name) in exclude.into_iter().enumerate() {
+                params.push(name);
+                if i > 0 {
+                    query.push_str(" OR");
+                }
+                query.push_str(&format!(" datname ~ ${}", params.len()));
+            }
+            query.push(')');
         }
 
-        Self::None
+        (query, params)
     }
 
-    fn remove_empty(mut names: HashSet<String>) -> (bool, Vec<String>) {
-        let null = names.remove(&"".to_owned());
-        (null, names.into_iter().collect())
+    fn get_match_params(&self) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
+        let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
+            Vec::with_capacity(self.match_params.len());
+        for item in self.match_params.iter() {
+            params.push(item);
+        }
+        params
     }
 
     async fn pg_stat_database(&self, client: &Client) -> Result<Vec<Row>, PgError> {
-        let mut conditions = "SELECT * FROM pg_stat_database".to_owned();
-        match self {
-            Self::Include {
-                need_null,
-                databases,
-            } => {
-                conditions += " WHERE datname = ANY($1)";
-                if *need_null {
-                    conditions += " OR datname IS NULL";
-                }
-                client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
-                    .await
-            }
-            Self::Exclude {
-                need_null,
-                databases,
-            } => {
-                conditions += " WHERE datname != ANY($1)";
-                if *need_null {
-                    conditions += " AND datname IS NOT NULL";
-                } else {
-                    conditions += " OR datname IS NULL";
-                }
-                client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
-                    .await
-            }
-            Self::None => client.query(conditions.as_str(), &[]).await,
-        }
+        client
+            .query(
+                self.pg_stat_database_sql.as_str(),
+                self.get_match_params().as_slice(),
+            )
+            .await
     }
 
     async fn pg_stat_database_conflicts(&self, client: &Client) -> Result<Vec<Row>, PgError> {
-        let mut conditions = "SELECT * FROM pg_stat_database_conflicts".to_owned();
-        match self {
-            Self::Include { databases, .. } => {
-                conditions += " WHERE datname = ANY($1)";
-                client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
-                    .await
-            }
-            Self::Exclude { databases, .. } => {
-                conditions += " WHERE datname != ANY($1)";
-                client
-                    .query(conditions.as_str(), &[&databases.as_slice()])
-                    .await
-            }
-            Self::None => client.query(conditions.as_str(), &[]).await,
-        }
+        client
+            .query(
+                self.pg_stat_database_conflicts_sql.as_str(),
+                self.get_match_params().as_slice(),
+            )
+            .await
+    }
+
+    async fn pg_stat_bgwriter(&self, client: &Client) -> Result<Row, PgError> {
+        client
+            .query_one("SELECT * FROM pg_stat_bgwriter", &[])
+            .await
     }
 }
 
 #[derive(Debug)]
 struct PostgresqlMetrics {
-    config: Config,
-    tls_config: Option<PostgresqlMetricsTlsConfig>,
-    client: Option<Client>,
-    version: Option<usize>,
+    client: PostgresqlClient,
     namespace: Option<String>,
     tags: BTreeMap<String, String>,
     datname_filter: DatnameFilter,
@@ -315,118 +454,18 @@ impl PostgresqlMetrics {
         tags.insert("endpoint".into(), config_to_endpoint(&config));
         tags.insert("host".into(), host);
 
-        let mut this = Self {
-            config,
-            tls_config,
-            client: None,
-            version: None,
+        Ok(Self {
+            client: PostgresqlClient::new(config, tls_config),
             namespace,
             tags,
             datname_filter,
-        };
-        this.build_client().await?;
-        Ok(this)
-    }
-
-    async fn build_client(&mut self) -> Result<(), BuildError> {
-        let client = match &self.tls_config {
-            Some(tls_config) => {
-                let mut builder =
-                    SslConnector::builder(SslMethod::tls_client()).context(TlsFailed)?;
-                builder
-                    .set_ca_file(tls_config.ca_file.clone())
-                    .context(TlsFailed)?;
-                let connector = MakeTlsConnector::new(builder.build());
-
-                let (client, connection) =
-                    self.config
-                        .connect(connector)
-                        .await
-                        .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&self.config),
-                        })?;
-                tokio::spawn(connection);
-                client
-            }
-            None => {
-                let (client, connection) =
-                    self.config
-                        .connect(NoTls)
-                        .await
-                        .with_context(|| ConnectionFailed {
-                            endpoint: config_to_endpoint(&self.config),
-                        })?;
-                tokio::spawn(connection);
-                client
-            }
-        };
-
-        let version_row = client
-            .query_one("SELECT version()", &[])
-            .await
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-        let version = version_row
-            .try_get::<&str, &str>("version")
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-        debug!(message = "Connected to server.", endpoint = %config_to_endpoint(&self.config), server_version = %version);
-
-        self.client = Some(client);
-        self.verify_version().await?;
-
-        Ok(())
-    }
-
-    async fn verify_version(&mut self) -> Result<(), BuildError> {
-        let row = self
-            .client
-            .as_ref()
-            .unwrap()
-            .query_one("SHOW server_version_num", &[])
-            .await
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-
-        let version = row
-            .try_get::<&str, &str>("server_version_num")
-            .with_context(|| SelectVersionFailed {
-                endpoint: config_to_endpoint(&self.config),
-            })?;
-
-        self.version = Some(match version.parse::<usize>() {
-            Ok(version) if version >= 90600 => version,
-            Ok(_) | Err(_) => {
-                return Err(BuildError::InvalidVersion {
-                    version: version.to_string(),
-                })
-            }
-        });
-
-        Ok(())
+        })
     }
 
     async fn collect(&mut self) -> stream::BoxStream<'static, Metric> {
-        let build_client = match self.client {
-            Some(_) => Ok(()),
-            None => self.build_client().await,
-        };
-
-        let metrics = match build_client {
-            Ok(()) => self
-                .collect_metrics(self.client.as_ref().expect("should exists at this point"))
-                .await
-                .map_err(|err| err.to_string()),
-            Err(err) => Err(err.to_string()),
-        };
-
-        let (up_value, metrics) = match metrics {
+        let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                self.client = None;
                 emit!(PostgresqlMetricsCollectFailed {
                     error,
                     endpoint: self.tags.get("endpoint"),
@@ -439,20 +478,34 @@ impl PostgresqlMetrics {
         stream::once(ready(up_metric)).chain(metrics).boxed()
     }
 
-    async fn collect_metrics(
-        &self,
-        client: &Client,
-    ) -> Result<impl Iterator<Item = Metric>, CollectError> {
-        try_join_all(vec![
-            self.collect_pg_stat_database(client).boxed(),
-            self.collect_pg_stat_database_conflicts(client).boxed(),
-            self.collect_pg_stat_bgwriter(client).boxed(),
+    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
+        let (client, client_version) = self
+            .client
+            .take()
+            .await
+            .map_err(|error| error.to_string())?;
+
+        match try_join_all(vec![
+            self.collect_pg_stat_database(&client, client_version)
+                .boxed(),
+            self.collect_pg_stat_database_conflicts(&client).boxed(),
+            self.collect_pg_stat_bgwriter(&client).boxed(),
         ])
-        .map_ok(|metrics| metrics.into_iter().flatten())
         .await
+        {
+            Ok(metrics) => {
+                self.client.set((client, client_version));
+                Ok(metrics.into_iter().flatten())
+            }
+            Err(error) => Err(error.to_string()),
+        }
     }
 
-    async fn collect_pg_stat_database(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_pg_stat_database(
+        &self,
+        client: &Client,
+        client_version: usize,
+    ) -> Result<Vec<Metric>, CollectError> {
         let rows = self
             .datname_filter
             .pg_stat_database(client)
@@ -540,7 +593,7 @@ impl PostgresqlMetrics {
                     tags!(self.tags, "db" => db),
                 ),
             ]);
-            if self.version.expect("version is set above") >= 120000 {
+            if client_version >= 120000 {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
@@ -630,8 +683,9 @@ impl PostgresqlMetrics {
     }
 
     async fn collect_pg_stat_bgwriter(&self, client: &Client) -> Result<Vec<Metric>, CollectError> {
-        let row = client
-            .query_one("SELECT * FROM pg_stat_bgwriter", &[])
+        let row = self
+            .datname_filter
+            .pg_stat_bgwriter(client)
             .await
             .context(QueryError)?;
 
@@ -700,14 +754,10 @@ impl PostgresqlMetrics {
         value: MetricValue,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(tags),
-            kind: MetricKind::Absolute,
-            value,
-        }
+        Metric::new(name, MetricKind::Absolute, value)
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(Utc::now()))
     }
 }
 
@@ -827,7 +877,12 @@ mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, tls, Pipeline};
 
-    async fn test_postgresql_metrics(endpoint: String, tls: Option<PostgresqlMetricsTlsConfig>) {
+    async fn test_postgresql_metrics(
+        endpoint: String,
+        tls: Option<PostgresqlMetricsTlsConfig>,
+        include_databases: Option<Vec<String>>,
+        exclude_databases: Option<Vec<String>>,
+    ) -> Vec<Event> {
         trace_init();
 
         let config: Config = endpoint.parse().unwrap();
@@ -844,6 +899,8 @@ mod integration_tests {
             PostgresqlMetricsConfig {
                 endpoints: vec![endpoint],
                 tls,
+                include_databases,
+                exclude_databases,
                 ..Default::default()
             }
             .build(
@@ -877,8 +934,9 @@ mod integration_tests {
             events
                 .iter()
                 .map(|e| e.as_metric())
-                .find(|e| e.name == "up")
+                .find(|e| e.name() == "up")
                 .unwrap()
+                .data
                 .value,
             gauge!(1)
         );
@@ -887,15 +945,12 @@ mod integration_tests {
         for event in &events {
             let metric = event.as_metric();
 
-            assert_eq!(metric.namespace, Some("postgresql".to_owned()));
+            assert_eq!(metric.namespace(), Some("postgresql"));
             assert_eq!(
-                metric.tags.as_ref().unwrap().get("endpoint").unwrap(),
+                metric.tags().unwrap().get("endpoint").unwrap(),
                 &tags_endpoint
             );
-            assert_eq!(
-                metric.tags.as_ref().unwrap().get("host").unwrap(),
-                &tags_host
-            );
+            assert_eq!(metric.tags().unwrap().get("host").unwrap(), &tags_host);
         }
 
         // test metrics from different queries
@@ -905,8 +960,10 @@ mod integration_tests {
             "pg_stat_bgwriter_checkpoints_timed_total",
         ];
         for name in names {
-            assert!(events.iter().any(|e| e.as_metric().name == name));
+            assert!(events.iter().any(|e| e.as_metric().name() == name));
         }
+
+        events
     }
 
     #[tokio::test]
@@ -914,8 +971,10 @@ mod integration_tests {
         test_postgresql_metrics(
             "postgresql://vector:vector@localhost/postgres".to_owned(),
             None,
+            None,
+            None,
         )
-        .await
+        .await;
     }
 
     #[tokio::test]
@@ -926,7 +985,7 @@ mod integration_tests {
             "postgresql:///postgres?host={}&user=vector&password=vector",
             socket.to_str().unwrap()
         );
-        test_postgresql_metrics(endpoint, None).await
+        test_postgresql_metrics(endpoint, None, None, None).await;
     }
 
     #[tokio::test]
@@ -936,7 +995,77 @@ mod integration_tests {
             Some(PostgresqlMetricsTlsConfig {
                 ca_file: tls::TEST_PEM_CA_PATH.into(),
             }),
+            None,
+            None,
         )
-        .await
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_host_include_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
+            None,
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags().unwrap().get("db") {
+                assert!(db == "vector" || db == "postgres");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_host_exclude_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            None,
+            Some(vec!["^vec".to_owned(), "gres$".to_owned()]),
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags().unwrap().get("db") {
+                assert!(db != "vector" && db != "postgres");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_host_exclude_databases_empty() {
+        test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            None,
+            Some(vec!["".to_owned()]),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_host_include_databases_and_exclude_databases() {
+        let events = test_postgresql_metrics(
+            "postgresql://vector:vector@localhost/postgres".to_owned(),
+            None,
+            Some(vec!["template\\d+".to_owned()]),
+            Some(vec!["template0".to_owned()]),
+        )
+        .await;
+
+        for event in events {
+            let metric = event.into_metric();
+
+            if let Some(db) = metric.tags().unwrap().get("db") {
+                assert!(db == "template1");
+            }
+        }
     }
 }

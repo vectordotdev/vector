@@ -32,8 +32,17 @@ static SENDER: OnceCell<Sender<Event>> = OnceCell::new();
 pub use tracing_futures::Instrument;
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
+fn metrics_layer_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
+}
+
 pub fn init(color: bool, json: bool, levels: &str) {
     let _ = BUFFER.set(Mutex::new(Some(Vec::new())));
+
+    // An escape hatch to disable injecting a mertics layer into tracing.
+    // May be used for performance reasons.
+    // This is a hidden and undocumented functionality.
+    let metrics_layer_enabled = metrics_layer_enabled();
 
     let dispatch = if json {
         let formatter = FmtSubscriber::builder()
@@ -41,18 +50,25 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .json()
             .flatten_event(true)
             .finish()
-            .with(Limit::default())
-            .with(MetricsLayer::new());
-
-        Dispatch::new(BroadcastSubscriber { formatter })
+            .with(Limit::default());
+        if metrics_layer_enabled {
+            let formatter = formatter.with(MetricsLayer::new());
+            Dispatch::new(BroadcastSubscriber { formatter })
+        } else {
+            Dispatch::new(BroadcastSubscriber { formatter })
+        }
     } else {
         let formatter = FmtSubscriber::builder()
             .with_ansi(color)
             .with_env_filter(levels)
             .finish()
-            .with(Limit::default())
-            .with(MetricsLayer::new());
-        Dispatch::new(BroadcastSubscriber { formatter })
+            .with(Limit::default());
+        if metrics_layer_enabled {
+            let formatter = formatter.with(MetricsLayer::new());
+            Dispatch::new(BroadcastSubscriber { formatter })
+        } else {
+            Dispatch::new(BroadcastSubscriber { formatter })
+        }
     };
 
     let _ = LogTracer::init();

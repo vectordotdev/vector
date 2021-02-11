@@ -36,12 +36,12 @@ impl Function for FormatTimestamp {
         &[Example {
             title: "format timestamp",
             source: r#"format_timestamp!(t'2021-02-10T23:32:00+00:00', "%d %B %Y %H:%M")"#,
-            result: Ok("10 February 2021 23:32")
+            result: Ok("10 February 2021 23:32"),
         }]
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 struct FormatTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,
@@ -87,9 +87,8 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use chrono::TimeZone;
-    
+
     vrl::test_type_def![
         value_and_format {
             expr: |_| FormatTimestampFn {
@@ -112,7 +111,7 @@ mod tests {
     fn format_timestamp() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Err("function call error: invalid format".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
@@ -120,7 +119,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("10".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
@@ -128,7 +127,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok("1970-01-01T00:00:10+00:00".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),

@@ -12,6 +12,7 @@ components: transforms: metric_to_log: {
 		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -43,6 +44,7 @@ components: transforms: metric_to_log: {
 			type: string: {
 				default: "hostname"
 				examples: ["host", "hostname"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -74,8 +76,10 @@ components: transforms: metric_to_log: {
 					code: "200"
 				}
 				histogram: {
-					buckets: [1.0, 2.0]
-					counts: [10, 20]
+					buckets: [
+						{upper_limit: 1.0, count: 10},
+						{upper_limit: 2.0, count: 20},
+					]
 					count: 30
 					sum:   50.0
 				}
@@ -89,8 +93,16 @@ components: transforms: metric_to_log: {
 				}
 				kind: "absolute"
 				histogram: {
-					buckets: [1.0, 2.0]
-					counts: [10, 20]
+					buckets: [
+						{
+							"count":       10
+							"upper_limit": 1.0
+						},
+						{
+							"count":       20
+							"upper_limit": 2.0
+						},
+					]
 					count: 30
 					sum:   50.0
 				}

@@ -1,6 +1,14 @@
 package metadata
 
 remap: functions: to_unix_timestamp: {
+	category:    "Coerce"
+	description: """
+		Coerces the `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+
+		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
+		returned via the `unit` argument.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -22,30 +30,29 @@ remap: functions: to_unix_timestamp: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["integer"]
-	category:    "Coerce"
-	description: """
-		Coerces the provided `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+	return: types: ["integer"]
 
-		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
-		returned via the `unit` argument.
-		"""
 	examples: [
 		{
-			title: "Convert to a Unix timestamp"
-			input: log: date: "2021-01-01T00:00:00+00:00"
+			title: "Convert to a Unix timestamp (seconds)"
 			source: #"""
-				.no_default = to_unix_timestamp(to_timestamp(.date))
-				.seconds = to_unix_timestamp(to_timestamp(.date))
-				.milliseconds = to_unix_timestamp(to_timestamp(.date), unit: "milliseconds")
-				.nanoseconds = to_unix_timestamp(to_timestamp(.date), unit: "nanoseconds")
+				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"))
 				"""#
-			output: input & {log: {
-				default:      1609459200
-				seconds:      1609459200
-				milliseconds: 1609459200000
-				nanoseconds:  1609459200000000000
-			}}
+			return: 1609459200
+		},
+		{
+			title: "Convert to a Unix timestamp (milliseconds)"
+			source: #"""
+				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"), unit: "milliseconds")
+				"""#
+			return: 1609459200000
+		},
+		{
+			title: "Convert to a Unix timestamp (nanoseconds)"
+			source: #"""
+				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"), unit: "nanoseconds")
+				"""#
+			return: 1609459200000000000
 		},
 	]
 }

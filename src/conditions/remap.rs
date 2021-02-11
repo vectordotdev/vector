@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
 use vrl::{value, Program, Runtime, Value};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {
-    source: String,
+    pub source: String,
 }
 
 inventory::submit! {
@@ -159,18 +159,19 @@ mod test {
             //     Ok(()),
             // ),
             (
-                Event::Metric(Metric {
-                    name: "zork".into(),
-                    namespace: Some("zerk".into()),
-                    timestamp: None,
-                    tags: Some({
+                Event::Metric(
+                    Metric::new(
+                        "zork",
+                        MetricKind::Incremental,
+                        MetricValue::Counter { value: 1.0 },
+                    )
+                    .with_namespace(Some("zerk"))
+                    .with_tags(Some({
                         let mut tags = BTreeMap::new();
                         tags.insert("host".into(), "zoobub".into());
                         tags
-                    }),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                }),
+                    })),
+                ),
                 r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
                 Ok(()),
                 Ok(()),

@@ -5,7 +5,7 @@ remap: expressions: block: {
 	description: """
 		A _block_ expression is a sequence of one or more expressions within matching brace brackets.
 
-		Blocks cannot be empty, instead, empty blocks are treated as blank maps.
+		Blocks can't be empty. Instead, empty blocks (`{}`) are treated as blank maps.
 		"""
 	return: """
 		Returns the result of the last evaluated expression within the block.

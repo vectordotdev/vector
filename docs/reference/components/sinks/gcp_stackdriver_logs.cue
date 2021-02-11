@@ -9,6 +9,7 @@ components: sinks: gcp_stackdriver_logs: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -87,6 +88,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["012345-6789AB-CDEF01"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -97,6 +99,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		folder_id: {
@@ -107,6 +110,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["My Folder"]
+				syntax: "literal"
 			}
 		}
 		log_id: {
@@ -115,6 +119,7 @@ components: sinks: gcp_stackdriver_logs: {
 			warnings: []
 			type: string: {
 				examples: ["vector-logs"]
+				syntax: "literal"
 			}
 		}
 		organization_id: {
@@ -125,6 +130,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["622418129737"]
+				syntax: "literal"
 			}
 		}
 		project_id: {
@@ -133,6 +139,7 @@ components: sinks: gcp_stackdriver_logs: {
 			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
+				syntax: "literal"
 			}
 		}
 		resource: {
@@ -155,6 +162,7 @@ components: sinks: gcp_stackdriver_logs: {
 						warnings: []
 						type: string: {
 							examples: ["global", "gce_instance"]
+							syntax: "literal"
 						}
 					}
 					"*": {
@@ -165,6 +173,7 @@ components: sinks: gcp_stackdriver_logs: {
 						type: string: {
 							default: null
 							examples: ["vector-123456", "Twilight"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -178,6 +187,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["severity"]
+				syntax: "literal"
 			}
 		}
 	}

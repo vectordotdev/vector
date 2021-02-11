@@ -1,7 +1,7 @@
-use crate::{config::Resource, sink::BoundedSink, Event};
+use crate::{config::Resource, Event};
 #[cfg(feature = "leveldb")]
 use futures::compat::{Sink01CompatExt, Stream01CompatExt};
-use futures::{Sink, Stream};
+use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use futures01::task::AtomicTask;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,6 @@ use std::{
 };
 #[cfg(feature = "leveldb")]
 use tokio::stream::StreamExt;
-use tokio::sync::mpsc;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -72,7 +71,9 @@ impl BufferInputCloner {
     pub fn get(&self) -> Box<dyn Sink<Event, Error = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
-                let inner = BoundedSink::new(tx.clone());
+                let inner = tx
+                    .clone()
+                    .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {

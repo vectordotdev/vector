@@ -9,6 +9,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -100,7 +101,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		stream_name: {
@@ -108,7 +109,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}

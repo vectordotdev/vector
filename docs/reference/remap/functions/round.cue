@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: round: {
+	category: "Number"
+	description: """
+		Rounds the `value` to the specified `precision`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,27 +22,27 @@ remap: functions: round: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["timestamp"]
-	category: "Number"
-	description: #"""
-		Rounds the provided `value` to number to the specified `precision`.
-		"""#
+	return: {
+		types: ["integer", "float"]
+		rules: [
+			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
+		]
+	}
+
 	examples: [
 		{
 			title: "Round a number (without precision)"
-			input: log: number: 4.345
 			source: #"""
-				.number = round(.number)
+				round(4.345)
 				"""#
-			output: log: number: 4
+			return: 4
 		},
 		{
 			title: "Round a number (with precision)"
-			input: log: number: 4.345
 			source: #"""
-				.number = round(.number, precision: 2)
+				round(4.345, precision: 2)
 				"""#
-			output: log: number: 4.35
+			return: 4.35
 		},
 	]
 }

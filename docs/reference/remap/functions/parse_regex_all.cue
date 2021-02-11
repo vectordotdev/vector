@@ -1,6 +1,14 @@
 package metadata
 
 remap: functions: parse_regex_all: {
+	category:    "Parse"
+	description: """
+		Parses the `value` via the provided [Regex](\(urls.regex)) `pattern`.
+
+		This function differs from the `parse_regex` function in that it returns _all_ matches, not just the first.
+		"""
+	notices:     remap.functions.parse_regex.notices
+
 	arguments: [
 		{
 			name:        "value"
@@ -18,21 +26,21 @@ remap: functions: parse_regex_all: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `pattern`",
 	]
-	return: ["array"]
-	category: "Parse"
-	description: """
-		Parses the provided `value` via the provided Regex `pattern`.
+	return: {
+		types: ["array"]
+		rules: [
+			"Matches will return all capture groups corresponding to the leftmost matches in the text.",
+			"If no match is found an empty map is returned.",
+		]
+	}
 
-		* Capture groups are supported.
-		* Returns all capture groups corresponding to the leftmost matches in the text.
-		* If no match is found an empty map is returned.
-		"""
 	examples: [
 		{
 			title: "Parse via Regex (all matches)"
-			input: log: message: "first group and second group."
-			source: ".matches = parse_regex_all(.message, /(?P<number>.*?) group/)"
-			output: input & {log: matches: [
+			source: """
+				parse_regex_all("first group and second group.", /(?P<number>.*?) group/)
+				"""
+			return: [
 				{
 					number: "first"
 					"0":    "first group"
@@ -43,7 +51,7 @@ remap: functions: parse_regex_all: {
 					"0":    "second group"
 					"1":    "second"
 				},
-			]}
+			]
 		},
 	]
 }

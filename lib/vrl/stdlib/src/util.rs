@@ -1,6 +1,18 @@
-use vrl::{Value, value::Kind};
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
+use std::str::FromStr;
+use vrl::{value::Kind, Value};
+
+#[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
+#[inline]
+pub(crate) fn is_scalar_value(value: &Value) -> bool {
+    use Value::*;
+
+    match value {
+        Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
+        Timestamp(_) | Object(_) | Array(_) | Regex(_) => false,
+    }
+}
 
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
@@ -47,8 +59,7 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind>
-{
+pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
     let mut inner_type = BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.
@@ -77,5 +88,43 @@ pub(crate) fn is_nullish(value: &Value) -> bool {
         }
         Value::Null => true,
         _ => false,
+    }
+}
+
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Base64Charset {
+    Standard,
+    UrlSafe,
+}
+
+impl Default for Base64Charset {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl Into<base64::CharacterSet> for Base64Charset {
+    fn into(self) -> base64::CharacterSet {
+        use Base64Charset::*;
+
+        match self {
+            Standard => base64::CharacterSet::Standard,
+            UrlSafe => base64::CharacterSet::UrlSafe,
+        }
+    }
+}
+
+impl FromStr for Base64Charset {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use Base64Charset::*;
+
+        match s {
+            "standard" => Ok(Standard),
+            "url_safe" => Ok(UrlSafe),
+            _ => Err("unknown charset"),
+        }
     }
 }

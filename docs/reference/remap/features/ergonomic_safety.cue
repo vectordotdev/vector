@@ -1,34 +1,69 @@
 remap: features: ergonomic_safety: {
-	title: "Ergonomic safety"
+	title:       "Ergonomic safety"
 	description: """
-		VRL is ergonomically designed to be safe, preventing the production of slow and unreliable programs. VRL is
-		designed to execute in the hot-path, and therefore includes intentional limitations, preventing common
-		foot-guns that often plague observability pipelines. Conversely, deep, purpose-built observability features
-		prevent the need for unsafe low-level constructs present in generic languages.
+		VRL is ergonomically safe in that it makes it difficult to create slow or buggy VRL programs.
+		While VRL's [compile-time checks](#\(features.compilation.anchor)) prevent runtime errors, they can't prevent
+		some of the more elusive performance and maintainability problems that stem from program complexity—problems
+		that can result in observability pipeline instability and unexpected resource costs. To protect against these
+		more subtle ergonomic problems, VRL is a carefully *limited* language that offers only those features necessary
+		to transform observability data. Any features that are extraneous to that task or likely to result in degraded
+		ergonomics are omitted from the language by design.
 		"""
 
+	principles: {
+		performance: true
+		safety:      true
+	}
+
 	characteristics: {
-		limitations: {
-			title: "Limitations"
+		internal_logging_limitation: {
+			title: "Internal logging limitation"
 			description: """
-				VRL is intentionally designed with limitations to prevent foot-guns that commonly plague observability
-				pipelines. To name a few:
-
-				1. Lack of custom classes, modules, and functions.
-				2. Lack of recursion.
-				3. Lack of direct access to low-level system resources that require caching, such as the network or disk.
-				4. Lack of state.
-
-				If an observability use cases requires any of these, they will be pushed into purpose-built functions
-				that are carefully designed for performance and safety.
+				VRL programs do produce internal logs but not a rate that's bound to saturate I/O.
+				"""
+		}
+		io_limitation: {
+			title: "I/O limitation"
+			description: """
+				VRL lacks access to system I/O, which tends to be computationally expensive, to require careful
+				caching, and to produce degraded performance.
+				"""
+		}
+		recursion_limitation: {
+			title: "Lack of recursion"
+			description: """
+				VRL lacks recursion capabilities, making it impossible to create large or infinite loops that could
+				stall VRL programs or needlessly drain memory.
+				"""
+		}
+		no_custom_functions: {
+			title: "Lack of custom functions"
+			description: """
+				VRL requires you to use only its built-in functions and doesn't enable you to create your own. This
+				keeps VRL programs easy to debug and reason about.
+				"""
+		}
+		state_limitation: {
+			title: "Lack of state"
+			description: """
+				VRL lacks the ability to hold and maintain state across events. This prevents things like unbounded
+				memory growth, hard-to-debug production issues, and unexpected program behavior.
+				"""
+		}
+		rate_limited_logging: {
+			title: "Rate-limited logging"
+			description: """
+				The VRL `log` function implements rate limiting by default. This ensures that VRL programs invoking the
+				`log` method don't accidentally saturate I/O.
 				"""
 		}
 		purpose_built: {
-			title: "Purpose-built"
+			title: "Purpose built for observability"
 			description: """
-				Conversely from limitations, VRL goes deep on purpose-built observability use cases, avoiding the
-				need for unsafe low-level constructs. Functions like `parse_syslog` and	`to_hive_partition` make
-				otherwise complex tasks simple.
+				VRL is laser focused on observability use cases and *only* those use cases. This makes many
+				frustration- and complexity-producing constructs you find in other languages completely superfluous.
+				Functions like `parse_syslog` and `parse_key_value`, for example, make otherwise complex tasks simple
+				and prevent the need for complex low-level constructs.
 				"""
 		}
 	}

@@ -41,10 +41,10 @@ or [**install Vector**][docs.installation].
 
 ### Community
 
-* Vector is relied on by startups and enterprises like **T-Mobile**,
+* Vector is relied on by startups and enterprises like **Atlassian**, **T-Mobile**,
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, **Visa**, **Mambu**, **Blockfi**, **Claranet**,
-  **Instacart**, **Forcepoint**, and many more.
+  **Instacart**, **Forcepoint**, and [many more][urls.production_users].
 * Vector is **downloaded over 100,000 times per day**.
 * Vector's largest user **processes over 30TB daily**.
 * Vector has **over 100 contributors** and growing.
@@ -213,7 +213,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
 [docs.transforms.regex_parser#types]: https://vector.dev/docs/reference/transforms/regex_parser/#types
 [docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
-[docs.transforms.swimlanes]: https://vector.dev/docs/reference/transforms/swimlanes/
+[docs.transforms.route]: https://vector.dev/docs/reference/transforms/route/
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
 [docs.unit-tests]: https://vector.dev/docs/reference/tests/
 [docs.updating]: https://vector.dev/docs/administration/updating/
@@ -225,6 +225,7 @@ Vector is an end-to-end, unified, open data platform.
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.latest]: https://vector.dev/releases/latest/
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
+[urls.production_users]: https://github.com/timberio/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
 [urls.vector_chat]: https://chat.vector.dev

@@ -1,7 +1,6 @@
 use crate::Error;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
@@ -9,6 +8,7 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
@@ -20,7 +20,8 @@ VRL REPL commands:
   exit              Terminate the program
 "#;
 
-const DOCS_URL: &str = "https://vector.dev/docs/reference/remap";
+const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;

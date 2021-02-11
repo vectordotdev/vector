@@ -9,6 +9,7 @@ components: sources: stdin: {
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -47,10 +48,13 @@ components: sources: stdin: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		max_length: {
 			common:      false

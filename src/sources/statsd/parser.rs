@@ -56,31 +56,23 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
     let metric = match metric_type {
         "c" => {
             let val: f64 = parts[0].parse()?;
-            Metric {
+            Metric::new(
                 name,
-                namespace: None,
-                timestamp: None,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter {
+                MetricKind::Incremental,
+                MetricValue::Counter {
                     value: val * sample_rate,
                 },
-            }
+            )
+            .with_tags(tags)
         }
         unit @ "h" | unit @ "ms" | unit @ "d" => {
             let val: f64 = parts[0].parse()?;
-            Metric {
-                name,
-                namespace: None,
-                timestamp: None,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![convert_to_base_units(unit, val)],
-                    sample_rates: vec![sample_rate as u32],
+            Metric::new(
+                name, MetricKind::Incremental, MetricValue::Distribution {
+                    samples: crate::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
-            }
+            ).with_tags(tags)
         }
         "g" => {
             let value = if parts[0]
@@ -95,36 +87,26 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             };
 
             match parse_direction(parts[0])? {
-                None => Metric {
+                None => Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+                    .with_tags(tags),
+                Some(sign) => Metric::new(
                     name,
-                    namespace: None,
-                    timestamp: None,
-                    tags,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value },
-                },
-                Some(sign) => Metric {
-                    name,
-                    namespace: None,
-                    timestamp: None,
-                    tags,
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Gauge {
+                    MetricKind::Incremental,
+                    MetricValue::Gauge {
                         value: value * sign,
                     },
-                },
+                )
+                .with_tags(tags),
             }
         }
-        "s" => Metric {
+        "s" => Metric::new(
             name,
-            namespace: None,
-            timestamp: None,
-            tags,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: vec![parts[0].into()].into_iter().collect(),
             },
-        },
+        )
+        .with_tags(tags),
         other => return Err(ParseError::UnknownMetricType(other.into())),
     };
     Ok(metric)
@@ -247,14 +229,11 @@ mod test {
     fn basic_counter() {
         assert_eq!(
             parse("foo:1|c"),
-            Ok(Metric {
-                name: "foo".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }),
+            Ok(Metric::new(
+                "foo",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )),
         );
     }
 
@@ -262,21 +241,19 @@ mod test {
     fn tagged_counter() {
         assert_eq!(
             parse("foo:1|c|#tag1,tag2:value"),
-            Ok(Metric {
-                name: "foo".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("tag1".to_owned(), "true".to_owned()),
-                        ("tag2".to_owned(), "value".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }),
+            Ok(Metric::new(
+                "foo",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(
+                vec![
+                    ("tag1".to_owned(), "true".to_owned()),
+                    ("tag2".to_owned(), "value".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -284,14 +261,11 @@ mod test {
     fn sampled_counter() {
         assert_eq!(
             parse("bar:2|c|@0.1"),
-            Ok(Metric {
-                name: "bar".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 20.0 },
-            }),
+            Ok(Metric::new(
+                "bar",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 20.0 },
+            )),
         );
     }
 
@@ -299,14 +273,11 @@ mod test {
     fn zero_sampled_counter() {
         assert_eq!(
             parse("bar:2|c|@0"),
-            Ok(Metric {
-                name: "bar".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 2.0 },
-            }),
+            Ok(Metric::new(
+                "bar",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 2.0 },
+            )),
         );
     }
 
@@ -314,18 +285,14 @@ mod test {
     fn sampled_timer() {
         assert_eq!(
             parse("glork:320|ms|@0.1"),
-            Ok(Metric {
-                name: "glork".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![0.320],
-                    sample_rates: vec![10],
+            Ok(Metric::new(
+                "glork",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![0.320 => 10],
                     statistic: StatisticKind::Histogram
                 },
-            }),
+            )),
         );
     }
 
@@ -333,26 +300,23 @@ mod test {
     fn sampled_tagged_histogram() {
         assert_eq!(
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
-            Ok(Metric {
-                name: "glork".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("region".to_owned(), "us-west1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                        ("e".to_owned(), "".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![320.0],
-                    sample_rates: vec![10],
+            Ok(Metric::new(
+                "glork",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
-            }),
+            )
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                    ("e".to_owned(), "".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -360,26 +324,23 @@ mod test {
     fn sampled_distribution() {
         assert_eq!(
             parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
-            Ok(Metric {
-                name: "glork".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("region".to_owned(), "us-west1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                        ("e".to_owned(), "".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![320.0],
-                    sample_rates: vec![10],
+            Ok(Metric::new(
+                "glork",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
-            }),
+            )
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                    ("e".to_owned(), "".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))),
         );
     }
 
@@ -387,14 +348,11 @@ mod test {
     fn simple_gauge() {
         assert_eq!(
             parse("gaugor:333|g"),
-            Ok(Metric {
-                name: "gaugor".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 333.0 },
-            }),
+            Ok(Metric::new(
+                "gaugor",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 333.0 },
+            )),
         );
     }
 
@@ -402,25 +360,19 @@ mod test {
     fn signed_gauge() {
         assert_eq!(
             parse("gaugor:-4|g"),
-            Ok(Metric {
-                name: "gaugor".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: -4.0 },
-            }),
+            Ok(Metric::new(
+                "gaugor",
+                MetricKind::Incremental,
+                MetricValue::Gauge { value: -4.0 },
+            )),
         );
         assert_eq!(
             parse("gaugor:+10|g"),
-            Ok(Metric {
-                name: "gaugor".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: 10.0 },
-            }),
+            Ok(Metric::new(
+                "gaugor",
+                MetricKind::Incremental,
+                MetricValue::Gauge { value: 10.0 },
+            )),
         );
     }
 
@@ -428,16 +380,13 @@ mod test {
     fn sets() {
         assert_eq!(
             parse("uniques:765|s"),
-            Ok(Metric {
-                name: "uniques".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
+            Ok(Metric::new(
+                "uniques",
+                MetricKind::Incremental,
+                MetricValue::Set {
                     values: vec!["765".into()].into_iter().collect()
                 },
-            }),
+            )),
         );
     }
 

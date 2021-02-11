@@ -1,6 +1,19 @@
 package metadata
 
 remap: functions: parse_grok: {
+	category:    "Parse"
+	description: """
+		Parses the `value` using the [`grok` format](\(urls.grok)).
+
+		All patterns [listed here](\(urls.grok_patterns)) are supported.
+		"""
+	notices: [
+		"""
+			It is recommended to use maintained Grok patterns when possible, since they will be improved over time
+			by the community.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -25,23 +38,18 @@ remap: functions: parse_grok: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `pattern`",
 	]
-	return: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` using the Rust [`grok` library](https://github.com/daschl/grok).
+	return: types: ["map"]
 
-		All patterns [listed here](https://github.com/daschl/grok/tree/master/patterns) are supported.
-		It is recommended to use maintained patterns when possible since they will be improved over time
-		by the community.
-		"""#
 	examples: [
 		{
 			title: "Parse via Grok"
-			input: log: message: "2020-10-02T23:22:12.223222Z info Hello world"
 			source: #"""
-				. = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+				parse_grok(
+					"2020-10-02T23:22:12.223222Z info Hello world",
+					"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+				)
 				"""#
-			output: log: {
+			return: {
 				timestamp: "2020-10-02T23:22:12.223222Z"
 				level:     "info"
 				message:   "Hello world"

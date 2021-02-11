@@ -15,6 +15,7 @@ chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
+hostname = { version = "0.3", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "6", optional = true }
@@ -26,7 +27,7 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.7", optional = true }
+syslog_loose = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
@@ -35,7 +36,6 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 anyhow = "1"
 
 [features]
-
 default = [
     "append",
     "assert",
@@ -54,12 +54,14 @@ default = [
     "format_number",
     "format_timestamp",
     "get_env_var",
+    "get_hostname",
     "includes",
     "ip_cidr_contains",
     "ip_subnet",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
     "is_nullish",
+    "join",
     "length",
     "log",
     "match",
@@ -69,7 +71,9 @@ default = [
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
+    "parse_common_log",
     "parse_duration",
+    "parse_glog",
     "parse_grok",
     "parse_json",
     "parse_key_value",
@@ -123,12 +127,14 @@ floor = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
+get_hostname = ["hostname"]
 includes = []
 ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
 is_nullish = []
+join = []
 length = []
 log = ["tracing"]
 match = ["regex"]
@@ -136,9 +142,11 @@ md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 parse_aws_alb_log = ["nom"]
-parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription"]
+parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
+parse_common_log = ["chrono"]
 parse_duration = ["rust_decimal"]
+parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]

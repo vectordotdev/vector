@@ -67,6 +67,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
+        receive_buffer_bytes: Option<usize>,
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
@@ -140,8 +141,16 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
-                                shutdown, socket, keepalive, source, tripwire, host, out,
+                                shutdown,
+                                socket,
+                                keepalive,
+                                receive_buffer_bytes,
+                                source,
+                                tripwire,
+                                host,
+                                out,
                             );
+
                             tokio::spawn(
                                 fut.map(move |()| drop(open_token)).instrument(span.clone()),
                             );
@@ -158,6 +167,7 @@ async fn handle_stream(
     mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
+    receive_buffer_bytes: Option<usize>,
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
@@ -178,6 +188,12 @@ async fn handle_stream(
     if let Some(keepalive) = keepalive {
         if let Err(error) = socket.set_keepalive(keepalive) {
             warn!(message = "Failed configuring TCP keepalive.", %error);
+        }
+    }
+
+    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
+            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
         }
     }
 

@@ -1,6 +1,12 @@
 package metadata
 
 remap: functions: upcase: {
+	description: """
+		Upcases the `value`.
+
+		"Upcase" is defined according to the terms of the Unicode Derived Core Property Uppercase.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -10,21 +16,16 @@ remap: functions: upcase: {
 		},
 	]
 	internal_failure_reasons: []
-	return: ["string"]
+	return: types: ["string"]
 	category: "String"
-	description: #"""
-		Returns a copy of `value` that is entirely uppercase.
 
-		"Uppercase" is defined according to the terms of the Unicode Derived Core Property Uppercase.
-		"""#
 	examples: [
 		{
 			title: "Upcase a string"
-			input: log: message: #"Here Is A Message"#
 			source: #"""
-				.message = upcase(.message)
+				upcase("Hello, World!")
 				"""#
-			output: log: message: "HERE IS A MESSAGE"
+			output: log: message: "HELLO, WORLD!"
 		},
 	]
 }

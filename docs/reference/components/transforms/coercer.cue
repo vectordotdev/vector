@@ -11,6 +11,7 @@ components: transforms: coercer: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {

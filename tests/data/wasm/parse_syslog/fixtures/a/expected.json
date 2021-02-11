@@ -1,0 +1,11 @@
+{
+  "appname": "su",
+  "facility": "user",
+  "hostname": "initech.io",
+  "severity": "warning",
+  "message": "TPS report missing cover sheet",
+  "msgid": "ID81",
+  "procid": 4015,
+  "timestamp": "2020-12-19 21:48:09.004 +00:00",
+  "version": 3
+}
