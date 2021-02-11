@@ -3,7 +3,7 @@ package metadata
 remap: literals: string: {
 	title:       "String"
 	description: """
-		A _string_ literal is a [UTF-8–encoded](\(urls.utf8)) string. String literals can be raw and interpreted.
+		A _string_ literal is a [UTF-8–encoded](\(urls.utf8)) string. String literals can be raw or interpreted.
 
 		**Raw string** literals are composed of the	uninterpreted (implicitly UTF-8-encoded) characters between single
 		quotes identified with the `s` sigil and wrapped with single quotes (`s'...'`); in particular, backslashes have
