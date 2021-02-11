@@ -10,7 +10,7 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::TransformConfig,
+    config::{GlobalOptions, TransformConfig},
     event::{Event, Value},
     test_util::runtime,
 };
@@ -240,7 +240,7 @@ fn benchmark_remap(c: &mut Criterion) {
                    "#,
                 )
                 .unwrap()
-                .build()
+                .build(&GlobalOptions::default())
                 .await
                 .unwrap()
             })

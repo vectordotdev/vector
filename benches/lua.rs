@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::TransformConfig,
+    config::{GlobalOptions, TransformConfig},
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
     Event,
@@ -105,7 +105,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     field: "the_field".to_string(),
                     value: "0".to_string(),
                 }
-                .build()
+                .build(&GlobalOptions::default())
                 .await
                 .unwrap()
             })
