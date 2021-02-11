@@ -31,9 +31,8 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-
-			keepalive: enabled: true
-
+			receive_buffer_bytes: enabled: true
+			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_enable:             true

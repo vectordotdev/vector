@@ -2,7 +2,7 @@ package metadata
 
 remap: {
 	#Feature: {
-		anchor:      "#\(name)"
+		anchor:      name
 		name:        string
 		title:       string
 		description: string
@@ -13,7 +13,7 @@ remap: {
 			}
 		}
 
-		characteristics: [Name=string]: remap.#Characteristic
+		characteristics: remap.#Characteristics
 	}
 
 	features: [Name=string]: #Feature & {

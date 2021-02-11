@@ -1,16 +1,16 @@
 package metadata
 
 remap: expressions: function_call: {
-	title: "Function call"
+	title:       "Function call"
 	description: """
-		A _function call_ expression invokes built-in VRL functions.
+		A _function call_ expression invokes built-in [VRL functions](\(urls.vrl_functions)).
 		"""
-	return: """
-		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, then the
-		error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
+	return:      """
+		Returns the value of the function invocation if the invocation succeeds. If the invocation fails, the error must
+		be [handled](\(urls.vrl_errors_reference)) and null is returned.
 
-		Functions can _only_ return a single value. If multiple values are relevant, they will be wrapped in a data
-		structure fit to hold them, such as an array or map.
+		Functions can _only_ return a single value. If multiple values are relevant, you should wrap them in a data
+		structure fit to hold them, such as an array or map (note that VRL doesn't support tuples).
 		"""
 
 	grammar: {
@@ -38,8 +38,8 @@ remap: expressions: function_call: {
 					result, err = f()
 					```
 
-					Failure to handle errors from fallible function will result in compile-time errors. Please see the
-					[error reference](\(urls.vrl_errors_reference)).
+					Failure to handle errors from fallible functions results in compile-time errors. See the
+					[error reference](\(urls.vrl_errors_reference)) for more info.
 					"""
 			}
 			arguments: {
@@ -83,8 +83,7 @@ remap: expressions: function_call: {
 							number = round("not a number") # fails at compile time
 							```
 
-							If the type of the value is not known, you are required to handle the potential argument
-							error:
+							If the type of the value is not known, you need to handle the potential argument error:
 
 							```vrl
 							number, err = round(.message)

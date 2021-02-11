@@ -9,36 +9,35 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
+use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LengthDelimitedCodec;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
-    pub address: SocketListenAddr,
-    pub keepalive: Option<TcpKeepaliveConfig>,
+    address: SocketListenAddr,
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
+    shutdown_timeout_secs: u64,
+    #[set = "pub"]
     tls: Option<TlsConfig>,
+    receive_buffer_bytes: Option<usize>,
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
-#[cfg(test)]
 impl VectorConfig {
-    pub fn new(
-        address: SocketListenAddr,
-        keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
-    ) -> Self {
+    pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
-            keepalive,
+            keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            tls,
+            tls: None,
+            receive_buffer_bytes: None,
         }
     }
 }
@@ -49,12 +48,9 @@ inventory::submit! {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:9000".parse().unwrap()),
-            keepalive: None,
-            shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            tls: None,
-        })
+        toml::Value::try_from(Self::from_address(SocketListenAddr::SocketAddr(
+            "0.0.0.0:9000".parse().unwrap(),
+        )))
         .unwrap()
     }
 }
@@ -76,6 +72,7 @@ impl SourceConfig for VectorConfig {
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
+            self.receive_buffer_bytes,
             shutdown,
             out,
         )
@@ -192,12 +189,8 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(addr.into(), None, None),
-            VectorSinkConfig {
-                address: format!("localhost:{}", addr.port()),
-                keepalive: None,
-                tls: None,
-            },
+            VectorConfig::from_address(addr.into()),
+            VectorSinkConfig::from_address(format!("localhost:{}", addr.port())),
         )
         .await;
     }
@@ -207,17 +200,22 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(addr.into(), None, Some(TlsConfig::test_config())),
-            VectorSinkConfig {
-                address: format!("localhost:{}", addr.port()),
-                keepalive: None,
-                tls: Some(TlsConfig {
+            {
+                let mut config = VectorConfig::from_address(addr.into());
+                config.set_tls(Some(TlsConfig::test_config()));
+                config
+            },
+            {
+                let mut config =
+                    VectorSinkConfig::from_address(format!("localhost:{}", addr.port()));
+                config.set_tls(Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
                         verify_certificate: Some(false),
                         ..Default::default()
                     },
-                }),
+                }));
+                config
             },
         )
         .await;

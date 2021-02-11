@@ -7,8 +7,35 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     if config.sources.is_empty() {
         errors.push("No sources defined in the config.".to_owned());
     }
+
     if config.sinks.is_empty() {
         errors.push("No sinks defined in the config.".to_owned());
+    }
+
+    // Helper for below
+    fn tagged<'a>(
+        tag: &'static str,
+        iter: impl Iterator<Item = &'a String>,
+    ) -> impl Iterator<Item = (&'static str, &'a String)> {
+        iter.map(move |x| (tag, x))
+    }
+
+    // Check for non-unique names across sources, sinks, and transforms
+    let mut name_uses = HashMap::<&str, Vec<&'static str>>::new();
+    for (ctype, name) in tagged("source", config.sources.keys())
+        .chain(tagged("transform", config.transforms.keys()))
+        .chain(tagged("sink", config.sinks.keys()))
+    {
+        let uses = name_uses.entry(name).or_default();
+        uses.push(ctype);
+    }
+
+    for (name, uses) in name_uses.into_iter().filter(|(_name, uses)| uses.len() > 1) {
+        errors.push(format!(
+            "More than one component with name \"{}\" ({}).",
+            name,
+            uses.join(", ")
+        ));
     }
 
     // Warnings and errors

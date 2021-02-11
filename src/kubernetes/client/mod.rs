@@ -31,7 +31,7 @@ use hyper::body::Body;
 
 pub mod config;
 
-use config::Config;
+pub use config::Config;
 
 /// A client to the k8s API.
 ///

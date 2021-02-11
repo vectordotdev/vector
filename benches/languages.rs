@@ -1,5 +1,4 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, SamplingMode, Throughput};
-use futures::compat::Future01CompatExt;
 use vector::{
     config,
     test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
@@ -290,7 +289,7 @@ fn benchmark_configs(
                     rt.block_on(async move {
                         send_lines(in_addr, lines).await.unwrap();
 
-                        topology.stop().compat().await.unwrap();
+                        topology.stop().await;
 
                         let output_lines = output_lines.await;
 

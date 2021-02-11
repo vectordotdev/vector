@@ -115,7 +115,7 @@ impl Expression for EndsWithFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -160,47 +160,47 @@ mod tests {
     fn ends_with() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foobar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", false),
             ),

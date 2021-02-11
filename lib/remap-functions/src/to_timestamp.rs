@@ -143,10 +143,10 @@ mod tests {
 
     #[test]
     fn to_timestamp() {
-        use crate::map;
+        use shared::btreemap;
 
         let cases = vec![(
-            map!["foo": Utc.timestamp(10, 0)],
+            btreemap! { "foo" => Utc.timestamp(10, 0) },
             Ok(Value::Timestamp(Utc.timestamp(10, 0))),
             ToTimestampFn::new(Box::new(Path::from("foo"))),
         )];

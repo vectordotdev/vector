@@ -155,7 +155,7 @@ fn ipv6_mask(subnet_bits: u32) -> IpAddr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     remap::test_type_def![value_string {
         expr: |_| IpSubnetFn {
@@ -173,7 +173,7 @@ mod tests {
     fn ip_subnet() {
         let cases = vec![
             (
-                map!["foo": "192.168.10.23"],
+                btreemap! { "foo" => "192.168.10.23" },
                 Ok(Value::from("192.168.0.0")),
                 IpSubnetFn::new(
                     Box::new(Path::from("foo")),
@@ -181,7 +181,7 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "2404:6800:4003:c02::64"],
+                btreemap! { "foo" => "2404:6800:4003:c02::64" },
                 Ok(Value::from("2400::")),
                 IpSubnetFn::new(
                     Box::new(Path::from("foo")),
@@ -189,17 +189,17 @@ mod tests {
                 ),
             ),
             (
-                map!["foo": "192.168.10.23"],
+                btreemap! { "foo" => "192.168.10.23" },
                 Ok(Value::from("192.168.0.0")),
                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/16"))),
             ),
             (
-                map!["foo": "192.168.10.23"],
+                btreemap! { "foo" => "192.168.10.23" },
                 Ok(Value::from("192.160.0.0")),
                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/12"))),
             ),
             (
-                map!["foo": "2404:6800:4003:c02::64"],
+                btreemap! { "foo" => "2404:6800:4003:c02::64" },
                 Ok(Value::from("2404:6800::")),
                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/32"))),
             ),

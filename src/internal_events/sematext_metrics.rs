@@ -1,19 +1,18 @@
 use super::InternalEvent;
-use crate::event::metric::{MetricKind, MetricValue};
+use crate::event::metric::Metric;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct SematextMetricsInvalidMetricReceived {
-    pub value: MetricValue,
-    pub kind: MetricKind,
+pub struct SematextMetricsInvalidMetricReceived<'a> {
+    pub metric: &'a Metric,
 }
 
-impl InternalEvent for SematextMetricsInvalidMetricReceived {
+impl<'a> InternalEvent for SematextMetricsInvalidMetricReceived<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Invalid metric received; dropping event.",
-            value = ?self.value,
-            kind = ?self.kind,
+            value = ?self.metric.data.value,
+            kind = ?self.metric.data.kind,
             internal_log_rate_secs = 30,
         )
     }
