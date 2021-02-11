@@ -18,7 +18,7 @@ remap: literals: integer: {
 		underscore: {
 			title: "Underscore"
 			description: """
-				Integers can leverage underscore (`_`) characters, instead of `,`, to make them human readable. For
+				Integers can use underscore (`_`) characters instead of `,` to make them human readable. For
 				example, `1_000_000`.
 				"""
 		}

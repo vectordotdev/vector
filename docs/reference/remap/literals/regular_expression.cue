@@ -6,7 +6,7 @@ remap: literals: regular_expression: {
 		A _regular expression_ literal represents a [Regular Expression](\(urls.regex)) used for string matching and
 		parsing.
 
-		Regular expressions are defined by the `r` sigil and wrapped with single quoted (`r'...'`). The value between
+		Regular expressions are defined by the `r` sigil and wrapped with single quotes (`r'...'`). The value between
 		the quotes uses the [Rust regex syntax](\(urls.rust_regex_syntax)).
 		"""
 

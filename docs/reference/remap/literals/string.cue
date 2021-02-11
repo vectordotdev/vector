@@ -3,7 +3,7 @@ package metadata
 remap: literals: string: {
 	title:       "String"
 	description: """
-		A "string" literal is a [UTF-8–encoded](\(urls.utf8)) string. String literals can be raw and interpreted.
+		A _string_ literal is a [UTF-8–encoded](\(urls.utf8)) string. String literals can be raw and interpreted.
 
 		**Raw string** literals are composed of the	uninterpreted (implicitly UTF-8-encoded) characters between single
 		quotes identified with the `s` sigil and wrapped with single quotes (`s'...'`); in particular, backslashes have
@@ -30,10 +30,10 @@ remap: literals: string: {
 	]
 
 	characteristics: {
-		backslash_esacpes: {
+		backslash_escapes: {
 			title: "Backslash escapes"
 			description: """
-				Special characters, such as new lines, can be expressed with a backslash escape.
+				Special characters, such as newlines, can be expressed with a backslash escape.
 				"""
 			enum: {
 				"`\\u{7FFF}`": "24-bit Unicode character code (up to 6 digits)"

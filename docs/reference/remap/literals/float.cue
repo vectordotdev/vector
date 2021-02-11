@@ -22,7 +22,7 @@ remap: literals: float: {
 		underscores: {
 			title: "Underscores"
 			description: """
-				Floats can leverage underscore (`_`) characters, instead of `,`, to make them human readable. For
+				Floats can use underscore (`_`) characters instead of `,` to make them human readable. For
 				example, `1_000_000`.
 				"""
 		}
