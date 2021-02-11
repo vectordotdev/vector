@@ -3,17 +3,24 @@ use metrics::counter;
 
 #[derive(Debug)]
 pub struct ElasticSearchEventEncoded {
-    pub byte_size: usize,
     pub index: String,
 }
 
 impl InternalEvent for ElasticSearchEventEncoded {
     fn emit_logs(&self) {
-        trace!(message = "Inserting event.", index = %self.index);
+        trace!(message = "Encoding event.", index = %self.index);
     }
+}
 
+#[derive(Debug)]
+pub struct ElasticSearchEventSent {
+    pub batch_size: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ElasticSearchEventSent {
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
+        counter!("processed_events_total", self.batch_size as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

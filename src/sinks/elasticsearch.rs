@@ -3,13 +3,15 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
+    internal_events::{
+        ElasticSearchEventEncoded, ElasticSearchEventSent, ElasticSearchMissingKeys,
+    },
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        sink, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -139,7 +141,7 @@ impl SinkConfig for ElasticSearchConfig {
             .parse_config(self.batch)?;
         let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
-        let sink = BatchedHttpSink::with_retry_logic(
+        let sink = BatchedHttpSink::<_, _, RequestByteSize, _>::with_retry_logic(
             common,
             Buffer::new(batch.size, compression),
             ElasticSearchRetryLogic,
@@ -228,10 +230,7 @@ impl HttpSink for ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventEncoded {
-            byte_size: body.len(),
-            index
-        });
+        emit!(ElasticSearchEventEncoded { index });
 
         Some(body)
     }
@@ -308,16 +307,38 @@ struct ESErrorDetails {
     err_type: String,
 }
 
+#[derive(Debug, Copy, Clone)]
+struct RequestByteSize(usize);
+
+impl From<&hyper::Request<Vec<u8>>> for RequestByteSize {
+    fn from(request: &hyper::Request<Vec<u8>>) -> Self {
+        RequestByteSize(request.body().len())
+    }
+}
+
+impl sink::Response for (hyper::Response<bytes::Bytes>, RequestByteSize) {
+    fn is_successful(&self) -> bool {
+        self.0.status().is_success()
+    }
+
+    fn emit_events(&self, batch_size: usize) {
+        emit!(ElasticSearchEventSent {
+            batch_size,
+            byte_size: self.1 .0,
+        });
+    }
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
-    type Response = hyper::Response<Bytes>;
+    type Response = (hyper::Response<Bytes>, RequestByteSize);
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.status();
+        let status = response.0.status();
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
@@ -327,14 +348,14 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_server_error() => RetryAction::Retry(format!(
                 "{}: {}",
                 status,
-                String::from_utf8_lossy(response.body())
+                String::from_utf8_lossy(response.0.body())
             )),
             _ if status.is_client_error() => {
-                let body = String::from_utf8_lossy(response.body());
+                let body = String::from_utf8_lossy(response.0.body());
                 RetryAction::DontRetry(format!("client-side error, {}: {}", status, body))
             }
             _ if status.is_success() => {
-                let body = String::from_utf8_lossy(response.body());
+                let body = String::from_utf8_lossy(response.0.body());
 
                 if body.contains("\"errors\":true") {
                     RetryAction::DontRetry(get_error_reason(&body))
@@ -613,7 +634,7 @@ mod tests {
             .unwrap();
         let logic = ElasticSearchRetryLogic;
         assert!(matches!(
-            logic.should_retry_response(&response),
+            logic.should_retry_response(&(response, RequestByteSize(0))),
             RetryAction::DontRetry(_)
         ));
     }
