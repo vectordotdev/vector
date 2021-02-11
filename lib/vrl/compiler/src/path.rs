@@ -1,5 +1,5 @@
 use std::fmt;
-use std::iter::IntoIterator;
+use std::iter::{FromIterator, IntoIterator};
 use std::str::FromStr;
 
 /// Provide easy access to individual [`Segment`]s of a path.
@@ -219,6 +219,13 @@ impl IntoIterator for Path {
 
     fn into_iter(self) -> Self::IntoIter {
         self.segments.into_iter()
+    }
+}
+
+impl FromIterator<Segment> for Path {
+    fn from_iter<I: IntoIterator<Item = Segment>>(iter: I) -> Self {
+        let segments = iter.into_iter().collect();
+        Self { segments }
     }
 }
 

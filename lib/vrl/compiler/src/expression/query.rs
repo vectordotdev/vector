@@ -88,13 +88,9 @@ impl Expression for Query {
                 }
             }
 
-            // FIXME:
-            //
-            // Here we need to recursively get the inner type definitions to
-            // check the final type definition.
-            Internal(variable) => variable.type_def(state),
-            FunctionCall(call) => call.type_def(state),
-            Container(container) => container.type_def(state),
+            Internal(variable) => variable.type_def(state).at_path(self.path.clone()),
+            FunctionCall(call) => call.type_def(state).at_path(self.path.clone()),
+            Container(container) => container.type_def(state).at_path(self.path.clone()),
         }
     }
 }

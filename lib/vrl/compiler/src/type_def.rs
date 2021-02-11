@@ -1,5 +1,7 @@
 use crate::value::Kind;
+use crate::{path, Path};
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter::FromIterator;
 use std::ops::BitOr;
 
 /// Properties for a given expression that express the expected outcome of the
@@ -83,6 +85,85 @@ impl KindInfo {
 
     pub fn is_unknown(&self) -> bool {
         matches!(self, KindInfo::Unknown)
+    }
+
+    fn object(&self) -> Option<&BTreeMap<Field, KindInfo>> {
+        match self {
+            KindInfo::Unknown => None,
+            KindInfo::Known(set) => set.iter().find_map(|k| match k {
+                TypeKind::Object(object) => Some(object),
+                _ => None,
+            }),
+        }
+    }
+
+    fn array(&self) -> Option<&BTreeMap<Index, KindInfo>> {
+        match self {
+            KindInfo::Unknown => None,
+            KindInfo::Known(set) => set.iter().find_map(|k| match k {
+                TypeKind::Array(array) => Some(array),
+                _ => None,
+            }),
+        }
+    }
+
+    pub fn at_path(&self, path: Path) -> KindInfo {
+        let mut iter = path.into_iter();
+
+        let info = match self {
+            kind @ KindInfo::Unknown => kind.clone(),
+            kind @ KindInfo::Known(_) => match iter.next() {
+                None => return kind.clone(),
+                Some(segment) => match segment {
+                    path::Segment::Coalesce(fields) => match kind.object() {
+                        None => KindInfo::Unknown,
+                        Some(kind) => fields
+                            .into_iter()
+                            .find_map(|field| {
+                                let field = Field::Field(field.as_str().to_owned());
+                                kind.get(&field).cloned()
+                            })
+                            .unwrap_or_else(|| {
+                                if let Some(kind) = kind.get(&Field::Any) {
+                                    kind.clone()
+                                } else {
+                                    KindInfo::Unknown
+                                }
+                            }),
+                    },
+                    path::Segment::Field(field) => match kind.object() {
+                        None => KindInfo::Unknown,
+                        Some(kind) => {
+                            let field = Field::Field(field.as_str().to_owned());
+
+                            if let Some(kind) = kind.get(&field) {
+                                kind.clone()
+                            } else if let Some(kind) = kind.get(&Field::Any) {
+                                kind.clone()
+                            } else {
+                                KindInfo::Unknown
+                            }
+                        }
+                    },
+                    path::Segment::Index(index) => match kind.array() {
+                        None => KindInfo::Unknown,
+                        Some(kind) => {
+                            let index = Index::Index(index as usize);
+
+                            if let Some(kind) = kind.get(&index) {
+                                kind.clone()
+                            } else if let Some(kind) = kind.get(&Index::Any) {
+                                kind.clone()
+                            } else {
+                                KindInfo::Unknown
+                            }
+                        }
+                    },
+                },
+            },
+        };
+
+        info.at_path(Path::from_iter(iter))
     }
 
     fn merge(self, rhs: Self, shallow: bool) -> Self {
@@ -309,6 +390,13 @@ impl From<()> for Field {
 impl TypeDef {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn at_path(&self, path: Path) -> TypeDef {
+        let fallible = self.fallible;
+        let kind = self.kind.at_path(path);
+
+        Self { fallible, kind }
     }
 
     pub fn kind(&self) -> Kind {

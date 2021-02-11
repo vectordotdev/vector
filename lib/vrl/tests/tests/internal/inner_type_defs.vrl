@@ -1,0 +1,8 @@
+# result: ["FOO", "BAR", null, "QUX"]
+
+v1 = upcase(["foo"][0])
+v2 = upcase({ "bar": "bar" }.bar)
+# v3 = upcase(parse_json!(s'{ "baz": "baz" }').baz)
+v4 = { qux = { "qux": "qux" }; upcase(qux.qux) }
+
+[v1, v2, v3, v4]
