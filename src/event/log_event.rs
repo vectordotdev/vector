@@ -467,7 +467,7 @@ mod test {
             let event = LogEvent::from(value);
             let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Target::get(&event, &path), expect)
+            assert_eq!(vrl::Target::get(&event, &path), expect)
         }
     }
 
