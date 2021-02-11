@@ -24,7 +24,7 @@ impl Function for ParseKeyValue {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
@@ -97,8 +97,10 @@ impl Expression for ParseKeyValueFn {
         Ok(Value::from_iter(values))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().object(map! {})
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::new().infallible().object::<(), Kind>(map! {
+            (): Kind::all()
+        })
     }
 }
 
