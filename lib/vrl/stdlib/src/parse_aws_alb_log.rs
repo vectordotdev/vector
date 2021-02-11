@@ -36,7 +36,7 @@ impl Function for ParseAwsAlbLog {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -55,7 +55,7 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
 
         parse_log(&String::from_utf8_lossy(&bytes))
     }
