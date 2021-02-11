@@ -26,7 +26,7 @@ impl Function for UuidV4 {
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve(&self, _: &mut Context) -> Resolved {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 

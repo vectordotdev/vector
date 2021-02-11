@@ -79,7 +79,7 @@ impl Expression for LogFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().infallible().null()
     }
 }

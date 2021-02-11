@@ -46,7 +46,7 @@ impl Expression for GetEnvVarFn {
             .map_err(|e| e.to_string().into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().bytes()
     }
 }

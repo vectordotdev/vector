@@ -50,7 +50,7 @@ impl Expression for DowncaseFn {
         Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().bytes().infallible()
     }
 }

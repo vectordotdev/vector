@@ -81,7 +81,7 @@ impl Expression for ToSyslogFacilityFn {
         Ok(code.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().bytes()
     }
 }

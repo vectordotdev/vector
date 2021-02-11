@@ -1,4 +1,4 @@
-use crate::expression::{assignment, Resolved};
+use crate::expression::Resolved;
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;

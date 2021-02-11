@@ -160,7 +160,7 @@ impl KindInfo {
                     self = KindInfo::Known(set);
                 }
                 Segment::Index(mut index) => {
-                    let mut index = index as usize;
+                    let index = index as usize;
                     let mut map = BTreeMap::default();
 
                     let mut i = 0;
@@ -430,7 +430,7 @@ impl Index {
         }
     }
 
-    fn shift(mut self, count: usize) -> Self {
+    fn shift(self, count: usize) -> Self {
         match self {
             Index::Index(i) => Index::Index(i + count),
             v => v,

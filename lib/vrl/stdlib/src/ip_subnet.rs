@@ -92,7 +92,7 @@ impl Expression for IpSubnetFn {
         Ok(mask_ips(value, mask)?.to_string().into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().bytes()
     }
 }

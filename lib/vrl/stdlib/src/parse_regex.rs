@@ -68,7 +68,7 @@ impl Expression for ParseRegexFn {
         Ok(parsed.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible()
             .object(util::regex_type_def(&self.pattern))

@@ -55,7 +55,7 @@ impl Expression for StripWhitespaceFn {
         Ok(value.unwrap_bytes_utf8_lossy().trim().into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().infallible().bytes()
     }
 }

@@ -74,7 +74,7 @@ impl Expression for DecodeBase64Fn {
         }
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
         TypeDef::new().bytes().fallible()

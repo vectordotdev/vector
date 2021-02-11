@@ -95,7 +95,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
         .map_err(Into::into)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible() // Log parsing error
             .object::<&str, Kind>(map! {

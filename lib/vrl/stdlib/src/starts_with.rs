@@ -95,7 +95,7 @@ impl Expression for StartsWithFn {
         Ok(value.starts_with(&substring).into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().infallible().boolean()
     }
 }

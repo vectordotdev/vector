@@ -120,7 +120,7 @@ impl Expression for ParseGlogFn {
         Ok(log.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().object::<&str, Kind>(map! {
             "level": Kind::Bytes,
             "timestamp": Kind::Timestamp,

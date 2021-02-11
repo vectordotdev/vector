@@ -62,7 +62,7 @@ impl Expression for IncludesFn {
         Ok(included.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().infallible().boolean()
     }
 }

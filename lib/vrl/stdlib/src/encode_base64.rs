@@ -89,7 +89,7 @@ impl Expression for EncodeBase64Fn {
         Ok(base64::encode_config(value, config).into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().bytes().infallible()
     }
 }

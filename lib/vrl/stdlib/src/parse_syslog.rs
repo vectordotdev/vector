@@ -51,7 +51,7 @@ impl Expression for ParseSyslogFn {
         Ok(message_to_value(parsed))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().object(type_def())
     }
 }

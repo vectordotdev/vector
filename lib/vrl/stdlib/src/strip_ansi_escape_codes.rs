@@ -44,7 +44,7 @@ impl Expression for StripAnsiEscapeCodesFn {
             .map_err(|e| e.to_string().into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         // We're marking this as infallible, because `strip_ansi_escapes` only
         // fails if it can't write to the buffer, which is highly unlikely to
         // occur.

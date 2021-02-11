@@ -66,7 +66,7 @@ impl Expression for ToSyslogSeverityFn {
         Ok(severity.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().integer()
     }
 }

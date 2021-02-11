@@ -1,4 +1,3 @@
-use regex::Regex;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -63,7 +62,7 @@ impl Expression for MatchFn {
         Ok(pattern.is_match(&string).into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().infallible().boolean()
     }
 }

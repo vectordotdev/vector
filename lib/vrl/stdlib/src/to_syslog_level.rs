@@ -65,7 +65,7 @@ impl Expression for ToSyslogLevelFn {
         Ok(level.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().bytes()
     }
 }

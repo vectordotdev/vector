@@ -71,7 +71,7 @@ impl Expression for ParseRegexAllFn {
             .into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         let inner_type_def = TypeDef::new().object(util::regex_type_def(&self.pattern));
 
         TypeDef::new()

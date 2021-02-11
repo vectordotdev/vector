@@ -8,7 +8,7 @@ impl Function for GetHostname {
         "get_hostname"
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, _: ArgumentList) -> Compiled {
         Ok(Box::new(GetHostnameFn))
     }
 

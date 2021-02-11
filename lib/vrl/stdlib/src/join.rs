@@ -72,7 +72,7 @@ impl Expression for JoinFn {
         Ok(Value::from(joined))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         /*let fallible = match self.value.type_def(state).kind.array() {
             Some(array) => !array.values().all(|kind| kind.is(kind::BYTES)),
             _ => true,
