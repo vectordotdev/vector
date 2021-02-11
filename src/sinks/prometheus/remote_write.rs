@@ -8,7 +8,7 @@ use crate::{
         self,
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-            http::HttpRetryLogic,
+            http::{HttpRetryLogic, RequestDataEmpty},
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
@@ -98,7 +98,7 @@ impl SinkConfig for RemoteWriteConfig {
         };
 
         let sink = {
-            let service = request.service(HttpRetryLogic, service);
+            let service = request.service(HttpRetryLogic::default(), service);
             let service = ServiceBuilder::new().service(service);
             let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
@@ -191,7 +191,7 @@ impl RemoteWriteService {
 }
 
 impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
-    type Response = http::Response<Bytes>;
+    type Response = (hyper::Response<Bytes>, RequestDataEmpty);
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -222,7 +222,7 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
-            Ok(hyper::Response::from_parts(parts, body))
+            Ok((hyper::Response::from_parts(parts, body), RequestDataEmpty))
         })
     }
 }
