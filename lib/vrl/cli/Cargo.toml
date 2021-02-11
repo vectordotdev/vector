@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 vrl = { path = "../core" }
-stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["ceil", "compact", "contains", "to_string", "to_timestamp", "string", "sha1", "upcase"] }
+# stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["ceil", "compact", "contains", "to_string", "to_timestamp", "string", "sha1", "upcase"] }
 
 bytes = "0.5.6"
 exitcode = "1"
@@ -23,6 +23,66 @@ serde_json = "1"
 structopt = { version = "0.3", default-features = false }
 thiserror = "1"
 webbrowser = { version = "0.5", default-features = false, optional = true }
+
+[dependencies.stdlib]
+package = "vrl-stdlib"
+path = "../stdlib"
+default-features = false
+features = [
+    "append",
+    "assert",
+    "ceil",
+    "compact",
+    "contains",
+    "decode_base64",
+    "del",
+    "downcase",
+    "encode_base64",
+    "encode_json",
+    "ends_with",
+    "exists",
+    "flatten",
+    "floor",
+    "format_number",
+    "format_timestamp",
+    "get_env_var",
+    "includes",
+    "ip_cidr_contains",
+    "ip_subnet",
+    "ip_to_ipv6",
+    "ipv6_to_ipv4",
+    "is_nullish",
+    "length",
+    "log",
+    "match",
+    "md5",
+    "merge",
+    "now",
+    "parse_aws_alb_log",
+    "parse_aws_cloudwatch_log_subscription_message",
+    "parse_json",
+    "replace",
+    "round",
+    "sha1",
+    "sha2",
+    "slice",
+    "split",
+    "starts_with",
+    "string",
+    "strip_ansi_escape_codes",
+    "strip_whitespace",
+    "to_bool",
+    "to_float",
+    "to_int",
+    "to_string",
+    "to_syslog_facility",
+    "to_syslog_level",
+    "to_syslog_severity",
+    "to_timestamp",
+    "to_unix_timestamp",
+    "upcase",
+    "uuid_v4",
+]
 
 [features]
 default = ["repl"]
