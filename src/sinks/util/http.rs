@@ -400,7 +400,7 @@ impl From<&hyper::Request<Vec<u8>>> for RequestDataEmpty {
     }
 }
 
-impl crate::sinks::util::sink::Response for (hyper::Response<bytes::Bytes>, RequestDataEmpty) {
+impl sink::Response for (hyper::Response<bytes::Bytes>, RequestDataEmpty) {
     fn is_successful(&self) -> bool {
         self.0.status().is_success()
     }

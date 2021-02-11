@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
+        sink, BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -303,7 +303,7 @@ impl From<&hyper::Request<Vec<u8>>> for RequestByteSize {
     }
 }
 
-impl crate::sinks::util::sink::Response for (hyper::Response<bytes::Bytes>, RequestByteSize) {
+impl sink::Response for (hyper::Response<bytes::Bytes>, RequestByteSize) {
     fn is_successful(&self) -> bool {
         self.0.status().is_success()
     }
