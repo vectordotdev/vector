@@ -83,6 +83,18 @@ impl KindInfo {
         }
     }
 
+    pub fn or_null(self) -> Self {
+        use KindInfo::*;
+
+        match self {
+            Unknown => Unknown,
+            Known(mut set) => {
+                set.insert(TypeKind::Null);
+                Known(set)
+            }
+        }
+    }
+
     pub fn is_unknown(&self) -> bool {
         matches!(self, KindInfo::Unknown)
     }
@@ -205,55 +217,62 @@ impl KindInfo {
 
         let info = match self {
             kind @ KindInfo::Unknown => return kind.clone(),
-            kind @ KindInfo::Known(_) => match iter.next() {
-                None => return kind.clone(),
-                Some(segment) => match segment {
-                    Segment::Coalesce(fields) => match kind.object() {
-                        None => KindInfo::Unknown,
-                        Some(kind) => fields
-                            .into_iter()
-                            .find_map(|field| {
+            kind @ KindInfo::Known(_) => {
+                let new = match iter.next() {
+                    None => return kind.clone(),
+                    Some(segment) => match segment {
+                        Segment::Coalesce(fields) => match kind.object() {
+                            None => KindInfo::Unknown,
+                            Some(kind) => fields
+                                .into_iter()
+                                .find_map(|field| {
+                                    let field = Field::Field(field.as_str().to_owned());
+                                    kind.get(&field).cloned()
+                                })
+                                .unwrap_or_else(|| {
+                                    if let Some(kind) = kind.get(&Field::Any) {
+                                        kind.clone()
+                                    } else {
+                                        KindInfo::Unknown
+                                    }
+                                }),
+                        },
+                        Segment::Field(field) => match kind.object() {
+                            None => KindInfo::Unknown,
+                            Some(kind) => {
                                 let field = Field::Field(field.as_str().to_owned());
-                                kind.get(&field).cloned()
-                            })
-                            .unwrap_or_else(|| {
-                                if let Some(kind) = kind.get(&Field::Any) {
+
+                                if let Some(kind) = kind.get(&field) {
+                                    kind.clone()
+                                } else if let Some(kind) = kind.get(&Field::Any) {
                                     kind.clone()
                                 } else {
                                     KindInfo::Unknown
                                 }
-                            }),
-                    },
-                    Segment::Field(field) => match kind.object() {
-                        None => KindInfo::Unknown,
-                        Some(kind) => {
-                            let field = Field::Field(field.as_str().to_owned());
-
-                            if let Some(kind) = kind.get(&field) {
-                                kind.clone()
-                            } else if let Some(kind) = kind.get(&Field::Any) {
-                                kind.clone()
-                            } else {
-                                KindInfo::Unknown
                             }
-                        }
-                    },
-                    Segment::Index(index) => match kind.array() {
-                        None => KindInfo::Unknown,
-                        Some(kind) => {
-                            let index = Index::Index(index as usize);
+                        },
+                        Segment::Index(index) => match kind.array() {
+                            None => KindInfo::Unknown,
+                            Some(kind) => {
+                                let index = Index::Index(index as usize);
 
-                            if let Some(kind) = kind.get(&index) {
-                                kind.clone()
-                            } else if let Some(kind) = kind.get(&Index::Any) {
-                                kind.clone()
-                            } else {
-                                KindInfo::Unknown
+                                if let Some(kind) = kind.get(&index) {
+                                    kind.clone()
+                                } else if let Some(kind) = kind.get(&Index::Any) {
+                                    kind.clone()
+                                } else {
+                                    KindInfo::Unknown
+                                }
                             }
-                        }
+                        },
                     },
-                },
-            },
+                };
+
+                match kind {
+                    KindInfo::Known(set) if set.len() > 1 => new.or_null(),
+                    _ => new,
+                }
+            }
         };
 
         info.at_path(Path::from_iter(iter))

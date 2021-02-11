@@ -72,7 +72,9 @@ impl Expression for ParseRegexAllFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        let inner_type_def = TypeDef::new().object(util::regex_type_def(&self.pattern));
+        let inner_type_def = TypeDef::new()
+            .object(util::regex_type_def(&self.pattern))
+            .add_null();
 
         TypeDef::new()
             .fallible()

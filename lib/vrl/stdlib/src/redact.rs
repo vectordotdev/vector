@@ -109,7 +109,6 @@ impl Expression for RedactFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-
         let mut typedef = self
             .value
             .type_def(state)

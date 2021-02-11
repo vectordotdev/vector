@@ -1,18 +1,18 @@
 # object: { "message": "bananas and another ant" }
 # result:
-# error: unhandled error
-#   ┌─ :3:1
+#
+# error: invalid argument type
+#   ┌─ :3:11
 #   │
 # 3 │ .a = sha3(.result[0].an)
-#   │ ^^^^^^^^^^^^^^^^^^^^^^^^
-#   │ │
-#   │ expression can result in runtime error
-#   │ handle the error case to ensure runtime success
+#   │           ^^^^^^^^^^^^^
+#   │           │
+#   │           this expression resolves to one of "string" or "null"
+#   │           but the parameter "value" expects the exact type "string"
 #   │
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
-.result = parse_regex_all!(.message, /(?P<an>an.)/)
+.result = parse_regex_all!(.message, r'(?P<an>an.)')
 .a = sha3(.result[0].an)
 
 "cant work since all array access is error prone"

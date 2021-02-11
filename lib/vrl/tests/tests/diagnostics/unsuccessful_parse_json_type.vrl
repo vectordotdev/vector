@@ -1,17 +1,17 @@
 # object: { "message": "{\"field\": \"value\"}" }
 # result:
 #
-# error: unhandled error
-#   ┌─ :3:1
+# error: invalid argument type
+#   ┌─ :4:6
 #   │
-# 3 │ sha3(result.message)
-#   │ ^^^^^^^^^^^^^^^^^^^^
-#   │ │
-#   │ expression can result in runtime error
-#   │ handle the error case to ensure runtime success
+# 4 │ sha3(result.message)
+#   │      ^^^^^^^^^^^^^^
+#   │      │
+#   │      this expression resolves to "unknown type"
+#   │      but the parameter "value" expects the exact type "string"
 #   │
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
+.message = to_string!(.message)
 result = parse_json!(.message)
 sha3(result.message)
