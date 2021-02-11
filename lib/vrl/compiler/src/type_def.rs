@@ -111,7 +111,7 @@ impl KindInfo {
         let mut iter = path.into_iter();
 
         let info = match self {
-            kind @ KindInfo::Unknown => kind.clone(),
+            kind @ KindInfo::Unknown => return kind.clone(),
             kind @ KindInfo::Known(_) => match iter.next() {
                 None => return kind.clone(),
                 Some(segment) => match segment {
