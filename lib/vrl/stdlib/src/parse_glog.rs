@@ -1,8 +1,8 @@
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use remap::prelude::*;
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
 lazy_static! {
     static ref REGEX_GLOG: Regex = Regex::new(
@@ -29,18 +29,29 @@ impl Function for ParseGlog {
         "parse_glog"
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
-            required: true,
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "valid",
+            // TODO: Remove `encode_json` hack.
+            source: r#"encode_json(parse_glog!("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"))"#,
+            result: Ok(
+                r#"s'{"file":"main.c++","id":15520,"level":"info","line":9,"message":"Hello world!","timestamp":"2021-01-31T14:48:54.411655+00:00"}'"#,
+            ),
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(ParseGlogFn { value }))
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[Parameter {
+            keyword: "value",
+            kind: kind::BYTES,
+            required: true,
+        }]
     }
 }
 
@@ -50,8 +61,8 @@ struct ParseGlogFn {
 }
 
 impl Expression for ParseGlogFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
         let message = String::from_utf8_lossy(&bytes);
 
         let mut log: BTreeMap<String, Value> = BTreeMap::new();
@@ -110,27 +121,18 @@ impl Expression for ParseGlogFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .into_fallible(true)
-            .with_constraint(value::Kind::Map)
-            .with_inner_type(inner_type_def())
+        TypeDef::new().fallible().object::<&str, Kind>(map! {
+            "level": Kind::Bytes,
+            "timestamp": Kind::Timestamp,
+            "id": Kind::Integer,
+            "file": Kind::Bytes,
+            "line": Kind::Integer,
+            "message": Kind::Bytes,
+        })
     }
 }
 
-fn inner_type_def() -> Option<InnerTypeDef> {
-    use value::Kind;
-
-    Some(inner_type_def!({
-        "level": Kind::Bytes,
-        "timestamp": Kind::Timestamp,
-        "id": Kind::Integer,
-        "file": Kind::Bytes,
-        "line": Kind::Integer,
-        "message": Kind::Bytes,
-    }))
-}
-
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,3 +204,4 @@ mod tests {
         }
     ];
 }
+*/
