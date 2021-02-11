@@ -95,7 +95,9 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
                 "message_type": Kind::Bytes,
                 "log_group": Kind::Bytes,
                 "log_stream": Kind::Bytes,
-                "subscription_filters": TypeDef::new().array(vec![Kind::Bytes]),
+                "subscription_filters": TypeDef::new().array_mapped::<(), Kind>(map! {
+                    (): Kind::Bytes
+                }),
                 "log_events": TypeDef::new().object::<&str, Kind>(map! {
                     "id": Kind::Bytes,
                     "timestamp": Kind::Timestamp,
