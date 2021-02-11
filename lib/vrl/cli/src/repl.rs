@@ -8,7 +8,7 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
@@ -21,7 +21,6 @@ VRL REPL commands:
 "#;
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
-const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
