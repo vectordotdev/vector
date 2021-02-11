@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
@@ -39,7 +39,7 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(AddTags::new(
             self.tags.clone(),
             self.overwrite,

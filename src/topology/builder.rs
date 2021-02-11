@@ -105,7 +105,7 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build().await {
+        let transform = match transform.inner.build(&config.global).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -179,6 +179,7 @@ pub async fn build_pieces(
         let cx = SinkContext {
             acker: acker.clone(),
             healthcheck,
+            globals: config.global.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {

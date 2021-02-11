@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for RemoveTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 

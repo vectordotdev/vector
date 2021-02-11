@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,7 @@ impl GenerateConfig for LuaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         match self {
             LuaConfig::V1(v1) => v1.config.build(),
             LuaConfig::V2(v2) => v2.config.build(),

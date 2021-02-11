@@ -262,7 +262,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

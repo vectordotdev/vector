@@ -166,7 +166,7 @@ mod test {
     #[async_trait]
     #[typetag::serde(name = "mock")]
     impl TransformConfig for MockTransformConfig {
-        async fn build(&self) -> crate::Result<Transform> {
+        async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
             unimplemented!()
         }
 
