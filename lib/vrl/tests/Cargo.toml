@@ -54,6 +54,7 @@ features = [
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
+    "parse_duration",
     "parse_json",
     "replace",
     "round",
