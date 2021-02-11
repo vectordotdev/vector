@@ -2,8 +2,12 @@ mod util;
 
 #[cfg(feature = "append")]
 mod append;
+#[cfg(feature = "array")]
+mod array;
 #[cfg(feature = "assert")]
 mod assert;
+#[cfg(feature = "boolean")]
+mod boolean;
 #[cfg(feature = "ceil")]
 mod ceil;
 #[cfg(feature = "compact")]
@@ -26,6 +30,8 @@ mod ends_with;
 mod exists;
 #[cfg(feature = "flatten")]
 mod flatten;
+#[cfg(feature = "float")]
+mod float;
 #[cfg(feature = "floor")]
 mod floor;
 #[cfg(feature = "format_number")]
@@ -38,6 +44,8 @@ mod get_env_var;
 mod get_hostname;
 #[cfg(feature = "includes")]
 mod includes;
+#[cfg(feature = "integer")]
+mod integer;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
 #[cfg(feature = "ip_subnet")]
@@ -62,6 +70,8 @@ mod md5;
 mod merge;
 #[cfg(feature = "now")]
 mod now;
+#[cfg(feature = "object")]
+mod object;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -118,6 +128,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "timestamp")]
+mod timestamp;
 #[cfg(feature = "to_bool")]
 mod to_bool;
 #[cfg(feature = "to_float")]
@@ -145,6 +157,8 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
+#[cfg(feature = "array")]
+pub use crate::array::Array;
 #[cfg(feature = "md5")]
 pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
@@ -153,6 +167,8 @@ pub use crate::sha1::Sha1;
 pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
+#[cfg(feature = "boolean")]
+pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
 pub use ceil::Ceil;
 #[cfg(feature = "compact")]
@@ -175,6 +191,8 @@ pub use ends_with::EndsWith;
 pub use exists::Exists;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
+#[cfg(feature = "float")]
+pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
 #[cfg(feature = "format_number")]
@@ -187,6 +205,8 @@ pub use get_env_var::GetEnvVar;
 pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
+#[cfg(feature = "integer")]
+pub use integer::Integer;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_subnet")]
@@ -207,6 +227,8 @@ pub use log::Log;
 pub use merge::Merge;
 #[cfg(feature = "now")]
 pub use now::Now;
+#[cfg(feature = "object")]
+pub use object::Object;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -263,6 +285,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "timestamp")]
+pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
 pub use to_bool::ToBool;
 #[cfg(feature = "to_float")]
@@ -290,10 +314,14 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
+        #[cfg(feature = "array")]
+        Box::new(Array),
         #[cfg(feature = "append")]
         Box::new(Append),
         #[cfg(feature = "assert")]
         Box::new(Assert),
+        #[cfg(feature = "boolean")]
+        Box::new(Boolean),
         #[cfg(feature = "ceil")]
         Box::new(Ceil),
         #[cfg(feature = "compact")]
@@ -320,6 +348,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegexAll),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
+        #[cfg(feature = "float")]
+        Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
         #[cfg(feature = "format_number")]
@@ -332,6 +362,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(GetHostname),
         #[cfg(feature = "includes")]
         Box::new(Includes),
+        #[cfg(feature = "integer")]
+        Box::new(Integer),
         #[cfg(feature = "ip_cidr_contains")]
         Box::new(IpCidrContains),
         #[cfg(feature = "ip_subnet")]
@@ -354,6 +386,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Merge),
         #[cfg(feature = "now")]
         Box::new(Now),
+        #[cfg(feature = "object")]
+        Box::new(Object),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -408,6 +442,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "timestamp")]
+        Box::new(Timestamp),
         #[cfg(feature = "to_bool")]
         Box::new(ToBool),
         #[cfg(feature = "to_float")]
