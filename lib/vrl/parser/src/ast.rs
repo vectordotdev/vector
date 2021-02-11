@@ -3,6 +3,7 @@ use diagnostic::Span;
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::iter::IntoIterator;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -13,7 +14,7 @@ use std::str::FromStr;
 
 /// A wrapper type for a node, containing span details of that given node as it
 /// relates to the source input from which the node was generated.
-#[derive(Clone, Eq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, Ord, PartialOrd)]
 pub struct Node<T> {
     pub(crate) span: Span,
     pub(crate) node: T,
@@ -104,6 +105,13 @@ impl<T: PartialEq> PartialEq for Node<T> {
     }
 }
 
+impl<T: Hash> Hash for Node<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.node.hash(state);
+        self.span.hash(state);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // program
 // -----------------------------------------------------------------------------
@@ -114,7 +122,7 @@ pub struct Program(pub Vec<Node<RootExpr>>);
 impl fmt::Debug for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for expr in &self.0 {
-            write!(f, "{:?}\n", expr)?;
+            writeln!(f, "{:?}", expr)?;
         }
 
         Ok(())
@@ -124,7 +132,7 @@ impl fmt::Debug for Program {
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for expr in &self.0 {
-            write!(f, "{}\n", expr)?;
+            writeln!(f, "{}", expr)?;
         }
 
         Ok(())
@@ -189,6 +197,7 @@ impl fmt::Display for RootExpr {
 // expression
 // -----------------------------------------------------------------------------
 
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq)]
 pub enum Expr {
     Literal(Node<Literal>),

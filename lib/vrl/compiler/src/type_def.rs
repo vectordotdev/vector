@@ -74,15 +74,6 @@ impl From<Kind> for KindInfo {
 }
 
 impl KindInfo {
-    pub fn contains(&self, kind: Kind) -> bool {
-        use KindInfo::*;
-
-        match self {
-            Unknown => true,
-            Known(set) => set.iter().any(|k| k.is_kind(kind)),
-        }
-    }
-
     pub fn or_null(self) -> Self {
         use KindInfo::*;
 
@@ -93,10 +84,6 @@ impl KindInfo {
                 Known(set)
             }
         }
-    }
-
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, KindInfo::Unknown)
     }
 
     fn object(&self) -> Option<&BTreeMap<Field, KindInfo>> {
@@ -277,126 +264,7 @@ impl KindInfo {
 
         info.at_path(Path::from_iter(iter))
     }
-
-    fn merge(self, rhs: Self, shallow: bool) -> Self {
-        use std::iter::FromIterator;
-        use KindInfo::*;
-
-        match (self, rhs) {
-            (KindInfo::Known(lhs), KindInfo::Known(rhs)) => {
-                let (lhs_array, lhs): (Vec<_>, Vec<_>) = lhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Array(_)));
-
-                let (rhs_array, rhs): (Vec<_>, Vec<_>) = rhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Array(_)));
-
-                // If both the lhs and rhs contain an array, we need to merge
-                // their definitions.
-                //
-                // We do this by taking the highest index of the lhs array, and
-                // increase the indexes of the rhs index by that amount.
-                let array = lhs_array
-                    .into_iter()
-                    .zip(rhs_array.into_iter())
-                    .map(|(l, r)| {
-                        let mut l = match l {
-                            TypeKind::Array(v) => v,
-                            _ => unreachable!(),
-                        };
-
-                        let r_start = l
-                            .keys()
-                            .filter_map(|i| i.to_inner())
-                            .max()
-                            .map(|i| i + 1)
-                            .unwrap_or_default();
-
-                        let mut r = match r {
-                            TypeKind::Array(v) => v
-                                .into_iter()
-                                .map(|(i, v)| (i.shift(r_start), v))
-                                .collect::<BTreeMap<_, _>>(),
-                            _ => unreachable!(),
-                        };
-
-                        l.append(&mut r);
-
-                        TypeKind::Array(l)
-                    });
-
-                let (lhs_object, lhs): (Vec<_>, Vec<_>) = lhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Object(_)));
-
-                let (rhs_object, rhs): (Vec<_>, Vec<_>) = rhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Object(_)));
-
-                // Similar to merging two arrays, but for objects.
-                //
-                // In this case, all we care about is merging the two objects,
-                // with the rhs object taking precedence.
-                let object = lhs_object
-                    .into_iter()
-                    .zip(rhs_object.into_iter())
-                    .map(|(l, r)| {
-                        let mut l = match l {
-                            TypeKind::Object(v) => v,
-                            _ => unreachable!(),
-                        };
-
-                        let mut r = match r {
-                            TypeKind::Object(v) => v,
-                            _ => unreachable!(),
-                        };
-
-                        // merge nested keys
-                        for (k1, v1) in l.iter_mut() {
-                            for (k2, v2) in r.iter_mut() {
-                                if k1 == k2 {
-                                    *v2 = v1.clone() | v2.clone();
-                                }
-                            }
-                        }
-
-                        l.append(&mut r);
-
-                        TypeKind::Object(l)
-                    });
-
-                let mut lhs = BTreeSet::from_iter(lhs.into_iter());
-                let mut rhs = BTreeSet::from_iter(rhs.into_iter());
-                let mut array = BTreeSet::from_iter(array);
-                let mut object = BTreeSet::from_iter(object);
-
-                lhs.append(&mut rhs);
-                lhs.append(&mut array);
-                lhs.append(&mut object);
-
-                // lhs.into_iter()
-
-                // match lhs {}
-
-                // merge arrays
-                // let lhs = lhs.into_iter()
-
-                // lhs.append(&mut rhs);
-                Known(lhs)
-            }
-            (lhs @ Known(_), _) => lhs,
-            (_, rhs @ Known(_)) => rhs,
-            _ => Unknown,
-        }
-    }
 }
-
-// impl From<TypeDef> for KindInfo {
-//     fn from(td: TypeDef) -> Self {
-//         td.kind
-//     }
-// }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 enum TypeKind {
@@ -412,11 +280,6 @@ enum TypeKind {
 }
 
 impl TypeKind {
-    /// Check if the given [`TypeKind`] matches a given [`Kind`].
-    pub fn is_kind(&self, kind: Kind) -> bool {
-        kind.contains(self.to_kind())
-    }
-
     /// Convert a given [`TypeKind`] into a [`Kind`].
     pub fn to_kind(&self) -> Kind {
         use TypeKind::*;
@@ -889,7 +752,6 @@ impl BitOr for KindInfo {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self {
-        use std::iter::FromIterator;
         use KindInfo::*;
 
         match (self, rhs) {

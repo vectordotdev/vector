@@ -1,5 +1,9 @@
 use lalrpop_util::lalrpop_mod;
-lalrpop_mod!(parser);
+lalrpop_mod!(
+    #[allow(clippy::all)]
+    #[allow(unused)]
+    parser
+);
 
 pub mod ast;
 mod lex;

@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use vrl::prelude::*;
 use vector::transforms::{
     add_fields::AddFields,
     coercer::CoercerConfig,
@@ -14,6 +13,7 @@ use vector::{
     event::{Event, Value},
     test_util::runtime,
 };
+use vrl::prelude::*;
 
 criterion_group!(
     name = benches;

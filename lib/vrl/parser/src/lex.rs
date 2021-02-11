@@ -99,7 +99,7 @@ impl DiagnosticError for Error {
 
                     if token == &Token::RQuery {
                         return vec![
-                            Label::primary(format!(r#"unexpected end of query path"#), span),
+                            Label::primary("unexpected end of query path", span),
                             Label::context(
                                 format!("expected one of: {}", expected.join(", ")),
                                 span,
@@ -549,6 +549,7 @@ impl<'input> Lexer<'input> {
         self.token2(start, end, token)
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn token2(
         &mut self,
         start: usize,
@@ -625,7 +626,7 @@ impl<'input> Lexer<'input> {
                  end: &mut usize,
                  chars: &mut Peekable<CharIndices<'input>>| {
                     result.map(|(_, _, new)| {
-                        while let Some((i, ch)) = chars.next() {
+                        for (i, ch) in chars {
                             *last_char = Some(ch);
                             if i == new + pos {
                                 break;
@@ -718,6 +719,7 @@ impl<'input> Lexer<'input> {
                         let literal_check = |result: Spanned<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
                             Err(_) => Err(()),
                             Ok((_, _, new)) => {
+                                #[allow(clippy::while_let_on_iterator)]
                                 while let Some((i, _)) = chars.next() {
                                     if i == new + pos {
                                         break;
@@ -765,17 +767,14 @@ impl<'input> Lexer<'input> {
                         if skip_delim == 0 && ch == end_delim {
                             break;
                         }
-                        chars.next().map(|(i, c)| {
+                        if let Some((_, c)) = chars.next() {
                             if c == start_delim {
                                 skip_delim += 1;
                             }
                             if c == end_delim {
                                 skip_delim -= 1;
                             }
-
-                            end = i;
-                            last_char = Some(c)
-                        });
+                        };
                     }
                 }
 
@@ -900,6 +899,7 @@ impl<'input> Lexer<'input> {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn identifier_or_function_call(&mut self, start: usize) -> Spanned<'input, usize> {
         let (end, ident) = self.take_while(start, is_ident_continue);
 

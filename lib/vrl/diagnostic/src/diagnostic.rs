@@ -111,16 +111,16 @@ impl From<Box<dyn DiagnosticError>> for Diagnostic {
     }
 }
 
-impl Into<diagnostic::Diagnostic<()>> for Diagnostic {
-    fn into(self) -> diagnostic::Diagnostic<()> {
-        let mut notes = self.notes.to_vec();
+impl From<Diagnostic> for diagnostic::Diagnostic<()> {
+    fn from(diag: Diagnostic) -> Self {
+        let mut notes = diag.notes.to_vec();
         notes.push(Note::SeeLangDocs);
 
         diagnostic::Diagnostic {
-            severity: self.severity.into(),
+            severity: diag.severity.into(),
             code: None,
-            message: self.message.to_string(),
-            labels: self.labels.to_vec().into_iter().map(Into::into).collect(),
+            message: diag.message.to_string(),
+            labels: diag.labels.to_vec().into_iter().map(Into::into).collect(),
             notes: notes.iter().map(ToString::to_string).collect(),
         }
     }

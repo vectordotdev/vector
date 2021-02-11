@@ -26,9 +26,9 @@ impl Label {
     }
 }
 
-impl Into<diagnostic::Label<()>> for Label {
-    fn into(self) -> diagnostic::Label<()> {
-        let style = match self.primary {
+impl From<Label> for diagnostic::Label<()> {
+    fn from(label: Label) -> Self {
+        let style = match label.primary {
             true => diagnostic::LabelStyle::Primary,
             false => diagnostic::LabelStyle::Secondary,
         };
@@ -36,8 +36,8 @@ impl Into<diagnostic::Label<()>> for Label {
         diagnostic::Label {
             style,
             file_id: (),
-            range: self.span.start()..self.span.end(),
-            message: self.message,
+            range: label.span.start()..label.span.end(),
+            message: label.message,
         }
     }
 }

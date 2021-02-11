@@ -1,11 +1,11 @@
 use super::{repl, Error};
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]

@@ -34,11 +34,11 @@ impl Severity {
     }
 }
 
-impl Into<diagnostic::Severity> for Severity {
-    fn into(self) -> diagnostic::Severity {
+impl From<Severity> for diagnostic::Severity {
+    fn from(severity: Severity) -> Self {
         use Severity::*;
 
-        match self {
+        match severity {
             Bug => diagnostic::Severity::Bug,
             Error => diagnostic::Severity::Error,
             Warning => diagnostic::Severity::Warning,
