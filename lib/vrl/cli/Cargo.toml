@@ -12,8 +12,6 @@ path = "src/main.rs"
 
 [dependencies]
 vrl = { path = "../core" }
-# stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["ceil", "compact", "contains", "to_string", "to_timestamp", "string", "sha1", "upcase"] }
-
 bytes = "0.5.6"
 exitcode = "1"
 prettytable-rs = { version = "0.8", default-features = false, optional = true }
@@ -61,6 +59,8 @@ features = [
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_json",
+    "parse_regex",
+    "parse_regex_all",
     "replace",
     "round",
     "sha1",

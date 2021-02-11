@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use regex::Regex;
 use vrl::prelude::*;
 
@@ -32,6 +34,24 @@ impl Function for ParseRegexAll {
 
         Ok(Box::new(ParseRegexAllFn { value, pattern }))
     }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "Simple match",
+            source: r#"parse_regex_all!("apples and carrots, peaches and peas", r'(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)')"#,
+            result: Ok(indoc! { r#"[
+               {"fruit": "apples",
+                "veg": "carrots",
+                "0": "apples and carrots",
+                "1": "apples",
+                "2": "carrots"},
+               {"fruit": "peaches",
+                "veg": "peas",
+                "0": "peaches and peas",
+                "1": "peaches",
+                "2": "peas"}]"# }),
+        }]
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -54,18 +74,20 @@ impl Expression for ParseRegexAllFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .with_constraint(value::Kind::Array)
+        let inner_type_def = TypeDef::new().object(util::regex_type_def(&self.pattern));
+
+        TypeDef::new()
+            .fallible()
+            .array_mapped::<(), TypeDef>(map![(): inner_type_def])
     }
 }
 
+/*
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-    
+
     vrl::test_type_def![
         value_string {
             expr: |_| ParseRegexAllFn {
@@ -121,3 +143,4 @@ mod tests {
         }
     ];
 }
+*/

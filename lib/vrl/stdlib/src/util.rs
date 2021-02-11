@@ -1,4 +1,6 @@
-use vrl::Value;
+use vrl::{Value, value::Kind};
+#[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
+use std::{collections::BTreeMap, ops::Deref};
 
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
@@ -42,6 +44,24 @@ pub(crate) fn capture_regex_to_map(
         });
 
     indexed.chain(names).collect()
+}
+
+#[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
+pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind>
+{
+    let mut inner_type = BTreeMap::new();
+
+    // Add typedefs for each capture by numerical index.
+    for num in 0..regex.captures_len() {
+        inner_type.insert(num.to_string(), Kind::Bytes.into());
+    }
+
+    // Add a typedef for each capture name.
+    for name in regex.capture_names().filter_map(std::convert::identity) {
+        inner_type.insert(name.to_owned(), Kind::Bytes.into());
+    }
+
+    inner_type
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]

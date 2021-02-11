@@ -86,13 +86,25 @@ prop_compose! {
 }
 
 prop_compose! {
+    fn timestamp_literal() (secs in 0..i64::MAX) -> Literal {
+        use chrono::{Utc, TimeZone};
+        Literal::Timestamp(Utc.timestamp(secs, 0).to_string())
+    }
+}
+
+prop_compose! {
     fn float_literal()(numerator in 0f64..1000.0, denominator in 0f64..1000.0) -> Literal {
         Literal::Float(NotNan::new(numerator / denominator).unwrap())
     }
 }
 
 fn literal() -> impl Strategy<Value = Literal> {
-    prop_oneof![string_literal(), int_literal(), float_literal()]
+    prop_oneof![
+        string_literal(),
+        int_literal(),
+        float_literal(),
+        timestamp_literal()
+    ]
 }
 
 prop_compose! {

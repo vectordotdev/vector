@@ -4,7 +4,6 @@ use crate::value::Kind;
 use crate::{Span, Value};
 use diagnostic::{DiagnosticError, Label};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::fmt;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
@@ -172,6 +171,23 @@ impl ArgumentList {
 
     pub fn required_query(&mut self, keyword: &'static str) -> Result<Query, Error> {
         Ok(required(self.optional_query(keyword)?))
+    }
+
+    pub fn optional_regex(&mut self, keyword: &'static str) -> Result<Option<regex::Regex>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Literal(Literal::Regex(regex)) => Ok((*regex).clone()),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "regex",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_regex(&mut self, keyword: &'static str) -> Result<regex::Regex, Error> {
+        Ok(required(self.optional_regex(keyword)?))
     }
 
     pub(crate) fn keywords(&self) -> Vec<&'static str> {

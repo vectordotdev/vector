@@ -1,6 +1,6 @@
 use regex::Regex;
-use vrl::prelude::*;
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
 use crate::util;
 
@@ -16,12 +16,12 @@ impl Function for ParseRegex {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                kind: kind::ANY,
+                kind: kind::REGEX,
                 required: true,
             },
         ]
@@ -32,6 +32,20 @@ impl Function for ParseRegex {
         let pattern = arguments.required_regex("pattern")?;
 
         Ok(Box::new(ParseRegexFn { value, pattern }))
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "simple match",
+            source: r#"parse_regex!("8.7.6.5 - zorp", r'^(?P<host>[\w\.]+) - (?P<user>[\w]+)')"#,
+            result: Ok(indoc! { r#"{
+                "0": "8.7.6.5 - zorp",
+                "1": "8.7.6.5",
+                "2": "zorp",
+                "host": "8.7.6.5",
+                "user": "zorp"
+            }"# }),
+        }]
     }
 }
 
@@ -55,18 +69,18 @@ impl Expression for ParseRegexFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
-            .with_constraint(value::Kind::Map)
+        TypeDef::new()
+            .fallible()
+            .object(util::regex_type_def(&self.pattern))
     }
 }
 
+/*
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-    
+
     vrl::test_type_def![
         value_string {
             expr: |_| ParseRegexFn {
@@ -143,3 +157,4 @@ mod tests {
         }
     ];
 }
+*/
