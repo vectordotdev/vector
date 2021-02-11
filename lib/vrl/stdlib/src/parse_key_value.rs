@@ -221,6 +221,7 @@ fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     move |input| alt((parse_delimited('"'), parse_undelimited(field_delimiter)))(input)
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -403,3 +404,4 @@ mod test {
         }
     ];
 }
+*/

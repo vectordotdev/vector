@@ -47,10 +47,12 @@ struct CeilFn {
 }
 
 impl CeilFn {
+    /*
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, precision: Option<Box<dyn Expression>>) -> Self {
         Self { value, precision }
     }
+    */
 }
 
 impl Expression for CeilFn {

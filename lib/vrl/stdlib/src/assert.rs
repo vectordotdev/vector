@@ -58,10 +58,12 @@ struct AssertFn {
 }
 
 impl AssertFn {
+    /*
     #[cfg(test)]
     fn new(condition: Box<dyn Expression>, message: Option<Box<dyn Expression>>) -> Self {
         Self { condition, message }
     }
+    */
 }
 
 impl Expression for AssertFn {

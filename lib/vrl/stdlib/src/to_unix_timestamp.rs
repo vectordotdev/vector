@@ -112,10 +112,12 @@ struct ToUnixTimestampFn {
 }
 
 impl ToUnixTimestampFn {
+    /*
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, unit: Unit) -> Self {
         Self { value, unit }
     }
+    */
 }
 
 impl Expression for ToUnixTimestampFn {

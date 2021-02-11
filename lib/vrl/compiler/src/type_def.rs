@@ -171,8 +171,8 @@ impl KindInfo {
 
                     self = KindInfo::Known(set);
                 }
-                Segment::Index(mut index) => {
-                    let index = index as usize;
+                Segment::Index(index) => {
+                    let index = *index as usize;
                     let mut map = BTreeMap::default();
 
                     let mut i = 0;

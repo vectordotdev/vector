@@ -37,10 +37,12 @@ struct DowncaseFn {
 }
 
 impl DowncaseFn {
+    /*
     #[cfg(test)]
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
+    */
 }
 
 impl Expression for DowncaseFn {

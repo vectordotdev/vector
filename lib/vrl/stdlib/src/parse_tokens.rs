@@ -41,10 +41,12 @@ struct ParseTokensFn {
 }
 
 impl ParseTokensFn {
+    /*
     #[cfg(test)]
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
+    */
 }
 
 impl Expression for ParseTokensFn {
