@@ -1,3 +1,4 @@
+/*
 use vrl::prelude::*;
 use std::str::FromStr;
 
@@ -287,3 +288,4 @@ mod test {
         }
     ];
 }
+*/

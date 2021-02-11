@@ -1,8 +1,8 @@
 use chrono::DateTime;
 use lazy_static::lazy_static;
 use regex::Regex;
-use remap::prelude::*;
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
 lazy_static! {
     // Information about the common log format taken from the
@@ -41,25 +41,35 @@ impl Function for ParseCommonLog {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
                 keyword: "timestamp_format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::BYTES,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let timestamp_format = arguments.optional("timestamp_format").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let timestamp_format = arguments.optional("timestamp_format");
 
         Ok(Box::new(ParseCommonLogFn {
             value,
             timestamp_format,
         }))
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "parse common log",
+            source: r#"encode_json(parse_common_log!(s'127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326'))"#,
+            result: Ok(
+                indoc! {r#"s'{"host":"127.0.0.1","identity":"bob","message":"GET /apache_pb.gif HTTP/1.0","method":"GET","path":"/apache_pb.gif","protocol":"HTTP/1.0","size":2326,"status":200,"timestamp":"2000-10-10T20:55:36+00:00","user":"frank"}'"#},
+            ),
+        }]
     }
 }
 
@@ -70,13 +80,13 @@ struct ParseCommonLogFn {
 }
 
 impl Expression for ParseCommonLogFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_bytes()?;
-        let message = String::from_utf8_lossy(&bytes);
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let bytes = self.value.resolve(ctx)?;
+        let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
             None => "%d/%b/%Y:%T %z".to_owned(),
             Some(timestamp_format) => timestamp_format
-                .execute(state, object)?
+                .resolve(ctx)?
                 .try_bytes_utf8_lossy()?
                 .to_string(),
         };
@@ -149,18 +159,12 @@ impl Expression for ParseCommonLogFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .into_fallible(true)
-            .with_constraint(value::Kind::Map)
-            .with_inner_type(inner_type_def())
+        TypeDef::new().fallible().object(type_def())
     }
 }
 
-fn inner_type_def() -> Option<InnerTypeDef> {
-    use value::Kind;
-
-    Some(inner_type_def!({
+fn type_def() -> BTreeMap<&'static str, TypeDef> {
+    map! {
         "host": Kind::Bytes | Kind::Null,
         "identity": Kind::Bytes | Kind::Null,
         "user": Kind::Bytes | Kind::Null,
@@ -171,9 +175,10 @@ fn inner_type_def() -> Option<InnerTypeDef> {
         "protocol": Kind::Bytes | Kind::Null,
         "status": Kind::Integer | Kind::Null,
         "size": Kind::Integer | Kind::Null,
-    }))
+    }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,3 +266,4 @@ mod tests {
         }
     ];
 }
+*/

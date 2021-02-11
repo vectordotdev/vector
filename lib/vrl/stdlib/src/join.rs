@@ -1,5 +1,5 @@
-use remap::prelude::*;
 use std::borrow::Cow;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Join;
@@ -13,22 +13,30 @@ impl Function for Join {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Array(_)),
+                kind: kind::ARRAY,
                 required: true,
             },
             Parameter {
                 keyword: "separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                kind: kind::BYTES,
                 required: false,
             },
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
-        let separator = arguments.optional("separator").map(Expr::boxed);
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
+        let separator = arguments.optional("separator");
 
         Ok(Box::new(JoinFn { value, separator }))
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "join",
+            source: r#"join(["a","b","c"], ",")"#,
+            result: Ok(r#"a,b,c"#),
+        }]
     }
 }
 
@@ -39,8 +47,8 @@ struct JoinFn {
 }
 
 impl Expression for JoinFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let array = self.value.execute(state, object)?.try_array()?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let array = self.value.resolve(ctx)?.try_array()?;
 
         let string_vec = array
             .iter()
@@ -52,7 +60,7 @@ impl Expression for JoinFn {
             .separator
             .as_ref()
             .map(|s| {
-                s.execute(state, object)
+                s.resolve(ctx)
                     .and_then(|v| Value::try_bytes(v).map_err(Into::into))
             })
             .transpose()?
@@ -65,22 +73,19 @@ impl Expression for JoinFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind;
+        /*let fallible = match self.value.type_def(state).kind.array() {
+            Some(array) => !array.values().all(|kind| kind.is(kind::BYTES)),
+            _ => true,
+        };
 
-        let separator_type = self
-            .separator
-            .as_ref()
-            .map(|separator| separator.type_def(state).fallible_unless(Kind::Bytes));
+        TypeDef::new().with_fallibility(fallible).bytes()
+        */
 
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Array)
-            .merge_optional(separator_type)
-            .fallible_unless_array_has_inner_type(Kind::Bytes)
-            .with_constraint(Kind::Bytes)
+        TypeDef::new().fallible().bytes()
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -172,3 +177,4 @@ mod test {
         }
     ];
 }
+*/
