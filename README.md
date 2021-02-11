@@ -18,9 +18,9 @@ Vector is a high-performance, end-to-end (agent & aggregator) observability data
 pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
 all your logs, metrics, and traces to any vendors you want today and any other
-vendors you may want tomorrow. Vector enables cost reduction, novel data
-enrichment, and data security when you need it, not when is most convenient for
-your vendors. 100% open source and up to 10x faster than every alternative.
+vendors you may want tomorrow. Vector enables dramatic cost reduction, novel data
+enrichment, and data security where you need it, not where is most convenient for
+your vendors. Open source and up to 10x faster than every alternative.
 
 To get started, follow our [**quickstart guide**][docs.quickstart]
 or [**install Vector**][docs.installation].
@@ -72,7 +72,7 @@ or [**install Vector**][docs.installation].
   * [**Transforms**][docs.configuration.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [dozens more...][docs.transforms]
   * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
   * [**Unit tests**][docs.configuration.tests]
-* [**Vector Remap Language**][docs.reference.vrl]
+* [**Remap Language**][docs.reference.vrl]
 * [**API**][docs.reference.api]
 * [**CLI**][docs.reference.cli]
 
