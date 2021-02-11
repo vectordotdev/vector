@@ -19,7 +19,7 @@ use crate::{
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{HttpSink, PartitionHttpSink},
+        http::{HttpSink, PartitionHttpSink, RequestDataEmpty},
         service::ConcurrencyOption,
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         UriSerde,
@@ -121,7 +121,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = LokiSink::new(config.clone());
 
-        let sink = PartitionHttpSink::new(
+        let sink = PartitionHttpSink::<_, _, RequestDataEmpty, _>::new(
             sink,
             PartitionBuffer::new(LokiBuffer::new(
                 batch_settings.size,

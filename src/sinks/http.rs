@@ -2,12 +2,13 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
+    internal_events::{HTTPEventMissingMessage, HTTPEventSent},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
+        sink, BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -143,7 +144,7 @@ impl SinkConfig for HttpSinkConfig {
             .parse_config(config.batch)?;
         let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestByteSize>::new(
             config,
             Buffer::new(batch.size, Compression::None),
             request,
@@ -205,10 +206,6 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        emit!(HTTPEventEncoded {
-            byte_size: body.len(),
-        });
-
         Some(body)
     }
 
@@ -258,6 +255,28 @@ impl HttpSink for HttpSinkConfig {
         }
 
         Ok(request)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct RequestByteSize(usize);
+
+impl From<&hyper::Request<Vec<u8>>> for RequestByteSize {
+    fn from(request: &hyper::Request<Vec<u8>>) -> Self {
+        RequestByteSize(request.body().len())
+    }
+}
+
+impl sink::Response for (hyper::Response<bytes::Bytes>, RequestByteSize) {
+    fn is_successful(&self) -> bool {
+        self.0.status().is_success()
+    }
+
+    fn emit_events(&self, batch_size: usize) {
+        emit!(HTTPEventSent {
+            batch_size,
+            byte_size: self.1 .0,
+        });
     }
 }
 

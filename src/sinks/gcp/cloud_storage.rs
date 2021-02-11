@@ -6,6 +6,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
+            http::RequestDataEmpty,
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -18,7 +19,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -250,7 +251,7 @@ impl GcsSink {
 }
 
 impl Service<RequestWrapper> for GcsSink {
-    type Response = Response<Body>;
+    type Response = (Response<Body>, RequestDataEmpty);
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -285,7 +286,10 @@ impl Service<RequestWrapper> for GcsSink {
             creds.apply(&mut request);
         }
 
-        self.client.call(request)
+        self.client
+            .call(request)
+            .map_ok(|response| (response, RequestDataEmpty))
+            .boxed()
     }
 }
 
@@ -439,14 +443,14 @@ struct GcsRetryLogic;
 // This is a clone of HttpRetryLogic for the Body type, should get merged
 impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
-    type Response = Response<Body>;
+    type Response = (Response<Body>, RequestDataEmpty);
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.status();
+        let status = response.0.status();
 
         match status {
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),

@@ -3,7 +3,7 @@ use crate::{
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestDataEmpty},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
@@ -60,7 +60,7 @@ impl SinkConfig for HoneycombConfig {
 
         let client = HttpClient::new(None)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestDataEmpty>::new(
             self.clone(),
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,

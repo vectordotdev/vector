@@ -384,7 +384,7 @@ where
 impl<R, F, B> Clone for HttpBatchService<R, F, B> {
     fn clone(&self) -> Self {
         Self {
-            _request_data: self._request_data.clone(),
+            _request_data: self._request_data,
             inner: self.inner.clone(),
             request_builder: Arc::clone(&self.request_builder),
         }
@@ -400,7 +400,7 @@ impl From<&hyper::Request<Vec<u8>>> for RequestDataEmpty {
     }
 }
 
-impl sink::Response for (hyper::Response<bytes::Bytes>, RequestDataEmpty) {
+impl<T: fmt::Debug> sink::Response for (hyper::Response<T>, RequestDataEmpty) {
     fn is_successful(&self) -> bool {
         self.0.status().is_success()
     }

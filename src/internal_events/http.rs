@@ -61,17 +61,18 @@ impl InternalEvent for HTTPEventMissingMessage {
 }
 
 #[derive(Debug)]
-pub struct HTTPEventEncoded {
+pub struct HTTPEventSent {
+    pub batch_size: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for HTTPEventEncoded {
+impl InternalEvent for HTTPEventSent {
     fn emit_logs(&self) {
-        trace!(message = "Encode event.");
+        trace!(message = "Sent event.");
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
+        counter!("processed_events_total", self.batch_size as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

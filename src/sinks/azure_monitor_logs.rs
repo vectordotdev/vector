@@ -5,7 +5,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpSink, RequestDataEmpty},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -117,7 +117,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
         let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestDataEmpty>::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,
