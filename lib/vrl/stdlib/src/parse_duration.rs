@@ -77,15 +77,6 @@ struct ParseDurationFn {
     unit: Box<dyn Expression>,
 }
 
-impl ParseDurationFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, unit: &str) -> Self {
-        let unit = Box::new(Literal::from(unit));
-
-        Self { value, unit }
-    }
-}
-
 impl Expression for ParseDurationFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.unwrap_bytes();
