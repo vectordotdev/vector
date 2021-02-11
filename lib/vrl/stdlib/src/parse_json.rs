@@ -105,6 +105,7 @@ impl Expression for ParseJsonFn {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,3 +127,4 @@ mod tests {
         },
     }];
 }
+*/

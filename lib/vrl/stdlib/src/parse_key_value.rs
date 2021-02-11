@@ -41,7 +41,18 @@ impl Function for ParseKeyValue {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[]
+        &[
+            Example {
+                title: "simple key value",
+                source: r#"parse_key_value!("zork=zook zonk=nork")"#,
+                result: Ok(r#"{"zork": "zook", "zonk": "nork"}"#),
+            },
+            Example {
+                title: "custom delimiters",
+                source: r#"parse_key_value!(s'zork: zoog, nonk: "nink nork"', key_value_delimiter: ":", field_delimiter: ",")"#,
+                result: Ok(r#"{"zork": "zoog", "nonk": "nink nork"}"#),
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
@@ -63,7 +74,7 @@ impl Function for ParseKeyValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ParseKeyValueFn {
     value: Box<dyn Expression>,
     key_value_delimiter: Box<dyn Expression>,

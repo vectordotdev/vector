@@ -78,7 +78,7 @@ impl Function for ParseGrok {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ParseGrokFn {
     value: Box<dyn Expression>,
 
