@@ -314,6 +314,21 @@ pub enum Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            Undefined { .. } => 105,
+            ArityMismatch { .. } => 106,
+            UnknownKeyword { .. } => 108,
+            Compilation { .. } => 610,
+            RequiredArgument { .. } => 107,
+            AbortInfallible { .. } => 620,
+            InvalidArgumentKind { .. } => 110,
+            FallibleArgument { .. } => 630,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use Error::*;
 

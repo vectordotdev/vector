@@ -5,28 +5,31 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnostic {
     severity: Severity,
+    code: usize,
     message: String,
     labels: Vec<Label>,
     notes: Vec<Note>,
 }
 
 impl Diagnostic {
-    pub fn error(message: impl ToString) -> Self {
-        Self::new(Severity::Error, message, vec![], vec![])
+    pub fn error(code: usize, message: impl ToString) -> Self {
+        Self::new(Severity::Error, code, message, vec![], vec![])
     }
 
-    pub fn bug(message: impl ToString) -> Self {
-        Self::new(Severity::Bug, message, vec![], vec![])
+    pub fn bug(code: usize, message: impl ToString) -> Self {
+        Self::new(Severity::Bug, code, message, vec![], vec![])
     }
 
     pub fn new(
         severity: Severity,
+        code: usize,
         message: impl ToString,
         labels: Vec<Label>,
         notes: Vec<Note>,
     ) -> Self {
         Self {
             severity,
+            code,
             message: message.to_string(),
             labels,
             notes,
@@ -104,6 +107,7 @@ impl From<Box<dyn DiagnosticError>> for Diagnostic {
     fn from(error: Box<dyn DiagnosticError>) -> Self {
         Self {
             severity: Severity::Error,
+            code: error.code(),
             message: error.message(),
             labels: error.labels(),
             notes: error.notes(),
@@ -115,10 +119,11 @@ impl From<Diagnostic> for diagnostic::Diagnostic<()> {
     fn from(diag: Diagnostic) -> Self {
         let mut notes = diag.notes.to_vec();
         notes.push(Note::SeeLangDocs);
+        notes.push(Note::SeeCodeDocs(diag.code));
 
         diagnostic::Diagnostic {
             severity: diag.severity.into(),
-            code: None,
+            code: Some(format!("E{:03}", diag.code)),
             message: diag.message.to_string(),
             labels: diag.labels.to_vec().into_iter().map(Into::into).collect(),
             notes: notes.iter().map(ToString::to_string).collect(),

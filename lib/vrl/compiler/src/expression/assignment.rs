@@ -431,6 +431,17 @@ impl std::error::Error for Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use ErrorVariant::*;
+
+        match &self.variant {
+            UnneededNoop(..) => 640,
+            FallibleAssignment(..) => 103,
+            InfallibleAssignment(..) => 104,
+            InvalidTarget(..) => 641,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use ErrorVariant::*;
 

@@ -286,6 +286,16 @@ impl std::error::Error for Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use ErrorVariant::*;
+
+        match &self.variant {
+            InvalidRegex(..) => 101,
+            InvalidTimestamp(..) => 601,
+            NanFloat => 602,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use ErrorVariant::*;
 

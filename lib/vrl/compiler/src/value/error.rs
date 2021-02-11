@@ -57,7 +57,29 @@ pub enum Error {
     Le(Kind, Kind),
 }
 
-impl DiagnosticError for Error {}
+impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            Expected { .. } => 300,
+            Coerce(..) => 301,
+            Rem(..) => 302,
+            Mul(..) => 303,
+            Div(..) => 304,
+            DivideByZero => 305,
+            NanFloat => 306,
+            Add(..) => 307,
+            Sub(..) => 308,
+            Or(..) => 309,
+            And(..) => 310,
+            Gt(..) => 311,
+            Ge(..) => 312,
+            Lt(..) => 313,
+            Le(..) => 314,
+        }
+    }
+}
 
 impl From<Error> for ExpressionError {
     fn from(err: Error) -> Self {

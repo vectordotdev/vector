@@ -44,6 +44,26 @@ pub enum Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            ParseError { source, .. } => match source {
+                lalrpop_util::ParseError::InvalidToken { .. } => 200,
+                lalrpop_util::ParseError::ExtraToken { .. } => 201,
+                lalrpop_util::ParseError::User { .. } => 202,
+                lalrpop_util::ParseError::UnrecognizedToken { .. } => 203,
+                lalrpop_util::ParseError::UnrecognizedEOF { .. } => 204,
+            },
+            ReservedKeyword { .. } => 205,
+            NumericLiteral { .. } => 206,
+            StringLiteral { .. } => 207,
+            Literal { .. } => 208,
+            EscapeChar { .. } => 209,
+            UnexpectedParseError(..) => 210,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use Error::*;
 

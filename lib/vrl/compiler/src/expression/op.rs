@@ -202,6 +202,14 @@ pub enum Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            ChainedComparison { .. } => 650,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use Error::*;
 
