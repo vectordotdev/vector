@@ -1,4 +1,4 @@
-use remap::prelude::*;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostname;
@@ -8,8 +8,16 @@ impl Function for GetHostname {
         "get_hostname"
     }
 
-    fn compile(&self, _: ArgumentList) -> Result<Box<dyn Expression>> {
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         Ok(Box::new(GetHostnameFn))
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "valid",
+            source: r#"get_hostname!() != """#,
+            result: Ok("true"),
+        }]
     }
 }
 
@@ -17,7 +25,7 @@ impl Function for GetHostname {
 struct GetHostnameFn;
 
 impl Expression for GetHostnameFn {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+    fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(hostname::get()
             .map_err(|error| format!("failed to get hostname: {}", error))?
             .to_string_lossy()
@@ -25,14 +33,11 @@ impl Expression for GetHostnameFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef {
-            fallible: true,
-            kind: value::Kind::Bytes,
-            ..Default::default()
-        }
+        TypeDef::new().fallible().bytes()
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,3 +61,4 @@ mod tests {
         assert!(matches!(&value, Value::Bytes(_)));
     }
 }
+*/

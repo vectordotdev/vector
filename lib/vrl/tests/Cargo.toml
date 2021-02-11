@@ -39,6 +39,7 @@ features = [
     "format_number",
     "format_timestamp",
     "get_env_var",
+    "get_hostname",
     "includes",
     "ip_cidr_contains",
     "ip_subnet",
