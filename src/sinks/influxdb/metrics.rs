@@ -13,7 +13,7 @@ use crate::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
-            http::{HttpBatchService, HttpRetryLogic},
+            http::{HttpBatchService, HttpRetryLogic, RequestDataEmpty},
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, TowerRequestConfig,
         },
@@ -36,7 +36,10 @@ use tower::Service;
 struct InfluxDBSvc {
     config: InfluxDBConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
+    inner: HttpBatchService<
+        RequestDataEmpty,
+        BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>,
+    >,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -142,7 +145,7 @@ impl InfluxDBSvc {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic,
+                HttpRetryLogic::default(),
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
@@ -156,7 +159,7 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = http::Response<Bytes>;
+    type Response = (http::Response<Bytes>, RequestDataEmpty);
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 

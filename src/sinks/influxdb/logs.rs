@@ -10,7 +10,7 @@ use crate::{
         util::{
             encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpSink, RequestDataEmpty},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -129,7 +129,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             encoding: self.encoding.clone().into(),
         };
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestDataEmpty>::new(
             sink,
             Buffer::new(batch.size, Compression::None),
             request,

@@ -110,22 +110,18 @@ impl SinkConfig for HecSinkConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
 
-        let sink: BatchedHttpSink<HecSinkConfig, Buffer, RequestByteSize> = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestByteSize>::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
             request,
             batch.timeout,
             client.clone(),
             cx.acker(),
-        );
+        )
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Sink(Box::new(
-                sink.sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error)),
-            )),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
