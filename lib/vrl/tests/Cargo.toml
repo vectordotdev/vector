@@ -57,6 +57,7 @@ features = [
     "parse_duration",
     "parse_json",
     "parse_syslog",
+    "parse_timestamp",
     "parse_url",
     "push",
     "replace",
