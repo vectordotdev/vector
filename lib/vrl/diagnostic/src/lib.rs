@@ -15,6 +15,8 @@ pub use span::{span, Span};
 /// A trait that can be implemented by error types to provide diagnostic
 /// information about the given error.
 pub trait DiagnosticError: std::error::Error {
+    fn code(&self) -> usize;
+
     /// The subject message of the error.
     ///
     /// Defaults to the error message itself.

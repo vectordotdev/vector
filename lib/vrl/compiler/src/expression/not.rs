@@ -81,6 +81,14 @@ impl std::error::Error for Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use ErrorVariant::*;
+
+        match &self.variant {
+            NonBoolean(..) => 660,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use ErrorVariant::*;
 

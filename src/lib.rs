@@ -18,7 +18,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
-extern crate remap_cli;
+extern crate vrl_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]

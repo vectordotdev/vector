@@ -259,6 +259,15 @@ pub enum Error {
 }
 
 impl diagnostic::DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            UnexpectedExpression { .. } => 400,
+            InvalidEnumVariant { .. } => 401,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use Error::*;
 

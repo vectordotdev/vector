@@ -6,6 +6,7 @@ pub enum Note {
     CoerceValue,
     SeeFunctionDocs(&'static str),
     SeeErrorDocs,
+    SeeCodeDocs(usize),
     SeeLangDocs,
 
     #[doc(hidden)]
@@ -26,6 +27,7 @@ impl fmt::Display for Note {
             }
             SeeErrorDocs => SeeDocs("error handling".to_owned(), "".to_owned()).fmt(f),
             SeeLangDocs => SeeDocs("language".to_owned(), "".to_owned()).fmt(f),
+            SeeCodeDocs(code) => write!(f, "learn more at: https://errors.vrl.dev/{}", code),
             SeeDocs(kind, path) => {
                 write!(
                     f,

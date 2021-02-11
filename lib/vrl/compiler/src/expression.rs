@@ -232,6 +232,14 @@ pub enum Error {
 }
 
 impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        use Error::*;
+
+        match self {
+            Fallible { .. } => 100,
+        }
+    }
+
     fn labels(&self) -> Vec<Label> {
         use Error::*;
 
@@ -274,6 +282,10 @@ impl std::error::Error for ExpressionError {
 }
 
 impl DiagnosticError for ExpressionError {
+    fn code(&self) -> usize {
+        0
+    }
+
     fn message(&self) -> String {
         self.message.clone()
     }
