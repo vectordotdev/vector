@@ -175,7 +175,7 @@ impl KinesisService {
 }
 
 impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
-    type Response = PutRecordsOutput;
+    type Response = (PutRecordsOutput, usize);
     type Error = RusotoError<PutRecordsError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -189,7 +189,9 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
-        let sizes: Vec<usize> = records.iter().map(|record| record.data.len()).collect();
+        let records_size = records
+            .iter()
+            .fold(0, |acc, record| acc + record.data.len());
 
         let client = self.client.clone();
         let request = PutRecordsInput {
@@ -200,11 +202,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
         Box::pin(async move {
             client
                 .put_records(request)
-                .inspect_ok(|_| {
-                    for byte_size in sizes {
-                        emit!(AwsKinesisStreamsEventSent { byte_size });
-                    }
-                })
+                .map_ok(|result| (result, records_size))
                 .instrument(info_span!("request"))
                 .await
         })
@@ -233,14 +231,21 @@ impl EncodedLength for PutRecordsRequestEntry {
     }
 }
 
-impl Response for PutRecordsOutput {}
+impl Response for (PutRecordsOutput, usize) {
+    fn emit_events(&self, batch_size: usize) {
+        emit!(AwsKinesisStreamsEventSent {
+            batch_size,
+            byte_size: self.1,
+        })
+    }
+}
 
 #[derive(Debug, Clone)]
 struct KinesisRetryLogic;
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = RusotoError<PutRecordsError>;
-    type Response = PutRecordsOutput;
+    type Response = (PutRecordsOutput, usize);
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
