@@ -12,13 +12,28 @@ impl Function for Push {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::ARRAY,
                 required: true,
             },
             Parameter {
                 keyword: "item",
                 kind: kind::ANY,
                 required: true,
+            },
+        ]
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        &[
+            Example {
+                title: "push item",
+                source: r#"push(["foo"], "bar")"#,
+                result: Ok(r#"["foo", "bar"]"#),
+            },
+            Example {
+                title: "empty array",
+                source: r#"push([], "bar")"#,
+                result: Ok(r#"["bar"]"#),
             },
         ]
     }
@@ -31,7 +46,7 @@ impl Function for Push {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PushFn {
     value: Box<dyn Expression>,
     item: Box<dyn Expression>,
@@ -39,7 +54,7 @@ struct PushFn {
 
 impl Expression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let mut list = self.value.resolve(ctx)?.unwrap_array();
         let item = self.item.resolve(ctx)?;
 
         list.push(item);
@@ -48,51 +63,19 @@ impl Expression for PushFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        
-        let item_type = self.item.type_def(state).into_fallible(false);
+        let item = TypeDef::new()
+            .infallible()
+            .array_mapped::<i32, TypeDef>(map! {
+                0: self.item.type_def(state),
+            });
 
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Array)
-            .merge(item_type)
-            .with_constraint(Kind::Array)
-            .with_inner_type(
-                self.item
-                    .type_def(state)
-                    .merge(self.value.type_def(state))
-                    .inner_type_def,
-            )
+        self.value.type_def(state).merge(item).infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    test_type_def![
-        value_array_infallible {
-            expr: |_| PushFn {
-                value: array!["foo", "bar", 127, 42.5].boxed(),
-                item: lit!(47).boxed(),
-            },
-            def: TypeDef {
-                fallible: false,
-                kind: Kind::Array,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Float | Kind::Integer,
-                    ..Default::default()
-                }.boxed())
-            },
-        }
-
-        value_non_array_fallible {
-            expr: |_| PushFn {
-                value: lit!(27).boxed(),
-                item: lit!("foo").boxed(),
-            },
-            def: TypeDef { kind: Kind::Array, fallible: true, ..Default::default() },
-        }
-    ];
 
     test_function![
         push => Push;
@@ -100,16 +83,31 @@ mod tests {
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],
             want: Ok(value!(["foo"])),
+            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
+                0: Kind::Bytes,
+            }),
         }
 
         new_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!("foo")],
             want: Ok(value!([11, false, 42.5, "foo"])),
+            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
+                0: Kind::Integer,
+                1: Kind::Boolean,
+                2: Kind::Float,
+                3: Kind::Bytes,
+            }),
         }
 
         already_exists_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!(42.5)],
             want: Ok(value!([11, false, 42.5, 42.5])),
+            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
+                0: Kind::Integer,
+                1: Kind::Boolean,
+                2: Kind::Float,
+                3: Kind::Float,
+            }),
         }
     ];
 }

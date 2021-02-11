@@ -25,12 +25,12 @@ impl Function for Length {
             },
             Example {
                 title: "object",
-                source: r#"exists({ "foo": "bar"})"#,
+                source: r#"length({ "foo": "bar"})"#,
                 result: Ok("1"),
             },
             Example {
                 title: "string",
-                source: r#"exists("foobar")"#,
+                source: r#"length("foobar")"#,
                 result: Ok("6"),
             },
         ]

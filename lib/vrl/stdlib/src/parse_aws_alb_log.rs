@@ -36,7 +36,7 @@ impl Function for ParseAwsAlbLog {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -55,7 +55,7 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
 
         parse_log(&String::from_utf8_lossy(&bytes))
     }
@@ -64,20 +64,18 @@ impl Expression for ParseAwsAlbLogFn {
         TypeDef::new()
             .fallible() // Log parsing error
             .object::<&str, Kind>(map! {
-                "received_bytes": Kind::Integer,
-                "sent_bytes": Kind::Integer,
-                "actions_executed": Kind::Bytes,
-                "chosen_cert_arn": Kind::Bytes,
-                "classification_reason": Kind::Bytes,
-                "classification": Kind::Bytes,
+                "actions_executed": Kind::Bytes | Kind::Null,
+                "chosen_cert_arn": Kind::Bytes | Kind::Null,
+                "classification_reason": Kind::Bytes | Kind::Null,
+                "classification": Kind::Bytes | Kind::Null,
                 "client_host": Kind::Bytes,
-                "domain_name": Kind::Bytes,
+                "domain_name": Kind::Bytes | Kind::Null,
                 "elb_status_code": Kind::Bytes,
                 "elb": Kind::Bytes,
-                "error_reason": Kind::Bytes,
-                "matched_rule_priority": Kind::Bytes,
+                "error_reason": Kind::Bytes | Kind::Null,
+                "matched_rule_priority": Kind::Bytes | Kind::Null,
                 "received_bytes": Kind::Integer,
-                "redirect_url": Kind::Bytes,
+                "redirect_url": Kind::Bytes | Kind::Null,
                 "request_creation_time": Kind::Bytes,
                 "request_method": Kind::Bytes,
                 "request_processing_time": Kind::Float,
@@ -85,14 +83,14 @@ impl Expression for ParseAwsAlbLogFn {
                 "request_url": Kind::Bytes,
                 "response_processing_time": Kind::Float,
                 "sent_bytes": Kind::Integer,
-                "ssl_cipher": Kind::Bytes,
-                "ssl_protocol": Kind::Bytes,
+                "ssl_cipher": Kind::Bytes | Kind::Null,
+                "ssl_protocol": Kind::Bytes | Kind::Null,
                 "target_group_arn": Kind::Bytes,
-                "target_host": Kind::Bytes,
-                "target_port_list": Kind::Bytes,
+                "target_host": Kind::Bytes | Kind::Null,
+                "target_port_list": Kind::Bytes | Kind::Null,
                 "target_processing_time": Kind::Float,
-                "target_status_code_list": Kind::Bytes,
-                "target_status_code": Kind::Bytes,
+                "target_status_code_list": Kind::Bytes | Kind::Null,
+                "target_status_code": Kind::Bytes | Kind::Null,
                 "timestamp": Kind::Bytes,
                 "trace_id": Kind::Bytes,
                 "type": Kind::Bytes,

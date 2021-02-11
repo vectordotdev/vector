@@ -4,7 +4,7 @@ macro_rules! value {
         $crate::Value::Array(vec![])
     });
 
-    ([$($v:expr),+ $(,)?]) => ({
+    ([$($v:tt),+ $(,)?]) => ({
         let vec: Vec<$crate::Value> = vec![$($crate::value!($v)),+];
         $crate::Value::Array(vec)
     });
@@ -13,7 +13,7 @@ macro_rules! value {
         $crate::Value::Object(::std::collections::BTreeMap::default())
     });
 
-    ({$($($k1:literal)? $($k2:ident)?: $v:expr),+ $(,)?}) => ({
+    ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({
         let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::value!($v))),+]
             .into_iter()
             .collect::<::std::collections::BTreeMap<_, $crate::Value>>();

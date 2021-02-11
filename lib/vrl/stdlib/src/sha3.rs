@@ -13,12 +13,12 @@ impl Function for Sha3 {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {
                 keyword: "variant",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: false,
             },
         ]
@@ -57,7 +57,7 @@ impl Function for Sha3 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Sha3Fn {
     value: Box<dyn Expression>,
     variant: Bytes,

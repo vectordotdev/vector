@@ -1,7 +1,7 @@
-use vrl::prelude::*;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use url::Url;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;
@@ -19,6 +19,25 @@ impl Function for ParseUrl {
         }]
     }
 
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "parse url",
+            source: r#"parse_url!("https://vector.dev")"#,
+            result: Ok(indoc! {r#"
+                {
+                    "fragment": null,
+                    "host": "vector.dev",
+                    "password": "",
+                    "path": "/",
+                    "port": null,
+                    "query": {},
+                    "scheme": "https",
+                    "username": ""
+                }
+            "#}),
+        }]
+    }
+
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
@@ -26,22 +45,15 @@ impl Function for ParseUrl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseUrlFn {
     value: Box<dyn Expression>,
-}
-
-impl ParseUrlFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>) -> Self {
-        Self { value }
-    }
 }
 
 impl Expression for ParseUrlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
+        let string = value.unwrap_bytes_utf8_lossy();
 
         Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())
@@ -49,10 +61,7 @@ impl Expression for ParseUrlFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .into_fallible(true) // URL parsing error
-            .with_constraint(value::Kind::Map)
+        TypeDef::new().fallible().object(type_def())
     }
 }
 
@@ -84,74 +93,41 @@ fn url_to_value(url: Url) -> Value {
     Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
 }
 
+fn type_def() -> BTreeMap<&'static str, TypeDef> {
+    map! {
+        "scheme": Kind::Bytes,
+        "username": Kind::Bytes,
+        "password": Kind::Bytes,
+        "path": Kind::Bytes | Kind::Null,
+        "host": Kind::Bytes,
+        "port": Kind::Bytes,
+        "fragment": Kind::Bytes | Kind::Null,
+        "query": TypeDef::new().object::<(), Kind>(map! {
+            (): Kind::Bytes,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_string {
-            expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
-        }
+    test_function![
+        parse_url => ParseUrl;
 
-        value_optional {
-            expr: |_| ParseUrlFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+        type_def {
+            args: func_args![value: value!("https://vector.dev")],
+            want: Ok(value!({
+                fragment: (),
+                host: "vector.dev",
+                password: "",
+                path: "/",
+                port: (),
+                query: {},
+                scheme: "https",
+                username: "",
+            })),
+            tdef: TypeDef::new().fallible().object::<&'static str, TypeDef>(type_def()),
         }
     ];
-
-    #[test]
-    fn parse_url() {
-        let cases = vec![
-            (
-                map![],
-                Ok(map![
-                        "scheme": "https",
-                        "username": "",
-                        "password": "",
-                        "host": "vector.dev",
-                        "port": Value::Null,
-                        "path": "/",
-                        "query": map![],
-                        "fragment": Value::Null,
-                ]
-                .into()),
-                ParseUrlFn::new(Box::new(Literal::from("https://vector.dev"))),
-            ),
-            (
-                map![],
-                Ok(map![
-                        "scheme": "ftp",
-                        "username": "foo",
-                        "password": "bar",
-                        "host": "vector.dev",
-                        "port": 4343,
-                        "path": "/foobar",
-                        "query": map!["hello": "world"],
-                        "fragment": "123",
-                ]
-                .into()),
-                ParseUrlFn::new(Box::new(Literal::from(
-                    "ftp://foo:bar@vector.dev:4343/foobar?hello=world#123",
-                ))),
-            ),
-            (
-                map![],
-                Err("function call error: unable to parse url: relative URL without a base".into()),
-                ParseUrlFn::new(Box::new(Literal::from("INVALID"))),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
