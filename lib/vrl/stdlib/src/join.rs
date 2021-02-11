@@ -34,7 +34,7 @@ impl Function for Join {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "join",
-            source: r#"join(["a","b","c"], ",")"#,
+            source: r#"join!(["a","b","c"], ",")"#,
             result: Ok(r#"a,b,c"#),
         }]
     }
