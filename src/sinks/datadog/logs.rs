@@ -7,7 +7,7 @@ use crate::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpSink, RequestDataEmpty},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
@@ -111,7 +111,7 @@ impl DatadogLogsConfig {
 
         let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::<_, _, RequestDataEmpty>::new(
             service,
             batch,
             request_settings,

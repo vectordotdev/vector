@@ -6,7 +6,7 @@ use crate::{
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
-            http::{HttpBatchService, HttpRetryLogic},
+            http::{HttpBatchService, HttpRetryLogic, RequestDataEmpty},
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
@@ -183,7 +183,7 @@ impl SinkConfig for DatadogConfig {
         };
 
         let svc = request.service(
-            HttpRetryLogic,
+            HttpRetryLogic::<RequestDataEmpty>::default(),
             HttpBatchService::new(client, move |request| ready(sink.build_request(request))),
         );
 
