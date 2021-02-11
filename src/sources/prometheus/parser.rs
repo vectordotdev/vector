@@ -152,18 +152,7 @@ mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use pretty_assertions::assert_eq;
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
-    }
+    use shared::btreemap;
 
     #[test]
     fn test_counter() {
@@ -176,7 +165,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "uptime".into(),
+                "uptime",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 123.0 },
             )]),
@@ -226,7 +215,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "name".into(),
+                    "name",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.23 },
                 )
@@ -239,7 +228,7 @@ mod test {
                     .collect()
                 )),
                 Metric::new(
-                    "name2".into(),
+                    "name2",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: std::f64::INFINITY
@@ -254,7 +243,7 @@ mod test {
                     .collect()
                 )),
                 Metric::new(
-                    "name2".into(),
+                    "name2",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: std::f64::NEG_INFINITY
@@ -282,7 +271,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "http_requests_total".into(),
+                    "http_requests_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1027.0 },
                 )
@@ -295,7 +284,7 @@ mod test {
                     .collect()
                 )),
                 Metric::new(
-                    "http_requests_total".into(),
+                    "http_requests_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 3.0 },
                 )
@@ -322,7 +311,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "latency".into(),
+                "latency",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 123.0 },
             )]),
@@ -338,7 +327,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "metric_without_timestamp_and_labels".into(),
+                "metric_without_timestamp_and_labels",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 12.47 },
             )]),
@@ -354,7 +343,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "no_labels".into(),
+                "no_labels",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 3.0 },
             )]),
@@ -370,7 +359,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "msdos_file_access_time_seconds".into(),
+                "msdos_file_access_time_seconds",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: 1458255915.0
@@ -397,11 +386,11 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "name".into(),
+                "name",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "}"}))]),
+            .with_tags(Some(btreemap! { "tag" => "}" }))]),
         );
     }
 
@@ -415,11 +404,11 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "name".into(),
+                "name",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "a,b"}))]),
+            .with_tags(Some(btreemap! { "tag" => "a,b" }))]),
         );
     }
 
@@ -433,11 +422,11 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "name".into(),
+                "name",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => "\\n"}))]),
+            .with_tags(Some(btreemap! { "tag" => "\\n" }))]),
         );
     }
 
@@ -451,11 +440,11 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "name".into(),
+                "name",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(map! {"tag" => " * "}))]),
+            .with_tags(Some(btreemap! { "tag" => " * " }))]),
         );
     }
 
@@ -468,7 +457,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "telemetry_scrape_size_bytes_count".into(),
+                "telemetry_scrape_size_bytes_count",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 1890.0 },
             )
@@ -510,7 +499,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "something_weird".into(),
+                "something_weird",
                 MetricKind::Absolute,
                 MetricValue::Gauge {
                     value: std::f64::INFINITY
@@ -536,7 +525,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "latency".into(),
+                    "latency",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 1.0 },
                 )
@@ -546,7 +535,7 @@ mod test {
                         .collect()
                 )),
                 Metric::new(
-                    "latency".into(),
+                    "latency",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
@@ -572,17 +561,17 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "uptime".into(),
+                    "uptime",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 123.0 },
                 ),
                 Metric::new(
-                    "temperature".into(),
+                    "temperature",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: -1.5 },
                 ),
                 Metric::new(
-                    "launch_count".into(),
+                    "launch_count",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 10.0 },
                 )
@@ -625,22 +614,22 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "uptime".into(),
+                    "uptime",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 123.0 },
                 ),
                 Metric::new(
-                    "last_downtime".into(),
+                    "last_downtime",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 4.0 },
                 ),
                 Metric::new(
-                    "temperature".into(),
+                    "temperature",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: -1.5 },
                 ),
                 Metric::new(
-                    "temperature_7_days_average".into(),
+                    "temperature_7_days_average",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 0.1 },
                 )
@@ -666,7 +655,7 @@ mod test {
         assert_eq!(
             parse(exp),
             Ok(vec![Metric::new(
-                "http_request_duration_seconds".into(),
+                "http_request_duration_seconds",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
                     buckets: crate::buckets![
@@ -729,7 +718,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 327,
                             60.0 => 147,
@@ -747,7 +736,7 @@ mod test {
                     },
                 ).with_tags(Some(vec![("runner".into(), "z".into())].into_iter().collect())),
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 1,
                             60.0 => 0,
@@ -765,7 +754,7 @@ mod test {
                     },
                 ).with_tags(Some(vec![("runner".into(), "x".into())].into_iter().collect())),
                 Metric::new(
-                    "gitlab_runner_job_duration_seconds".into(), MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: crate::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
@@ -805,7 +794,7 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "rpc_duration_seconds".into(),
+                    "rpc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: crate::quantiles![
@@ -823,7 +812,7 @@ mod test {
                     vec![("service".into(), "a".into())].into_iter().collect()
                 )),
                 Metric::new(
-                    "go_gc_duration_seconds".into(),
+                    "go_gc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: crate::quantiles![
@@ -867,81 +856,81 @@ mod test {
             parse(exp),
             Ok(vec![
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 263719.0 },
                 )
-                .with_tags(Some(map! {"direction" => "in", "host" => "*"})),
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "*" })),
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 255061.0 },
                 )
-                .with_tags(Some(map! {"direction" => "in", "host" => "_"})),
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "_" })),
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 8658.0 },
                 )
                 .with_tags(Some(
-                    map! {"direction" => "in", "host" => "nginx-vts-status"}
+                    btreemap! { "direction" => "in", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 944199.0 },
                 )
-                .with_tags(Some(map! {"direction" => "out", "host" => "*"})),
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "*" })),
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 360775.0 },
                 )
-                .with_tags(Some(map! {"direction" => "out", "host" => "_"})),
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "_" })),
                 Metric::new(
-                    "nginx_server_bytes".into(),
+                    "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 583424.0 },
                 )
                 .with_tags(Some(
-                    map! {"direction" => "out", "host" => "nginx-vts-status"}
+                    btreemap! { "direction" => "out", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "bypass"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "bypass" })),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "expired"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "expired" })),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "hit"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "hit" })),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "miss"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "miss" })),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "revalidated"})),
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "revalidated" })),
                 Metric::new(
-                    "nginx_server_cache".into(),
+                    "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(map! {"host" => "*", "status" => "scarce"}))
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
             ])
         );
     }

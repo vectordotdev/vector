@@ -163,6 +163,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 
 ##@ Building
 .PHONY: build
+build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
@@ -214,7 +215,7 @@ cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
 cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
-cross-%: export RUSTFLAGS += -C link-arg=-s
+cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
@@ -226,7 +227,7 @@ cross-%: cargo-install-cross
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
-target/%/vector: export RUSTFLAGS += -C link-arg=-s
+target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
@@ -515,6 +516,7 @@ test-cli: ## Runs cli tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
 
 $(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
+$(WASM_MODULE_OUTPUTS): export CFLAGS += -g0 -O3
 $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
 	${MAYBE_ENVIRONMENT_EXEC} cargo build \
@@ -546,6 +548,11 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-languages
+bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-metrics
 bench-metrics: ## Run metrics benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "metrics-benches" ${CARGO_BENCH_FLAGS}
@@ -554,7 +561,7 @@ bench-metrics: ## Run metrics benches
 .PHONY: bench-all
 bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches" ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
@@ -601,7 +608,7 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes

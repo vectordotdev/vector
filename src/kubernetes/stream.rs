@@ -1,13 +1,12 @@
 //! Work with HTTP bodies as streams of Kubernetes resources.
 
-use super::multi_response_decoder::MultiResponseDecoder;
+use super::{multi_response_decoder::MultiResponseDecoder, response, Response};
 use crate::internal_events::kubernetes::stream as internal_events;
 use async_stream::try_stream;
 use bytes::Buf;
 use futures::pin_mut;
 use futures::stream::Stream;
 use hyper::body::HttpBody as Body;
-use k8s_openapi::{Response, ResponseError};
 use snafu::{ResultExt, Snafu};
 
 /// Converts the HTTP response [`Body`] to a stream of parsed Kubernetes
@@ -59,7 +58,7 @@ where
     #[snafu(display("data parsing failed"))]
     Parsing {
         /// Response parsing error.
-        source: ResponseError,
+        source: response::Error,
     },
 
     /// An incomplete response remains in the buffer, but we don't expect
@@ -76,7 +75,7 @@ mod tests {
     use super::*;
     use crate::test_util::trace_init;
     use futures::StreamExt;
-    use k8s_openapi::{api::core::v1::Pod, WatchResponse};
+    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::WatchEvent};
 
     fn hyper_body_from_chunks(
         chunks: Vec<Result<&'static str, std::io::Error>>,
@@ -102,7 +101,7 @@ mod tests {
         let chunks: Vec<Result<_, std::io::Error>> = vec![Ok(data)];
         let sample_body = hyper_body_from_chunks(chunks);
 
-        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        let out_stream = body::<_, WatchEvent<Pod>>(sample_body);
         pin_mut!(out_stream);
 
         assert!(out_stream.next().await.unwrap().is_ok());
@@ -117,7 +116,7 @@ mod tests {
         let chunks: Vec<Result<_, std::io::Error>> = vec![Err(err)];
         let sample_body = hyper_body_from_chunks(chunks);
 
-        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        let out_stream = body::<_, WatchEvent<Pod>>(sample_body);
         pin_mut!(out_stream);
 
         {
@@ -135,12 +134,12 @@ mod tests {
         let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("qwerty")];
         let sample_body = hyper_body_from_chunks(chunks);
 
-        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        let out_stream = body::<_, WatchEvent<Pod>>(sample_body);
         pin_mut!(out_stream);
 
         {
             let err = out_stream.next().await.unwrap().unwrap_err();
-            assert!(matches!(err, Error::Parsing { source: ResponseError::Json(_) }));
+            assert!(matches!(err, Error::Parsing { source: response::Error::Json(_) }));
         }
 
         assert!(out_stream.next().await.is_none());
@@ -153,7 +152,7 @@ mod tests {
         let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("{")];
         let sample_body = hyper_body_from_chunks(chunks);
 
-        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        let out_stream = body::<_, WatchEvent<Pod>>(sample_body);
         pin_mut!(out_stream);
 
         {

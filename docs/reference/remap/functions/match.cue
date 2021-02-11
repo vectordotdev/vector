@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: match: {
+	category: "String"
+	description: """
+		Determines if the `value` matches the `pattern`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,15 +22,12 @@ remap: functions: match: {
 	]
 	internal_failure_reasons: []
 	return: types: ["boolean"]
-	category: "String"
-	description: """
-		Returns `true` if the provided `value` matches the provided `pattern`.
-		"""
+
 	examples: [
 		{
 			title: "Regex match on a string"
 			source: """
-				match("I'm a little teapot", /teapot/)
+				match("I'm a little teapot", r'teapot')
 				"""
 			return: true
 		},

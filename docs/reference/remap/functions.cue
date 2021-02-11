@@ -12,6 +12,7 @@ remap: {
 	}
 
 	#Function: {
+		anchor:      name
 		name:        string
 		category:    #FunctionCategory
 		description: string

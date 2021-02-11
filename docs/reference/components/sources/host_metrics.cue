@@ -15,6 +15,7 @@ components: sources: host_metrics: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -51,6 +52,7 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/proc"]
+				syntax: "literal"
 			}
 		}
 
@@ -59,6 +61,7 @@ components: sources: host_metrics: {
 			type: string: {
 				default: null
 				examples: ["/mnt/host/sys"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -69,14 +72,18 @@ components: sources: host_metrics: {
 			common:      true
 			required:    false
 			type: array: {
-				default: ["cpu", "disk", "filesystem", "load", "memory", "network"]
-				items: type: string: enum: {
-					cpu:        "Metrics related to CPU utilization."
-					disk:       "Metrics related to disk I/O utilization."
-					filesystem: "Metrics related to filesystem space utilization."
-					load:       "Load average metrics (UNIX only)."
-					memory:     "Metrics related to memory utilization."
-					network:    "Metrics related to network utilization."
+				default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network"]
+				items: type: string: {
+					enum: {
+						cpu:        "Metrics related to CPU utilization."
+						disk:       "Metrics related to disk I/O utilization."
+						filesystem: "Metrics related to filesystem space utilization."
+						load:       "Load average metrics (UNIX only)."
+						host:       "Metrics related to host"
+						memory:     "Metrics related to memory utilization."
+						network:    "Metrics related to network utilization."
+					}
+					syntax: "literal"
 				}
 			}
 		}
@@ -84,7 +91,10 @@ components: sources: host_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
@@ -115,7 +125,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -128,7 +141,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -155,7 +171,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -168,7 +187,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -188,7 +210,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -201,7 +226,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -221,7 +249,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -234,7 +265,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -261,7 +295,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -274,7 +311,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -330,6 +370,10 @@ components: sources: host_metrics: {
 		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
 		load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
 		load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
+
+		// Host time
+		uptime:    _host & _host_metric & {description: "The number of seconds since the last boot."}
+		boot_time: _host & _host_metric & {description: "The UNIX timestamp of the last boot."}
 
 		// Host memory
 		memory_active_bytes:           _host & _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
@@ -396,6 +440,12 @@ components: sources: host_metrics: {
 				collector: examples: ["loadavg"]
 			}
 			relevant_when: "OS is not Windows"
+		}
+		_host_metric: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["host"]
+			}
 		}
 		_memory_counter: {
 			type: "counter"

@@ -1,6 +1,13 @@
 package metadata
 
 remap: functions: strip_whitespace: {
+	category:    "String"
+	description: """
+		Strips whitespace from the start and end of the `value`.
+
+		Whitespace is as defined by [Unicode `White_Space` property](\(urls.unicode_whitespace))
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -11,12 +18,7 @@ remap: functions: strip_whitespace: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "String"
-	description: #"""
-		Strips the whitespace from the start and end of the provided `value`.
 
-		Whitespace is as defined by [Unicode `White_Space` property](\(urls.unicode_whitespace))
-		"""#
 	examples: [
 		{
 			title: "Strip whitespace"

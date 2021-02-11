@@ -141,7 +141,8 @@ from the event's data. Two syntaxes are supported for fields that support field
 interpolation:
 
 1. [Strptime specifiers][urls.strptime_specifiers]. Ex: `date=%Y/%m/%d`
-2. [Event fields][docs.data-model]. Ex: `{{ field_name }}`
+2. [Log fields][docs.data-model.log]. Ex: `{{ field_name }}`
+3. [Metric name, namespace, or tags][docs.data-model.metric]. Ex: `{{ name }} {{ namespace }} {{ tags.tag_name }}`
 
 For example:
 

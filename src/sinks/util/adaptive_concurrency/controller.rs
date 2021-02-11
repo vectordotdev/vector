@@ -251,7 +251,7 @@ where
                 } else {
                     warn!(
                         message = "Unhandled error response.",
-                        ?error,
+                        %error,
                         internal_log_rate_secs = 5
                     );
                     false

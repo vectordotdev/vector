@@ -11,6 +11,7 @@ components: transforms: dedupe: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -67,7 +68,10 @@ components: transforms: dedupe: {
 						warnings: []
 						type: array: {
 							default: null
-							items: type: string: examples: ["field1", "parent.child_field"]
+							items: type: string: {
+								examples: ["field1", "parent.child_field"]
+								syntax: "literal"
+							}
 						}
 					}
 					match: {
@@ -77,7 +81,10 @@ components: transforms: dedupe: {
 						warnings: []
 						type: array: {
 							default: ["timestamp", "host", "message"]
-							items: type: string: examples: ["field1", "parent.child_field", "host", "message"]
+							items: type: string: {
+								examples: ["field1", "parent.child_field", "host", "message"]
+								syntax: "literal"
+							}
 						}
 					}
 				}

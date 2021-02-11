@@ -41,10 +41,10 @@ or [**install Vector**][docs.installation].
 
 ### Community
 
-* Vector is relied on by startups and enterprises like **T-Mobile**,
+* Vector is relied on by startups and enterprises like **Atlassian**, **T-Mobile**,
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, **Visa**, **Mambu**, **Blockfi**, **Claranet**,
-  **Instacart**, **Forcepoint**, and many more.
+  **Instacart**, **Forcepoint**, and [many more][urls.production_users].
 * Vector is **downloaded over 100,000 times per day**.
 * Vector's largest user **processes over 30TB daily**.
 * Vector has **over 100 contributors** and growing.
@@ -210,6 +210,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.under-the-hood.architecture]: /docs/about/under-the-hood/architecture/
 [docs.under-the-hood.guarantees]: /docs/about/under-the-hood/guarantees/
 [docs.under-the-hood.networking]: /docs/about/under-the-hood/networking/
+[urls.production_users]: https://github.com/timberio/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md

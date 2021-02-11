@@ -9,6 +9,7 @@ components: sinks: splunk_hec: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
+		stateful: false
 	}
 
 	features: {
@@ -59,8 +60,8 @@ components: sinks: splunk_hec: {
 				interface: {
 					socket: {
 						api: {
-							title: "Splunk HEC protocol"
-							url:   urls.splunk_hec_protocol
+							title: "Splunk HEC event endpoint"
+							url:   urls.splunk_hec_event_endpoint
 						}
 						direction: "outgoing"
 						protocols: ["http"]
@@ -93,6 +94,7 @@ components: sinks: splunk_hec: {
 			required:    true
 			type: string: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
+				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -103,6 +105,7 @@ components: sinks: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["hostname"]
+				syntax: "literal"
 			}
 		}
 		index: {
@@ -113,6 +116,7 @@ components: sinks: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["custom_index"]
+				syntax: "literal"
 			}
 		}
 		indexed_fields: {
@@ -122,7 +126,10 @@ components: sinks: splunk_hec: {
 			warnings: []
 			type: array: {
 				default: null
-				items: type: string: examples: ["field1", "field2"]
+				items: type: string: {
+					examples: ["field1", "field2"]
+					syntax: "field_path"
+				}
 			}
 		}
 		source: {
@@ -133,6 +140,7 @@ components: sinks: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["/var/log/syslog", "UDP:514"]
+				syntax: "literal"
 			}
 		}
 		sourcetype: {
@@ -143,6 +151,7 @@ components: sinks: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["_json", "httpevent"]
+				syntax: "literal"
 			}
 		}
 		token: {
@@ -151,6 +160,7 @@ components: sinks: splunk_hec: {
 			warnings: []
 			type: string: {
 				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

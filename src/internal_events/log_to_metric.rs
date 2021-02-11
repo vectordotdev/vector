@@ -11,7 +11,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
         warn!(
             message = "Field not found.",
             missing_field = %self.field,
-            rate_limit_sec = 30
+            internal_log_rate_secs = 30
         );
     }
 

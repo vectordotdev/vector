@@ -1,6 +1,4 @@
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
-
-use futures::compat::Future01CompatExt;
 use tempfile::tempdir;
 use vector::test_util::{
     next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
@@ -51,7 +49,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let lines = random_lines(line_size).take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     let output_lines = output_lines.await;
 
@@ -97,7 +95,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
 
                     // TODO: shutdown after flush
                     // assert_eq!(num_lines, output_lines.await.len());
@@ -145,7 +143,7 @@ fn benchmark_buffers(c: &mut Criterion) {
     //rt.block_on(async move {
     //let lines = random_lines(line_size).take(num_lines);
     //send_lines(in_addr, lines).await.unwrap();
-    //topology.stop().compat().await.unwrap();
+    //topology.stop().await;
 
     //// TODO: shutdown after flush
     //// assert_eq!(num_lines, output_lines.await.len());

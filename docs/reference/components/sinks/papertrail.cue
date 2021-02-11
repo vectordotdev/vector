@@ -9,6 +9,7 @@ components: sinks: papertrail: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: ["Papertrail"]
+		stateful: false
 	}
 
 	features: {
@@ -24,8 +25,9 @@ components: sinks: papertrail: {
 					enum: ["json", "text"]
 				}
 			}
-			keepalive: enabled: true
-			request: enabled:   false
+			send_buffer_bytes: enabled: true
+			keepalive: enabled:         true
+			request: enabled:           false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -73,6 +75,7 @@ components: sinks: papertrail: {
 			required:    true
 			type: string: {
 				examples: ["logs.papertrailapp.com:12345"]
+				syntax: "literal"
 			}
 		}
 	}
