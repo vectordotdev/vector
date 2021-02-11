@@ -6,7 +6,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
-use vrl::{value, Program, Runtime, Value};
+use vrl::{Program, Runtime, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {

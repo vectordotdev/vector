@@ -3,17 +3,6 @@ use std::collections::BTreeMap;
 use std::str::FromStr;
 use vrl::{value::Kind, Value};
 
-#[cfg(any(feature = "to_float", feature = "to_int", feature = "to_bool"))]
-#[inline]
-pub(crate) fn is_scalar_value(value: &Value) -> bool {
-    use Value::*;
-
-    match value {
-        Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
-        Timestamp(_) | Object(_) | Array(_) | Regex(_) => false,
-    }
-}
-
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
 /// can be specified.

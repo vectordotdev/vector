@@ -8,6 +8,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metric {

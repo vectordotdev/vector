@@ -7,7 +7,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
-use vrl::{value, Program, Runtime};
+use vrl::{Program, Runtime};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
