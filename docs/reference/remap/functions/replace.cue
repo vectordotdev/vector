@@ -48,7 +48,7 @@ remap: functions: replace: {
 		{
 			title: "Replace via regular expression"
 			source: #"""
-				replace("Apples and Bananas", /bananas/i, "Pineapples")
+				replace("Apples and Bananas", r'bananas'i, "Pineapples")
 				"""#
 			return: "apples and Pineapples"
 		},
