@@ -4,7 +4,7 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink, RequestDataEmpty},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -191,21 +191,21 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str) -> crate::Result<Uri> {
 
 #[derive(Debug, Default, Clone)]
 struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic,
+    inner: HttpRetryLogic<RequestDataEmpty>,
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = hyper::Error;
-    type Response = http::Response<Bytes>;
+    type Response = (hyper::Response<Bytes>, RequestDataEmpty);
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        match response.status() {
+        match response.0.status() {
             StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.body();
+                let body = response.0.body();
 
                 // Currently, clickhouse returns 500's incorrect data and type mismatch errors.
                 // This attempts to check if the body starts with `Code: {code_num}` and to not
