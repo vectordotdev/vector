@@ -145,7 +145,7 @@ where
                 println!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
                 continue;
             }
-            Err(err) => Err(err)?,
+            Err(err) => return Err(err.into()),
         };
 
         match predicate(val) {
