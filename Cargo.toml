@@ -86,9 +86,12 @@ tracing-subscriber = "0.2.15"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = "0.13.0-alpha.13"
-metrics-tracing-context = "0.1.0-alpha.7"
-metrics-util = "0.4.0-alpha.10"
+metrics = "=0.13.0-alpha.13"
+metrics-tracing-context = "=0.1.0-alpha.7"
+metrics-util = "=0.4.0-alpha.10"
+# Indirect dependency; benchmark regression detected; pinning until
+# https://github.com/timberio/vector/issues/6412 is resolved
+metrics-macros = "=0.1.0-alpha.9"
 
 # Aws
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
@@ -120,8 +123,8 @@ goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.4.10", optional = true }
-async-graphql-warp = { version = "2.4.10", optional = true }
+async-graphql = { version = "=2.5.0", optional = true }
+async-graphql-warp = { version = "=2.5.0", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
@@ -137,7 +140,7 @@ remap-functions = { path = "lib/remap-functions" }
 # External libs
 anyhow = "1.0.37"
 async-compression = { version = "0.3.7", features = ["tokio-02", "gzip", "zstd"] }
-avro-rs = { version = "0.12.0", optional = true }
+avro-rs = { version = "0.13.0", optional = true }
 base64 = { version = "0.13.0", optional = true }
 bloom = { version = "0.3.2", optional = true }
 bollard = { version = "0.9.1", features = ["ssl"], optional = true }
@@ -207,7 +210,7 @@ syslog = { version = "5", optional = true }
 syslog_loose = { version = "0.10.0", optional = true }
 # Indirect dependency; pinning until
 # https://github.com/timberio/vector/issues/6005 is resolved
-thread_local = "= 1.0.1"
+thread_local = "=1.0.1"
 tokio-postgres = { version = "0.5.5", features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = "0.5.8"
 typetag = "0.1.6"
@@ -658,7 +661,5 @@ required-features = ["metrics-benches"]
 tower-layer = "=0.3.0"
 
 [patch.crates-io]
-# TODO: update to next 0.12.x (after 0.12.0, if any)
-avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 # TODO: update to the next 0.13.x (after 0.13.10, if any) or 0.14 (or higher)
 hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "d7495a75abca34646b1d6d047589c1b8110d0fa5" }
