@@ -370,6 +370,8 @@ fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
+    use indoc::indoc;
 
     #[test]
     fn generate_all() {
@@ -429,8 +431,6 @@ mod tests {
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     #[test]
     fn generate_basic() {
-        use indoc::indoc;
-
         assert_eq!(
             generate_example(true, "stdin/json_parser/console", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
@@ -574,7 +574,8 @@ mod tests {
 
         assert_eq!(
             generate_example(false, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"[transforms.transform0]
+            Ok(indoc! {r#"
+                [transforms.transform0]
                 inputs = []
                 type = "add_fields"
 
