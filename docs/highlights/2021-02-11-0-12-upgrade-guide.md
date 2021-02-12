@@ -18,17 +18,17 @@ painlessly. If you have questions, [hop in our chat][chat] and we'll help you up
 ### The `encoding.codec` option is now required for all relevant sinks
 
 [Pull request #5281][pr_5281] removed the default values for the sink-level `encoding.codec` option. Therefore, you are
-now requied to provide a value for this option, ensuring that you are not surprised by opinionated encoding defaults.
+now required to provide a value for this option, ensuring that you are not surprised by opinionated encoding defaults.
 Affected sinks include:
 
-* `aws_s3`
-* `file`
-* `humio`
-* `kafka`
-* `nats`
-* `new_relic_logs`
-* `pulsar`
-* `splunk_hec`
+* `aws_s3` (previously defaulted to `text`)
+* `file` (previously defaulted to `text`)
+* `humio` (previously defaulted to `json`)
+* `kafka` (previously defaulted to `text`)
+* `nats` (previously defaulted to `text`)
+* `new_relic_logs` (previously defaulted to `json`)
+* `pulsar` (previously defaulted to `text`)
+* `splunk_hec` (previously defaulted to `text`)
 
 Upgrading is easy, just add the `encoding.codec` to your sinks with your preferred format (`json` or `text`):
 
@@ -42,12 +42,16 @@ Upgrading is easy, just add the `encoding.codec` to your sinks with your preferr
 +encoding.codec = "json"
 ```
 
+For clarity, the `text` option strips away all structured data and passes only the value of the `message` field. It is
+intended for use cases where Vector acts as a proxy and should not alter data. For most use cases we recommend `json`
+since it includes all structured data.
+
 ### Vector `check_fields` conditions now require the `type` option
 
 With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl_reference] (VRL), [pull request #5978][pr_5978]
 _deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
 `check_fields` conditions were limiting and suffered from many of the [pitfalls][config_synytax_pitfalls] outlined in
-the VRL announcement. Configuration languages, like TOML, are very bad at expressing boolean conditions and severly
+the VRL announcement. Configuration languages, like TOML, are bad at expressing boolean conditions and severly
 limited how users could [route][route_transform], [filter][filter_transform], and [reduce][reduce_transform] data.
 
 While `check_fields` is deprecated and still supported, you will need to explicitly opt-into the feature by adding the
