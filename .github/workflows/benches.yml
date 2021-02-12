@@ -28,7 +28,7 @@ env:
 
 jobs:
   cancel-previous:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
@@ -103,7 +103,7 @@ jobs:
     needs:
       - cancel-previous
       - bench
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Discord notification
       env:
