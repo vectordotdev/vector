@@ -379,6 +379,9 @@ impl<'a> Parser<'a> {
         Ok((start..end, nodes).into())
     }
 
+    // ignoring the unnecessariy wrap as this whole parser is going away momentarily and this
+    // matches up better with the other *_from_* methods anyway
+    #[allow(clippy::unnecessary_wraps)]
     fn pairs_from_str<'b>(&mut self, rule: R, source: &'b str) -> IResult<Pairs<'b, R>> {
         use pest::Parser;
 

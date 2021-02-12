@@ -122,6 +122,9 @@ impl Expression for Assignment {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object);
 
+        // ignoring the unnecessariy wrap as this whole parser is going away momentarily and this
+        // matches up better with the other *_assignment methods anyway
+        #[allow(clippy::unnecessary_wraps)]
         fn var_assignment<'a>(
             state: &mut state::Program,
             var: &Variable,

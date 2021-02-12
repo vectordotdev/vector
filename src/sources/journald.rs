@@ -627,7 +627,7 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -640,7 +640,7 @@ mod tests {
                 }
             }
 
-            Ok((Box::pin(journal), Box::new(|| ())))
+            (Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -674,7 +674,10 @@ mod tests {
             remap_priority: true,
             out: tx,
         }
-        .run_shutdown(shutdown, Box::new(FakeJournal::new));
+        .run_shutdown(
+            shutdown,
+            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
+        );
         tokio::spawn(source);
 
         delay_for(Duration::from_millis(100)).await;
