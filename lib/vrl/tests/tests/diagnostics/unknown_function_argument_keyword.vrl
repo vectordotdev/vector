@@ -1,6 +1,6 @@
 # result:
 #
-# error: unknown function argument keyword
+# error[E108]: unknown function argument keyword
 #   ┌─ :2:11
 #   │
 # 2 │ to_string(foo: "foo")
@@ -9,5 +9,6 @@
 #   │ this function accepts the following keywords: "value"
 #   │
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/108
 
 to_string(foo: "foo")

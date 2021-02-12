@@ -1,21 +1,21 @@
 # result: ~
 #
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
-# error: syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
+# syntax error
 
 true.foo
 true[0]

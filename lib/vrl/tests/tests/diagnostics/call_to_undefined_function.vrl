@@ -1,6 +1,6 @@
 # result:
 #
-# error: call to undefined function
+# error[E105]: call to undefined function
 #   ┌─ :2:1
 #   │
 # 2 │ unknown_function(.foo, .bar)
@@ -10,5 +10,6 @@
 #   │ did you mean "parse_duration"?
 #   │
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/105
 
 unknown_function(.foo, .bar)

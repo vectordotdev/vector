@@ -1,6 +1,6 @@
 # result:
 #
-# error: cannot abort function that never fails
+# error[E620]: cannot abort function that never fails
 #   ┌─ :2:1
 #   │
 # 2 │ now!()

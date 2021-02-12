@@ -1,6 +1,6 @@
 # result:
 #
-# error: function argument arity mismatch
+# error[E106]: function argument arity mismatch
 #   ┌─ :2:11
 #   │
 # 2 │ to_string("foo", "bar")
@@ -10,5 +10,6 @@
 #   │           this function takes a maximum of 1 argument
 #   │
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/106
 
 to_string("foo", "bar")

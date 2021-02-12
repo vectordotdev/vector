@@ -353,12 +353,8 @@ fn test_name(path: &Path) -> String {
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
-    let got = got
-        .lines()
-        .filter(|line| line.trim().starts_with("error: "))
-        .collect::<Vec<_>>();
-
-    let want = want.trim().lines().collect::<Vec<_>>();
-
-    got == want
+    got.lines()
+        .filter(|line| line.trim().starts_with("error[E"))
+        .zip(want.trim().lines())
+        .all(|(got, want)| got.contains(want))
 }

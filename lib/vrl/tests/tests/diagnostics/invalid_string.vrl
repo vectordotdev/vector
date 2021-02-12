@@ -1,6 +1,6 @@
 # result:
 #
-# error: syntax error
+# error[E202]: syntax error
 #   ┌─ :1:1
 #   │
 # 1 │ ╭

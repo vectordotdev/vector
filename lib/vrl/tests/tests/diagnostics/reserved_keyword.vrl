@@ -1,6 +1,6 @@
 # result:
 #
-# error: reserved keyword
+# error[E205]: reserved keyword
 #   ┌─ :2:1
 #   │
 # 2 │ array = []

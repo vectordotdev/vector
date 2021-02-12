@@ -1,6 +1,6 @@
 # result:
 #
-# error: syntax error
+# error[E203]: syntax error
 #   ┌─ :2:5
 #   │
 # 2 │ .foo.

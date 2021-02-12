@@ -1,6 +1,6 @@
 # result:
 #
-# error: non-boolean negation
+# error[E660]: non-boolean negation
 #   ┌─ :2:2
 #   │
 # 2 │ !!"true"

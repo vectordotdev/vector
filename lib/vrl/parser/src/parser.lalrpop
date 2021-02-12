@@ -132,6 +132,11 @@ pub Test: Test = {
 RootExprs: Vec<Node<RootExpr>> = {
     RootExpr => vec![<>],
     (<RootExpr> EndOfExpression)*,
+    <v:(<RootExpr> EndOfExpression)+> <e:RootExpr> => {
+        let mut v = v;
+        v.push(e);
+        v
+    },
 };
 
 RootExpr: Node<RootExpr> = {

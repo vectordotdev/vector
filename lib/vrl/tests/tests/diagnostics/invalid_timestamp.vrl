@@ -1,6 +1,6 @@
 # result:
 #
-# error: invalid timestamp
+# error[E601]: invalid timestamp
 #   ┌─ :2:1
 #   │
 # 2 │ t'foobar'

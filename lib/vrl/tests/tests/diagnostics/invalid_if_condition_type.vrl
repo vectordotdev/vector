@@ -1,6 +1,6 @@
 # result:
 #
-# error: non-boolean predicate
+# error[E102]: non-boolean predicate
 #   ┌─ :2:4
 #   │
 # 2 │ if "nope" {
@@ -11,6 +11,7 @@
 #   │
 #   = hint: coerce the value using one of the coercion functions
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/102
 
 if "nope" {
     true
