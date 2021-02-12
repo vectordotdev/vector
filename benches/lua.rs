@@ -114,7 +114,7 @@ fn bench_field_filter(c: &mut Criterion) {
             let source = String::from(
                 r#"
 if event["the_field"] ~= "0" then
-event = nil
+    event = nil
 end
 "#,
             );
@@ -124,10 +124,9 @@ end
             let config = r#"
 hooks.process = """
 function (event, emit)
-if event.log["the_field"] ~= "0" then
-event = nil
-end
-emit(event)
+    if event.log["the_field"] == "0" then
+      emit(event)
+    end
 end
 """
 "#;
