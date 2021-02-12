@@ -54,8 +54,6 @@ impl Expression for ObjectFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Object)
+        self.value.type_def(state).fallible_unless(Kind::Object)
     }
 }

@@ -350,7 +350,6 @@ impl From<(Span, chrono::ParseError)> for Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{expr, test_type_def, TypeDef};
 
     test_type_def![

@@ -54,8 +54,6 @@ impl Expression for ArrayFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(Kind::Array)
+        self.value.type_def(state).fallible_unless(Kind::Array)
     }
 }

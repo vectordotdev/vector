@@ -224,7 +224,7 @@ impl DiagnosticError for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::{Literal, Noop};
+    use crate::expression::Literal;
     use crate::{test_type_def, value::Kind};
     use ast::Opcode::*;
     use ordered_float::NotNan;

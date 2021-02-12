@@ -58,7 +58,6 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{expr, map, test_type_def, value::Kind, TypeDef};
 
     test_type_def![
