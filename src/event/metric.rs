@@ -721,6 +721,19 @@ impl Target for Metric {
         }
 
         match path.segments() {
+            [Segment::Field(tags)] if tags.as_str() == "tags" => {
+                let value = value.try_object().map_err(|e| e.to_string())?;
+                for (field, value) in value.iter() {
+                    self.set_tag_value(
+                        field.as_str().to_owned(),
+                        value
+                            .try_bytes_utf8_lossy()
+                            .map_err(|e| e.to_string())?
+                            .into_owned(),
+                    );
+                }
+                Ok(())
+            }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.set_tag_value(
