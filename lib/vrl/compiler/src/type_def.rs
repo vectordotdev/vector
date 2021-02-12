@@ -1,5 +1,5 @@
 use crate::value::Kind;
-use crate::{path, Path};
+use crate::{map, path, Path};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Properties for a given expression that express the expected outcome of the
@@ -647,16 +647,17 @@ impl TypeDef {
 
     #[inline]
     pub fn restrict_array(mut self) -> Self {
-        self.kind = match self.kind {
-            KindInfo::Known(set) => KindInfo::Known(
-                set.into_iter()
-                    .filter(|k| matches!(k, TypeKind::Array(_)))
-                    .collect(),
-            ),
-            v => v,
-        };
-
-        self
+        match self.kind {
+            KindInfo::Known(set) => {
+                self.kind = KindInfo::Known(
+                    set.into_iter()
+                        .filter(|k| matches!(k, TypeKind::Array(_)))
+                        .collect(),
+                );
+                self
+            }
+            KindInfo::Unknown => self.array_mapped::<(), Kind>(map! { (): Kind::all() }),
+        }
     }
 
     #[inline]
@@ -715,16 +716,17 @@ impl TypeDef {
 
     #[inline]
     pub fn restrict_object(mut self) -> Self {
-        self.kind = match self.kind {
-            KindInfo::Known(set) => KindInfo::Known(
-                set.into_iter()
-                    .filter(|k| matches!(k, TypeKind::Object(_)))
-                    .collect(),
-            ),
-            v => v,
-        };
-
-        self
+        match self.kind {
+            KindInfo::Known(set) => {
+                self.kind = KindInfo::Known(
+                    set.into_iter()
+                        .filter(|k| matches!(k, TypeKind::Object(_)))
+                        .collect(),
+                );
+                self
+            }
+            KindInfo::Unknown => self.object::<(), Kind>(map! { (): Kind::all() }),
+        }
     }
 
     fn add_container(mut self, kind: TypeKind) -> Self {
