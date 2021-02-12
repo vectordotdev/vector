@@ -12,7 +12,17 @@ impl Function for ToInt {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_) | Value::Timestamp(_) | Value::Null),
+            accepts: |v| {
+                matches!(
+                    v,
+                    Value::Integer(_)
+                        | Value::Float(_)
+                        | Value::Bytes(_)
+                        | Value::Boolean(_)
+                        | Value::Timestamp(_)
+                        | Value::Null
+                )
+            },
             required: true,
         }]
     }

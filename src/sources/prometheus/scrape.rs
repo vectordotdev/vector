@@ -435,7 +435,7 @@ mod integration_tests {
         // Sample some well-known metrics
         let build = find_metric("prometheus_build_info");
         assert!(matches!(build.data.kind, MetricKind::Absolute));
-        assert!(matches!(build.data.value, MetricValue::Gauge { ..}));
+        assert!(matches!(build.data.value, MetricValue::Gauge { .. }));
         assert!(build.tags().unwrap().contains_key("branch"));
         assert!(build.tags().unwrap().contains_key("version"));
 

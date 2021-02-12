@@ -319,7 +319,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::ExpectedChar { expected: ',', .. }, ..
+                kind: ErrorKind::ExpectedChar { expected: ',', .. },
+                ..
             }
         ));
 
@@ -329,7 +330,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::InvalidMetricKind { .. }, ..
+                kind: ErrorKind::InvalidMetricKind { .. },
+                ..
             }
         ));
 
@@ -339,7 +341,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::ExpectedSpace { .. }, ..
+                kind: ErrorKind::ExpectedSpace { .. },
+                ..
             }
         ));
 
@@ -349,7 +352,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::ExpectedChar { expected: '"', .. }, ..
+                kind: ErrorKind::ExpectedChar { expected: '"', .. },
+                ..
             }
         ));
 
@@ -359,7 +363,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::ExpectedChar { expected: '"', .. }, ..
+                kind: ErrorKind::ExpectedChar { expected: '"', .. },
+                ..
             }
         ));
 
@@ -369,7 +374,8 @@ mod test {
         assert!(matches!(
             error,
             ParserError::WithLine {
-                kind: ErrorKind::ParseFloatError { .. }, ..
+                kind: ErrorKind::ParseFloatError { .. },
+                ..
             }
         ));
     }

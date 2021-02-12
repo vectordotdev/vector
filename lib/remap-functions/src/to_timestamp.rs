@@ -16,10 +16,7 @@ impl Function for ToTimestamp {
             accepts: |v| {
                 matches!(
                     v,
-                    Value::Integer(_) |
-                    Value::Float(_) |
-                    Value::Bytes(_) |
-                    Value::Timestamp(_)
+                    Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Timestamp(_)
                 )
             },
             required: true,
