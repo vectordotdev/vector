@@ -5,7 +5,7 @@ pub struct Integer;
 
 impl Function for Integer {
     fn identifier(&self) -> &'static str {
-        "integer"
+        "int"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -20,14 +20,14 @@ impl Function for Integer {
         &[
             Example {
                 title: "valid",
-                source: r#"integer(42)"#,
+                source: r#"int(42)"#,
                 result: Ok("42"),
             },
             Example {
                 title: "invalid",
-                source: "integer!(true)",
+                source: "int!(true)",
                 result: Err(
-                    r#"function call error for "integer" at (0:14): expected "integer", got "boolean""#,
+                    r#"function call error for "int" at (0:10): expected "integer", got "boolean""#,
                 ),
             },
         ]

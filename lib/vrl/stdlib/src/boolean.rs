@@ -5,7 +5,7 @@ pub struct Boolean;
 
 impl Function for Boolean {
     fn identifier(&self) -> &'static str {
-        "boolean"
+        "bool"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -20,14 +20,14 @@ impl Function for Boolean {
         &[
             Example {
                 title: "valid",
-                source: r#"boolean(false)"#,
+                source: r#"bool(false)"#,
                 result: Ok("false"),
             },
             Example {
                 title: "invalid",
-                source: "boolean!(42)",
+                source: "bool!(42)",
                 result: Err(
-                    r#"function call error for "boolean" at (0:12): expected "boolean", got "integer""#,
+                    r#"function call error for "bool" at (0:9): expected "boolean", got "integer""#,
                 ),
             },
         ]
