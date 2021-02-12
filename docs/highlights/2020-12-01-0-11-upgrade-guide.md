@@ -2,7 +2,7 @@
 last_modified_on: "2020-12-01"
 $schema: ".schema.json"
 title: "0.11 Upgrade Guide"
-description: "An upgrade guide that addresses breaking changes"
+description: "An upgrade guide that addresses breaking changes in 0.11.0"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [3557, 4580, 4557, 4647, 4918, 3297, 3427, 4103]
 release: "0.11.0"

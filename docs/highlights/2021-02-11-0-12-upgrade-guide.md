@@ -1,0 +1,142 @@
+---
+last_modified_on: "2021-02-11"
+$schema: ".schema.json"
+title: "0.12 Upgrade Guide"
+description: "An upgrade guide that addresses breaking changes in 0.12.0"
+author_github: "https://github.com/binarylogic"
+pr_numbers: [5281, 5978]
+release: "0.12.0"
+hide_on_release_notes: false
+tags: ["type: breaking change"]
+---
+
+0.12 includes minimal breaking changes but significant deprecations. This guide will upgrade you quickly and
+painlessly. If you have questions, [hop in our chat][chat] and we'll help you upgrade.
+
+## Breaking Changes
+
+### The `encoding.codec` option is now required for all relevant sinks
+
+[Pull request #5281][pr_5281] removed the default values for the sink-level `encoding.codec` option. Therefore, you are
+now requied to provide a value for this option, ensuring that you are not surprised by opinionated encoding defaults.
+Affected sinks include:
+
+* `aws_s3`
+* `file`
+* `humio`
+* `kafka`
+* `nats`
+* `new_relic_logs`
+* `pulsar`
+* `splunk_hec`
+
+Upgrading is easy, just add the `encoding.codec` to your sinks with your preferred format (`json` or `text`):
+
+```diff
+ [sinks.backup]
+ type = "aws_s3"
+ inputs = ["..."]
+ bucket = "my-bucket"
+ compression = "gzip"
+ region = "us-east-1"
++encoding.codec = "json"
+```
+
+### Vector `check_fields` conditions now require the `type` option
+
+With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl] (VRL), [pull request #5978][pr_5978]
+_deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
+`check_fields` conditions were limiting and suffered from many of the [pitfalls][config_synytax_pitfalls] outlined in
+the VRL announcement. Configuration languages, like TOML, are very bad at expressing boolean conditions and severly
+limited how users could [route][route_transform], [filter][filter_transform], and [reduce][reduce_transform] data.
+
+While `check_fields` is deprecated and still supported, you will need to explicitly opt-into the feature by adding the
+`type` option:
+
+```diff
+ [transforms.route]
+ type = "swimlanes"
++lanes.errors.type = "check_field"
+ lanes.errors."level.eq" = "error"
+```
+
+Alteratively, we recommend migrating to the new VRL syntax:
+
+```diff
+ [transforms.route]
+ type = "swimlanes"
+-lanes.errors."level.eq" = "error"
++lanes.errors = '.level = "error"'
+```
+
+Refer to the [VRL reference][vrl_reference] for the many ways you can specify conditions.
+
+## Deprecations
+
+### Many transforms have been deprecated in favor of the new `remap` transform
+
+The following transforms have been deprecated in favor of the new [`remap` transform][remap_transform]:
+
+* [`add_fields`][add_fields_transform]
+* [`add_tags`][add_tags_transform]
+* [`ansi_stripper`][ansi_stripper_transform]
+* [`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser_transform]
+* [`coercer`][coercer_transform]
+* [`concat`][concat_transform]
+* [`grok_parser`][grok_parser_transform]
+* [`json_parser`][json_parser_transform]
+* [`key_value_parser`][key_value_parser_transform]
+* [`logfmt_parser`][logfmt_parser_transform]
+* [`merge`][merge_transform]
+* [`regex_parser`][regex_parser_transform]
+* [`remove_fields`][remove_fields_transform]
+* [`remove_tags`][remove_tags_transform]
+* [`rename_fields`][rename_fields_transform]
+* [`split`][split_transform]
+* [`tokenizer`][tokenizer_transform]
+
+Deprecation notices have been placed on each of these transforms with example VRL programs that demonstrate how to
+migrate to the new `remap` transform. For example, migrating from the `json_parser` transform is as simple as:
+
+```toml
+[transforms.remap]
+type = "remap"
+source = '''
+. = merge(., parse_json!(.message))
+'''
+```
+
+**You do not need to upgrade immediately. These transforms will not be removed until Vector hits 1.0, a milestone that
+we hope to achieve in late 2022.** But, if possible, we recommend using this opportunity to upgrade and significantly
+simplify your Vector configuration.
+
+As always, if you need assistance [hop in our chat][chat]. We're eager to help and receive feedback on the language.
+
+[add_fields_transform]: a
+[add_tags_transform]: a
+[ansi_stripper_transform]: a
+[aws_cloudwatch_logs_subscription_parser_transform]: a
+[chat]: a
+[coercer_transform]: a
+[concat_transform]: a
+[config_synytax_pitfalls]: a
+[grok_parser_transform]: a
+[json_parser_transform]: a
+[key_value_parser_transform]: a
+[logfmt_parser_transform]: a
+[merge_transform]: a
+[pr_5281]: a
+[pr_5978]: a
+[filter_transform]: a
+[reduce_transform]: a
+[regex_parser_transform]: a
+[remove_fields_transform]: a
+[remove_tags_transform]: a
+[rename_fields_transform]: a
+[route_transform]: a
+[split_transform]: a
+[tokenizer_transform]: a
+[vrl]: a
+[vrl_announcement]: a
+[vrl_boolean_expression]: a
+[vrl_reference]: a
