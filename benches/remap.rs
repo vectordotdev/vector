@@ -70,7 +70,7 @@ fn benchmark_remap(c: &mut Criterion) {
             Remap::new(RemapConfig {
                 source: r#".foo = "bar"
             .bar = "baz"
-            .copy = .copy_from"#
+            .copy = string!(.copy_from)"#
                     .to_string(),
                 drop_on_err: true,
             })
@@ -196,8 +196,8 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: r#"
-                .number = to_int!(.number)
-                .bool = to_bool!(.bool)
+                .number = int!(.number)
+                .bool = bool!(.bool)
                 .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
                 "#
                 .to_owned(),
