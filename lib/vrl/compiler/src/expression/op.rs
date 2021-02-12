@@ -81,7 +81,7 @@ impl Expression for Op {
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);
-        let merged_def = lhs_def.clone() | rhs_def.clone();
+        let merged_def = lhs_def.clone().merge(rhs_def.clone());
 
         let lhs_kind = lhs_def.kind();
         let rhs_kind = rhs_def.kind();

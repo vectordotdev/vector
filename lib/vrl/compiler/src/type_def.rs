@@ -1,7 +1,6 @@
 use crate::value::Kind;
 use crate::{path, Path};
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::BitOr;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -263,6 +262,129 @@ impl KindInfo {
 
         info.at_path(iter.collect())
     }
+
+    fn merge(self, rhs: Self, shallow: bool) -> Self {
+        use KindInfo::*;
+
+        match (self, rhs) {
+            (KindInfo::Known(lhs), KindInfo::Known(rhs)) => {
+                let (lhs_array, lhs): (Vec<_>, Vec<_>) = lhs
+                    .into_iter()
+                    .partition(|k| matches!(k, TypeKind::Array(_)));
+                let lhs_array = lhs_array
+                    .into_iter()
+                    .filter_map(|k| match k {
+                        TypeKind::Array(v) => Some(v),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .pop();
+
+                let (rhs_array, rhs): (Vec<_>, Vec<_>) = rhs
+                    .into_iter()
+                    .partition(|k| matches!(k, TypeKind::Array(_)));
+                let rhs_array = rhs_array
+                    .into_iter()
+                    .filter_map(|k| match k {
+                        TypeKind::Array(v) => Some(v),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .pop();
+
+                // If both the lhs and rhs contain an array, we need to merge
+                // their definitions.
+                //
+                // We do this by taking the highest index of the lhs array, and
+                // increase the indexes of the rhs index by that amount.
+                #[allow(clippy::suspicious_arithmetic_impl)]
+                let array = lhs_array
+                    .clone()
+                    .zip(rhs_array.clone())
+                    .map(|(mut l, r)| {
+                        let r_start = l
+                            .keys()
+                            .filter_map(|i| i.to_inner())
+                            .max()
+                            .map(|i| i + 1)
+                            .unwrap_or_default();
+
+                        let mut r = r
+                            .into_iter()
+                            .map(|(i, v)| (i.shift(r_start), v))
+                            .collect::<BTreeMap<_, _>>();
+
+                        l.append(&mut r);
+                        l
+                    })
+                    .or_else(|| lhs_array.or(rhs_array));
+
+                let (lhs_object, lhs): (Vec<_>, Vec<_>) = lhs
+                    .into_iter()
+                    .partition(|k| matches!(k, TypeKind::Object(_)));
+                let lhs_object = lhs_object
+                    .into_iter()
+                    .filter_map(|k| match k {
+                        TypeKind::Object(v) => Some(v),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .pop();
+
+                let (rhs_object, rhs): (Vec<_>, Vec<_>) = rhs
+                    .into_iter()
+                    .partition(|k| matches!(k, TypeKind::Object(_)));
+                let rhs_object = rhs_object
+                    .into_iter()
+                    .filter_map(|k| match k {
+                        TypeKind::Object(v) => Some(v),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .pop();
+
+                // Similar to merging two arrays, but for objects.
+                //
+                // In this case, all we care about is merging the two objects,
+                // with the rhs object taking precedence.
+                let object = lhs_object
+                    .clone()
+                    .zip(rhs_object.clone())
+                    .map(|(mut l, mut r)| {
+                        // merge nested keys, if requested
+                        if !shallow {
+                            for (k1, v1) in l.iter_mut() {
+                                for (k2, v2) in r.iter_mut() {
+                                    if k1 == k2 {
+                                        *v2 = v1.clone().merge(v2.clone(), false);
+                                    }
+                                }
+                            }
+                        }
+
+                        l.append(&mut r);
+                        l
+                    })
+                    .or_else(|| lhs_object.or(rhs_object));
+
+                let mut lhs: BTreeSet<_> = lhs.into_iter().collect();
+                let mut rhs = rhs.into_iter().collect();
+                lhs.append(&mut rhs);
+
+                if let Some(array) = array {
+                    lhs.insert(TypeKind::Array(array));
+                }
+
+                if let Some(object) = object {
+                    lhs.insert(TypeKind::Object(object));
+                }
+                Known(lhs)
+            }
+            (lhs @ Known(_), _) => lhs,
+            (_, rhs @ Known(_)) => rhs,
+            _ => Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -495,7 +617,7 @@ impl TypeDef {
     pub fn add_scalar(mut self, kind: Kind) -> Self {
         debug_assert!(kind.is_scalar());
 
-        self.kind = self.kind | kind.into();
+        self.kind = self.kind.merge(kind.into(), false);
         self
     }
 
@@ -583,7 +705,7 @@ impl TypeDef {
         let mut set = BTreeSet::default();
         set.insert(kind);
 
-        self.kind = self.kind | KindInfo::Known(set);
+        self.kind = self.kind.merge(KindInfo::Known(set), false);
         self
     }
 
@@ -713,8 +835,20 @@ impl TypeDef {
     }
 
     /// Performs a bitwise-or operation, and returns the resulting type definition.
-    pub fn merge(self, other: Self) -> Self {
-        self | other
+    pub fn merge(self, rhs: Self) -> Self {
+        Self {
+            fallible: self.fallible | rhs.fallible,
+            kind: self.kind.merge(rhs.kind, false),
+        }
+    }
+
+    /// Performs a shallow bitwise-or operation, and returns the resulting type
+    /// definition.
+    pub fn merge_shallow(self, rhs: Self) -> Self {
+        Self {
+            fallible: self.fallible | rhs.fallible,
+            kind: self.kind.merge(rhs.kind, true),
+        }
     }
 }
 
@@ -732,142 +866,6 @@ impl From<Kind> for TypeDef {
         Self {
             fallible: false,
             kind: kind.into(),
-        }
-    }
-}
-
-impl BitOr for TypeDef {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self {
-        Self {
-            fallible: self.fallible | rhs.fallible,
-            kind: self.kind | rhs.kind,
-        }
-    }
-}
-
-impl BitOr for KindInfo {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self {
-        use KindInfo::*;
-
-        match (self, rhs) {
-            (KindInfo::Known(lhs), KindInfo::Known(rhs)) => {
-                let (lhs_array, lhs): (Vec<_>, Vec<_>) = lhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Array(_)));
-                let lhs_array = lhs_array
-                    .into_iter()
-                    .filter_map(|k| match k {
-                        TypeKind::Array(v) => Some(v),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .pop();
-
-                let (rhs_array, rhs): (Vec<_>, Vec<_>) = rhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Array(_)));
-                let rhs_array = rhs_array
-                    .into_iter()
-                    .filter_map(|k| match k {
-                        TypeKind::Array(v) => Some(v),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .pop();
-
-                // If both the lhs and rhs contain an array, we need to merge
-                // their definitions.
-                //
-                // We do this by taking the highest index of the lhs array, and
-                // increase the indexes of the rhs index by that amount.
-                #[allow(clippy::suspicious_arithmetic_impl)]
-                let array = lhs_array
-                    .clone()
-                    .zip(rhs_array.clone())
-                    .map(|(mut l, r)| {
-                        let r_start = l
-                            .keys()
-                            .filter_map(|i| i.to_inner())
-                            .max()
-                            .map(|i| i + 1)
-                            .unwrap_or_default();
-
-                        let mut r = r
-                            .into_iter()
-                            .map(|(i, v)| (i.shift(r_start), v))
-                            .collect::<BTreeMap<_, _>>();
-
-                        l.append(&mut r);
-                        l
-                    })
-                    .or_else(|| lhs_array.or(rhs_array));
-
-                let (lhs_object, lhs): (Vec<_>, Vec<_>) = lhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Object(_)));
-                let lhs_object = lhs_object
-                    .into_iter()
-                    .filter_map(|k| match k {
-                        TypeKind::Object(v) => Some(v),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .pop();
-
-                let (rhs_object, rhs): (Vec<_>, Vec<_>) = rhs
-                    .into_iter()
-                    .partition(|k| matches!(k, TypeKind::Object(_)));
-                let rhs_object = rhs_object
-                    .into_iter()
-                    .filter_map(|k| match k {
-                        TypeKind::Object(v) => Some(v),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .pop();
-
-                // Similar to merging two arrays, but for objects.
-                //
-                // In this case, all we care about is merging the two objects,
-                // with the rhs object taking precedence.
-                let object = lhs_object
-                    .clone()
-                    .zip(rhs_object.clone())
-                    .map(|(mut l, mut r)| {
-                        // merge nested keys
-                        for (k1, v1) in l.iter_mut() {
-                            for (k2, v2) in r.iter_mut() {
-                                if k1 == k2 {
-                                    *v2 = v1.clone() | v2.clone();
-                                }
-                            }
-                        }
-
-                        l.append(&mut r);
-                        l
-                    })
-                    .or_else(|| lhs_object.or(rhs_object));
-
-                let mut lhs: BTreeSet<_> = lhs.into_iter().collect();
-                let mut rhs = rhs.into_iter().collect();
-                lhs.append(&mut rhs);
-
-                if let Some(array) = array {
-                    lhs.insert(TypeKind::Array(array));
-                }
-
-                if let Some(object) = object {
-                    lhs.insert(TypeKind::Object(object));
-                }
-                Known(lhs)
-            }
-            (lhs @ Known(_), _) => lhs,
-            (_, rhs @ Known(_)) => rhs,
-            _ => Unknown,
         }
     }
 }

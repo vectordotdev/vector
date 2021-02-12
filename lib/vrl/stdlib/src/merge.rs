@@ -73,13 +73,9 @@ impl Expression for MergeFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        // FIXME: have to do a shallow merge, because it isn't know at
-        // compile-time if deep-merging happens at runtime.
-        //
-        // We should extract the `BitOr` in `TypeDef` and move it into a
-        // `merge(shallow: bool)` method. Then below call `merge_shallow` which
-        // propagates to the correct inner function call.
-        self.to.type_def(state).merge(self.from.type_def(state))
+        self.to
+            .type_def(state)
+            .merge_shallow(self.from.type_def(state))
     }
 }
 
@@ -186,7 +182,6 @@ mod tests {
                 "key1": Kind::Bytes,
                 "key2": Kind::Bytes,
                 "child": TypeDef::new().object::<String, TypeDef>(map! {
-                    "grandchild1": Kind::Bytes,
                     "grandchild2": Kind::Boolean,
                 }),
             }),
