@@ -131,7 +131,7 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: parse JSON with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: ".bar = parse_json!(.foo)".to_owned(),
+                source: ".bar = parse_json!(string!(.foo))".to_owned(),
                 drop_on_err: false,
             })
             .unwrap(),
