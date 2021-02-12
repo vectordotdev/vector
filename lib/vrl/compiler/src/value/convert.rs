@@ -232,7 +232,7 @@ impl Value {
         }
     }
 
-    pub fn unwrap_bytes_utf8_lossy<'a>(&'a self) -> Cow<'a, str> {
+    pub fn unwrap_bytes_utf8_lossy(&self) -> Cow<'_, str> {
         match self.as_bytes() {
             Some(bytes) => String::from_utf8_lossy(&bytes),
             None => panic!("not a bytes"),
@@ -249,7 +249,7 @@ impl Value {
         }
     }
 
-    pub fn try_bytes_utf8_lossy<'a>(&'a self) -> Result<Cow<'a, str>, Error> {
+    pub fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
         match self.as_bytes() {
             Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
             None => Err(Error::Expected {

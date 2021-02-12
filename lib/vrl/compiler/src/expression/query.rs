@@ -33,10 +33,10 @@ impl Query {
         }
     }
 
-    pub fn expression_target(&self) -> Option<Box<&dyn Expression>> {
+    pub fn expression_target(&self) -> Option<&dyn Expression> {
         match &self.target {
-            Target::FunctionCall(expr) => Some(Box::new(expr)),
-            Target::Container(expr) => Some(Box::new(expr)),
+            Target::FunctionCall(expr) => Some(expr),
+            Target::Container(expr) => Some(expr),
             _ => None,
         }
     }

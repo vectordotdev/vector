@@ -240,7 +240,7 @@ impl Target {
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
                 match ctx.state_mut().variable_mut(ident) {
-                    Some(stored) => return stored.insert_by_path(path, value),
+                    Some(stored) => stored.insert_by_path(path, value),
                     None => ctx
                         .state_mut()
                         .insert_variable(ident.clone(), value.at_path(path)),

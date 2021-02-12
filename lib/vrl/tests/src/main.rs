@@ -71,7 +71,7 @@ fn main() {
     for mut test in tests {
         if category != test.category {
             category = test.category;
-            println!("{}", Colour::Fixed(3).bold().paint(format!("{}", category)));
+            println!("{}", Colour::Fixed(3).bold().paint(category.to_string()));
         }
 
         if let Some(err) = test.error {
@@ -105,19 +105,19 @@ fn main() {
                 match result {
                     Ok(got) => {
                         if !test.skip {
-                            let want = if want.starts_with("r'") && want.ends_with("'") {
+                            let want = if want.starts_with("r'") && want.ends_with('\'') {
                                 match regex::Regex::new(
                                     &want[2..want.len() - 1].replace("\\'", "'"),
                                 ) {
                                     Ok(want) => want.into(),
                                     Err(_) => want.into(),
                                 }
-                            } else if want.starts_with("t'") && want.ends_with("'") {
+                            } else if want.starts_with("t'") && want.ends_with('\'') {
                                 match DateTime::<Utc>::from_str(&want[2..want.len() - 1]) {
                                     Ok(want) => want.into(),
                                     Err(_) => want.into(),
                                 }
-                            } else if want.starts_with("s'") && want.ends_with("'") {
+                            } else if want.starts_with("s'") && want.ends_with('\'') {
                                 want[2..want.len() - 1].into()
                             } else {
                                 match serde_json::from_str::<'_, Value>(&want.trim()) {
@@ -154,9 +154,9 @@ fn main() {
                             let got = err.to_string().trim().to_owned();
                             let want = want.trim().to_owned();
 
-                            if test.result_approx && compare_partial_diagnostic(&got, &want) {
-                                println!("{}", Colour::Green.bold().paint("OK"));
-                            } else if got == want {
+                            if (test.result_approx && compare_partial_diagnostic(&got, &want))
+                                || got == want
+                            {
                                 println!("{}", Colour::Green.bold().paint("OK"));
                             } else {
                                 println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
@@ -183,9 +183,9 @@ fn main() {
                     let got = formatter.to_string().trim().to_owned();
                     let want = want.trim().to_owned();
 
-                    if test.result_approx && compare_partial_diagnostic(&got, &want) {
-                        println!("{}", Colour::Green.bold().paint("OK"));
-                    } else if got == want {
+                    if (test.result_approx && compare_partial_diagnostic(&got, &want))
+                        || got == want
+                    {
                         println!("{}", Colour::Green.bold().paint("OK"));
                     } else {
                         println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
@@ -335,21 +335,19 @@ fn test_category(path: &Path) -> String {
     path.to_string_lossy()
         .strip_prefix("tests/")
         .expect("test")
-        .rsplitn(2, "/")
-        .skip(1)
-        .next()
+        .rsplitn(2, '/')
+        .nth(1)
         .unwrap()
         .to_owned()
 }
 
 fn test_name(path: &Path) -> String {
     path.to_string_lossy()
-        .rsplitn(2, "/")
+        .rsplitn(2, '/')
         .next()
         .unwrap()
         .trim_end_matches(".vrl")
         .replace("_", " ")
-        .to_owned()
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {

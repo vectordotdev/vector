@@ -379,12 +379,12 @@ impl DiagnosticError for Error {
                 ident_span,
                 keywords,
             } => vec![
-                Label::primary(format!("unknown keyword"), keyword_span),
+                Label::primary("unknown keyword", keyword_span),
                 Label::context(
                     format!(
                         "this function accepts the following keywords: {}",
                         keywords
-                            .into_iter()
+                            .iter()
                             .map(|k| format!(r#""{}""#, k))
                             .collect::<Vec<_>>()
                             .join(", ")
@@ -463,7 +463,7 @@ impl DiagnosticError for Error {
             FallibleArgument { expr_span } => vec![
                 Label::primary("this expression can fail", expr_span),
                 Label::context(
-                    format!(r#"handle the error before passing it in as an argument"#),
+                    "handle the error before passing it in as an argument",
                     expr_span,
                 ),
             ],

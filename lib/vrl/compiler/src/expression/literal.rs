@@ -27,10 +27,10 @@ impl Literal {
         match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.clone()),
+            Float(v) => Value::Float(v.to_owned()),
             Boolean(v) => Value::Boolean(*v),
             Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.clone()),
+            Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
         }
     }

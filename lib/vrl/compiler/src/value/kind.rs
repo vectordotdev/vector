@@ -87,18 +87,18 @@ impl Kind {
     }
 
     pub fn is_exact(self) -> bool {
-        match self {
-            Kind::Bytes => true,
-            Kind::Integer => true,
-            Kind::Float => true,
-            Kind::Boolean => true,
-            Kind::Object => true,
-            Kind::Array => true,
-            Kind::Timestamp => true,
-            Kind::Regex => true,
-            Kind::Null => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Kind::Bytes
+                | Kind::Integer
+                | Kind::Float
+                | Kind::Boolean
+                | Kind::Object
+                | Kind::Array
+                | Kind::Timestamp
+                | Kind::Regex
+                | Kind::Null
+        )
     }
 }
 

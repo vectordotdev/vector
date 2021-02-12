@@ -105,7 +105,7 @@ impl Expression for ParseGrokFn {
 
                 Ok(Value::from(result))
             }
-            None => Err("unable to parse input with grok pattern")?,
+            None => Err("unable to parse input with grok pattern".into()),
         }
     }
 

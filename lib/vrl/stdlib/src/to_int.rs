@@ -112,7 +112,7 @@ impl Expression for ToIntFn {
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
             Timestamp(v) => Ok(v.timestamp().into()),
-            v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()))?,
+            v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
         }
     }
 

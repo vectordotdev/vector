@@ -119,9 +119,8 @@ impl Expression for ToTimestampFn {
                 .into(),
             Bytes(v) => Conversion::Timestamp
                 .convert::<Value>(v)
-                .map_err(|err| err.to_string())?
-                .into(),
-            v => Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()))?,
+                .map_err(|err| err.to_string())?,
+            v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
         };
 
         Ok(value)

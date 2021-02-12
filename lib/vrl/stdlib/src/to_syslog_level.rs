@@ -59,7 +59,7 @@ impl Expression for ToSyslogLevelFn {
             5 => "notice",
             6 => "info",
             7 => "debug",
-            _ => Err(format!("severity level {} not valid", value))?,
+            _ => return Err(format!("severity level {} not valid", value).into()),
         };
 
         Ok(level.into())

@@ -96,6 +96,7 @@ impl<'a> Compiler<'a> {
 
         Literal::try_from(node).unwrap_or_else(|err| {
             let value = match &err.variant {
+                #[allow(clippy::trivial_regex)]
                 InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
                 InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
                 NanFloat => NotNan::new(0.0).unwrap().into(),
@@ -184,7 +185,7 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes),
         };
 
-        Predicate::new(Node::new(span, Block::new(exprs)), &mut self.state)
+        Predicate::new(Node::new(span, Block::new(exprs)), &self.state)
     }
 
     fn compile_op(&mut self, node: Node<ast::Op>) -> Op {

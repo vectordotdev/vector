@@ -1,7 +1,6 @@
 use crate::value::Kind;
 use crate::{path, Path};
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::FromIterator;
 use std::ops::BitOr;
 
 /// Properties for a given expression that express the expected outcome of the
@@ -137,7 +136,7 @@ impl KindInfo {
     pub fn for_path(mut self, path: Path) -> Self {
         use path::Segment;
 
-        for segment in path.segments().into_iter().rev() {
+        for segment in path.segments().iter().rev() {
             match segment {
                 Segment::Field(field) => {
                     let mut map = BTreeMap::default();
@@ -262,7 +261,7 @@ impl KindInfo {
             }
         };
 
-        info.at_path(Path::from_iter(iter))
+        info.at_path(iter.collect())
     }
 }
 
@@ -785,6 +784,7 @@ impl BitOr for KindInfo {
                 //
                 // We do this by taking the highest index of the lhs array, and
                 // increase the indexes of the rhs index by that amount.
+                #[allow(clippy::suspicious_arithmetic_impl)]
                 let array = lhs_array
                     .clone()
                     .zip(rhs_array.clone())
@@ -852,8 +852,8 @@ impl BitOr for KindInfo {
                     })
                     .or_else(|| lhs_object.or(rhs_object));
 
-                let mut lhs = BTreeSet::from_iter(lhs.into_iter());
-                let mut rhs = BTreeSet::from_iter(rhs.into_iter());
+                let mut lhs: BTreeSet<_> = lhs.into_iter().collect();
+                let mut rhs = rhs.into_iter().collect();
                 lhs.append(&mut rhs);
 
                 if let Some(array) = array {

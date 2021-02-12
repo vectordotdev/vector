@@ -9,7 +9,7 @@ use parser::ast::{
 };
 use proptest::prelude::*;
 
-static RESERVED: &[&'static str] = &[
+static RESERVED: &[&str] = &[
     "if",
     "for",
     "else",
@@ -243,12 +243,8 @@ fn expr() -> impl Strategy<Value = Expr> {
                     expr: Box::new(node(expr)),
                 }))
             )),
-            (
-                ident(),
-                prop::bool::ANY,
-                prop::collection::vec(inner.clone(), 1..3)
-            )
-                .prop_map(|(ident, abort_on_error, arguments)| {
+            (ident(), prop::bool::ANY, prop::collection::vec(inner, 1..3)).prop_map(
+                |(ident, abort_on_error, arguments)| {
                     Expr::FunctionCall(node(FunctionCall {
                         ident: node(ident),
                         abort_on_error,
@@ -262,7 +258,8 @@ fn expr() -> impl Strategy<Value = Expr> {
                             })
                             .collect(),
                     }))
-                }),
+                }
+            ),
         ]
     })
 }

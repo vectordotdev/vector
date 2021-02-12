@@ -53,12 +53,12 @@ pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
-        inner_type.insert(num.to_string(), Kind::Bytes.into());
+        inner_type.insert(num.to_string(), Kind::Bytes);
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().filter_map(std::convert::identity) {
-        inner_type.insert(name.to_owned(), Kind::Bytes.into());
+        inner_type.insert(name.to_owned(), Kind::Bytes);
     }
 
     inner_type

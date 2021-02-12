@@ -75,7 +75,7 @@ impl Expression for ToSyslogFacilityFn {
             21 => "local5",
             22 => "local6",
             23 => "local7",
-            _ => Err(format!("facility code {} not valid", value))?,
+            _ => return Err(format!("facility code {} not valid", value).into()),
         };
 
         Ok(code.into())
