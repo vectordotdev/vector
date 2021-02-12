@@ -391,18 +391,16 @@ fn create_event(record: Record) -> Event {
         log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log
+    if let Some(Value::Bytes(timestamp)) = log
         .get(&*SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
-        if let Value::Bytes(timestamp) = timestamp {
-            if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
-                let timestamp = chrono::Utc.timestamp(
-                    (timestamp / 1_000_000) as i64,
-                    (timestamp % 1_000_000) as u32 * 1_000,
-                );
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
-            }
+        if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
+            let timestamp = chrono::Utc.timestamp(
+                (timestamp / 1_000_000) as i64,
+                (timestamp % 1_000_000) as u32 * 1_000,
+            );
+            log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
         }
     }
     // Add source type
