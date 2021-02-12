@@ -928,7 +928,7 @@ impl<'input> Lexer<'input> {
             Token::ident(ident)
         };
 
-        Ok((start, token, end));
+        Ok((start, token, end))
     }
 
     fn operator(&mut self, start: usize) -> Spanned<'input, usize> {
@@ -941,7 +941,7 @@ impl<'input> Lexer<'input> {
             op => Token::Operator(op),
         };
 
-        Ok((start, token, end));
+        Ok((start, token, end))
     }
 
     fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
