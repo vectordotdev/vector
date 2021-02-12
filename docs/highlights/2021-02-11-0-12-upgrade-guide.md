@@ -44,7 +44,7 @@ Upgrading is easy, just add the `encoding.codec` to your sinks with your preferr
 
 ### Vector `check_fields` conditions now require the `type` option
 
-With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl] (VRL), [pull request #5978][pr_5978]
+With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl_reference] (VRL), [pull request #5978][pr_5978]
 _deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
 `check_fields` conditions were limiting and suffered from many of the [pitfalls][config_synytax_pitfalls] outlined in
 the VRL announcement. Configuration languages, like TOML, are very bad at expressing boolean conditions and severly
@@ -112,31 +112,30 @@ simplify your Vector configuration.
 
 As always, if you need assistance [hop in our chat][chat]. We're eager to help and receive feedback on the language.
 
-[add_fields_transform]: a
-[add_tags_transform]: a
-[ansi_stripper_transform]: a
-[aws_cloudwatch_logs_subscription_parser_transform]: a
-[chat]: a
-[coercer_transform]: a
-[concat_transform]: a
-[config_synytax_pitfalls]: a
-[grok_parser_transform]: a
-[json_parser_transform]: a
-[key_value_parser_transform]: a
-[logfmt_parser_transform]: a
-[merge_transform]: a
-[pr_5281]: a
-[pr_5978]: a
-[filter_transform]: a
-[reduce_transform]: a
-[regex_parser_transform]: a
-[remove_fields_transform]: a
-[remove_tags_transform]: a
-[rename_fields_transform]: a
-[route_transform]: a
-[split_transform]: a
-[tokenizer_transform]: a
-[vrl]: a
-[vrl_announcement]: a
-[vrl_boolean_expression]: a
-[vrl_reference]: a
+[add_fields_transform]: /docs/reference/configuration/transforms/add_fields/
+[add_tags_transform]: /docs/reference/configuration/transforms/add_tags/
+[ansi_stripper_transform]: /docs/reference/configuration/transforms/ansi_stripper/
+[aws_cloudwatch_logs_subscription_parser_transform]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser_transform/
+[chat]: https://chat.vector.dev
+[coercer_transform]: /docs/reference/configuration/transforms/coercer/
+[concat_transform]: /docs/reference/configuration/transforms/concat/
+[config_synytax_pitfalls]: /blog/vector-remap-language/#configuration-langauges-are-bad-at-expressing-data-transformations
+[grok_parser_transform]: /docs/reference/configuration/transforms/grok_parser/
+[json_parser_transform]: /docs/reference/configuration/transforms/json_parser/
+[key_value_parser_transform]: /docs/reference/configuration/transforms/key_value_parser/
+[logfmt_parser_transform]: /docs/reference/configuration/transforms/logfmt_parser/
+[merge_transform]: /docs/reference/configuration/transforms/merge/
+[pr_5281]: https://github.com/timberio/vector/pull/5281
+[pr_5978]: https://github.com/timberio/vector/pull/5978
+[filter_transform]: /docs/reference/configuration/transforms/filter/
+[reduce_transform]: /docs/reference/configuration/transforms/reduce/
+[regex_parser_transform]: /docs/reference/configuration/transforms/regex_parser/
+[remove_fields_transform]: /docs/reference/configuration/transforms/remove_fields/
+[remove_tags_transform]: /docs/reference/configuration/transforms/remove_tags/
+[rename_fields_transform]: /docs/reference/configuration/transforms/rename_fields/
+[route_transform]: /docs/reference/configuration/transforms/route/
+[split_transform]: /docs/reference/configuration/transforms/split/
+[tokenizer_transform]: /docs/reference/configuration/transforms/tokenizer/
+[vrl_announcement]: /blog/vector-remap-language/
+[vrl_boolean_expression]: /docs/reference/vrl/expressions/#comparison
+[vrl_reference]: /docs/reference/vrl/
