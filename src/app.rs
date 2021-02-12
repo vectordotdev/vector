@@ -56,6 +56,7 @@ impl Application {
             level => [
                 format!("vector={}", level),
                 format!("codec={}", level),
+                format!("vrl={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
