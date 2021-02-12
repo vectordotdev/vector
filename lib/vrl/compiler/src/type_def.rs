@@ -646,6 +646,20 @@ impl TypeDef {
     }
 
     #[inline]
+    pub fn restrict_array(mut self) -> Self {
+        self.kind = match self.kind {
+            KindInfo::Known(set) => KindInfo::Known(
+                set.into_iter()
+                    .filter(|k| matches!(k, TypeKind::Array(_)))
+                    .collect(),
+            ),
+            v => v,
+        };
+
+        self
+    }
+
+    #[inline]
     pub fn array_mapped<I, V>(self, map: BTreeMap<I, V>) -> Self
     where
         I: Into<Index>,
@@ -697,6 +711,20 @@ impl TypeDef {
             });
 
         self.add_container(TypeKind::Object(map))
+    }
+
+    #[inline]
+    pub fn restrict_object(mut self) -> Self {
+        self.kind = match self.kind {
+            KindInfo::Known(set) => KindInfo::Known(
+                set.into_iter()
+                    .filter(|k| matches!(k, TypeKind::Object(_)))
+                    .collect(),
+            ),
+            v => v,
+        };
+
+        self
     }
 
     fn add_container(mut self, kind: TypeKind) -> Self {
