@@ -15,7 +15,7 @@ use std::str;
 pub struct CoercerConfig {
     types: HashMap<String, String>,
     drop_unspecified: bool,
-    timezone: TimeZone,
+    timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -27,8 +27,9 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        let types = parse_conversion_map(&self.types, self.timezone)?;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let types = parse_conversion_map(&self.types, timezone)?;
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,

@@ -741,7 +741,7 @@ components: {
 
 			_timezone: {
 				common:      false
-				description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone."
+				description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone. This overrides the global [`timezone` option][docs.reference.configuration.global-options#timezone]"
 				required:    false
 				warnings: []
 				type: string: {

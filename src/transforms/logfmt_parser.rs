@@ -16,7 +16,7 @@ pub struct LogfmtConfig {
     pub field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -28,12 +28,13 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let conversions = parse_conversion_map(&self.types, self.timezone)?;
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let conversions = parse_conversion_map(&self.types, timezone)?;
 
         Ok(Transform::function(Logfmt {
             field,

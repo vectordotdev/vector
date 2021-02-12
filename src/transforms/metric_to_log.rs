@@ -16,7 +16,7 @@ use shared::TimeZone;
 #[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub host_tag: Option<String>,
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -27,7 +27,7 @@ impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             host_tag: Some("host-tag".to_string()),
-            timezone: TimeZone::default(),
+            timezone: None,
         })
         .unwrap()
     }
@@ -36,10 +36,10 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
-            self.timezone,
+            self.timezone.unwrap_or(globals.timezone),
         )))
     }
 

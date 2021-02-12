@@ -19,7 +19,7 @@ pub struct SplitConfig {
     pub field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -31,13 +31,14 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names, self.timezone)
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)
             .map_err(|error| format!("{}", error))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value

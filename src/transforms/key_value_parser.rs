@@ -25,7 +25,7 @@ pub struct KeyValueConfig {
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
     pub types: HashMap<String, String>,
-    pub timezone: TimeZone,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -37,8 +37,9 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        let conversions = parse_conversion_map(&self.types, self.timezone)?;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let conversions = parse_conversion_map(&self.types, timezone)?;
         let field = self
             .field
             .clone()

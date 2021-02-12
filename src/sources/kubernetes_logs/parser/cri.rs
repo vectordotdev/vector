@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use derivative::Derivative;
+use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
@@ -41,7 +42,7 @@ impl Cri {
                 "timestamp|%+".to_owned(),
             );
 
-            let parser = RegexParser::build(&rp_config)
+            let parser = RegexParser::build(&rp_config, TimeZone::Local)
                 .expect("regexp patterns are static, should never fail");
             parser.into_function()
         };

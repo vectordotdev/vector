@@ -434,6 +434,7 @@ mod tests {
         assert_eq!(
             generate_example(true, "stdin/json_parser/console", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+                timezone = "local"
 
                 [sources.source0]
                 max_length = 102400
@@ -467,6 +468,7 @@ mod tests {
         assert_eq!(
             generate_example(true, "stdin|json_parser|console", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+                timezone = "local"
 
                 [sources.source0]
                 max_length = 102400
@@ -500,6 +502,7 @@ mod tests {
         assert_eq!(
             generate_example(true, "stdin//console", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+                timezone = "local"
 
                 [sources.source0]
                 max_length = 102400
@@ -527,6 +530,7 @@ mod tests {
         assert_eq!(
             generate_example(true, "//console", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+                timezone = "local"
 
                 [sinks.sink0]
                 inputs = ["component-name"]
@@ -550,6 +554,7 @@ mod tests {
         assert_eq!(
             generate_example(true, "/add_fields,json_parser,remove_fields", &None),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+                timezone = "local"
 
                 [transforms.transform0]
                 inputs = []
