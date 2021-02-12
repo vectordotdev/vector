@@ -25,7 +25,9 @@ apt-get install --yes grub-efi
 update-grub
 set -e
 
-apt upgrade --yes
+# using force-overwrite due to
+# https://github.com/actions/virtual-environments/issues/2703
+apt upgrade  -o Dpkg::Options::="--force-overwrite" --yes
 
 # Deps
 apt install --yes \
