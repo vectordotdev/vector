@@ -58,14 +58,14 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
         self.value
             .type_def(state)
             .into_fallible(true) // Message parsing error
-            .with_inner_type(inner_type_def())
+            .with_inner_type(Some(inner_type_def()))
             .with_constraint(value::Kind::Map)
     }
 }
 
 /// The type defs of the fields contained by the returned map.
-fn inner_type_def() -> Option<InnerTypeDef> {
-    Some(inner_type_def! ({
+fn inner_type_def() -> InnerTypeDef {
+    inner_type_def! ({
         "owner": Kind::Bytes,
         "message_type": Kind::Bytes,
         "log_group": Kind::Bytes,
@@ -78,7 +78,7 @@ fn inner_type_def() -> Option<InnerTypeDef> {
                 "timestamp": Kind::Timestamp,
                 "message": Kind::Bytes,
             })))
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -150,7 +150,7 @@ mod tests {
         def: TypeDef {
             fallible: true,
             kind: Kind::Map,
-            inner_type_def: inner_type_def(),
+            inner_type_def: Some(inner_type_def()),
         },
     }];
 }

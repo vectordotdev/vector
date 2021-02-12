@@ -64,14 +64,14 @@ impl Expression for ParseAwsVpcFlowLogFn {
         self.value
             .type_def(state)
             .into_fallible(true) // Log parsin_ error
-            .with_inner_type(inner_type_def())
+            .with_inner_type(Some(inner_type_def()))
             .with_constraint(value::Kind::Map)
     }
 }
 
 /// The type defs of the fields contained by the returned map.
-fn inner_type_def() -> Option<InnerTypeDef> {
-    Some(inner_type_def! ({
+fn inner_type_def() -> InnerTypeDef {
+    inner_type_def! ({
         "version": Kind::Integer | Kind::Null,
         "account_id": Kind::Integer | Kind::Null,
         "interface_id": Kind::Bytes | Kind::Null,
@@ -96,11 +96,12 @@ fn inner_type_def() -> Option<InnerTypeDef> {
         "region": Kind::Bytes | Kind::Null,
         "az_id": Kind::Bytes | Kind::Null,
         "sublocation_type": Kind::Bytes | Kind::Null,
-    }))
+    })
 }
 
 type ParseResult<T> = std::result::Result<T, String>;
 
+#[allow(clippy::unnecessary_wraps)] // match other parse methods
 fn identity<'a>(_key: &'a str, value: &'a str) -> ParseResult<&'a str> {
     Ok(value)
 }
@@ -185,22 +186,22 @@ mod tests {
     remap::test_type_def![
         value_noop {
             expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from(1).boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), None),
-            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         format_non_string {
             expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
-            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
     ];
 

@@ -115,12 +115,12 @@ impl Expression for ParseSyslogFn {
             .type_def(state)
             .into_fallible(true)
             .with_constraint(Kind::Map)
-            .with_inner_type(inner_type_def())
+            .with_inner_type(Some(inner_type_def()))
     }
 }
 
-fn inner_type_def() -> Option<InnerTypeDef> {
-    Some(inner_type_def! ({
+fn inner_type_def() -> InnerTypeDef {
+    inner_type_def! ({
         "message": Kind::Bytes,
         "hostname": Kind::Bytes | Kind::Null,
         "severity": Kind::Bytes | Kind::Null,
@@ -129,7 +129,7 @@ fn inner_type_def() -> Option<InnerTypeDef> {
         "msgid": Kind::Bytes | Kind::Null,
         "timestamp": Kind::Timestamp | Kind::Null,
         "procid": Kind::Bytes | Kind::Integer | Kind::Null
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -143,7 +143,7 @@ mod tests {
             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
             def: TypeDef { kind: Kind::Map,
                            fallible: true,
-                           inner_type_def: inner_type_def(),
+                           inner_type_def: Some(inner_type_def()),
             },
         }
 
@@ -151,7 +151,7 @@ mod tests {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: inner_type_def(),
+                           inner_type_def: Some(inner_type_def()),
             },
         }
 
@@ -159,7 +159,7 @@ mod tests {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
             def: TypeDef { fallible: true,
                            kind: Kind::Map,
-                           inner_type_def: inner_type_def(),
+                           inner_type_def: Some(inner_type_def()),
             },
         }
     ];

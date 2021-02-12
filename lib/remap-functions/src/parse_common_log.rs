@@ -153,14 +153,14 @@ impl Expression for ParseCommonLogFn {
             .type_def(state)
             .into_fallible(true)
             .with_constraint(value::Kind::Map)
-            .with_inner_type(inner_type_def())
+            .with_inner_type(Some(inner_type_def()))
     }
 }
 
-fn inner_type_def() -> Option<InnerTypeDef> {
+fn inner_type_def() -> InnerTypeDef {
     use value::Kind;
 
-    Some(inner_type_def!({
+    inner_type_def!({
         "host": Kind::Bytes | Kind::Null,
         "identity": Kind::Bytes | Kind::Null,
         "user": Kind::Bytes | Kind::Null,
@@ -171,7 +171,7 @@ fn inner_type_def() -> Option<InnerTypeDef> {
         "protocol": Kind::Bytes | Kind::Null,
         "status": Kind::Integer | Kind::Null,
         "size": Kind::Integer | Kind::Null,
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -242,22 +242,22 @@ mod tests {
     test_type_def![
         value_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: None },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_non_string {
             expr: |_| ParseCommonLogFn { value: Literal::from(1).boxed(), timestamp_format: None },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         timestamp_format_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: Some(Literal::from("foo").boxed()) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         timestamp_format_non_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: Some(Literal::from(1).boxed()) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
     ];
 }
