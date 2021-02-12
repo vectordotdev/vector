@@ -1,4 +1,3 @@
-use crate::Error;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use remap::{state, Formatter, Object, Program, Runtime, Value};
@@ -24,7 +23,7 @@ VRL REPL commands:
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
 
@@ -131,8 +130,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn resolve(
