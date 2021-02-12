@@ -329,7 +329,7 @@ jobs:
       - test-integration-loki
       - test-integration-pulsar
       - test-integration-splunk
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - name: Discord notification
       env:
