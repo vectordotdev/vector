@@ -392,7 +392,7 @@ impl Value {
         }
     }
 
-    pub fn unwrap_null(self) -> () {
+    pub fn unwrap_null(self) {
         match self {
             Value::Null => (),
             _ => panic!("not a null"),
