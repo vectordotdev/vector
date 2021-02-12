@@ -102,8 +102,7 @@ fn literal() -> impl Strategy<Value = Literal> {
     prop_oneof![
         string_literal(),
         int_literal(),
-        float_literal(),
-        timestamp_literal()
+        float_literal()
     ]
 }
 
