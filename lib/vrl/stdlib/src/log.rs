@@ -13,7 +13,7 @@ impl Function for Log {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
