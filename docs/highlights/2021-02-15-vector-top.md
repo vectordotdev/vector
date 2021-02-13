@@ -8,7 +8,7 @@ featured: true
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: featured", "domain: api"]
+tags: ["type: new feature", "domain: cli", "domain: observability"]
 ---
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well
