@@ -25,3 +25,8 @@ confusing. To resolve this, [PR 6178][pr_6178] deprecated the `start_at_beginnin
 ```
 
 Adjust as necessary. The above values are the defaults and are not required to be specified.
+
+[file_source]: /docs/reference/configuration/sources/file/
+[ignore_checkpoints]: /docs/reference/configuration/sources/file/#ignore_checkpoints
+[pr_6178]: https://github.com/timberio/vector/pull/6178
+[read_from]: /docs/reference/configuration/sources/file/#read_from
