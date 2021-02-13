@@ -8,8 +8,8 @@ releases: "0.12.0": {
 		an expression-oriented language designed for transforming obervability data (logs and metrics) in a
 		[safe](\(urls.vrl_safety)) and [performant](\(urls.vrl_performance)) manner.
 
-		Check out the [VRL announcement post] for more details as well as the [highlights](#highlights) and
-		[changelog](#changelog) for a complete list of changes in 0.12.0.
+		Check out the [VRL announcement post](\(urls.vrl_announcement)) for more details as well as the
+		[highlights](#highlights) and [changelog](#changelog) for a complete list of changes in 0.12.0.
 		"""
 
 	whats_next: [
