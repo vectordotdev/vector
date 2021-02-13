@@ -1,13 +1,6 @@
-// Root
-//
-// The root file defines the schema for all of Vector's reference metadata.
-// It does not include boilerplate or domain specific policies.
-
 package metadata
 
-import (
-	"strings"
-)
+import "strings"
 
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
@@ -17,7 +10,7 @@ _values: {
 }
 
 // `#Any` allows for any value.
-#Any: _ | {[_=string]: #Any} | [...#Any]
+#Any: *_ | {[_=string]: #Any}
 
 #Arch: "ARM64" | "ARMv7" | "x86_64"
 
@@ -83,8 +76,8 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	log?:    #LogEvent
-	metric?: #MetricEvent
+	{log?: #LogEvent} |
+	{metric?: #MetricEvent}
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -93,15 +86,15 @@ _values: {
 // * `metric` - metric event
 #EventType: "log" | "metric"
 
-#Fields: [Name=string]: #Fields | _
+#Fields: [Name=string]: #Fields | *_
 
 #Interface: {
-	close({binary: #InterfaceBinary}) |
-	close({ffi: close({})}) |
-	close({file_system: #InterfaceFileSystem}) |
-	close({socket: #InterfaceSocket}) |
-	close({stdin: close({})}) |
-	close({stdout: close({})})
+	{binary: #InterfaceBinary} |
+	{ffi: {}} |
+	{file_system: #InterfaceFileSystem} |
+	{socket: #InterfaceSocket} |
+	{stdin: {}} |
+	{stdout: {}}
 }
 
 #InterfaceBinary: {
@@ -134,7 +127,7 @@ _values: {
 	ssl:     "disabled" | "required" | "optional"
 }
 
-#HowItWorks: [Name=string]: close({
+#HowItWorks: [Name=string]: {
 	#Subsection: {
 		title: string
 		body:  string
@@ -144,9 +137,11 @@ _values: {
 	title: string
 	body:  string | null
 	sub_sections?: [#Subsection, ...#Subsection]
-})
+}
 
-#LogEvent: #Any | {}
+#LogEvent: {
+	...
+}
 
 #Map: [string]: string
 
@@ -156,12 +151,12 @@ _values: {
 	namespace?: string
 	tags: [Name=string]: string
 	timestamp?: string
-	close({counter: #MetricEventCounter}) |
-	close({distribution: #MetricEventDistribution}) |
-	close({gauge: #MetricEventGauge}) |
-	close({histogram: #MetricEventHistogram}) |
-	close({set: #MetricEventSet}) |
-	close({summary: #MetricEventSummary})
+	{counter: #MetricEventCounter} |
+	{distribution: #MetricEventDistribution} |
+	{gauge: #MetricEventGauge} |
+	{histogram: #MetricEventHistogram} |
+	{set: #MetricEventSet} |
+	{summary: #MetricEventSummary}
 }
 
 #MetricEventCounter: {
@@ -208,14 +203,14 @@ _values: {
 	value:       float
 }
 
-#MetricTags: [Name=string]: close({
+#MetricTags: [Name=string]: {
 	name:        Name
 	default?:    string
 	description: string
 	enum?:       #Enum
 	examples?: [string, ...string]
 	required: bool
-})
+}
 
 #MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"
 
@@ -362,7 +357,7 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	close({"array": #TypeArray & {_args: required: Args.required}}) |
+	{"array": #TypeArray & {_args: required: Args.required}} |
 	#TypePrimitive
 }
 
@@ -377,13 +372,13 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	close({"*": close({})}) |
-	close({"bool": #TypeBool & {_args: required: Args.required}}) |
-	close({"float": #TypeFloat & {_args: required: Args.required}}) |
-	close({"object": #TypeObject & {_args: required: Args.required}}) |
-	close({"string": #TypeString & {_args: required: Args.required}}) |
-	close({"timestamp": #TypeTimestamp & {_args: required: Args.required}}) |
-	close({"uint": #TypeUint & {_args: required: Args.required}})
+	{"*": {}} |
+	{"bool": #TypeBool & {_args: required: Args.required}} |
+	{"float": #TypeFloat & {_args: required: Args.required}} |
+	{"object": #TypeObject & {_args: required: Args.required}} |
+	{"string": #TypeString & {_args: required: Args.required}} |
+	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
+	{"uint": #TypeUint & {_args: required: Args.required}}
 }
 
 #TypeArray: {
@@ -454,7 +449,7 @@ _values: {
 
 	examples?: [...string]
 
-	if Args.required {
+	if Args.required && enum != _|_ {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[

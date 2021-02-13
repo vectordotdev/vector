@@ -104,7 +104,7 @@ installation: {
 				address: "127.0.0.1:8686"
 			}
 
-			sources?: [Name=string]: {
+			sources: [Name=string]: {
 				type: string
 
 				if type == "file" {
