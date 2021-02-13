@@ -421,8 +421,8 @@ impl<'a> Parser<'a> {
         if let Target::Infallible { ok, err } = &target {
             if !expression.type_def(&self.compiler_state).is_fallible() {
                 self.diagnostics.push(
-                    Diagnostic::error("unneeded error assignment")
-                        .with_primary("this error assignment is unneeded", target_span)
+                    Diagnostic::error("unnecessary error assignment")
+                        .with_primary("this error assignment is unnecessary", target_span)
                         .with_context("because this expression cannot fail", expression_span)
                         .with_note(Note::InfallibleAssignment {
                             ok: ok.to_string(),

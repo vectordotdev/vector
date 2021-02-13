@@ -52,8 +52,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
-pub(crate) mod prometheus;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -75,6 +73,8 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
+pub mod udp;
 pub mod unit_test;
 pub mod validate;
 #[cfg(windows)]

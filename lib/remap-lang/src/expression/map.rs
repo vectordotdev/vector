@@ -1,4 +1,6 @@
-use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    state, type_def::InnerTypeDef, value, Expr, Expression, Object, Result, TypeDef, Value,
+};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -68,15 +70,12 @@ impl Expression for Map {
         let inner_type_def = if self.expressions.is_empty() {
             None
         } else {
-            let type_def = self.expressions.iter().fold(
-                TypeDef {
-                    kind: value::Kind::empty(),
-                    ..Default::default()
-                },
-                |type_def, (_, expression)| type_def.merge(expression.type_def(state)),
-            );
-
-            Some(type_def.boxed())
+            Some(InnerTypeDef::Map(
+                self.expressions
+                    .iter()
+                    .map(|(name, expression)| (name.clone(), expression.type_def(state)))
+                    .collect(),
+            ))
         };
 
         TypeDef {
@@ -90,7 +89,9 @@ impl Expression for Map {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{array, expression::Arithmetic, map, test_type_def, value::Kind, Operator};
+    use crate::{
+        array, expression::Arithmetic, inner_type_def, map, test_type_def, value::Kind, Operator,
+    };
 
     test_type_def![
         no_expression {
@@ -106,10 +107,9 @@ mod tests {
             expr: |_| map!{"a": true},
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Boolean,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: Some(inner_type_def! ({
+                    "a": Kind::Boolean,
+                })),
                 ..Default::default()
             },
         }
@@ -122,10 +122,11 @@ mod tests {
             },
             def: TypeDef {
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Boolean | Kind::Integer,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: Some(inner_type_def! ({
+                    "a": Kind::Bytes,
+                    "b": Kind::Boolean,
+                    "c": Kind::Integer
+                })),
                 ..Default::default()
             },
         }
@@ -142,11 +143,10 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean,
-                    fallible: true,
-                    ..Default::default()
-                }.boxed()),
+                inner_type_def: Some(inner_type_def! ({
+                    "a": Kind::Boolean,
+                    "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true)
+                }))
             },
         }
 
@@ -163,15 +163,11 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Map,
-                inner_type_def: Some(TypeDef {
-                    kind: Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean | Kind::Array,
-                    fallible: true,
-                    inner_type_def: Some(TypeDef {
-                        kind: Kind::Integer,
-                        fallible: false,
-                        ..Default::default()
-                    }.boxed()),
-                }.boxed()),
+                inner_type_def: Some(inner_type_def! ({
+                    "a": Kind::Boolean,
+                    "b": TypeDef::from(Kind::Bytes | Kind::Integer | Kind::Float).into_fallible(true),
+                    "c": TypeDef::from(Kind::Array).with_inner_type(Some(inner_type_def!([ Kind::Integer ])))
+                }))
             },
         }
     ];

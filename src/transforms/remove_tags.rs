@@ -88,7 +88,7 @@ mod tests {
     fn remove_tags() {
         let event = Event::Metric(
             Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
             )
@@ -117,7 +117,7 @@ mod tests {
     fn remove_all_tags() {
         let event = Event::Metric(
             Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
             )
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn remove_tags_from_none() {
         let event = Event::Metric(Metric::new(
-            "foo".into(),
+            "foo",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bar".into()].into_iter().collect(),

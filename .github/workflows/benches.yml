@@ -28,7 +28,7 @@ env:
 
 jobs:
   cancel-previous:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
@@ -44,7 +44,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -87,6 +87,7 @@ jobs:
           path: "./target/criterion.zip"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
+        if: github.ref == 'refs/heads/master'
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
@@ -102,7 +103,7 @@ jobs:
     needs:
       - cancel-previous
       - bench
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

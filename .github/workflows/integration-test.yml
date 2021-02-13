@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -85,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -121,7 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -157,7 +157,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -175,7 +175,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -193,7 +193,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -229,7 +229,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -247,7 +247,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -265,7 +265,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -283,7 +283,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -301,7 +301,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -329,7 +329,7 @@ jobs:
       - test-integration-loki
       - test-integration-pulsar
       - test-integration-splunk
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

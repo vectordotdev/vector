@@ -7,22 +7,22 @@ publish = false
 license = "MIT"
 
 [dependencies]
+bstr = "0.2"
 bytes = "0.5"
+chrono = { version = "0.4.19", features = ["serde"] }
 crc = "1.8.1"
+dashmap = "4.0.0"
+flate2 = "1.0.19"
 futures = { version = "0.3", default-features = false, features = ["executor"] }
 glob = "0.3.0"
-scan_fmt = "0.2.5"
-tracing = "0.1.15"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
-flate2 = "1.0.19"
-winapi = { version = "0.3", features = ["winioctl"] }
 libc =  "0.2"
-tokio = { version = "0.2.13", features = ["rt-core", "blocking", "time"] }
+scan_fmt = "0.2.5"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.33"
-chrono = { version = "0.4.19", features = ["serde"] }
-dashmap = "4.0.0"
-bstr = "0.2"
+tokio = { version = "0.2.13", features = ["rt-core", "blocking", "time"] }
+tracing = "0.1.15"
+winapi = { version = "0.3", features = ["winioctl"] }
 
 [dev-dependencies]
 quickcheck = "1"

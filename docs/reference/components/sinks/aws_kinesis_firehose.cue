@@ -9,6 +9,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -88,6 +89,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
+				syntax: "literal"
 			}
 		}
 	}

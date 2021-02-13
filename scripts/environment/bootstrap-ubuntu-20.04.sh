@@ -2,6 +2,7 @@
 set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
+export ACCEPT_EULA=Y
 
 echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
@@ -24,7 +25,9 @@ apt-get install --yes grub-efi
 update-grub
 set -e
 
-apt upgrade --yes
+# using force-overwrite due to
+# https://github.com/actions/virtual-environments/issues/2703
+apt upgrade  -o Dpkg::Options::="--force-overwrite" --yes
 
 # Deps
 apt install --yes \

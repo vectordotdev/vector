@@ -84,7 +84,7 @@ impl Expression for CeilFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
     use value::Kind;
 
     remap::test_type_def![
@@ -125,22 +125,22 @@ mod tests {
     fn ceil() {
         let cases = vec![
             (
-                map!["foo": 1234.2],
+                btreemap! { "foo" => 1234.2 },
                 Ok(1235.0.into()),
                 CeilFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1235.0.into()),
                 CeilFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.into()),
                 CeilFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.4.into()),
                 CeilFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
@@ -148,7 +148,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(1234.5673.into()),
                 CeilFn::new(
                     Box::new(Literal::from(Value::Float(1234.56725))),
@@ -156,7 +156,7 @@ mod tests {
                 ),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(9876543210123456789098765432101234567890987654321.98766.into()),
                 CeilFn::new(
                     Box::new(Literal::from(

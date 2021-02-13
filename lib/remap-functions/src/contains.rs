@@ -113,53 +113,53 @@ impl Expression for ContainsFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
+    use shared::btreemap;
 
     #[test]
     fn contains() {
         let cases = vec![
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "foobar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", true),
             ),
             (
-                map![],
+                btreemap! {},
                 Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", false),
             ),

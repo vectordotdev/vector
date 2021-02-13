@@ -13,8 +13,7 @@ tags: ["type: featured", "domain: remap"]
 
 The Vector team is excited to announce the **Vector Remap Language**
 (VRL for short). VRL is a purpose-built observability data mapping language
-designed for high-volume processing. It hits a sweet spot of performance and
-safety that wasn't achievable otherwise. VRL is built on the following
+designed for high-volume processing. VRL is built on the following two
 principles:
 
 1. **Performance** - In addition to being built in Rust, and tightly integrated
@@ -25,12 +24,8 @@ principles:
    implements thoughtful limitations, compile-time checks, required error
    handling, and type safety. If a VRL expression compiles, you can have high
    cofidence it will work as expected in production.
-3. **Self-documenting** - VRL's complexity will never pass the self-documenting
-   threshold. A VRL script does not include hard-to-follow constructs like
-   modules, functions, or loops. VRL is intentionally simple to ensure it is
-   easy to understand and collaborate on across a team.
 
-[**Read the VRL announcement post →**][announcement_post]
+[**Read the VRL announcement post →**][post]
 
 ## VRL example
 
@@ -77,10 +72,10 @@ If your interest in VRL is now piqued, we recommend checking out these resources
 * The [VRL documentation][docs]
 * VRL [examples]
 
-[docs]: https://vector.dev/docs/reference/remap
-[examples]: https://vector.dev/docs/reference/transforms/remap#examples
+[docs]: /docs/reference/vrl
+[examples]: /docs/reference/transforms/remap#examples
 [jq]: https://stedolan.github.io/jq
-[lua]: https://vector.dev/docs/reference/transforms/lua
-[post]: https://vector.dev/blog/vector-remap-language
-[remove_fields]: https://vector.dev/docs/reference/transforms/remove_fields
-[wasm]: https://vector.dev/docs/reference/transforms/wasm
+[lua]: /docs/reference/transforms/lua
+[post]: /blog/vector-remap-language
+[remove_fields]: /docs/reference/transforms/remove_fields
+[wasm]: /docs/reference/transforms/wasm

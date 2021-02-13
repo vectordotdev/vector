@@ -30,7 +30,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   changes:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-20.04
       # Set job outputs to values from filter step
       outputs:
         source: ${{ steps.filter.outputs.source }}
@@ -87,7 +87,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -108,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -121,6 +121,7 @@ jobs:
       - run: make test-shutdown
       - run: make test-cli
       - run: make test-behavior
+      - run: make check-examples
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
@@ -142,7 +143,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -169,7 +170,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -221,7 +222,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -286,7 +287,7 @@ jobs:
       - test-windows
       - check-component-features
       - checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

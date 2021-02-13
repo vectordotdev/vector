@@ -21,13 +21,13 @@ ACTION=$1
 start_podman () {
   podman pod create --replace --name vector-test-integration-loki -p 3100:3100
   podman run -d --pod=vector-test-integration-loki -v "$(pwd)"/tests/data:/etc/loki \
-	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+	 --name vector_loki grafana/loki:2.1.0 -config.file=/etc/loki/loki-config.yaml
 }
 
 start_docker () {
   docker network create vector-test-integration-loki
   docker run -d --network=vector-test-integration-loki -p 3100:3100 -v "$(pwd)"/tests/data:/etc/loki \
-	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+	 --name vector_loki grafana/loki:2.1.0 -config.file=/etc/loki/loki-config.yaml
 }
 
 stop_podman () {

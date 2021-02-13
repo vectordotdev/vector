@@ -221,7 +221,7 @@ impl NginxMetrics {
     }
 
     fn create_metric(&self, name: &str, value: MetricValue) -> Metric {
-        Metric::new(name.into(), MetricKind::Absolute, value)
+        Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(self.tags.clone()))
             .with_timestamp(Some(Utc::now()))

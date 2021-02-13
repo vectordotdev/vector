@@ -13,7 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter,
+    FileServer, FingerprintStrategy, Fingerprinter, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -63,7 +63,9 @@ pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
     pub file_key: Option<String>,
-    pub start_at_beginning: bool,
+    pub start_at_beginning: Option<bool>,
+    pub ignore_checkpoints: Option<bool>,
+    pub read_from: Option<ReadFromConfig>,
     pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
@@ -90,11 +92,27 @@ pub enum FingerprintConfig {
     Checksum {
         // Deprecated name
         #[serde(alias = "fingerprint_bytes")]
-        bytes: usize,
+        bytes: Option<usize>,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFromConfig {
+    Beginning,
+    End,
+}
+
+impl From<ReadFromConfig> for ReadFrom {
+    fn from(rfc: ReadFromConfig) -> Self {
+        match rfc {
+            ReadFromConfig::Beginning => ReadFrom::Beginning,
+            ReadFromConfig::End => ReadFrom::End,
+        }
+    }
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -103,10 +121,19 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
-            } => FingerprintStrategy::Checksum {
-                bytes,
-                ignored_header_bytes,
-            },
+            } => {
+                let bytes = match bytes {
+                    Some(bytes) => {
+                        warn!(message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
+                        bytes
+                    }
+                    None => 256,
+                };
+                FingerprintStrategy::Checksum {
+                    bytes,
+                    ignored_header_bytes,
+                }
+            }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
@@ -122,11 +149,13 @@ impl Default for FileConfig {
             include: vec![],
             exclude: vec![],
             file_key: Some("file".to_string()),
-            start_at_beginning: false,
+            start_at_beginning: None,
+            ignore_checkpoints: None,
+            read_from: None,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             },
             ignore_not_found: false,
@@ -202,9 +231,19 @@ pub fn file_source(
         .ignore_older
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
+    let (ignore_checkpoints, read_from) = reconcile_position_options(
+        config.start_at_beginning,
+        config.ignore_checkpoints,
+        config.read_from,
+    );
 
-    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
-        .expect("invalid glob patterns");
+    let paths_provider = Glob::new(
+        &config.include,
+        &config.exclude,
+        MatchOptions::default(),
+        FileSourceInternalEventsEmitter,
+    )
+    .expect("invalid glob patterns");
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -218,7 +257,8 @@ pub fn file_source(
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
-        start_at_beginning: config.start_at_beginning,
+        ignore_checkpoints,
+        read_from,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
@@ -311,6 +351,29 @@ pub fn file_source(
     })
 }
 
+/// Emit deprecation warning if the old option is used, and take it into account when determining
+/// defaults. Any of the newer options will override it when set directly.
+fn reconcile_position_options(
+    start_at_beginning: Option<bool>,
+    ignore_checkpoints: Option<bool>,
+    read_from: Option<ReadFromConfig>,
+) -> (bool, ReadFrom) {
+    if start_at_beginning.is_some() {
+        warn!(message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead.")
+    }
+
+    match start_at_beginning {
+        Some(true) => (
+            ignore_checkpoints.unwrap_or(true),
+            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+        ),
+        _ => (
+            ignore_checkpoints.unwrap_or(false),
+            read_from.map(Into::into).unwrap_or_default(),
+        ),
+    }
+}
+
 fn wrap_with_line_agg(
     rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
     config: line_agg::Config,
@@ -376,7 +439,7 @@ mod tests {
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 8,
+                bytes: Some(8),
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
@@ -412,7 +475,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             }
         );
@@ -438,7 +501,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 128,
+                bytes: Some(128),
                 ignored_header_bytes: 512,
             }
         );
@@ -451,6 +514,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "beginning"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "end"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::End));
     }
 
     #[test]
@@ -907,7 +986,8 @@ mod tests {
 
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                start_at_beginning: true,
+                ignore_checkpoints: Some(true),
+                read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = Pipeline::new_test();
@@ -1002,7 +1082,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             ignore_older: Some(5),
             ..test_default_file_config(&dir)
         };
@@ -1279,7 +1358,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: false,
             ..test_default_file_config(&dir)
@@ -1343,7 +1421,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: true,
             ..test_default_file_config(&dir)
@@ -1407,7 +1484,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
         };

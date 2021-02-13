@@ -24,14 +24,14 @@ remap: expressions: path: {
 			path_segments: {
 				description: """
 					`path_segments` denote a segment of a nested path. Each segment must be delimited by a `.` character
-					and only contain alpha-numeric, `_`, and `@` characters (`a-zA-Z0-9_@`). Segments that contain
+					and only contain alpha-numeric characters, `_`, and `@` (`a-zA-Z0-9_@`). Segments that contain
 					characters outside of this range must be quoted.
 					"""
 				characteristics: {
 					array_elements: {
 						title: "Array element paths"
 						description: """
-							Array elements can be accessed by their index. Negative indice are currently _not_
+							Array elements can be accessed by their index. Negative indices are currently _not_
 							supported:
 
 							```vrl
@@ -42,7 +42,7 @@ remap: expressions: path: {
 					coalescing: {
 						title:       "Path segment coalecing"
 						description: """
-							Path segments can be coalesced, allowing for the first non-null values to be used. This is
+							Path segments can be coalesced, allowing for the first non-null value to be used. This is
 							particularly useful when working with
 							[externally tagged](\(urls.externally_tagged_representation)) data:
 
@@ -70,19 +70,19 @@ remap: expressions: path: {
 					nonexistent: {
 						title: "Non-existent paths"
 						description: """
-							Non-existent paths resolve to null.
+							Non-existent paths resolve to `null`.
 							"""
 					}
 					quoting: {
 						title: "Path quoting"
-						description: """
+						description: #"""
 							Path segments can be quoted to include special characters, such as spaces, periods, and
 							others:
 
 							```vrl
 							."parent.key.with.special \"characters\"".child
 							```
-							"""
+							"""#
 					}
 					valid_characters: {
 						title: "Valid path characters"

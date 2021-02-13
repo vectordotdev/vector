@@ -6,38 +6,31 @@ remap: literals: regular_expression: {
 		A _regular expression_ literal represents a [Regular Expression](\(urls.regex)) used for string matching and
 		parsing.
 
-		Regular expressions are delimited by `/` and use [Rust regex syntax](\(urls.rust_regex_syntax)). There is one
-		limitation with Regular Expressions in VRL:
-
-		You can't assign a regex to a map path. Thus, `.pattern = /foo|bar/i` is not allowed. This is because regex's
-		cannot be serialized to JSON.
+		Regular expressions are defined by the `r` sigil and wrapped with single quotes (`r'...'`). The value between
+		the quotes uses the [Rust regex syntax](\(urls.rust_regex_syntax)).
 		"""
 
 	examples: [
-		#"/^Hello, World!$/"#,
-		#"/^Hello, World!$/i"#,
-		#"/^\d{4}-\d{2}-\d{2}$/"#,
-		#"/(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})/"#,
+		#"r'^Hello, World!$'"#,
+		#"r'^Hello, World!$'i"#,
+		#"r'^\d{4}-\d{2}-\d{2}$'"#,
+		#"r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'"#,
 	]
 
 	characteristics: {
 		flags: {
 			title:       "Flags"
 			description: #"""
-				Regular expressions allow three flags:
+				Regular expressions allow for flags. Flags can be combined, as in `r'pattern'xmi`, `r'pattern'im`, etc.
 
-				|Flag | Description
-				|:----|:-----------
-				|`x`  | Ignore whitespace
-				|`i`  | Case insensitive
-				|`m`  | Multi-line mode
-
-				Regex flags can be combined, as in `/pattern/xmi`, `/pattern/im`, etc.
-
-				To learn more about regular expressions in Rust—and by extension in VRL—we strongly
-				recommend the in-browser [Rustexp expression editor and
-				tester](\#(urls.regex_tester)).
+				To learn more about regular expressions in Rust—and by extension in VRL—we strongly	recommend the
+				in-browser [Rustexp expression editor and tester](\#(urls.regex_tester)).
 				"""#
+			enum: {
+				"x": "Ignore whitespace"
+				"i": "Case insensitive"
+				"m": "Multi-line mode"
+			}
 		}
 		named_captures: {
 			title: "Named Captures"
@@ -45,8 +38,8 @@ remap: literals: regular_expression: {
 				Regular Expressions support named capture groups, allowing extractions to be keyed by their name.
 				Named captures should be preceded with a `?P<name>` declaraction. For example:
 
-				```js
-				/(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})/
+				```vrl
+				r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'
 				```
 
 				Will extract captures with the `y`, `m`, and `d` keys.

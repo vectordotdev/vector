@@ -10,7 +10,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
@@ -191,13 +191,13 @@ fn prometheus(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            match parser::parse(&body) {
+                            match parser::parse_text(&body) {
                                 Ok(metrics) => {
                                     emit!(PrometheusEventReceived {
                                         byte_size,
                                         count: metrics.len(),
                                     });
-                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                    Some(stream::iter(metrics).map(Ok))
                                 }
                                 Err(error) => {
                                     if url.path() == "/" {
@@ -255,7 +255,6 @@ mod test {
         test_util::{next_addr, start_topology},
         Error,
     };
-    use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
         {Body, Client, Response, Server},
@@ -382,7 +381,7 @@ mod test {
             ],
         );
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }
 

@@ -11,6 +11,7 @@ components: transforms: tokenizer: {
 		commonly_used: true
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -37,9 +38,11 @@ components: transforms: tokenizer: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `tokenize`
-			function](\(urls.vector_remap_transform)#tokenize). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
+			\(tokenizer._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_tokens(.message)
+			```
 			""",
 		]
 		notices: []
@@ -61,13 +64,17 @@ components: transforms: tokenizer: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The log field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["timestamp", "level", "message", "parent.child"]
+				syntax: "literal"
+			}
 		}
 		types: configuration._types
 	}

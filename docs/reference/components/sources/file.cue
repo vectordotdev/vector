@@ -11,6 +11,7 @@ components: sources: file: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -55,7 +56,10 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["\(_directory)/binary-file.log"]
+				items: type: string: {
+					examples: ["\(_directory)/binary-file.log"]
+					syntax: "literal"
+				}
 			}
 		}
 		file_key: {
@@ -66,6 +70,7 @@ components: sources: file: {
 			type: string: {
 				default: "file"
 				examples: ["file"]
+				syntax: "literal"
 			}
 		}
 		fingerprint: {
@@ -80,19 +85,10 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
+							checksum:         "Read the first line of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
-					}
-				}
-				bytes: {
-					common:        false
-					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: {
-						default: 256
-						unit:    "bytes"
+						syntax: "literal"
 					}
 				}
 				ignored_header_bytes: {
@@ -121,7 +117,10 @@ components: sources: file: {
 			common:      false
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		ignore_not_found: {
 			common:      false
@@ -142,7 +141,10 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
+			type: array: items: type: string: {
+				examples: ["\(_directory)/**/*.log"]
+				syntax: "literal"
+			}
 		}
 		line_delimiter: {
 			common:      false
@@ -151,6 +153,7 @@ components: sources: file: {
 			type: string: {
 				default: "\n"
 				examples: ["\r\n"]
+				syntax: "literal"
 			}
 		}
 		max_line_bytes: {
@@ -191,9 +194,22 @@ components: sources: file: {
 				unit: "seconds"
 			}
 		}
-		start_at_beginning: {
+		read_from: {
+			common:      true
+			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
+			required:    false
+			type: string: {
+				syntax:  "literal"
+				default: "beginning"
+				enum: {
+					"beginning": "Read from the beginning of the file."
+					"end":       "Start reading from the current end of the file."
+				}
+			}
+		}
+		ignore_checkpoints: {
 			common:      false
-			description: "For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint. "
+			description: "This causes Vector to ignore existing checkpoints when determining where to start reading a file. Checkpoints are still written normally."
 			required:    false
 			type: bool: default: false
 		}
@@ -205,13 +221,19 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["\(_directory)/apache/access.log"]
+				type: string: {
+					examples: ["\(_directory)/apache/access.log"]
+					syntax: "literal"
+				}
 			}
 			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp
 		}
@@ -506,13 +528,15 @@ components: sources: file: {
 		read_position: {
 			title: "Read Position"
 			body: """
-				By default, Vector will read new data only for newly discovered
-				files, similar to the `tail` command. You can read from the
-				beginning of the file by setting the `start_at_beginning` option to
-				`true`.
+				By default, Vector will read from the beginning of newly discovered
+				files. You can change this behavior by setting the `read_from` option to
+				`"end"`.
 
-				Previously discovered files will be checkpointed](#checkpointing),
-				and the read position will resume from the last checkpoint.
+				Previously discovered files will be [checkpointed](#checkpointing), and
+				the read position will resume from the last checkpoint. To disable this
+				behavior, you can set the `ignore_checkpoints` option to `true`.  This
+				will cause Vector to disregard existing checkpoints when determining the
+				starting read position of a file.
 				"""
 		}
 	}
@@ -528,5 +552,6 @@ components: sources: file: {
 		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
+		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
 	}
 }

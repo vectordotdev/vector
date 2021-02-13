@@ -1,6 +1,5 @@
 use regex::Regex;
 use remap::prelude::*;
-use std::collections::BTreeMap;
 
 use crate::util;
 
@@ -46,18 +45,20 @@ impl Expression for ParseRegexFn {
         let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
-        Ok(self
+        let parsed = self
             .pattern
             .captures(&value)
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
-            .unwrap_or_else(BTreeMap::new)
-            .into())
+            .ok_or("unable to parse regular expression")?;
+
+        Ok(parsed.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::Bytes)
+            .into_fallible(true)
+            .with_inner_type(Some(util::regex_type_def(&self.pattern)))
             .with_constraint(value::Kind::Map)
     }
 }
@@ -72,25 +73,42 @@ mod tests {
         value_string {
             expr: |_| ParseRegexFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { kind: Kind::Map, ..Default::default() },
+            def: TypeDef { kind: Kind::Map,
+                           fallible: true,
+                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                   "1": Kind::Bytes,
+                                                                   "group": Kind::Bytes
+                           })) },
         }
 
         value_non_string {
             expr: |_| ParseRegexFn {
                 value: Literal::from(1).boxed(),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                   "1": Kind::Bytes,
+                                                                   "group": Kind::Bytes
+                           })),
+            },
         }
 
         value_optional {
             expr: |_| ParseRegexFn {
                 value: Box::new(Noop),
-                pattern: Regex::new("").unwrap(),
+                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
             },
-            def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
+                                                                   "1": Kind::Bytes,
+                                                                   "group": Kind::Bytes
+                           }))
+            },
         }
     ];
 
@@ -140,7 +158,7 @@ mod tests {
                 pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
                             .unwrap()
             ],
-            want: Ok(value!({})),
+            want: Err("function call error: unable to parse regular expression".to_string()),
         }
     ];
 }
