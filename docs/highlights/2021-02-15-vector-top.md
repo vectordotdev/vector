@@ -19,8 +19,13 @@ as information about your Vector [topology] through a beautiful dashboard-style 
 vector top --url https://my-vector-instance.prod.acmecorp.biz
 ```
 
+That pulls up an interface that looks like this:
+
+![vector top example screen](/img/blog/2020-12-07-graphql-api/vector-top.png)
+
 By default, the `vector top` looks for a Vector instance running locally at http://localhost:8686, but you can also
-monitor remote instances, as in the example above.
+monitor remote instances, as in the example above. The information displayed updates every second by default, but you
+can adjust that using the `--interval` flag.
 
 Architecturally, `vector top` interacts directly with Vector's [GraphQL API][api], which was built with `vector top` as
 a primary consumer. The dashboard UI was created using the excellent [tui-rs] library.
