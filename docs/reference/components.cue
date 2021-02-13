@@ -803,11 +803,19 @@ components: {
 
 			if Kind != "source" {
 				inputs: {
-					description: "A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms)) IDs. See [configuration](\(urls.vector_configuration)) for more info."
+					description: """
+						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
+						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+
+						See [configuration](\(urls.vector_configuration)) for more info.
+						"""
 					required:    true
 					sort:        -1
 					type: array: items: type: string: {
-						examples: ["my-source-or-transform-id"]
+						examples: [
+							"my-source-or-transform-id",
+							"prefix-*",
+						]
 						syntax: "literal"
 					}
 				}
