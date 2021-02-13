@@ -3,7 +3,7 @@ package metadata
 remap: expressions: index: {
 	title: "Index"
 	description: """
-		An _index_ expression denotes the element of an array.
+		An _index_ expression denotes an element of an array. Array indices in VRL start at zero.
 		"""
 	return: """
 		Returns the element in the position of the supplied index.
@@ -20,16 +20,16 @@ remap: expressions: index: {
 					"""
 
 				characteristics: {
-					negative_indexes: {
-						title: "Negative indexes"
+					negative_indices: {
+						title: "Negative indices"
 						description: """
-							Negative indexes are currently _not_ supported.
+							Negative indices are currently _not_ supported.
 							"""
 					}
 					zero_based: {
-						title: "Zero-based indexes"
+						title: "Zero-based indices"
 						description: """
-							Indexes are zero-based where `0` represents the first array element or string character.
+							Indexes are zero-based where `0` represents the first array element.
 							"""
 					}
 				}

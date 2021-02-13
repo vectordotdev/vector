@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn add_tags() {
         let event = Event::Metric(Metric::new(
-            "bar".into(),
+            "bar",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         ));
@@ -142,7 +142,7 @@ mod tests {
         tags.insert("region".to_string(), "us-east-1".to_string());
         let event = Event::Metric(
             Metric::new(
-                "bar".into(),
+                "bar",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 10.0 },
             )

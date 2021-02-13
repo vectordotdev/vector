@@ -51,14 +51,14 @@ remap: functions: redact: {
 		{
 			title: "Redact (credit card number)"
 			source: """
-				redact("9876123454320123", filters: ["pattern"], redactor: "full", patterns: [/[0-9]{16}/])
+				redact("9876123454320123", filters: ["pattern"], redactor: "full", patterns: [r'[0-9]{16}'])
 				"""
 			return: "****"
 		},
 		{
 			title: "Redact (email address)"
 			source: #"""
-				redact("vic@vector.dev", filters: ["pattern"], redactor: "full", patterns: [/^\S+@\S+$/])
+				redact("vic@vector.dev", filters: ["pattern"], redactor: "full", patterns: [r'^\S+@\S+$'])
 				"""#
 			return: "****"
 		},

@@ -9,6 +9,7 @@ use crate::{
     event::Event,
     internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
+    stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
@@ -19,10 +20,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{
-    sync::mpsc,
-    time::{timeout, Duration},
-};
+use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -56,7 +54,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
-        let (tx, rx) = mpsc::channel(1000);
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
@@ -115,7 +113,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = mpsc::channel(100);
+        let (input_tx, input_rx) = futures::channel::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
 
         let (output, control) = Fanout::new();
@@ -123,10 +121,10 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
-                .inspect(|_| emit!(EventProcessed))
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
+                    emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
@@ -134,7 +132,7 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventProcessed));
+                    .on_processed(|| emit!(EventProcessed));
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output)
@@ -219,6 +217,7 @@ pub async fn build_pieces(
         };
         let task = Task::new(name, typetag, sink);
 
+        let component_name = name.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -229,11 +228,22 @@ pub async fn build_pieces(
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
-                            error!(message = "Healthcheck: Failed Reason.", %error);
+                            error!(
+                                msg = "Healthcheck: Failed Reason.",
+                                %error,
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                         Err(_) => {
-                            error!("Healthcheck: timeout.");
+                            error!(
+                                msg = "Healthcheck: timeout.",
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                     })

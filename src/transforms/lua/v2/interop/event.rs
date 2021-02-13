@@ -82,7 +82,7 @@ mod test {
     #[test]
     fn to_lua_metric() {
         let event = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         ));
@@ -130,7 +130,7 @@ mod test {
             }
         }"#;
         let expected = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         ));

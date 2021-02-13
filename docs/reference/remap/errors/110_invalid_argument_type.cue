@@ -4,11 +4,12 @@ remap: errors: "110": {
 	title:       "Invalid argument type"
 	description: """
 		An argument passed to a [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
-		is not a supported type.
+		isn't a supported type.
 		"""
 	rationale:   """
-		VRL is [type-safe](\(urls.vrl_type_safety)) and requires that types align upon compilation. This contributes
-		heavily to VRL's [safety principle](\(urls.vrl_safety)), ensuring that VRL programs are reliable once deployed.
+		VRL is [type safe](\(urls.vrl_type_safety)) and requires that types align upon compilation. This provides
+		important [safety guarantees](\(urls.vrl_safety)) to VRL and helps to ensure that VRL programs run reliably when
+		deployed.
 		"""
 	resolution: #"""
 		You must guarantee the type of the variable by using the appropriate [type](\(urls.vrl_functions)#type) or

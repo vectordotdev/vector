@@ -2,7 +2,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{FilterEventDiscarded, FilterEventProcessed},
+    internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,6 @@ impl Filter {
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
-            emit!(FilterEventProcessed);
             output.push(event);
         } else {
             emit!(FilterEventDiscarded);

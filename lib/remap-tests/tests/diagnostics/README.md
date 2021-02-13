@@ -9,13 +9,13 @@ message.
 A diagnostic message is shown at compile-time, similar to this example:
 
 ```text
-error: unneeded error assignment
+error: unnecessary error assignment
   ┌─ :2:1
   │
 2 │ ok, err = 5;
   │ ^^^^^^^   - because this expression cannot fail
   │ │
-  │ this error assignment is unneeded
+  │ this error assignment is unnecessary
   │
   = hint: assign to "ok", without assigning to "err"
   = see language documentation at: https://vector.dev/docs/reference/vrl/
