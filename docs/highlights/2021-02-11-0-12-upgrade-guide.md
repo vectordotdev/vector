@@ -13,9 +13,15 @@ tags: ["type: breaking change"]
 0.12 includes minimal breaking changes but significant deprecations. This guide will upgrade you quickly and
 painlessly. If you have questions, [hop in our chat][chat] and we'll help you upgrade.
 
-## Breaking Changes
+1. [Breaking: The `encoding.codec` option is now required for all relevant sinks](#first)
+1. [Breaking: Vector `check_fields` conditions now require the `type` option](#second)
+1. [Breaking: The `generator` source requires a `format` option](#third)
+1. [Deprecation: Many transforms have been deprecated in favor of the new `remap` transform](#fourth)
+1. [Deprecation: The `file` source `start_at_beginning` has been deprecated](#fifth)
 
-### The `encoding.codec` option is now required for all relevant sinks
+## Upgrade Guide
+
+### Breaking: The `encoding.codec` option is now required for all relevant sinks<a name="first"></a>
 
 [Pull request #5281][pr_5281] removed the default values for the sink-level `encoding.codec` option. Therefore, you are
 now required to provide a value for this option, ensuring that you are not surprised by opinionated encoding defaults.
@@ -46,7 +52,7 @@ For clarity, the `text` option strips away all structured data and passes only t
 intended for use cases where Vector acts as a proxy and should not alter data. For most use cases we recommend `json`
 since it includes all structured data.
 
-### Vector `check_fields` conditions now require the `type` option
+### Breaking: Vector `check_fields` conditions now require the `type` option<a name="second"></a>
 
 With the [announcement][vrl_announcement] of the [Vector Remap Language][vrl_reference] (VRL), [pull request #5978][pr_5978]
 _deprecated_ the `check_fields` conditions in favor of using [VRL boolean expressions][vrl_boolean_expression]. The old
@@ -75,7 +81,7 @@ Alteratively, we recommend migrating to the new VRL syntax:
 
 Refer to the [VRL reference][vrl_reference] for the many ways you can specify conditions.
 
-### The `generator` source requires a `format` option
+### Breaking: The `generator` source requires a `format` option<a name="third"></a>
 
 The [`generator` source], commonly used for testing, has been updated with a new `format` option that emits logs in
 the specified format. You will not be required to provide this option. Upgrading is easy:
@@ -86,9 +92,7 @@ the specified format. You will not be required to provide this option. Upgrading
 +format = "apache_common"  # or "apache_error" or "syslog"
 ```
 
-## Deprecations
-
-### Many transforms have been deprecated in favor of the new `remap` transform
+### Deprecation: Many transforms have been deprecated in favor of the new `remap` transform<a name="fourth"></a>
 
 The following transforms have been deprecated in favor of the new [`remap` transform][remap_transform]:
 
@@ -127,7 +131,7 @@ simplify your Vector configuration.
 
 As always, if you need assistance [hop in our chat][chat]. We're eager to help and receive feedback on the language.
 
-### The `file` source `start_at_beginning` has been deprecated
+### Deprecation: The `file` source `start_at_beginning` has been deprecated<a name="fifth"></a>
 
 As noted in the [file source checkpointing highlight][file_source_highlight], we've removed the `start_at_beginning`
 option and replaced it with new [`ignore_checkpoints`][ignore_checkpoints] and [`read_from`][read_from] options.
