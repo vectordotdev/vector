@@ -137,7 +137,7 @@ configuration: {
 			title: "Wildcards in identifiers"
 			body: """
 				Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports
-				it as the last character. For example:
+				them as the last character. For example:
 
 				```toml
 				[sources.app1_logs]
