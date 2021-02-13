@@ -8,7 +8,7 @@ featured: false
 pr_numbers: [6170]
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["domain: topology"]
+tags: ["type: enhancement", "domain: topology"]
 ---
 
 [PR 6170][pr_6170] introduced wildcards when referencing component IDs in the `inputs` option. This allows you to build
