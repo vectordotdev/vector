@@ -34,7 +34,7 @@ components: transforms: add_tags: {
 			```vrl
 			#".tag = "value""#
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

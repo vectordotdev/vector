@@ -43,7 +43,7 @@ components: transforms: grok_parser: {
 			```vrl
 			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
 			```
-			"""
+			""",
 		]
 		notices: [
 			"""

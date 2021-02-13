@@ -41,7 +41,7 @@ components: transforms: coercer: {
 			.string = to_string(1)
 			.timestamp = to_timestamp("2021-01-15T12:33:22.213221Z")
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

@@ -43,7 +43,7 @@ components: transforms: regex_parser: {
 			```vrl
 			.message = parse_regex(.message, r'(?P<number>.*?) group')
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

@@ -37,7 +37,7 @@ components: transforms: ansi_stripper: {
 			```vrl
 			.message = strip_ansi_escape_codes(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

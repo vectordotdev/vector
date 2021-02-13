@@ -37,7 +37,7 @@ components: transforms: remove_tags: {
 			```vrl
 			del(.tag)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

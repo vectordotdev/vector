@@ -43,7 +43,7 @@ components: transforms: logfmt_parser: {
 			```vrl
 			.message = parse_key_value(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

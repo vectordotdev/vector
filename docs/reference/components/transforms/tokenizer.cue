@@ -43,7 +43,7 @@ components: transforms: tokenizer: {
 			```vrl
 			.message = parse_tokens(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

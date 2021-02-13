@@ -37,7 +37,7 @@ components: transforms: remove_fields: {
 			```vrl
 			del(.level)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

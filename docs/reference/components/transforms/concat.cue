@@ -37,7 +37,7 @@ components: transforms: concat: {
 			```vrl
 			.message = "The severity level is " + .level
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

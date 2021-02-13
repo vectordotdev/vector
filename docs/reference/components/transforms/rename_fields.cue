@@ -37,7 +37,7 @@ components: transforms: rename_fields: {
 			```vrl
 			.new_name = del(.old_name)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

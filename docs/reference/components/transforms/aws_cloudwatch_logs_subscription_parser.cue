@@ -44,7 +44,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			```vrl
 			.message = parse_aws_cloudwatch_log_subscription_message(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

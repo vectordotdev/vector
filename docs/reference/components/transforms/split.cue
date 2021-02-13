@@ -37,7 +37,7 @@ components: transforms: split: {
 			```vrl
 			.message = split(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

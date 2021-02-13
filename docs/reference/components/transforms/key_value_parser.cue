@@ -43,7 +43,7 @@ components: transforms: key_value_parser: {
 			```vrl
 			.message = parse_key_value(.message)
 			```
-			"""
+			""",
 		]
 		notices: [
 			"""

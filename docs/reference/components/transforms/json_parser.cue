@@ -43,7 +43,7 @@ components: transforms: json_parser: {
 			```vrl
 			.message = parse_json(.message)
 			```
-			"""
+			""",
 		]
 		notices: []
 	}

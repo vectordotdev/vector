@@ -37,7 +37,7 @@ components: transforms: add_fields: {
 			.success_codes = [200, 201, 202, 204]
 			.timestamp = now()
 			```
-			"""
+			""",
 		]
 		notices: []
 	}
