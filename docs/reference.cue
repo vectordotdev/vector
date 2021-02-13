@@ -76,7 +76,7 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	{log?:    #LogEvent} |
+	{log?: #LogEvent} |
 	{metric?: #MetricEvent}
 }
 
@@ -449,7 +449,7 @@ _values: {
 
 	examples?: [...string]
 
-	if Args.required {
+	if Args.required && enum != _|_ {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[
