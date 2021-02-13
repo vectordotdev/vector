@@ -7,16 +7,6 @@ components: transforms: coercer: {
 		Coerces log fields into typed values.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: [
-			"to_bool",
-			"to_float",
-			"to_int",
-			"to_string",
-			"to_timestamp",
-		]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -40,7 +30,19 @@ components: transforms: coercer: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(coercer._remap_deprecation_notice)
+
+			```vrl
+			.bool = to_bool("false")
+			.float = to_float("1.0")
+			.int = to_int("1")
+			.string = to_string(1)
+			.timestamp = to_timestamp("2021-01-15T12:33:22.213221Z")
+			```
+			"""
+		]
 		notices: []
 	}
 

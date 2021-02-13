@@ -7,10 +7,6 @@ components: transforms: regex_parser: {
 		Parses a log field's value with a [Regular Expression](\(urls.regex)).
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["parse_regex", "parse_regex_all"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -40,7 +36,15 @@ components: transforms: regex_parser: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(regex_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_regex(.message, r'(?P<number>.*?) group')
+			```
+			"""
+		]
 		notices: []
 	}
 

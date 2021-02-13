@@ -7,10 +7,6 @@ components: transforms: split: {
 		Splits a string field on a defined separator.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["split"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -34,7 +30,15 @@ components: transforms: split: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(split._remap_deprecation_notice)
+
+			```vrl
+			.message = split(.message)
+			```
+			"""
+		]
 		notices: []
 	}
 

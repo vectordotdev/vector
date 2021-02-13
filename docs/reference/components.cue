@@ -120,28 +120,6 @@ components: {
 			output: #Output
 		}
 
-		if Kind == "transform" {
-			// Specify either the name of the function that replaces the transform or, when that isn't applicable, as
-			// with the add_fields transform, provide a description and VRL examples
-			#VRLReplacement: {
-				replacement_funcs: [string, ...string]
-			} | {
-				description?: string
-				examples: [string, ...string]
-			}
-
-			vrl_replacement?: #VRLReplacement
-
-			if vrl_replacement != _|_ {
-				deprecation_notice: """
-					This transform has been deprecated in favor of the [`remap`](\(urls.vector_remap_transform))
-					transform, which enables you to use [Vector Remap Language](\(urls.vrl_reference)) (VRL for short) to
-					create transform logic of any degree of complexity. The examples below show how you can use VRL to
-					replace this transform's functionality.
-					"""
-			}
-		}
-
 		// `support` communicates the varying levels of support of the component.
 		support: #Support & {_args: kind: Kind}
 

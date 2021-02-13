@@ -7,10 +7,6 @@ components: transforms: tokenizer: {
 		wrapping characters, and zip the tokens into ordered field names.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["parse_tokens"]
-	}
-
 	classes: {
 		commonly_used: true
 		development:   "deprecated"
@@ -40,7 +36,15 @@ components: transforms: tokenizer: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(tokenizer._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_tokens(.message)
+			```
+			"""
+		]
 		notices: []
 	}
 

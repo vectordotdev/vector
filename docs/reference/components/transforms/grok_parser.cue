@@ -7,10 +7,6 @@ components: transforms: grok_parser: {
 		Parses a log field value with [Grok](\(urls.grok)).
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["parse_grok"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -40,7 +36,15 @@ components: transforms: grok_parser: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(grok_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+			```
+			"""
+		]
 		notices: [
 			"""
 				Vector uses the Rust [`grok` library](\(urls.rust_grok_library)). All patterns

@@ -4,16 +4,6 @@ components: transforms: add_fields: {
 	title:       "Add Fields"
 	description: "Adds fields to log events."
 
-	vrl_replacement: {
-		description: "In VRL, you can add fields to an event by assigning values to not-yet-existing fields."
-		examples: [
-			#".severity = "crit""#,
-			".status = 200",
-			".success_codes = [200, 201, 202, 204]",
-			".timestamp = now()",
-		]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -37,7 +27,18 @@ components: transforms: add_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(add_fields._remap_deprecation_notice)
+
+			```vrl
+			.severity = "crit"
+			.status = 200
+			.success_codes = [200, 201, 202, 204]
+			.timestamp = now()
+			```
+			"""
+		]
 		notices: []
 	}
 

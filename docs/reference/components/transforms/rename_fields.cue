@@ -7,15 +7,6 @@ components: transforms: rename_fields: {
 		Renames one or more log fields.
 		"""
 
-	vrl_replacement: {
-		description: "In VRL, you can rename fields by assigning the value of the renamed field to a new field."
-		examples: [
-			".new = del(.old)",
-			".log_level = del(.level)",
-			".host = del(.hostname)",
-		]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -39,7 +30,15 @@ components: transforms: rename_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(rename_fields._remap_deprecation_notice)
+
+			```vrl
+			.new_name = del(.old_name)
+			```
+			"""
+		]
 		notices: []
 	}
 

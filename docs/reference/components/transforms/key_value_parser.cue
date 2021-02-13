@@ -7,10 +7,6 @@ components: transforms: key_value_parser: {
 		Loosely parses a log field's value in key-value format.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["parse_key_value"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -42,10 +38,12 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-				This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
-				function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
-				simple syntax for robust data transformation. Let us know what you think!
-				""",
+			\(key_value_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_key_value(.message)
+			```
+			"""
 		]
 		notices: [
 			"""

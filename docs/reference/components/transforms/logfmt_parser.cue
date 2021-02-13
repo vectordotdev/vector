@@ -7,10 +7,6 @@ components: transforms: logfmt_parser: {
 		Parses a log field's value in the [logfmt](\(urls.logfmt)) format.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["parse_key_value"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -40,7 +36,15 @@ components: transforms: logfmt_parser: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(logfmt_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_key_value(.message)
+			```
+			"""
+		]
 		notices: []
 	}
 

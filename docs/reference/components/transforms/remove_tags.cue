@@ -7,10 +7,6 @@ components: transforms: remove_tags: {
 		Removes one or more metric tags.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["del"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -34,7 +30,15 @@ components: transforms: remove_tags: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(remove_tags._remap_deprecation_notice)
+
+			```vrl
+			del(.tag)
+			```
+			"""
+		]
 		notices: []
 	}
 

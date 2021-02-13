@@ -7,15 +7,6 @@ components: transforms: filter: {
 		Filters events based on a set of conditions.
 		"""
 
-	vrl_replacement: {
-		description: "You can now specify filtering conditions using VRL instead of the now-deprecated `check_fields`."
-		examples: [
-			#".hostname == "acmecorp.org" || .severity == "crit""#,
-			".status_code < 300 && .status_code >= 200",
-			#"includes(.stacktrace, "unauthorized operation")"#,
-		]
-	}
-
 	classes: {
 		commonly_used: true
 		development:   "stable"

@@ -7,10 +7,6 @@ components: transforms: remove_fields: {
 		Removes one or more log fields.
 		"""
 
-	vrl_replacement: {
-		replacement_funcs: ["del"]
-	}
-
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -34,7 +30,15 @@ components: transforms: remove_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(remove_fields._remap_deprecation_notice)
+
+			```vrl
+			del(.level)
+			```
+			"""
+		]
 		notices: []
 	}
 
