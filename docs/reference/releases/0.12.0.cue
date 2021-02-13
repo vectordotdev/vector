@@ -1,33 +1,44 @@
 package metadata
 
 releases: "0.12.0": {
-	date:     "2021-02-11"
-	codename: "Vector Remap Language"
+	date:        "2021-02-11"
+	codename:    "Vector Remap Language"
 	description: """
-		The Vector team is pleased to announce 0.12.0. This release	introduces the **Vector Remap Language**, an
-		[expression-oriented](\#(urls.expression_oriented_language)) language designed for transforming obervability
-		data (logs and metrics) in a [safe](\#(urls.vrl_safety)) and [performant](\#(urls.vrl_performance)) manner.
-		Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
+		The Vector team is pleased to announce 0.12.0. This release	introduces the [**Vector Remap Language**](\(urls.vrl_reference)),
+		an expression-oriented language designed for transforming obervability data (logs and metrics) in a
+		[safe](\(urls.vrl_safety)) and [performant](\(urls.vrl_performance)) manner.
+
+		Check out the [VRL announcement post] for more details as well as the [highlights](#highlights) and
+		[changelog](#changelog) for a complete list of changes in 0.12.0.
 		"""
 
 	whats_next: [
 		{
 			title: "Vector's own observability"
 			description: """
-				The next Vector release (0.12.0) will focus on Vector's own	internal
-				observability. We've got some _very_ exciting features planned for this.
+				We will be working to improve Vector's own observability with high-quality internal metrics, logs,
+				CLI tools, and dashboards.
 				"""
 		},
 		{
-			title: "Vector enterpise"
+			title: "Improved Vector to Vector communication"
 			description: """
-				The next Vector release (0.12.0) will focus on Vector's own	internal
-				observability. We've got some _very_ exciting features planned for this.
+				The `vector` source and sink currently leverage the TCP protocol to transmit data. While this has
+				served users well, it presents operational challenges for large-scale deployments of Vector. Because
+				HTTP is widely used and easy to integrate into platforms like Kubernetes we will be moving these
+				components to the HTTP protocol.
+				"""
+		},
+		{
+			title:       "Schema support"
+			description: """
+				With the inclusion of [type-safety in VRL](\(urls.vrl_type_safety)) we will be working to officially
+				support common and custom schemas within Vector. This will be an opt-in feature that will provide
+				Vector with type information about your data, making Vector type safe from end to end and further
+				raising confidence that Vector will operate properly post-deployment.
 				"""
 		},
 	]
-
-	whats_next: []
 
 	commits: [
 		{sha: "5ae2247d946733fc0f53d03d12afe83a2998cb7e", date: "2020-12-02 19:50:10 UTC", description: "Add UNIX datagram mode", pr_number:                                                          5298, scopes: ["socket source"], type:                                       "enhancement", breaking_change: false, author: "Bruce Guenter", files_count:             8, insertions_count:  272, deletions_count:  64},

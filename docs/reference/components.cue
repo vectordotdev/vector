@@ -803,7 +803,7 @@ components: {
 
 			if Kind != "source" {
 				inputs: {
-					description:	"""
+					description: """
 						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
 						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
 
@@ -814,7 +814,7 @@ components: {
 					type: array: items: type: string: {
 						examples: [
 							"my-source-or-transform-id",
-							"prefix-*"
+							"prefix-*",
 						]
 						syntax: "literal"
 					}
