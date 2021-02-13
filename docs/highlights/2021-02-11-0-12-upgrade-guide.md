@@ -127,6 +127,22 @@ simplify your Vector configuration.
 
 As always, if you need assistance [hop in our chat][chat]. We're eager to help and receive feedback on the language.
 
+### The `file` source `start_at_beginning` has been deprecated
+
+As noted in the [file source checkpointing highlight][file_source_highlight], we've removed the `start_at_beginning`
+option and replaced it with new [`ignore_checkpoints`][ignore_checkpoints] and [`read_from`][read_from] options.
+Migrating is easy:
+
+```diff
+ [sources.file]
+ type = "file"
+-start_at_beginning = true
++ignore_checkpoints = false # default
++read_from = "beginning" # default
+```
+
+Adjust as necessary. The above values are the defaults and are not required to be specified.
+
 [add_fields_transform]: /docs/reference/configuration/transforms/add_fields/
 [add_tags_transform]: /docs/reference/configuration/transforms/add_tags/
 [ansi_stripper_transform]: /docs/reference/configuration/transforms/ansi_stripper/
@@ -135,6 +151,7 @@ As always, if you need assistance [hop in our chat][chat]. We're eager to help a
 [coercer_transform]: /docs/reference/configuration/transforms/coercer/
 [concat_transform]: /docs/reference/configuration/transforms/concat/
 [config_synytax_pitfalls]: /blog/vector-remap-language/#configuration-langauges-are-bad-at-expressing-data-transformations
+[file_source_highlight]: /highlights/2021-01-31-file-source-checkpointing
 [grok_parser_transform]: /docs/reference/configuration/transforms/grok_parser/
 [json_parser_transform]: /docs/reference/configuration/transforms/json_parser/
 [key_value_parser_transform]: /docs/reference/configuration/transforms/key_value_parser/
@@ -143,6 +160,8 @@ As always, if you need assistance [hop in our chat][chat]. We're eager to help a
 [pr_5281]: https://github.com/timberio/vector/pull/5281
 [pr_5978]: https://github.com/timberio/vector/pull/5978
 [filter_transform]: /docs/reference/configuration/transforms/filter/
+[ignore_checkpoints]: /docs/reference/configuration/sources/file/#ignore_checkpoints
+[read_from]: /docs/reference/configuration/sources/file/#read_from
 [reduce_transform]: /docs/reference/configuration/transforms/reduce/
 [regex_parser_transform]: /docs/reference/configuration/transforms/regex_parser/
 [remove_fields_transform]: /docs/reference/configuration/transforms/remove_fields/
