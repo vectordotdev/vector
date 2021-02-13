@@ -30,9 +30,9 @@ can adjust that using the `--interval` flag.
 Architecturally, `vector top` interacts directly with Vector's [GraphQL API][api], which was built with `vector top` as
 a primary consumer. The dashboard UI was created using the excellent [tui-rs] library.
 
-[api]: https://vector.dev/docs/reference/api
-[cli]: https://vector.dev/docs/reference/cli
+[api]: /docs/reference/api
+[cli]: /docs/reference/cli
 [htop]: https://htop.dev
-[top]: https://vector.dev/docs/reference/cli/#top
-[topology]: https://vector.dev/docs/about/concepts/#topology
+[top]: /docs/reference/cli/#top
+[topology]: /docs/about/concepts/#topology
 [tui]: https://docs.rs/tui
