@@ -76,8 +76,8 @@ pub fn make_test_pod<'a>(
     )
 }
 
-pub fn parse_json(s: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    Ok(serde_json::from_str(s)?)
+pub fn parse_json(s: &str) -> Result<serde_json::Value, serde_json::Error> {
+    serde_json::from_str(s)
 }
 
 pub fn generate_long_string(a: usize, b: usize) -> String {
@@ -136,7 +136,17 @@ where
             continue;
         }
 
-        let val = parse_json(&line)?;
+        let val = match parse_json(&line) {
+            Ok(val) => val,
+            Err(err) if err.is_eof() => {
+                // We got an EOF error, this is most likely some very long line,
+                // we don't produce lines this bing is our test cases, so we'll
+                // just skip the error - as if it wasn't a JSON string.
+                println!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
+                continue;
+            }
+            Err(err) => return Err(err.into()),
+        };
 
         match predicate(val) {
             FlowControlCommand::GoOn => {

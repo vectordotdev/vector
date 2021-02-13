@@ -48,7 +48,7 @@ remap: functions: parse_regex: {
 		{
 			title: "Parse via Regex (with capture groups)"
 			source: """
-				parse_regex("first group and second group.", /(?P<number>.*?) group/)
+				parse_regex("first group and second group.", r'(?P<number>.*?) group')
 				"""
 			return: {
 				number: "first"
@@ -59,7 +59,7 @@ remap: functions: parse_regex: {
 		{
 			title: "Parse via Regex (without capture groups)"
 			source: """
-				parse_regex("first group and second group.", /(?.*?) group/)
+				parse_regex("first group and second group.", r'(?.*?) group')
 				"""
 			return: {
 				"1": "first"

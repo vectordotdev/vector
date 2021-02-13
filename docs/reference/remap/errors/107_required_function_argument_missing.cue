@@ -8,7 +8,7 @@ remap: errors: "107": {
 		"""
 	rationale:   null
 	resolution: """
-		Supply all required function arguments to adhere to the function's documented signature.
+		Supply all of the required function arguments to adhere to the function's documented signature.
 		"""
 
 	examples: [
