@@ -2,7 +2,7 @@
 last_modified_on: "2020-02-15"
 $schema: ".schema.json"
 title: "Introducing `vector top`"
-description: "A lean, fast, and expressive language for transforming observability data."
+description: "A CLI dashboard interface for monitoring Vector instances."
 author_github: "https://github.com/lucperkins"
 featured: true
 pr_numbers: []
