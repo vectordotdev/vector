@@ -1,0 +1,27 @@
+---
+last_modified_on: "2020-01-31"
+$schema: ".schema.json"
+title: "Improved `file` source checkpointing"
+description: "The `file` source checkpointing strategy has been improved to solve surprising edge cases."
+author_github: "https://github.com/binarylogic"
+featured: false
+pr_numbers: [6178]
+release: "0.12.0"
+hide_on_release_notes: false
+tags: ["domain: sources", "source: file"]
+---
+
+The Vector [`file` source][file_source] included an option called `start_at_beginning` that would determine where
+Vector would begin reading a file based on a [variety of conditions]. As you can see, these conditions were quite
+confusing. To resolve this, [PR 6178][pr_6178] deprecated the `start_at_beginning` option and replaced it with new
+[`ignore_checkpoints`][ignore_checkpoints] and [`read_from`][read_from] options. Migrating is easy:
+
+```diff
+ [sources.file]
+ type = "file"
+-start_at_beginning = true
++ignore_checkpoints = false # default
++read_from = "beginning" # default
+```
+
+Adjust as necessary. The above values are the defaults and are not required to be specified.

@@ -75,6 +75,17 @@ Alteratively, we recommend migrating to the new VRL syntax:
 
 Refer to the [VRL reference][vrl_reference] for the many ways you can specify conditions.
 
+### The `generator` source requires a `format` option
+
+The [`generator` source], commonly used for testing, has been updated with a new `format` option that emits logs in
+the specified format. You will not be required to provide this option. Upgrading is easy:
+
+```diff
+ [sources.generator]
+ type = "generator"
++format = "apache_common"  # or "apache_error" or "syslog"
+```
+
 ## Deprecations
 
 ### Many transforms have been deprecated in favor of the new `remap` transform
