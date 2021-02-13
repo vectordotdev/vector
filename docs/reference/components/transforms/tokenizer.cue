@@ -7,6 +7,10 @@ components: transforms: tokenizer: {
 		wrapping characters, and zip the tokens into ordered field names.
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_tokens"]
+	}
+
 	classes: {
 		commonly_used: true
 		development:   "deprecated"
@@ -36,13 +40,7 @@ components: transforms: tokenizer: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new [`remap` transform's `tokenize`
-			function](\(urls.vector_remap_transform)#tokenize). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
-			""",
-		]
+		warnings: []
 		notices: []
 	}
 

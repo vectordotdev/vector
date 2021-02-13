@@ -7,6 +7,16 @@ components: transforms: coercer: {
 		Coerces log fields into typed values.
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: [
+			"to_bool",
+			"to_float",
+			"to_int",
+			"to_string",
+			"to_timestamp",
+		]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -30,7 +40,7 @@ components: transforms: coercer: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [transforms.add_fields.support.warnings[0]]
+		warnings: []
 		notices: []
 	}
 

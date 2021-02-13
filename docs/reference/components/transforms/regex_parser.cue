@@ -7,6 +7,10 @@ components: transforms: regex_parser: {
 		Parses a log field's value with a [Regular Expression](\(urls.regex)).
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_regex", "parse_regex_all"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -36,14 +40,7 @@ components: transforms: regex_parser: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new [`remap` transform's
-			`parse_regex` function](\(urls.vector_remap_transform)#parse_regex). The `remap`
-			transform provides a simple syntax for robust data transformation. Let us know what you
-			think!
-			""",
-		]
+		warnings: []
 		notices: []
 	}
 

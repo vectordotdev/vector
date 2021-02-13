@@ -7,6 +7,10 @@ components: transforms: ansi_stripper: {
 		Strips [ANSI escape sequences](\(urls.ansi_escape_codes)).
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["strip_ansi_escape_codes"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"

@@ -7,6 +7,15 @@ components: transforms: rename_fields: {
 		Renames one or more log fields.
 		"""
 
+	vrl_replacement: {
+		description: "In VRL, you can rename fields by assigning the value of the renamed field to a new field."
+		examples: [
+			".new = del(.old)",
+			".log_level = del(.level)",
+			".host = del(.hostname)",
+		]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -30,14 +39,7 @@ components: transforms: rename_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
-			transform provides a simple syntax for robust data transformation.
-			Let us know what you think!
-			""",
-		]
+		warnings: []
 		notices: []
 	}
 

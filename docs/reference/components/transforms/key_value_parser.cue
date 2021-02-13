@@ -7,6 +7,10 @@ components: transforms: key_value_parser: {
 		Loosely parses a log field's value in key-value format.
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_key_value"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"

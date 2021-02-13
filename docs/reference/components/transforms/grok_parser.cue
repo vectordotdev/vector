@@ -7,6 +7,10 @@ components: transforms: grok_parser: {
 		Parses a log field value with [Grok](\(urls.grok)).
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_grok"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -36,13 +40,7 @@ components: transforms: grok_parser: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new [`remap` transform's `parse_grok`
-			function](\(urls.vector_remap_transform)#parse_grok)` The `remap` transform provides a
-			simple syntax for robust data transformation. Let us know what you think!
-			""",
-		]
+		warnings: []
 		notices: [
 			"""
 				Vector uses the Rust [`grok` library](\(urls.rust_grok_library)). All patterns

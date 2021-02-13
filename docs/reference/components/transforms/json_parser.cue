@@ -7,6 +7,10 @@ components: transforms: json_parser: {
 		Parses a log field value as [JSON](\(urls.json)).
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["parse_json"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"

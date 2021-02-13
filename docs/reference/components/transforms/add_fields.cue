@@ -4,6 +4,16 @@ components: transforms: add_fields: {
 	title:       "Add Fields"
 	description: "Adds fields to log events."
 
+	vrl_replacement: {
+		description: "In VRL, you can add fields to an event by assigning values to not-yet-existing fields."
+		examples: [
+			#".severity = "crit""#,
+			".status = 200",
+			".success_codes = [200, 201, 202, 204]",
+			".timestamp = now()",
+		]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -27,14 +37,7 @@ components: transforms: add_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
-			transform provides a simple syntax for robust data transformation.
-			Let us know what you think!
-			""",
-		]
+		warnings: []
 		notices: []
 	}
 

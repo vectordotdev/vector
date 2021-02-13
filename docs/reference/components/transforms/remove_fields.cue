@@ -7,6 +7,10 @@ components: transforms: remove_fields: {
 		Removes one or more log fields.
 		"""
 
+	vrl_replacement: {
+		replacement_funcs: ["del"]
+	}
+
 	classes: {
 		commonly_used: false
 		development:   "deprecated"
@@ -30,13 +34,7 @@ components: transforms: remove_fields: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [
-			"""
-			This component has been deprecated in favor of the new [`remap` transform's `del`
-			function](\(urls.vector_remap_transform)#del). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
-			""",
-		]
+		warnings: []
 		notices: []
 	}
 
