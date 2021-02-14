@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-01-31"
+last_modified_on: "2021-01-31"
 $schema: ".schema.json"
 title: "Improved `file` source checkpointing"
 description: "The `file` source checkpointing strategy has been improved to solve surprising edge cases."

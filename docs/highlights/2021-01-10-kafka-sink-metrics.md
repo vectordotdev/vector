@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-01-10"
+last_modified_on: "2021-01-10"
 $schema: ".schema.json"
 title: "The `kafka` sink now supports metrics"
 description: "Send metric events to Kafka"

@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-02-15"
+last_modified_on: "2020-12-23"
 $schema: ".schema.json"
 title: "Introducing `vector top`"
 description: "A CLI dashboard interface for monitoring Vector instances."
