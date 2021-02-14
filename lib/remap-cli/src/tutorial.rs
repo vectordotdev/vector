@@ -29,7 +29,7 @@ pub fn tutorial() -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new("> ")));
 
-    let mut tutorials = load_tutorials_from_json()?.tutorials;
+    let mut tutorials = load_tutorials_from_toml()?.tutorials;
 
     println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
 
@@ -116,7 +116,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     );
 }
 
-fn load_tutorials_from_json() -> Result<Tutorials, Error> {
+fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
     let mut buf = String::new();
     let _ = File::open(TUTORIALS_TOML_FILE)?.read_to_string(&mut buf)?;
 
