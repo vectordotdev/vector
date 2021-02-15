@@ -310,10 +310,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
-        #[cfg(feature = "parse_regex")]
-        Box::new(ParseRegex),
-        #[cfg(feature = "parse_regex_all")]
-        Box::new(ParseRegexAll),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "floor")]
@@ -344,6 +340,8 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "match")]
+        Box::new(Match),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -368,6 +366,10 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_regex")]
+        Box::new(ParseRegex),
+        #[cfg(feature = "parse_regex_all")]
+        Box::new(ParseRegexAll),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -378,8 +380,6 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ParseUrl),
         #[cfg(feature = "push")]
         Box::new(Push),
-        #[cfg(feature = "match")]
-        Box::new(Match),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]
@@ -408,14 +408,14 @@ pub fn all() -> Vec<Box<dyn remap::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_string")]
+        Box::new(ToString),
         #[cfg(feature = "to_syslog_facility")]
         Box::new(ToSyslogFacility),
         #[cfg(feature = "to_syslog_level")]
         Box::new(ToSyslogLevel),
         #[cfg(feature = "to_syslog_severity")]
         Box::new(ToSyslogSeverity),
-        #[cfg(feature = "to_string")]
-        Box::new(ToString),
         #[cfg(feature = "to_timestamp")]
         Box::new(ToTimestamp),
         #[cfg(feature = "to_unix_timestamp")]

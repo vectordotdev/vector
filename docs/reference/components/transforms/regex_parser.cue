@@ -38,10 +38,11 @@ components: transforms: regex_parser: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's
-			`parse_regex` function](\(urls.vector_remap_transform)#parse_regex). The `remap`
-			transform provides a simple syntax for robust data transformation. Let us know what you
-			think!
+			\(regex_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_regex(.message, r'(?P<number>.*?) group')
+			```
 			""",
 		]
 		notices: []

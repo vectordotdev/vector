@@ -22,7 +22,7 @@ remap: features: quality_error_messages: {
 		  │ function call error
 		  │ unable to parse json: key must be a string at line 1 column 3
 		  │
-		  = see function documentation at: https://master.vector.dev/docs/reference/remap/#parse_json
+		  = see function documentation at: https://master.vector.dev/docs/reference/vrl/functions/#parse_json
 		  = see language documentation at: https://vector.dev/docs/reference/vrl/
 		```
 		"""

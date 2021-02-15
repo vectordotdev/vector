@@ -27,7 +27,7 @@ format = "syslog"
 interval = 1
 
 # Parse Apache formatted logs
-# See the Remap reference: https://vector.dev/docs/reference/remap/
+# See the Remap reference: https://vector.dev/docs/reference/vrl/
 [transforms.parse_logs]
 type = "remap"
 source = '''

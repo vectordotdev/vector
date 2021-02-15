@@ -38,9 +38,11 @@ components: transforms: tokenizer: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `tokenize`
-			function](\(urls.vector_remap_transform)#tokenize). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
+			\(tokenizer._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_tokens(.message)
+			```
 			""",
 		]
 		notices: []

@@ -38,9 +38,11 @@ components: transforms: json_parser: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `parse_json`
-			function](\(urls.vector_remap_transform)#parse_json). The `remap` transform provides a
-			simple syntax for robust data transformation. Let us know what you think!
+			\(json_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_json(.message)
+			```
 			""",
 		]
 		notices: []
