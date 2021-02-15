@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: float: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not a float, if `value` is a float it is returned. This allows the type checker
-		to guarantee that the returned value is a float and can be used in any function that expects this type.
+		Errors if `value` is not a float, if `value` is a float it is returned.
+
+		This allows the type checker to guarantee that the returned value is a float and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [
