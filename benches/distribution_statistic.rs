@@ -35,11 +35,10 @@ fn bench_statistic(c: &mut Criterion) {
     let sizes = [5, 10, 50, 100, 200, 500, 1000];
     for &size in &sizes {
         group.bench_function(format!("small-bin-{}", size), |b| {
-            let samples = generate_samples(size, 3);
-
             b.iter_batched(
-                || samples.clone(),
-                |samples| {
+                || size,
+                |size| {
+                    let samples = generate_samples(size, 3);
                     DistributionStatistic::from_samples(&samples, &[0.5, 0.75, 0.9, 0.95, 0.99])
                 },
                 BatchSize::SmallInput,
@@ -50,11 +49,10 @@ fn bench_statistic(c: &mut Criterion) {
     let sizes = [50, 100, 200, 500, 1000];
     for &size in &sizes {
         group.bench_function(format!("large-bin-{}", size), |b| {
-            let samples = generate_samples(size, 20);
-
             b.iter_batched(
-                || samples.clone(),
-                |samples| {
+                || size,
+                |size| {
+                    let samples = generate_samples(size, 20);
                     DistributionStatistic::from_samples(&samples, &[0.5, 0.75, 0.9, 0.95, 0.99])
                 },
                 BatchSize::SmallInput,
