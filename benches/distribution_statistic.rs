@@ -65,7 +65,7 @@ fn bench_statistic(c: &mut Criterion) {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().noise_threshold(0.05);
+    config = Criterion::default().noise_threshold(0.1);
     targets = bench_statistic
 );
 criterion_main!(benches);
