@@ -1,8 +1,8 @@
-use rustyline::{Context, Editor, Helper};
 use rustyline::completion::Completer;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
+use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 pub mod cmd;

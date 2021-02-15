@@ -2,7 +2,7 @@ use super::{Error, Repl};
 use rustyline::{error::ReadlineError, Editor};
 use serde::Deserialize;
 use stdlib::all as funcs;
-use vrl::{state, diagnostic::Formatter, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Deserialize)]
 struct Tutorial {
@@ -71,7 +71,11 @@ pub fn tutorial() -> Result<(), Error> {
                                         println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                                         break;
                                     } else {
-                                        println!("You've completed tutorial {} out of {}\n", index + 1, tutorials.len());
+                                        println!(
+                                            "You've completed tutorial {} out of {}\n",
+                                            index + 1,
+                                            tutorials.len()
+                                        );
                                         println!("Moving on to the next exercise...\n\n");
                                         index = index.saturating_add(1);
                                         print_tutorial_help_text(index, &tutorials);
@@ -117,7 +121,7 @@ fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
 
     match toml::from_str(toml_file) {
         Ok(tuts) => Ok(tuts),
-        Err(err) => Err(Error::Toml(err))
+        Err(err) => Err(Error::Toml(err)),
     }
 }
 

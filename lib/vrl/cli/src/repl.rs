@@ -3,7 +3,7 @@ use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::error::ReadlineError;
 use stdlib::all as funcs;
-use vrl::{state, diagnostic::Formatter, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 
