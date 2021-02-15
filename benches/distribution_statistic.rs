@@ -10,9 +10,7 @@ use vector::event::metric::Sample;
 use vector::sinks::util::statistic::DistributionStatistic;
 
 fn generate_samples(mut size: u32, max_bin_count: u32) -> Vec<Sample> {
-    // generate random samples, but we also want to use
-    // the same samples set on each run.
-    let mut rng = SmallRng::seed_from_u64(1234);
+    let mut rng = rand::thread_rng();
     let range = Uniform::from(1..=max_bin_count);
     let mut value = 1.0;
     let mut samples = Vec::new();
