@@ -40,7 +40,7 @@ remap: functions: parse_regex: {
 		types: ["map"]
 		rules: [
 			"Matches will return the capture groups corresponding to the leftmost matches in the text.",
-			"If no match is found an empty map is returned.",
+			"If no match is found an error is raised.",
 		]
 	}
 
