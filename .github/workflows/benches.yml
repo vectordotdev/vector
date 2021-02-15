@@ -28,11 +28,11 @@ env:
 
 jobs:
   cancel-previous:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.6.0
+      - uses: styfle/cancel-workflow-action@0.8.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -44,7 +44,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.4
         with:
           path: |
             ~/.cargo/registry
@@ -103,7 +103,7 @@ jobs:
     needs:
       - cancel-previous
       - bench
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

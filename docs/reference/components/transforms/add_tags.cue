@@ -27,7 +27,15 @@ components: transforms: add_tags: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(add_tags._remap_deprecation_notice)
+
+			```vrl
+			#".tag = "value""#
+			```
+			""",
+		]
 		notices: []
 	}
 

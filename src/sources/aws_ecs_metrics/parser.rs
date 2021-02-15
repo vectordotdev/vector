@@ -538,7 +538,7 @@ mod test {
             parse(json.as_bytes(), namespace()).unwrap(),
             vec![
                 Metric::new(
-                    "blkio_recursive_io_service_bytes_total".into(),
+                    "blkio_recursive_io_service_bytes_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
@@ -558,7 +558,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "blkio_recursive_io_service_bytes_total".into(),
+                    "blkio_recursive_io_service_bytes_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 520192.0 },
                 )
@@ -616,7 +616,7 @@ mod test {
             parse(json.as_bytes(), namespace()).unwrap(),
             vec![
                 Metric::new(
-                    "cpu_online_cpus".into(),
+                    "cpu_online_cpus",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
@@ -634,7 +634,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_system_jiffies_total".into(),
+                    "cpu_usage_system_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 2007130000000.0
@@ -654,7 +654,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_usermode_jiffies_total".into(),
+                    "cpu_usage_usermode_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 510000000.0 },
                 )
@@ -672,7 +672,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_kernelmode_jiffies_total".into(),
+                    "cpu_usage_kernelmode_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 190000000.0 },
                 )
@@ -690,7 +690,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_total_jiffies_total".into(),
+                    "cpu_usage_total_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 2324920942.0
@@ -710,7 +710,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttling_periods_total".into(),
+                    "cpu_throttling_periods_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
@@ -728,7 +728,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttled_periods_total".into(),
+                    "cpu_throttled_periods_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
@@ -746,7 +746,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttled_time_seconds_total".into(),
+                    "cpu_throttled_time_seconds_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
@@ -764,7 +764,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_percpu_jiffies_total".into(),
+                    "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 1095931487.0
@@ -785,7 +785,7 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_percpu_jiffies_total".into(),
+                    "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 1228989455.0
@@ -867,7 +867,7 @@ mod test {
                 .find(|m| m.name() == "memory_used_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_used_bytes".into(),
+                "memory_used_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 40120320.0 },
             )
@@ -892,7 +892,7 @@ mod test {
                 .find(|m| m.name() == "memory_max_used_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_max_used_bytes".into(),
+                "memory_max_used_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 47177728.0 },
             )
@@ -917,7 +917,7 @@ mod test {
                 .find(|m| m.name() == "memory_active_anonymous_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_active_anonymous_bytes".into(),
+                "memory_active_anonymous_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 34885632.0 },
             )
@@ -942,7 +942,7 @@ mod test {
                 .find(|m| m.name() == "memory_total_page_faults_total")
                 .unwrap(),
             &Metric::new(
-                "memory_total_page_faults_total".into(),
+                "memory_total_page_faults_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 31131.0 },
             )
@@ -993,7 +993,7 @@ mod test {
                 .find(|m| m.name() == "network_receive_bytes_total")
                 .unwrap(),
             &Metric::new(
-                "network_receive_bytes_total".into(),
+                "network_receive_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 329932716.0 },
             )
@@ -1019,7 +1019,7 @@ mod test {
                 .find(|m| m.name() == "network_transmit_bytes_total")
                 .unwrap(),
             &Metric::new(
-                "network_transmit_bytes_total".into(),
+                "network_transmit_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 2001229.0 },
             )

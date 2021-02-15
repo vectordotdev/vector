@@ -1,0 +1,18 @@
+# object: { "foo": "bar" }
+# result:
+#
+# error[E110]: invalid argument type
+#   ┌─ :4:15
+#   │
+# 4 │ .foo = upcase(.foo) # string
+#   │               ^^^^
+#   │               │
+#   │               this expression resolves to one of "string" or "null"
+#   │               but the parameter "value" expects the exact type "string"
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/110
+
+.foo # any
+.foo, err = to_string(.foo) # string or null
+.foo = upcase(.foo) # string

@@ -1,0 +1,217 @@
+# result: [
+#     "unable to add value type \"string\" to \"integer\"",
+#     "unable to add value type \"boolean\" to \"integer\"",
+#     "unable to add value type \"boolean\" to \"integer\"",
+#     "unable to add value type \"null\" to \"integer\"",
+#     "unable to add value type \"array\" to \"integer\"",
+#     "unable to add value type \"object\" to \"integer\"",
+#     "unable to add value type \"regex\" to \"integer\"",
+#     "unable to add value type \"timestamp\" to \"integer\"",
+#
+#     "unable to add value type \"string\" to \"float\"",
+#     "unable to add value type \"boolean\" to \"float\"",
+#     "unable to add value type \"boolean\" to \"float\"",
+#     "unable to add value type \"null\" to \"float\"",
+#     "unable to add value type \"array\" to \"float\"",
+#     "unable to add value type \"object\" to \"float\"",
+#     "unable to add value type \"regex\" to \"float\"",
+#     "unable to add value type \"timestamp\" to \"float\"",
+#
+#     "unable to add value type \"integer\" to \"string\"",
+#     "unable to add value type \"float\" to \"string\"",
+#     "unable to add value type \"boolean\" to \"string\"",
+#     "unable to add value type \"boolean\" to \"string\"",
+#     "unable to add value type \"array\" to \"string\"",
+#     "unable to add value type \"object\" to \"string\"",
+#     "unable to add value type \"regex\" to \"string\"",
+#     "unable to add value type \"timestamp\" to \"string\"",
+#
+#     "unable to add value type \"integer\" to \"boolean\"",
+#     "unable to add value type \"float\" to \"boolean\"",
+#     "unable to add value type \"string\" to \"boolean\"",
+#     "unable to add value type \"boolean\" to \"boolean\"",
+#     "unable to add value type \"boolean\" to \"boolean\"",
+#     "unable to add value type \"null\" to \"boolean\"",
+#     "unable to add value type \"array\" to \"boolean\"",
+#     "unable to add value type \"object\" to \"boolean\"",
+#     "unable to add value type \"regex\" to \"boolean\"",
+#     "unable to add value type \"timestamp\" to \"boolean\"",
+#
+#     "unable to add value type \"integer\" to \"null\"",
+#     "unable to add value type \"float\" to \"null\"",
+#     "unable to add value type \"boolean\" to \"null\"",
+#     "unable to add value type \"boolean\" to \"null\"",
+#     "unable to add value type \"null\" to \"null\"",
+#     "unable to add value type \"array\" to \"null\"",
+#     "unable to add value type \"object\" to \"null\"",
+#     "unable to add value type \"regex\" to \"null\"",
+#     "unable to add value type \"timestamp\" to \"null\"",
+#
+#     "unable to add value type \"string\" to \"array\"",
+#     "unable to add value type \"integer\" to \"array\"",
+#     "unable to add value type \"float\" to \"array\"",
+#     "unable to add value type \"boolean\" to \"array\"",
+#     "unable to add value type \"boolean\" to \"array\"",
+#     "unable to add value type \"null\" to \"array\"",
+#     "unable to add value type \"array\" to \"array\"",
+#     "unable to add value type \"object\" to \"array\"",
+#     "unable to add value type \"regex\" to \"array\"",
+#     "unable to add value type \"timestamp\" to \"array\"",
+#
+#     "unable to add value type \"string\" to \"object\"",
+#     "unable to add value type \"integer\" to \"object\"",
+#     "unable to add value type \"float\" to \"object\"",
+#     "unable to add value type \"boolean\" to \"object\"",
+#     "unable to add value type \"boolean\" to \"object\"",
+#     "unable to add value type \"null\" to \"object\"",
+#     "unable to add value type \"array\" to \"object\"",
+#     "unable to add value type \"object\" to \"object\"",
+#     "unable to add value type \"regex\" to \"object\"",
+#     "unable to add value type \"timestamp\" to \"object\"",
+#
+#     "unable to add value type \"string\" to \"regex\"",
+#     "unable to add value type \"integer\" to \"regex\"",
+#     "unable to add value type \"float\" to \"regex\"",
+#     "unable to add value type \"boolean\" to \"regex\"",
+#     "unable to add value type \"boolean\" to \"regex\"",
+#     "unable to add value type \"null\" to \"regex\"",
+#     "unable to add value type \"array\" to \"regex\"",
+#     "unable to add value type \"object\" to \"regex\"",
+#     "unable to add value type \"regex\" to \"regex\"",
+#     "unable to add value type \"timestamp\" to \"regex\"",
+#
+#     "unable to add value type \"string\" to \"timestamp\"",
+#     "unable to add value type \"integer\" to \"timestamp\"",
+#     "unable to add value type \"float\" to \"timestamp\"",
+#     "unable to add value type \"boolean\" to \"timestamp\"",
+#     "unable to add value type \"boolean\" to \"timestamp\"",
+#     "unable to add value type \"null\" to \"timestamp\"",
+#     "unable to add value type \"array\" to \"timestamp\"",
+#     "unable to add value type \"object\" to \"timestamp\"",
+#     "unable to add value type \"regex\" to \"timestamp\"",
+#     "unable to add value type \"timestamp\" to \"timestamp\""
+# ]
+
+ok, err1 = 1 + "foo"
+ok, err2 = 1 + true
+ok, err3 = 1 + false
+ok, err4 = 1 + null
+ok, err5 = 1 + []
+ok, err6 = 1 + {}
+ok, err7 = 1 + r'foo'
+ok, err8 = 1 + now()
+
+integer_errs = [err1, err2, err3, err4, err5, err6, err7, err8]
+
+ok, err1 = 1.0 + "foo"
+ok, err2 = 1.0 + true
+ok, err3 = 1.0 + false
+ok, err4 = 1.0 + null
+ok, err5 = 1.0 + []
+ok, err6 = 1.0 + {}
+ok, err7 = 1.0 + r'foo'
+ok, err8 = 1.0 + now()
+
+float_errs = [err1, err2, err3, err4, err5, err6, err7, err8]
+
+ok, err1 = "foo" + 1
+ok, err2 = "foo" + 1.0
+ok, err3 = "foo" + true
+ok, err4 = "foo" + false
+ok, err5 = "foo" + []
+ok, err6 = "foo" + {}
+ok, err7 = "foo" + r'foo'
+ok, err8 = "foo" + now()
+
+string_errs = [err1, err2, err3, err4, err5, err6, err7, err8]
+
+ok, err1  = true + 1
+ok, err2  = true + 1.0
+ok, err3  = true + "foo"
+ok, err4  = true + true
+ok, err5  = true + false
+ok, err6  = true + null
+ok, err7  = true + []
+ok, err8  = true + {}
+ok, err9  = true + r'foo'
+ok, err10 = true + now()
+
+bool_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1 = null + 1
+ok, err2 = null + 1.0
+ok, err3 = null + true
+ok, err4 = null + false
+ok, err5 = null + null
+ok, err6 = null + []
+ok, err7 = null + {}
+ok, err8 = null + r'foo'
+ok, err9 = null + now()
+
+null_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9]
+
+ok, err1  = [] + "foo"
+ok, err2  = [] + 1
+ok, err3  = [] + 1.0
+ok, err4  = [] + true
+ok, err5  = [] + false
+ok, err6  = [] + null
+ok, err7  = [] + []
+ok, err8  = [] + {}
+ok, err9  = [] + r'foo'
+ok, err10 = [] + now()
+
+array_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = {} + "foo"
+ok, err2  = {} + 1
+ok, err3  = {} + 1.0
+ok, err4  = {} + true
+ok, err5  = {} + false
+ok, err6  = {} + null
+ok, err7  = {} + []
+ok, err8  = {} + {}
+ok, err9  = {} + r'foo'
+ok, err10 = {} + now()
+
+object_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = r'' + "foo"
+ok, err2  = r'' + 1
+ok, err3  = r'' + 1.0
+ok, err4  = r'' + true
+ok, err5  = r'' + false
+ok, err6  = r'' + null
+ok, err7  = r'' + []
+ok, err8  = r'' + {}
+ok, err9  = r'' + r'foo'
+ok, err10 = r'' + now()
+
+regex_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = to_timestamp(0) + "foo"
+ok, err2  = to_timestamp(0) + 1
+ok, err3  = to_timestamp(0) + 1.0
+ok, err4  = to_timestamp(0) + true
+ok, err5  = to_timestamp(0) + false
+ok, err6  = to_timestamp(0) + null
+ok, err7  = to_timestamp(0) + []
+ok, err8  = to_timestamp(0) + {}
+ok, err9  = to_timestamp(0) + r'foo'
+ok, err10 = to_timestamp(0) + now()
+
+timestamp_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+errs = [
+    integer_errs,
+    float_errs,
+    string_errs,
+    bool_errs,
+    null_errs,
+    array_errs,
+    object_errs,
+    regex_errs,
+    timestamp_errs,
+]
+
+flatten(errs)

@@ -4,7 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
@@ -15,7 +15,7 @@ use crate::{
     Event,
 };
 use chrono::{DateTime, Utc};
-use futures::{stream, FutureExt, SinkExt, StreamExt};
+use futures::{stream, FutureExt, SinkExt};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -187,13 +187,16 @@ impl SinkConfig for DatadogConfig {
             HttpBatchService::new(client, move |request| ready(sink.build_request(request))),
         );
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::<DatadogMetricNormalize>::new(batch.size));
+        let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+        let mut normalizer = MetricNormalizer::<DatadogMetricNormalize>::default();
 
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
-                let ep = DatadogEndpoint::from_metric(&event);
-                stream::iter(Some(PartitionInnerBuffer::new(event, ep))).map(Ok)
+                stream::iter(normalizer.apply(event).map(|event| {
+                    let endpoint = DatadogEndpoint::from_metric(&event);
+                    Ok(PartitionInnerBuffer::new(event, endpoint))
+                }))
             });
 
         Ok((VectorSink::Sink(Box::new(svc_sink)), healthcheck))
@@ -546,25 +549,25 @@ mod tests {
 
         let events = vec![
             Metric::new(
-                "total".into(),
+                "total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
             )
-            .with_namespace(Some("test".into())),
+            .with_namespace(Some("test")),
             Metric::new(
-                "check".into(),
+                "check",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("test".into()))
+            .with_namespace(Some("test"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
             Metric::new(
-                "unsupported".into(),
+                "unsupported",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("test".into()))
+            .with_namespace(Some("test"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
@@ -598,18 +601,18 @@ mod tests {
         let interval = 60;
         let events = vec![
             Metric::new(
-                "total".into(),
+                "total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.5 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_timestamp(Some(ts())),
             Metric::new(
-                "check".into(),
+                "check",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("ns".into()))
+            .with_namespace(Some("ns"))
             .with_tags(Some(tags()))
             .with_timestamp(Some(ts())),
         ];
@@ -625,7 +628,7 @@ mod tests {
     #[test]
     fn encode_gauge() {
         let events = vec![Metric::new(
-            "volume".into(),
+            "volume",
             MetricKind::Absolute,
             MetricValue::Gauge { value: -1.1 },
         )
@@ -642,7 +645,7 @@ mod tests {
     #[test]
     fn encode_set() {
         let events = vec![Metric::new(
-            "users".into(),
+            "users",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
@@ -744,7 +747,7 @@ mod tests {
     fn encode_distribution() {
         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
         let events = vec![Metric::new(
-            "requests".into(),
+            "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
@@ -765,7 +768,7 @@ mod tests {
     fn encode_datadog_distribution() {
         // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
         let events = vec![Metric::new(
-            "requests".into(),
+            "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],

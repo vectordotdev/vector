@@ -1,0 +1,14 @@
+# result:
+#
+# error[E203]: syntax error
+#   ┌─ :2:5
+#   │
+# 2 │ .foo.
+#   │     ^
+#   │     │
+#   │     unexpected end of query path
+#   │     expected one of: "(", "identifier", "string literal"
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+.foo.

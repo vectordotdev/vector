@@ -1,0 +1,9 @@
+# object: { "message": "bananas and another ant" }
+# result: "anaana"
+
+.message = to_string!(.message)
+.result = parse_regex!(.message, r'(?P<an>an.)')
+a = strip_whitespace(.result.an)
+b = strip_whitespace(.result."1")
+
+a + b

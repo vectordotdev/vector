@@ -32,8 +32,8 @@ pub mod service_control {
     use std::fmt;
     use std::time::Duration;
 
-    use nom::lib::std::fmt::Formatter;
     use snafu::ResultExt;
+    use std::fmt::Formatter;
 
     struct ErrorDisplay<'a> {
         error: &'a windows_service::Error,

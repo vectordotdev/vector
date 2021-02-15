@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-01-10"
+last_modified_on: "2021-01-10"
 $schema: ".schema.json"
 title: "The `kafka` sink now supports metrics"
 description: "Send metric events to Kafka"
@@ -8,7 +8,7 @@ featured: false
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: featured", "domain: metrics", "sink: kafka"]
+tags: ["type: enhancement", "domain: metrics", "sink: kafka"]
 ---
 
 The [`kafka` sink][kafka_sink] now supports metrics, making it possible to send
