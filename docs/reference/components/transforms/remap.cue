@@ -102,7 +102,7 @@ components: transforms: "remap": {
 				without paying the performance or safety penalty.
 
 				Learn more about Vector's Remap Language in the
-				[Vector Remap Language reference](\(urls.vector_remap_language_reference)).
+				[Vector Remap Language reference](\#(urls.vrl_reference)).
 				"""#
 		}
 	}
