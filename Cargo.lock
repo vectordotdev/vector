@@ -2099,6 +2099,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fakelogs"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "fakedata_generator",
+ "rand 0.8.2",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7977,7 +7986,7 @@ dependencies = [
  "encoding_rs",
  "evmap",
  "exitcode",
- "fakedata_generator",
+ "fakelogs",
  "file-source",
  "flate2",
  "futures 0.1.30",
