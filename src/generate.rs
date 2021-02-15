@@ -574,7 +574,9 @@ mod tests {
 
         assert_eq!(
             generate_example(false, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"[transforms.transform0]
+            Ok(indoc! {r#"
+
+                [transforms.transform0]
                 inputs = []
                 type = "add_fields"
 
