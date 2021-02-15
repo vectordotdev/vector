@@ -35,7 +35,7 @@ package metadata
 		warnings?: [string, ...string]
 	}
 
-	#Type: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "path" | "string" | "regex" | "timestamp"
+	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
 
 	concepts:    _
 	description: string

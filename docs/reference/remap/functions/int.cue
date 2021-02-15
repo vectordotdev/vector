@@ -21,7 +21,7 @@ remap: functions: int: {
 		"`value` is not an integer.",
 	]
 	return: {
-		types: ["int"]
+		types: ["integer"]
 		rules: [
 			#"If `value` is an integer then it is returned."#,
 			#"Otherwise an error is raised."#,

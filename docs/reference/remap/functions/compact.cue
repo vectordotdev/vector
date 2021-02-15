@@ -13,7 +13,7 @@ remap: functions: compact: {
 			name:        "value"
 			description: "The map or array to compact."
 			required:    true
-			type: ["array", "map"]
+			type: ["array", "object"]
 		},
 		{
 			name:        "recursive"
@@ -60,7 +60,7 @@ remap: functions: compact: {
 	]
 	internal_failure_reasons: []
 	return: {
-		types: ["array", "map"]
+		types: ["array", "object"]
 		rules: [
 			"The return type will match the `value` type.",
 		]
@@ -74,7 +74,7 @@ remap: functions: compact: {
 			return: ["foo", "bar", "buzz"]
 		},
 		{
-			title: "Compact a map"
+			title: "Compact an object"
 			source: #"""
 				compact({"field1": 1, "field2": "", "field3": [], "field4": null}, string: true, array: true, null: true)
 				"""#

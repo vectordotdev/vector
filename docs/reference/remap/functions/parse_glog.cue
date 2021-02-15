@@ -16,7 +16,7 @@ remap: functions: parse_glog: {
 	internal_failure_reasons: [
 		"`value` does not match the `glog` format",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 	examples: [
 		{
 			title: "Parse via glog"

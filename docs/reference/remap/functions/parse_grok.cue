@@ -38,7 +38,7 @@ remap: functions: parse_grok: {
 	internal_failure_reasons: [
 		"`value` fails to parse via the provided `pattern`",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{

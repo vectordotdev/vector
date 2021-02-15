@@ -17,7 +17,7 @@ remap: functions: parse_aws_alb_log: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted AWS ALB log",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{
