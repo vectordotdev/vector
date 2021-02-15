@@ -1,12 +1,8 @@
 use super::{Error, Repl};
 use rustyline::{error::ReadlineError, Editor};
 use serde::Deserialize;
-use std::fs::File;
-use std::io::Read;
 use stdlib::all as funcs;
 use vrl::{state, diagnostic::Formatter, Runtime, Target, Value};
-
-const TUTORIALS_TOML_FILE: &str = "./tutorials.toml";
 
 #[derive(Deserialize)]
 struct Tutorial {
@@ -117,10 +113,9 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 }
 
 fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
-    let mut buf = String::new();
-    let _ = File::open(TUTORIALS_TOML_FILE)?.read_to_string(&mut buf)?;
+    let toml_file = std::include_str!("../tutorials.toml");
 
-    match toml::from_str(&buf) {
+    match toml::from_str(toml_file) {
         Ok(tuts) => Ok(tuts),
         Err(err) => Err(Error::Toml(err))
     }
