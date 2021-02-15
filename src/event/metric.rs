@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use remap::{Object, Segment};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -9,6 +8,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metric {
@@ -54,10 +54,10 @@ pub enum MetricKind {
     Absolute,
 }
 
-impl TryFrom<remap::Value> for MetricKind {
+impl TryFrom<vrl::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: remap::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -70,7 +70,7 @@ impl TryFrom<remap::Value> for MetricKind {
     }
 }
 
-impl From<MetricKind> for remap::Value {
+impl From<MetricKind> for vrl::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -198,10 +198,10 @@ pub fn zip_quantiles(
         .collect()
 }
 
-/// Convert the Metric value into a remap value.
-/// Currently remap can only read the type of the value and doesn't consider
+/// Convert the Metric value into a vrl value.
+/// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
-impl From<MetricValue> for remap::Value {
+impl From<MetricValue> for vrl::Value {
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter { .. } => "counter",
@@ -714,13 +714,26 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
-impl Object for Metric {
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
+impl Target for Metric {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
         match path.segments() {
+            [Segment::Field(tags)] if tags.as_str() == "tags" => {
+                let value = value.try_object().map_err(|e| e.to_string())?;
+                for (field, value) in value.iter() {
+                    self.set_tag_value(
+                        field.as_str().to_owned(),
+                        value
+                            .try_bytes_utf8_lossy()
+                            .map_err(|e| e.to_string())?
+                            .into_owned(),
+                    );
+                }
+                Ok(())
+            }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.set_tag_value(
@@ -756,9 +769,9 @@ impl Object for Metric {
         }
     }
 
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            let mut map = BTreeMap::<String, remap::Value>::new();
+            let mut map = BTreeMap::<String, vrl::Value>::new();
             map.insert("name".to_string(), self.series.name.name.clone().into());
             if let Some(ref namespace) = self.series.name.namespace {
                 map.insert("namespace".to_string(), namespace.clone().into());
@@ -796,7 +809,7 @@ impl Object for Metric {
             }
             [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags().map(|map| {
                 let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                remap::Value::from_iter(iter)
+                vrl::Value::from_iter(iter)
             })),
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
@@ -812,11 +825,7 @@ impl Object for Metric {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &remap::Path,
-        _compact: bool,
-    ) -> Result<Option<remap::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, _compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -831,7 +840,7 @@ impl Object for Metric {
             [Segment::Field(tags)] if tags.as_str() == "tags" => {
                 Ok(self.series.tags.take().map(|map| {
                     let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                    remap::Value::from_iter(iter)
+                    vrl::Value::from_iter(iter)
                 }))
             }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
@@ -877,9 +886,9 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use remap::{Path, Value};
     use shared::btreemap;
     use std::str::FromStr;
+    use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

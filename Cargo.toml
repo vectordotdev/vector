@@ -47,14 +47,18 @@ members = [
   "lib/k8s-test-framework",
   "lib/portpicker",
   "lib/prometheus-parser",
-  "lib/remap-cli",
-  "lib/remap-functions",
-  "lib/remap-lang",
-  "lib/remap-tests",
   "lib/shared",
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/vrl/cli",
+  "lib/vrl/compiler",
+  "lib/vrl/core",
+  "lib/vrl/diagnostic",
+  "lib/vrl/parser",
+  "lib/vrl/stdlib",
+  "lib/vrl/tests",
+  "lib/vrl/proptests",
 ]
 
 [dependencies]
@@ -64,10 +68,10 @@ derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
-remap-cli = { path = "lib/remap-cli", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1"
@@ -133,9 +137,9 @@ num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
 
-# Remap Lang
-remap = { package = "remap-lang", path = "lib/remap-lang" }
-remap-functions = { path = "lib/remap-functions" }
+# VRL Lang
+vrl = { path = "lib/vrl/core" }
+vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
 anyhow = "1.0.37"
@@ -307,9 +311,6 @@ wasm = ["lucet-runtime", "lucet-wasi", "lucetc", "vector-wasm"]
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
 kubernetes = ["evmap", "k8s-openapi"]
-
-# VRL
-vrl-cli = ["remap-cli"]
 
 # API
 api = [

@@ -1,0 +1,18 @@
+# result:
+#
+# error[E102]: non-boolean predicate
+#   ┌─ :2:4
+#   │
+# 2 │ if "nope" {
+#   │    ^^^^^^
+#   │    │
+#   │    this predicate must resolve to a boolean
+#   │    instead it resolves to "string"
+#   │
+#   = hint: coerce the value using one of the coercion functions
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/102
+
+if "nope" {
+    true
+}

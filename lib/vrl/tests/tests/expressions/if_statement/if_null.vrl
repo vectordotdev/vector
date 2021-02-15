@@ -1,0 +1,5 @@
+# result: null
+
+if false {
+    "yes"
+}

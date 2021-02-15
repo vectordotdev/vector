@@ -1,0 +1,100 @@
+[package]
+name = "vrl-tests"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+parser = { package = "vrl-parser", path = "../parser" }
+# stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+vrl = { path = "../core" }
+ansi_term = "0.12"
+chrono = "0.4"
+glob = "0.3"
+prettydiff = "0.4"
+regex = "1"
+serde_json = "1"
+structopt = { version = "0.3", default-features = false }
+
+[dependencies.stdlib]
+package = "vrl-stdlib"
+path = "../stdlib"
+default-features = false
+features = [
+    "append",
+    "array",
+    "assert",
+    "boolean",
+    "ceil",
+    "compact",
+    "contains",
+    "decode_base64",
+    "del",
+    "downcase",
+    "encode_base64",
+    "encode_json",
+    "ends_with",
+    "exists",
+    "flatten",
+    "float",
+    "floor",
+    "format_number",
+    "format_timestamp",
+    "get_env_var",
+    "get_hostname",
+    "includes",
+    "integer",
+    "ip_cidr_contains",
+    "ip_subnet",
+    "ip_to_ipv6",
+    "ipv6_to_ipv4",
+    "is_nullish",
+    "join",
+    "length",
+    "log",
+    "match",
+    "md5",
+    "merge",
+    "now",
+    "object",
+    "parse_aws_alb_log",
+    "parse_aws_cloudwatch_log_subscription_message",
+    "parse_aws_vpc_flow_log",
+    "parse_common_log",
+    "parse_duration",
+    "parse_glog",
+    "parse_grok",
+    "parse_json",
+    "parse_regex_all",
+    "parse_regex",
+    "parse_syslog",
+    "parse_timestamp",
+    "parse_tokens",
+    "parse_url",
+    "push",
+    "replace",
+    "round",
+    "sha1",
+    "sha2",
+    "sha3",
+    "slice",
+    "split",
+    "starts_with",
+    "string",
+    "strip_ansi_escape_codes",
+    "strip_whitespace",
+    "timestamp",
+    "to_bool",
+    "to_float",
+    "to_int",
+    "to_string",
+    "to_syslog_facility",
+    "to_syslog_level",
+    "to_syslog_severity",
+    "to_timestamp",
+    "to_unix_timestamp",
+    "truncate",
+    "upcase",
+    "uuid_v4",
+]

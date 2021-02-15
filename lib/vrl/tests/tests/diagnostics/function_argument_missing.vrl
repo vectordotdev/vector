@@ -1,0 +1,12 @@
+# result:
+#
+# error[E107]: function argument missing
+#   ┌─ :2:1
+#   │
+# 2 │ to_string()
+#   │ ^^^^^^^^^^^ required argument missing: "value" (position 0)
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/107
+
+to_string()

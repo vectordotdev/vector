@@ -15,6 +15,7 @@ use vector::{
     event::{Event, Value},
     test_util::runtime,
 };
+use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
@@ -26,7 +27,7 @@ criterion_group!(
 criterion_main!(benches);
 
 bench_function! {
-    upcase => remap_functions::Upcase;
+    upcase => vrl_stdlib::Upcase;
 
     literal_value {
         args: func_args![value: "foo"],
@@ -35,7 +36,7 @@ bench_function! {
 }
 
 bench_function! {
-    downcase => remap_functions::Downcase;
+    downcase => vrl_stdlib::Downcase;
 
     literal_value {
         args: func_args![value: "FOO"],
@@ -44,7 +45,7 @@ bench_function! {
 }
 
 bench_function! {
-    parse_json => remap_functions::ParseJson;
+    parse_json => vrl_stdlib::ParseJson;
 
     literal_value {
         args: func_args![value: r#"{"key": "value"}"#],
@@ -72,9 +73,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 source: indoc! {r#"
                     .foo = "bar"
                     .bar = "baz"
-                    .copy = .copy_from
-                "#}
-                .to_string(),
+                    .copy = string!(.copy_from)
+                "#},
                 drop_on_err: true,
             })
             .unwrap(),
@@ -134,7 +134,7 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: parse JSON with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: ".bar = parse_json!(.foo)".to_owned(),
+                source: ".bar = parse_json!(string!(.foo))".to_owned(),
                 drop_on_err: false,
             })
             .unwrap(),
@@ -202,8 +202,7 @@ fn benchmark_remap(c: &mut Criterion) {
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
                     .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
-                "#}
-                .to_owned(),
+                "#},
                 drop_on_err: true,
             })
             .unwrap(),
