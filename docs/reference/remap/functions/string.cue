@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: string: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not a string, if `value` is a string it is returned. This allows the type checker
-		to guarantee that the returned value is a string and can be used in any function that expects this type.
+		Errors if `value` is not a string, if `value` is a string it is returned.
+
+		This allows the type checker to guarantee that the returned value is a string and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [

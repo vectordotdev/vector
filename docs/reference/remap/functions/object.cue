@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: object: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not an object, if `value` is an object it is returned. This allows the type checker
-		to guarantee that the returned value is an object and can be used in any function that expects this type.
+		Errors if `value` is not an object, if `value` is an object it is returned.
+
+		This allows the type checker to guarantee that the returned value is an object and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [

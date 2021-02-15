@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: array: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not an array, if `value` is an array it is returned. This allows the type checker
-		to guarantee that the returned value is an array and can be used in any function that expects this type.
+		Errors if `value` is not an array, if `value` is an array it is returned.
+
+		This allows the type checker to guarantee that the returned value is an array and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [

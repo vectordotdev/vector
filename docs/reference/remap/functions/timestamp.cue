@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: timestamp: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not a timestamp, if `value` is a timestamp it is returned. This allows the type checker
-		to guarantee that the returned value is a timestamp and can be used in any function that expects this type.
+		Errors if `value` is not a timestamp, if `value` is a timestamp it is returned.
+
+		This allows the type checker to guarantee that the returned value is a timestamp and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [

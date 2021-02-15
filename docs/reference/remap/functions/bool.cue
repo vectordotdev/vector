@@ -1,10 +1,12 @@
 package metadata
 
 remap: functions: bool: {
-	category: "Coerce"
+	category: "Type"
 	description: """
-		Errors if `value` is not a boolean, if `value` is a boolean it is returned. This allows the type checker
-		to guarantee that the returned value is a boolean and can be used in any function that expects this type.
+		Errors if `value` is not a boolean, if `value` is a boolean it is returned.
+
+		This allows the type checker to guarantee that the returned value is a boolean and can be used in any function
+		that expects this type.
 		"""
 
 	arguments: [
