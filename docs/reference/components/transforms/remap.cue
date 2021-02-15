@@ -92,7 +92,7 @@ components: transforms: "remap": {
 	how_it_works: {
 		remap_language: {
 			title: "Vector Remap Language"
-			body: #"""
+			body:  #"""
 				The Vector Remap Language (VRL) is a restrictive, fast, and safe language we
 				designed specifically for mapping observability data. It avoids the need to
 				chain together many fundamental Vector transforms to accomplish rudimentary
