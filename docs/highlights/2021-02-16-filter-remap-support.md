@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-12-23"
+last_modified_on: "2021-02-16"
 $schema: ".schema.json"
 title: "Remap support for the `filter` transform"
 description: "Use VRL to specify conditions for filtering events in a stream"

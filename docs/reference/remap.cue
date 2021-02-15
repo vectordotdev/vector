@@ -3,6 +3,7 @@ package metadata
 #Remap: {
 	#Characteristic: {
 		anchor:      name
+		enum?:       #Enum
 		name:        string
 		title:       string
 		description: string
@@ -45,6 +46,7 @@ package metadata
 	functions:   _
 	literals:    _
 	principles:  _
+	syntax:      _
 }
 
 remap: #Remap & {

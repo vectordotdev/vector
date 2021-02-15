@@ -1,3 +1,5 @@
+package metadata
+
 remap: functions: parse_syslog: {
 	category:    "Parse"
 	description: """

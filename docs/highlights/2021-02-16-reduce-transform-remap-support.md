@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2020-12-23"
+last_modified_on: "2021-02-16"
 $schema: ".schema.json"
 title: "Remap support for the `reduce` transform (multi-line logs)"
 description: "Use VRL to specify conditions for reducing multi-log lines into a single log event"

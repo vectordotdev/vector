@@ -239,12 +239,12 @@ mod tests {
     use crate::{
         config::SinkContext,
         event::{MetricKind, MetricValue},
-        prometheus::proto,
         sinks::util::test::build_test_server,
         test_util,
     };
     use futures::StreamExt;
     use http::HeaderMap;
+    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {

@@ -1,3 +1,5 @@
+package metadata
+
 remap: functions: to_float: {
 	category: "Coerce"
 	description: """
