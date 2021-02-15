@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use indoc::indoc;
-use remap::prelude::*;
 use vector::transforms::{
     add_fields::AddFields,
     coercer::CoercerConfig,
@@ -74,7 +73,8 @@ fn benchmark_remap(c: &mut Criterion) {
                     .foo = "bar"
                     .bar = "baz"
                     .copy = string!(.copy_from)
-                "#},
+                "#}
+                .to_owned(),
                 drop_on_err: true,
             })
             .unwrap(),
@@ -202,7 +202,8 @@ fn benchmark_remap(c: &mut Criterion) {
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
                     .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
-                "#},
+                "#}
+                .to_owned(),
                 drop_on_err: true,
             })
             .unwrap(),

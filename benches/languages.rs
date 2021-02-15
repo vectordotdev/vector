@@ -85,7 +85,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   type = "remap"
                   inputs = ["in"]
                   source = """
-                  . = parse_json!(.message)
+                  . = parse_json!(string!(.message))
                   """
             "#},
         ),
