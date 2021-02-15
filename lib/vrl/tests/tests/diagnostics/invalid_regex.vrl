@@ -1,0 +1,12 @@
+# result:
+#
+# error[E101]: invalid regex
+#   ┌─ :2:1
+#   │
+# 2 │ r'['
+#   │ ^^^^ regex parse error: unclosed character class: [
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/101
+
+r'['

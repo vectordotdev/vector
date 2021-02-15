@@ -15,7 +15,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        !exists(.a) && \
+        !exists(.a) &&
         .b == 4
       '''
 
@@ -36,7 +36,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a.b == 3 && \
+        .a.b == 3 &&
         !exists(.a.c)
       '''
 
@@ -60,10 +60,10 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        !exists(.a.b) && \
-        !exists(.a.c) && \
-        !exists(.a) && \
-        !exists(.b.a) && \
-        exists(.b) && \
+        !exists(.a.b) &&
+        !exists(.a.c) &&
+        !exists(.a) &&
+        !exists(.b.a) &&
+        exists(.b) &&
         .b.b == 4
       '''

@@ -4,8 +4,9 @@ use crate::{
     internal_events::RemapConditionExecutionError,
     Event,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{Program, Runtime, Value};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {
@@ -21,28 +22,28 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let constraint = TypeConstraint {
-            allow_any: false,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Boolean,
-                ..Default::default()
-            },
-        };
+        // TODO(jean): re-add this to VRL
+        // let constraint = TypeConstraint {
+        //     allow_any: false,
+        //     type_def: TypeDef {
+        //         fallible: true,
+        //         kind: value::Kind::Boolean,
+        //         ..Default::default()
+        //     },
+        // };
 
         // Filter out functions that directly mutate the event.
         //
         // TODO(jean): expose this as a method on the `Function` trait, so we
         // don't need to do this manually.
-        let functions = remap_functions::all()
+        let functions = vrl_stdlib::all()
             .into_iter()
             .filter(|f| f.identifier() != "del")
             .filter(|f| f.identifier() != "only_fields")
             .collect::<Vec<_>>();
 
-        let (program, _) = Program::new(self.source.clone(), &functions, Some(constraint), false)
-            .map_err(|diagnostics| {
-            remap::Formatter::new(&self.source, diagnostics)
+        let program = vrl::compile(&self.source, &functions).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()
         })?;
@@ -59,11 +60,11 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn run(&self, event: &Event) -> remap::RuntimeResult {
-        // TODO(jean): This clone exists until remap-lang has an "immutable"
+    fn run(&self, event: &Event) -> vrl::RuntimeResult {
+        // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
         //
-        // For now, mutability in reduce "remap ends-when conditions" is
+        // For now, mutability in reduce "vrl ends-when conditions" is
         // allowed, but it won't mutate the original event, since we cloned it
         // here.
         //
@@ -73,8 +74,8 @@ impl Remap {
         //
         // see: https://github.com/timberio/vector/issues/4744
         match event {
-            Event::Log(event) => Runtime::default().run(&mut event.clone(), &self.program),
-            Event::Metric(event) => Runtime::default().run(&mut event.clone(), &self.program),
+            Event::Log(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
         }
     }
 }
@@ -84,7 +85,7 @@ impl Condition for Remap {
         self.run(&event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => unreachable!("boolean type constraint set"),
+                _ => false,
             })
             .unwrap_or_else(|_| {
                 emit!(RemapConditionExecutionError);
@@ -100,7 +101,7 @@ impl Condition for Remap {
         match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-            _ => unreachable!("boolean type constraint set"),
+            _ => Err("source execution resolved to a non-boolean value".into()),
         }
     }
 }

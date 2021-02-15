@@ -1,0 +1,4 @@
+# result: { "err": "unable to divide by zero", "ok": null }
+
+.ok, .err = 1 / 0
+.

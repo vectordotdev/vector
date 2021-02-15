@@ -1,0 +1,20 @@
+# result:
+#
+# error[E650]: comparison operators cannot be chained
+#   ┌─ :2:7
+#   │
+# 2 │ 2 < 3 < 4
+#   │       ^
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#
+# error[E650]: comparison operators cannot be chained
+#   ┌─ :3:15
+#   │
+# 3 │ true == false == true
+#   │               ^^
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+2 < 3 < 4
+true == false == true

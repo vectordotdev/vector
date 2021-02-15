@@ -70,19 +70,19 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .message == "first message value" && \
-        .host == "host1" && \
-        .request_id == "1" && \
-        .counter == 21 && \
+        .message == "first message value" &&
+        .host == "host1" &&
+        .request_id == "1" &&
+        .counter == 21 &&
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .message == "other reduce one" && \
-        .host == "host3" && \
-        .request_id == "2" && \
-        .counter == 20 && \
+        .message == "other reduce one" &&
+        .host == "host3" &&
+        .request_id == "2" &&
+        .counter == 20 &&
         exists(.timestamp_end)
       '''
 
@@ -177,21 +177,21 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .message == "first message value second message value third message value" && \
-        .another == "foo\nbar baz\nqux\nquux" && \
-        .host == "host1" && \
-        .request_id == "1" && \
-        .counter == 21 && \
+        .message == "first message value second message value third message value" &&
+        .another == "foo\nbar baz\nqux\nquux" &&
+        .host == "host1" &&
+        .request_id == "1" &&
+        .counter == 21 &&
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .message == "other reduce one other reduce two other reduce three" && \
-        .concat_array == ["foo", "bar", "baz"] && \
-        .host == "host3" && \
-        .request_id == "2" && \
-        .counter == 20 && \
+        .message == "other reduce one other reduce two other reduce three" &&
+        .concat_array == ["foo", "bar", "baz"] &&
+        .host == "host3" &&
+        .request_id == "2" &&
+        .counter == 20 &&
         exists(.timestamp_end)
       '''
 
@@ -239,8 +239,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .mins == 5.1 && \
-        .maxs == 7.2 && \
+        .mins == 5.1 &&
+        .maxs == 7.2 &&
         exists(.timestamp_end)
       '''
 
@@ -274,8 +274,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .mins == 5 && \
-        .maxs == 7 && \
+        .mins == 5 &&
+        .maxs == 7 &&
         exists(.timestamp_end)
       '''
 
@@ -352,22 +352,22 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .request_id == "1" && \
-        .counter == 6 && \
+        .request_id == "1" &&
+        .counter == 6 &&
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .request_id == "2" && \
-        .counter == 7 && \
+        .request_id == "2" &&
+        .counter == 7 &&
         exists(.test_end_message)
       '''
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .request_id == "3" && \
-        .counter == 5 && \
+        .request_id == "3" &&
+        .counter == 5 &&
         exists(.test_end_message)
       '''
 
@@ -378,7 +378,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match!(.message, /^\\w.*/)"
+    starts_when.source = "match(string!(.message), r'^\\w.*')"
 
 [[tests]]
   name = "reduce_ruby_exception"
@@ -437,7 +437,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     ends_when.type = "remap"
-    ends_when.source = """!ends_with(strip_whitespace!(.message), "\\\\")"""
+    ends_when.source = """!ends_with(strip_whitespace(string!(.message)), "\\\\")"""
 
 [[tests]]
   name = "reduce_line_continuation"
@@ -491,7 +491,7 @@
   type = "reduce"
   merge_strategies.message = "concat"
   ends_when.type = "remap"
-  ends_when.source = """ends_with(strip_whitespace!(.message), ";")"""
+  ends_when.source = """ends_with(strip_whitespace(string!(.message)), ";")"""
 
 [[tests]]
   name = "reduce_line_termination"
@@ -545,7 +545,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     starts_when.type = "remap"
-    starts_when.source = "match!(.message, /^<\\d\\d> /)"
+    starts_when.source = "match(string!(.message), r'^<\\d\\d> ')"
 
 [[tests]]
   name = "reduce_log_stream"
@@ -599,7 +599,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match!(.message, /^\\d{4}-\\d{2}-\\d{2} .+/)"
+    starts_when.source = "match(string!(.message), r'^\\d{4}-\\d{2}-\\d{2} .+')"
 
 [[tests]]
   name = "reduce_java_exception"
@@ -669,6 +669,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        starts_with!(.message, "2020-10-19 04:34:15,389") && \
-        ends_with!(.message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
+        message = string!(.message)
+        starts_with(message, "2020-10-19 04:34:15,389") &&
+        ends_with(message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
       '''
