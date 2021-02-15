@@ -2,9 +2,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use rand::distributions::Distribution;
 use rand::distributions::Uniform;
-use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rand::SeedableRng;
 
 use vector::event::metric::Sample;
 use vector::sinks::util::statistic::DistributionStatistic;
