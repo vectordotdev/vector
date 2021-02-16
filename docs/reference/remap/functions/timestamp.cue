@@ -29,14 +29,12 @@ remap: functions: timestamp: {
 	}
 	examples: [
 		{
-			title: "Timestamp"
-			input: log: {
-				timestamp: "2020-10-10T16:00:00Z"
-			}
+			title: "Declare a timestamp type"
+			input: log: timestamp: "2020-10-10T16:00:00Z"
 			source: #"""
-				format_timestamp!(timestamp!(.timestamp), format: "%+")
+				timestamp(.timestamp)
 				"""#
-			return: "2020-10-10T16:00:00Z"
+			return: input.log.timestamp
 		},
 	]
 }
