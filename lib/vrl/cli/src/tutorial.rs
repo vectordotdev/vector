@@ -45,7 +45,7 @@ pub fn tutorial() -> Result<(), Error> {
                     "next" => {
                         clear_screen();
 
-                        // End if no more tutorials are less, or else increment the index
+                        // End if no more tutorials are left, or else increment the index
                         if (index + 1) == tutorials.len() {
                             println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                             break;
@@ -70,6 +70,7 @@ pub fn tutorial() -> Result<(), Error> {
                         let event = &mut tut.initial_event;
                         let correct_answer = &tut.correct_answer;
 
+                        // Purely for debugging
                         if command == "cheat" {
                             clear_screen();
                             println!("{}", correct_answer);
@@ -85,12 +86,13 @@ pub fn tutorial() -> Result<(), Error> {
                                         event
                                     );
 
+                                    // Exit if no more tutorials are left, otherwise move on to the next one
                                     if (index + 1) == tutorials.len() {
                                         println!("Congratulations! You've successfully completed the VRL tutorial.\n");
                                         break 'outer;
                                     } else {
                                         println!(
-                                            "You've now completed tutorial {} out of {}.\n\nType `next` and hit Enter to move on to tutorial number {} or `exit` to leave the VRL tutorial.\n",
+                                            "You've now completed tutorial {} out of {}.\nType `next` and hit Enter to move on to tutorial number {} or `exit` to leave the VRL tutorial.\n",
                                             index + 1,
                                             tutorials.len(),
                                             index + 2,
@@ -120,7 +122,6 @@ pub fn tutorial() -> Result<(), Error> {
                                         }
 
                                         index = index.saturating_add(1);
-
                                         print_tutorial_help_text(index, &tutorials);
                                     }
                                 } else {
