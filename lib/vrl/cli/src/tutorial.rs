@@ -31,10 +31,10 @@ pub fn tutorial() -> Result<(), Error> {
 
     print_tutorial_help_text(index, &tutorials);
 
-    loop {
+    'outer: loop {
         let readline = rl.readline("$ ");
         match readline.as_deref() {
-            Ok(line) if line == "exit" || line == "quit" => break,
+            Ok(line) if line == "exit" || line == "quit" => break 'outer,
             Ok(line) => {
                 rl.add_history_entry(line);
 
@@ -69,7 +69,7 @@ pub fn tutorial() -> Result<(), Error> {
 
                                     if (index + 1) == tutorials.len() {
                                         println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
-                                        break;
+                                        break 'outer;
                                     } else {
                                         println!(
                                             "You've completed tutorial {} out of {}\n",
@@ -91,11 +91,11 @@ pub fn tutorial() -> Result<(), Error> {
                     }
                 };
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) => break 'outer,
+            Err(ReadlineError::Eof) => break 'outer,
             Err(err) => {
                 println!("unable to read line: {}", err);
-                break;
+                break 'outer;
             }
         }
     }
