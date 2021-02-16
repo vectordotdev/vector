@@ -67,7 +67,10 @@ pub fn tutorial() -> Result<(), Error> {
                                 if event == &tut.correct_answer {
                                     clear_screen();
 
-                                    println!("CORRECT! You've wisely ended up with this event:\n\n{}\n", event);
+                                    println!(
+                                        "CORRECT! You've wisely ended up with this event:\n\n{}\n",
+                                        event
+                                    );
 
                                     if (index + 1) == tutorials.len() {
                                         println!("Congratulations! You've successfully completed the VRL tutorial.\n");
@@ -85,7 +88,11 @@ pub fn tutorial() -> Result<(), Error> {
 
                                             'next: loop {
                                                 match rl.readline("> ").as_deref() {
-                                                    Ok(line) if line == "exit" || line == "quit" => break 'outer,
+                                                    Ok(line)
+                                                        if line == "exit" || line == "quit" =>
+                                                    {
+                                                        break 'outer
+                                                    }
                                                     Ok(line) if line == "next" => {
                                                         clear_screen();
                                                         break 'next;
