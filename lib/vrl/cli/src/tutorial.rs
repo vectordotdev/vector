@@ -27,7 +27,9 @@ pub fn tutorial() -> Result<(), Error> {
 
     let mut tutorials = load_tutorials_from_toml()?.tutorials;
 
-    println!("\nWelcome to the Vector Remap Language interactive tutorial!\n");
+    clear_screen();
+
+    println!("Welcome to the Vector Remap Language interactive tutorial!\n");
 
     print_tutorial_help_text(index, &tutorials);
 
@@ -39,8 +41,11 @@ pub fn tutorial() -> Result<(), Error> {
                 rl.add_history_entry(line);
 
                 match line {
+                    "" => continue,
                     "help" => help(),
                     "next" => {
+                        clear_screen();
+
                         if (index + 1) == tutorials.len() {
                             println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                             break;
@@ -51,6 +56,8 @@ pub fn tutorial() -> Result<(), Error> {
                         print_tutorial_help_text(index, &tutorials);
                     }
                     "prev" => {
+                        clear_screen();
+
                         if index == 0 {
                             println!("\n\nYou're back at the beginning!\n\n");
                         }
@@ -58,13 +65,19 @@ pub fn tutorial() -> Result<(), Error> {
                         index = index.saturating_sub(1);
                         print_tutorial_help_text(index, &tutorials);
                     }
-                    "" => continue,
                     command => {
                         let tut = &mut tutorials[index];
                         let event = &mut tut.initial_event;
+                        let correct_answer = &tut.correct_answer;
+
+                        if command == "cheat" {
+                            clear_screen();
+                            println!("{}", correct_answer);
+                        }
+
                         match resolve_to_value(event, &mut rt, command, &mut compiler_state) {
                             Ok(result) => {
-                                if event == &tut.correct_answer {
+                                if event == correct_answer {
                                     clear_screen();
 
                                     println!(
@@ -77,9 +90,10 @@ pub fn tutorial() -> Result<(), Error> {
                                         break 'outer;
                                     } else {
                                         println!(
-                                            "You've now completed tutorial {} out of {}.\n\nType `next` and hit Enter to move on or `exit` to leave the VRL tutorial.\n",
+                                            "You've now completed tutorial {} out of {}.\n\nType `next` and hit Enter to move on to tutorial number {} or `exit` to leave the VRL tutorial.\n",
                                             index + 1,
-                                            tutorials.len()
+                                            tutorials.len(),
+                                            index + 2,
                                         );
 
                                         // Wait for "next" to continue
@@ -186,4 +200,5 @@ Tutorial commands:
   next     Load the next tutorial
   prev     Load the previous tutorial
   exit     Exit the VRL interactive tutorial
+  cheat    Choose the coward's way out
 "#;

@@ -27,3 +27,37 @@ TASK:
 
 correct_answer = { three = 3 }
 initial_event = { one = 1, two = 2, three = 3 }
+
+[[tutorials]]
+number = "2.1"
+title = "Parsing JSON"
+help_text = """
+You can parse inputs to JSON in VRL using the `parse_json` function:
+
+parse_json(.field)
+
+`parse_json` is fallible, so make sure to handle potential errors!
+
+TASK:
+- Set the value of the event to the `message` field parsed as JSON
+"""
+
+correct_answer = { severity = "info", message = "Coast is clear" }
+initial_event = { message = '{"severity":"info","message":"Coast is clear"}', timestamp = "2021-02-16T00:25:12.728003Z" }
+
+[[tutorials]]
+number = "2.2"
+title = "Parsing Syslog"
+help_text = """
+You can parse Syslog messages into named fields using the `parse_syslog` function:
+
+parse_syslog(.field)
+
+`parse_syslog` is fallible, so make sure to handle potential errors!
+
+TASK:
+- Set the value of the event to the `message` field parsed from Syslog
+"""
+
+correct_answer = { appname = "su", facility = "user", hostname = "initech.io", message = "TPS report missing cover sheet", msgid = "ID81", procid = 4015, severity = "warning", timestamp = "2020-12-19 21:48:09.004 +00:00" }
+initial_event = { message = '<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet', timestamp = "2020-12-19T21:48:09.004Z" }
