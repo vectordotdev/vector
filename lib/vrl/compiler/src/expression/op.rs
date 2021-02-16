@@ -99,7 +99,7 @@ impl Expression for Op {
             Or if !lhs_kind.is_boolean() => {
                 // We can remove Null from the lhs since we know that if the lhs is Null
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
-                (lhs_def - K::Null).merge(rhs_def.clone())
+                (lhs_def - K::Null).merge(rhs_def)
             }
 
             // ... || ...
@@ -472,7 +472,7 @@ mod tests {
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
                         consequent: Block::new(vec![Literal::from("string").into()]),
-                        alternative:  Some(Block::new(vec![Literal::from(42).into()])).into()
+                        alternative:  Some(Block::new(vec![Literal::from(42).into()]))
                 }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
