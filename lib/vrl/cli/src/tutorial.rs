@@ -27,14 +27,13 @@ pub fn tutorial() -> Result<(), Error> {
 
     let mut tutorials = load_tutorials_from_toml()?.tutorials;
 
+    // Tutorial intro
     clear_screen();
-
     println!("Welcome to the Vector Remap Language interactive tutorial!\n");
-
-    print_tutorial_help_text(index, &tutorials);
+    print_tutorial_help_text(0, &tutorials);
 
     'outer: loop {
-        let readline = rl.readline("$ ");
+        let readline = rl.readline("> ");
         match readline.as_deref() {
             Ok(line) if line == "exit" || line == "quit" => break 'outer,
             Ok(line) => {
@@ -46,6 +45,7 @@ pub fn tutorial() -> Result<(), Error> {
                     "next" => {
                         clear_screen();
 
+                        // End if no more tutorials are less, or else increment the index
                         if (index + 1) == tutorials.len() {
                             println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
                             break;
@@ -168,8 +168,14 @@ fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
     }
 }
 
+#[cfg(unix)]
 fn clear_screen() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+}
+
+#[cfg(windows)]
+fn clear_screen() {
+    print!("\x1b[2J");
 }
 
 // This function reworks the resolve function in repl.rs to return a Result rather than a String. If the Result is
