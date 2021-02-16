@@ -9,7 +9,7 @@ remap: functions: flatten: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The array or map to flatten."
+			description: "The array or object to flatten."
 			required:    true
 			type: ["array", "object"]
 		},

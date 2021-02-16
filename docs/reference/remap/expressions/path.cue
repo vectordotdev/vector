@@ -4,7 +4,7 @@ remap: expressions: path: {
 	title: "Path"
 	description: """
 		A _path_ expression is a sequence of period-delimited segments that represent the location of a value
-		within a map.
+		within an object.
 		"""
 	return: """
 		Returns the value of the path location.
@@ -57,10 +57,10 @@ remap: expressions: path: {
 							Dynamic paths are currently not supported.
 							"""
 					}
-					nested_maps: {
-						title: "Nested map paths"
+					nested_objects: {
+						title: "Nested object paths"
 						description: """
-							Nested map values are accessed by delimiting each ancestor path with `.`:
+							Nested object values are accessed by delimiting each ancestor path with `.`:
 
 							```vrl
 							.parent.child

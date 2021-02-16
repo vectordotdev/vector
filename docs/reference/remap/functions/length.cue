@@ -9,7 +9,7 @@ remap: functions: length: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The array or map"
+			description: "The array or object"
 			required:    true
 			type: ["array", "object", "string"]
 		},

@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: merge: {
-	category: "Map"
+	category: "Object"
 	description: """
 		Merges the `from` object into the `to` object.
 		"""

@@ -11,7 +11,7 @@ remap: functions: compact: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The map or array to compact."
+			description: "The object or array to compact."
 			required:    true
 			type: ["array", "object"]
 		},
@@ -37,8 +37,8 @@ remap: functions: compact: {
 			type: ["boolean"]
 		},
 		{
-			name:        "map"
-			description: "Should an empty map be treated as an empty value."
+			name:        "object"
+			description: "Should an empty object be treated as an empty value."
 			required:    false
 			default:     true
 			type: ["boolean"]
