@@ -125,6 +125,10 @@ fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
     }
 }
 
+fn clear_screen() {
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+}
+
 // This function reworks the resolve function in repl.rs to return a Result rather than a String. If the Result is
 // Ok, the value is used to check whether the current event is equal to the "correct" answer.
 pub fn resolve_to_value(
