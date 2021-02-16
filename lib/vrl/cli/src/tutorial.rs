@@ -65,19 +65,41 @@ pub fn tutorial() -> Result<(), Error> {
                         match resolve_to_value(event, &mut rt, command, &mut compiler_state) {
                             Ok(result) => {
                                 if event == &tut.correct_answer {
-                                    println!("\n\nCORRECT! You have wisely ended up with this event:\n{}\n", event);
+                                    clear_screen();
+
+                                    println!("CORRECT! You've wisely ended up with this event:\n\n{}\n", event);
 
                                     if (index + 1) == tutorials.len() {
-                                        println!("\n\nCongratulations! You've successfully completed the VRL tutorial.\n");
+                                        println!("Congratulations! You've successfully completed the VRL tutorial.\n");
                                         break 'outer;
                                     } else {
                                         println!(
-                                            "You've completed tutorial {} out of {}\n",
+                                            "You've now completed tutorial {} out of {}.\n\nType `next` and hit Enter to move on or `exit` to leave the VRL tutorial.\n",
                                             index + 1,
                                             tutorials.len()
                                         );
-                                        println!("Moving on to the next exercise...\n\n");
+
+                                        // Wait for "next" to continue
+                                        {
+                                            let mut rl = Editor::<Repl>::new();
+
+                                            'next: loop {
+                                                match rl.readline("> ").as_deref() {
+                                                    Ok(line) if line == "exit" || line == "quit" => break 'outer,
+                                                    Ok(line) if line == "next" => {
+                                                        clear_screen();
+                                                        break 'next;
+                                                    }
+                                                    _ => {
+                                                        println!("\nDidn't recognize that input. Type `next` and hit Enter to move on or `exit` to leave the VRL tutorial.\n");
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         index = index.saturating_add(1);
+
                                         print_tutorial_help_text(index, &tutorials);
                                     }
                                 } else {
