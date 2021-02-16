@@ -11,7 +11,7 @@ remap: functions: length: {
 			name:        "value"
 			description: "The array or map"
 			required:    true
-			type: ["array", "map", "string"]
+			type: ["array", "object", "string"]
 		},
 	]
 	internal_failure_reasons: []
@@ -26,7 +26,7 @@ remap: functions: length: {
 
 	examples: [
 		{
-			title: "Length (map)"
+			title: "Length (object)"
 			source: """
 				length({
 					"portland": "Trail Blazers"
@@ -36,7 +36,7 @@ remap: functions: length: {
 			return: 2
 		},
 		{
-			title: "Length (nested map)"
+			title: "Length (nested object)"
 			source: """
 				length({
 					"home": {

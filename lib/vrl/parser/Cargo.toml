@@ -1,0 +1,21 @@
+[package]
+name = "vrl-parser"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+build = "build.rs" # LALRPOP preprocessing
+
+[dependencies]
+diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+
+lalrpop-util = "0.19"
+ordered-float = "2"
+paste = "1"
+thiserror = "1"
+
+[dev-dependencies]
+test-case = "1"
+
+[build-dependencies]
+lalrpop = "0.19"

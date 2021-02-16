@@ -1,0 +1,14 @@
+# result:
+#
+# error[E660]: non-boolean negation
+#   ┌─ :2:2
+#   │
+# 2 │ !!"true"
+#   │  ^------ this expression resolves to "string"
+#   │  │
+#   │  negation only works on boolean values
+#   │
+#   = hint: coerce the value using one of the coercion functions
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+!!"true"

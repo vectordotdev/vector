@@ -1,0 +1,11 @@
+# result:
+#
+# error[E601]: invalid timestamp
+#   ┌─ :2:1
+#   │
+# 2 │ t'foobar'
+#   │ ^^^^^^^^^ invalid timestamp format: input contains invalid characters
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+
+t'foobar'

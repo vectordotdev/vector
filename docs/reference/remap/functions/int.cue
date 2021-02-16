@@ -20,13 +20,7 @@ remap: functions: int: {
 	internal_failure_reasons: [
 		"`value` is not an integer.",
 	]
-	return: {
-		types: ["int"]
-		rules: [
-			#"If `value` is an integer then it is returned."#,
-			#"Otherwise an error is raised."#,
-		]
-	}
+	return: types: ["integer"]
 	examples: [
 		{
 			title: "Integer"
