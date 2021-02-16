@@ -29,14 +29,12 @@ remap: functions: bool: {
 	}
 	examples: [
 		{
-			title: "Boolean"
-			input: log: {
-				case: false
-			}
+			title: "Declare a boolean type"
+			input: log: value: false
 			source: #"""
-				starts_with("Apples and bananas", "apples", bool!(.case))
+				bool(.value)
 				"""#
-			return: true
+			return: input.log.value
 		},
 	]
 }

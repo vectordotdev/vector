@@ -20,24 +20,15 @@ remap: functions: array: {
 	internal_failure_reasons: [
 		"`value` is not an array.",
 	]
-	return: {
-		types: ["array"]
-		rules: [
-			#"If `value` is an array then it is returned."#,
-			#"Otherwise an error is raised."#,
-		]
-	}
+	return: types: ["array"]
 	examples: [
 		{
-			title: "Array"
-			input: log: {
-				field1: [1, 2, 3]
-				field2: [4, 5, 6]
-			}
+			title: "Declare an array type"
+			input: log: value: [1, 2, 3]
 			source: #"""
-				append(array!(.field1), array!(.field2))
+				array(.value)
 				"""#
-			return: [1, 2, 3, 4, 5, 6]
+			return: input.log.value
 		},
 	]
 }

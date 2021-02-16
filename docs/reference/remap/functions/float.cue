@@ -29,15 +29,12 @@ remap: functions: float: {
 	}
 	examples: [
 		{
-			title: "Float"
-			input: log: {
-				radius: 42
-			}
+			title: "Delcare a float type"
+			input: log: value: 42
 			source: #"""
-				radius = float!(.radius)
-				3.14 * radius * radius
+				float(.radius)
 				"""#
-			return: 5538.96
+			return: input.log.value
 		},
 	]
 }

@@ -23,14 +23,12 @@ remap: functions: int: {
 	return: types: ["integer"]
 	examples: [
 		{
-			title: "Integer"
-			input: log: {
-				value: 42
-			}
+			title: "Declare an integer type"
+			input: log: value: 42
 			source: #"""
-				84 / int!(.value)
+				int(.value)
 				"""#
-			return: 2
+			return: input.log.value
 		},
 	]
 }

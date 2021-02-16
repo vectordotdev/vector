@@ -29,19 +29,15 @@ remap: functions: object: {
 	}
 	examples: [
 		{
-			title: "Object"
-			input: log: {
+			title: "Declare an object type"
+			input: log: value: {
 				field1: "value1"
 				field2: "value2"
 			}
 			source: #"""
-				merge(object!(.), {"field3", "value3"})
+				object(.value)
 				"""#
-			return: {
-				field1: "value1"
-				field2: "value2"
-				field3: "value3"
-			}
+			return: input.log.value
 		},
 	]
 }

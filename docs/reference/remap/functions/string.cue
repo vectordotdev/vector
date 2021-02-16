@@ -29,16 +29,12 @@ remap: functions: string: {
 	}
 	examples: [
 		{
-			title: "String"
-			input: log: {
-				message: '{"field": "value"}'
-			}
+			title: "Delcare a string type"
+			input: log: message: '{"field": "value"}'
 			source: #"""
-				parse_json!(string!(.message))
+				string(.message)
 				"""#
-			return: {
-				field: "value"
-			}
+			return: input.log.message
 		},
 	]
 }
