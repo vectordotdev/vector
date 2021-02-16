@@ -1,6 +1,9 @@
 use crate::value::Kind;
 use crate::{map, path, Path};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Sub,
+};
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -17,6 +20,25 @@ pub struct TypeDef {
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
     kind: KindInfo,
+}
+
+impl Sub<Kind> for TypeDef {
+    type Output = Self;
+
+    /// Removes the given kinds from this type definition.
+    fn sub(mut self, other: Kind) -> Self::Output {
+        let kind = match self.kind {
+            KindInfo::Unknown => KindInfo::Unknown,
+            KindInfo::Known(kinds) => {
+                // Note, it would be much nicer to use retain here, but that is unfortunately still in nightly.
+                KindInfo::Known(kinds.into_iter().filter(|k| k.to_kind() != other).collect())
+            }
+        };
+
+        self.kind = kind;
+
+        self
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]

@@ -94,8 +94,13 @@ impl Expression for Op {
             // null || ...
             Or if lhs_kind.is_null() => rhs_def,
 
-            // "foo" || ...
-            Or if !lhs_kind.is_boolean() => lhs_def,
+            Or if !lhs_kind.contains(K::Null) => lhs_def,
+
+            Or if !lhs_kind.is_boolean() => {
+                // We can remove Null from the lhs since we know that if the lhs is Null
+                // we will be taking the rhs and only the rhs type_def will then be relevant.
+                (lhs_def - K::Null).merge(rhs_def.clone())
+            }
 
             // ... || ...
             Or => merged_def,
@@ -224,7 +229,7 @@ impl DiagnosticError for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::Literal;
+    use crate::expression::{Block, IfStatement, Literal, Predicate};
     use crate::{test_type_def, value::Kind};
     use ast::Opcode::*;
     use ordered_float::NotNan;
@@ -445,6 +450,34 @@ mod tests {
                 opcode: Err,
             },
             want: TypeDef::new().scalar(Kind::Float | Kind::Bytes),
+        }
+
+        or_nullable {
+            expr: |_| Op {
+                lhs: Box::new(
+                    IfStatement {
+                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        consequent: Block::new(vec![Literal::from("string").into()]),
+                        alternative: None,
+                    }.into()),
+                rhs: Box::new(Literal::from("another string").into()),
+                opcode: Or,
+            },
+            want: TypeDef::new().scalar(Kind::Bytes),
+        }
+
+        or_not_nullable {
+            expr: |_| Op {
+                lhs: Box::new(
+                    IfStatement {
+                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        consequent: Block::new(vec![Literal::from("string").into()]),
+                        alternative:  Some(Block::new(vec![Literal::from(42).into()])).into()
+                }.into()),
+                rhs: Box::new(Literal::from("another string").into()),
+                opcode: Or,
+            },
+            want: TypeDef::new().scalar(Kind::Bytes | Kind::Integer),
         }
     ];
 }
