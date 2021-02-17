@@ -1,7 +1,6 @@
 use super::{Error, Repl};
 use rustyline::{error::ReadlineError, Editor};
 use serde::Deserialize;
-use stdlib::all as funcs;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Deserialize)]
@@ -187,7 +186,7 @@ pub fn resolve_to_value(
     program: &str,
     state: &mut state::Compiler,
 ) -> Result<Value, String> {
-    let program = match vrl::compile_with_state(program, &funcs(), state) {
+    let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(program, diagnostics).colored().to_string();

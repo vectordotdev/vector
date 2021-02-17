@@ -2,7 +2,6 @@ use super::{Editor, Error, Repl};
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::error::ReadlineError;
-use stdlib::all as funcs;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
@@ -139,7 +138,7 @@ fn resolve_to_string(
         Some(object) => object,
     };
 
-    let program = match vrl::compile_with_state(program, &funcs(), state) {
+    let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
         Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
     };
