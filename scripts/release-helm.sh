@@ -50,6 +50,19 @@ scripts/helm-dependencies.sh validate
 # Read the shared scripting config.
 source "distribution/helm/scripting-config.sh"
 
+# Filter out vector and aggregator if not publishing to nightly
+NIGHTLY_CHARTS=( "vector" "vector-aggregator" )
+
+if [ "${CHANNEL}" != "nightly" ]; then
+    for IDX in "${!CHARTS_TO_PUBLISH[@]}"; do
+        if [[ "${NIGHTLY_CHARTS[*]}" =~ ${CHARTS_TO_PUBLISH[$IDX]} ]]; then
+            unset "CHARTS_TO_PUBLISH[$IDX]"
+        fi
+    done
+fi
+
+CHARTS_TO_PUBLISH=("${CHARTS_TO_PUBLISH[@]}")
+
 # Package our charts.
 for CHART in "${CHARTS_TO_PUBLISH[@]}"; do
   helm package \
