@@ -102,7 +102,7 @@ rusoto_cloudwatch = { version = "0.45.0", optional = true }
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.45.0", optional = true }
 rusoto_es = { version = "0.45.0", optional = true }
-rusoto_firehose = { version = "0.45.0", optional = true }
+rusoto_firehose = { version = "0.46.0", optional = true }
 rusoto_kinesis = { version = "0.45.0", optional = true }
 rusoto_logs = { version = "0.45.0", optional = true }
 rusoto_s3 = { version = "0.45.0", optional = true }
