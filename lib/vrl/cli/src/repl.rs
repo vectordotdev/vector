@@ -1,4 +1,3 @@
-use crate::Error;
 use indoc::indoc;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
