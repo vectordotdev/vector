@@ -30,6 +30,7 @@ VRL REPL commands:
 "#;
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
@@ -310,7 +311,7 @@ fn show_error_docs(line: &str, pattern: &Regex) {
     let error_code = matches.get(1).unwrap().as_str();
 
     if ERRORS.iter().any(|e| e == &error_code) {
-        let error_code_url = format!("{}/errors/#{}", DOCS_URL, error_code);
+        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
         open_url(&error_code_url);
     } else {
         println!("error code {} not recognized", error_code);
