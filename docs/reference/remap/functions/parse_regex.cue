@@ -37,10 +37,10 @@ remap: functions: parse_regex: {
 		"`value` fails to parse via the provided `pattern`",
 	]
 	return: {
-		types: ["map"]
+		types: ["object"]
 		rules: [
 			"Matches will return the capture groups corresponding to the leftmost matches in the text.",
-			"If no match is found an empty map is returned.",
+			"If no match is found an error is raised.",
 		]
 	}
 
@@ -48,7 +48,7 @@ remap: functions: parse_regex: {
 		{
 			title: "Parse via Regex (with capture groups)"
 			source: """
-				parse_regex("first group and second group.", /(?P<number>.*?) group/)
+				parse_regex("first group and second group.", r'(?P<number>.*?) group')
 				"""
 			return: {
 				number: "first"
@@ -59,7 +59,7 @@ remap: functions: parse_regex: {
 		{
 			title: "Parse via Regex (without capture groups)"
 			source: """
-				parse_regex("first group and second group.", /(?.*?) group/)
+				parse_regex("first group and second group.", r'(?.*?) group')
 				"""
 			return: {
 				"1": "first"

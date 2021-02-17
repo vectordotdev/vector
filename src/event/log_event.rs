@@ -1,5 +1,4 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
-use remap::{Object, Path};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -244,8 +243,8 @@ impl Serialize for LogEvent {
     }
 }
 
-impl Object for LogEvent {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+impl vrl::Target for LogEvent {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let iter = self
                 .as_map()
@@ -253,7 +252,7 @@ impl Object for LogEvent {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()));
 
-            return Ok(Some(remap::Value::from_iter(iter)));
+            return Ok(Some(vrl::Value::from_iter(iter)));
         }
 
         let value = path
@@ -266,7 +265,7 @@ impl Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Ok(Some(
                 std::mem::take(&mut self.fields)
@@ -289,10 +288,10 @@ impl Object for LogEvent {
         Ok(None)
     }
 
-    fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
-                remap::Value::Map(map) => {
+                vrl::Value::Object(map) => {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))
@@ -420,8 +419,8 @@ mod test {
 
     #[test]
     fn object_get() {
-        use remap::{Field::*, Object, Path, Segment::*};
         use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
@@ -466,16 +465,16 @@ mod test {
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let event = LogEvent::from(value);
-            let path = Path::new_unchecked(segments);
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::get(&event, &path), expect)
+            assert_eq!(vrl::Target::get(&event, &path), expect)
         }
     }
 
     #[test]
     fn object_insert() {
-        use remap::{Field::*, Object, Path, Segment::*};
         use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
@@ -570,19 +569,22 @@ mod test {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: remap::Value = value;
-            let path = Path::new_unchecked(segments);
+            let value: vrl::Value = value;
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::insert(&mut event, &path, value.clone()), result);
+            assert_eq!(
+                vrl::Target::insert(&mut event, &path, value.clone()),
+                result
+            );
             assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
 
     #[test]
     fn object_remove() {
-        use remap::{Field::*, Object, Path, Segment::*};
         use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
@@ -660,11 +662,11 @@ mod test {
 
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
-            let path = Path::new_unchecked(segments);
-            let removed = Object::get(&event, &path).unwrap();
+            let path = vrl::Path::new_unchecked(segments);
+            let removed = vrl::Target::get(&event, &path).unwrap();
 
-            assert_eq!(Object::remove(&mut event, &path, compact), Ok(removed));
-            assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
+            assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
+            assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
         }
     }
 }

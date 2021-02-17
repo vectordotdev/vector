@@ -30,7 +30,7 @@ remap: functions: parse_regex_all: {
 		types: ["array"]
 		rules: [
 			"Matches will return all capture groups corresponding to the leftmost matches in the text.",
-			"If no match is found an empty map is returned.",
+			"If no match is found an error is raised.",
 		]
 	}
 
@@ -38,7 +38,7 @@ remap: functions: parse_regex_all: {
 		{
 			title: "Parse via Regex (all matches)"
 			source: """
-				parse_regex_all("first group and second group.", /(?P<number>.*?) group/)
+				parse_regex_all("first group and second group.", r'(?P<number>.*?) group')
 				"""
 			return: [
 				{

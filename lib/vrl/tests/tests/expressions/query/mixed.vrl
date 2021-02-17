@@ -1,0 +1,12 @@
+# result: true
+
+[
+    null,
+    {
+        "foo": [
+            {
+                "bar": parse_json!("{ \"baz\": true }").baz,
+            }
+        ]
+    }
+][1].foo[0].bar

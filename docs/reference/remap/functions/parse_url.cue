@@ -17,7 +17,7 @@ remap: functions: parse_url: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted URL",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{
