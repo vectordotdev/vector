@@ -206,17 +206,13 @@ impl Hinter for Repl {
             .iter()
             .filter_map(|hint| {
                 if pos > 0 && hint.starts_with(&line[..pos]) {
-                    Some(suffix(hint, pos))
+                    Some(String::from(&hint[pos..]))
                 } else {
                     None
                 }
             })
             .next()
     }
-}
-
-fn suffix(s: &str, pos: usize) -> String {
-    String::from(&s[pos..])
 }
 
 impl Highlighter for Repl {
