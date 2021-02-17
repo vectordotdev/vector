@@ -231,16 +231,14 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with coercer", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
-                toml::from_str::<CoercerConfig>(
-                    indoc! {r#"
+                toml::from_str::<CoercerConfig>(indoc! {r#"
                         drop_unspecified = false
 
                         [types]
                         number = "int"
                         bool = "bool"
                         timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-                   "#},
-                )
+                   "#})
                 .unwrap()
                 .build()
                 .await
