@@ -141,7 +141,7 @@ struct Repl {
     validator: MatchingBracketValidator,
     history_hinter: HistoryHinter,
     colored_prompt: String,
-    hints: Vec<String>,
+    hints: Vec<&'static str>,
 }
 
 impl Repl {
@@ -156,19 +156,17 @@ impl Repl {
     }
 }
 
-fn initial_hints() -> Vec<String> {
-    let mut hints: Vec<String> = Vec::new();
+fn initial_hints() -> Vec<&'static str> {
+    let mut hints: Vec<&'static str> = Vec::with_capacity(stdlib::all().len());
 
     let mut func_names = stdlib::all()
         .iter()
-        .map(|f| f.identifier().into())
-        .collect::<Vec<String>>();
+        .map(|f| f.identifier())
+        .collect::<Vec<&'static str>>();
 
     hints.append(&mut func_names);
 
-    for s in RESERVED_TERMS {
-        hints.push(s.to_string());
-    }
+    RESERVED_TERMS.iter().for_each(|t| hints.push(t));
 
     hints
 }
