@@ -5913,7 +5913,7 @@ dependencies = [
  "md5",
  "percent-encoding",
  "pin-project 0.4.27",
- "rusoto_credential",
+ "rusoto_credential 0.45.0",
  "rusoto_signature",
  "rustc_version",
  "serde",
@@ -5939,6 +5939,24 @@ dependencies = [
  "serde_json",
  "shlex",
  "tokio 0.2.25",
+ "zeroize",
+]
+
+[[package]]
+name = "rusoto_credential"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e91e4c25ea8bfa6247684ff635299015845113baaa93ba8169b9e565701b58e"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dirs-next 2.0.0",
+ "futures 0.3.12",
+ "hyper 0.14.4",
+ "serde",
+ "serde_json",
+ "shlex",
+ "tokio 1.2.0",
  "zeroize",
 ]
 
@@ -6029,7 +6047,7 @@ dependencies = [
  "md5",
  "percent-encoding",
  "pin-project 0.4.27",
- "rusoto_credential",
+ "rusoto_credential 0.45.0",
  "rustc_version",
  "serde",
  "sha2 0.9.3",
@@ -7276,11 +7294,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8190d04c665ea9e6b6a0dc45523ade572c088d2e6566244c1122671dbf4ae3a"
 dependencies = [
  "autocfg 1.0.1",
+ "bytes 1.0.1",
  "libc",
  "mio 0.7.7",
  "num_cpus",
+ "once_cell",
  "pin-project-lite 0.2.4",
+ "signal-hook-registry",
  "tokio-macros 1.1.0",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -8127,7 +8149,7 @@ dependencies = [
  "rlua",
  "rusoto_cloudwatch",
  "rusoto_core",
- "rusoto_credential",
+ "rusoto_credential 0.46.0",
  "rusoto_es",
  "rusoto_firehose",
  "rusoto_kinesis",
