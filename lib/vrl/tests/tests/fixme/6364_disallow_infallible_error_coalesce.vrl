@@ -3,12 +3,12 @@
 #
 # result:
 #
-# error: unneeded error coalescing
+# error: unnecessary error coalescing
 #   ┌─ :2:5
 #   │
 # 2 │ "foo" ?? "bar"
 #   │ ----- ^^
-#   │ │     this error coalescing is unneeded
+#   │ │     this error coalescing is unnecessary
 #   │ │
 #   │ because this expression cannot fail
 #   │

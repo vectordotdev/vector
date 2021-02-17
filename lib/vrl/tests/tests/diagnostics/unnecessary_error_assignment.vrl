@@ -1,12 +1,12 @@
 # result:
 #
-# error[E104]: unneeded error assignment
+# error[E104]: unnecessary error assignment
 #   ┌─ :2:5
 #   │
 # 2 │ ok, err = 5;
 #   │ --  ^^^   - because this expression cannot fail
 #   │ │   │
-#   │ │   this error assignment is unneeded
+#   │ │   this error assignment is unnecessary
 #   │ use: ok = 5
 #   │
 #   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
