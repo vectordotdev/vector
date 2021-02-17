@@ -84,6 +84,7 @@ features = [
     "string",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "tag_types_externally",
     "timestamp",
     "to_bool",
     "to_float",

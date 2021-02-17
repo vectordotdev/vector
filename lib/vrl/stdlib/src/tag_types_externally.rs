@@ -1,6 +1,6 @@
-use remap::prelude::*;
 use shared::btreemap;
 use std::collections::BTreeMap;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TagTypesExternally;
@@ -10,18 +10,35 @@ impl Function for TagTypesExternally {
         "tag_types_externally"
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            accepts: |_| true,
-            required: true,
+    fn examples(&self) -> &'static [Example] {
+        &[Example {
+            title: "object",
+            source: indoc! {r#"
+                tag_types_externally({
+                    "message": "Hello world",
+                    "request": {
+                        "duration_ms": 67.9
+                    }
+                })
+            "#},
+            result: Ok(
+                r#"{ "message": { "bytes": "Hello world" }, "request": { "duration_ms": { "float": 67.9 } } }"#,
+            ),
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required("value")?.boxed();
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        let value = arguments.required("value");
 
         Ok(Box::new(TagTypesExternallyFn { value }))
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[Parameter {
+            keyword: "value",
+            kind: kind::ANY,
+            required: true,
+        }]
     }
 }
 
@@ -31,18 +48,22 @@ struct TagTypesExternallyFn {
 }
 
 impl Expression for TagTypesExternallyFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?;
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        let value = self.value.resolve(ctx)?;
         let tagged_externally = tag_type_externally(&value);
 
         Ok(tagged_externally)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .into_fallible(false)
-            .with_constraint(value::Kind::Map | value::Kind::Array)
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::new()
+            .infallible()
+            .object::<(), Kind>(map! {
+                (): Kind::all()
+            })
+            .add_array_mapped::<(), Kind>(map! {
+                (): Kind::all()
+            })
     }
 }
 
@@ -52,9 +73,10 @@ fn tag_type_externally(value: &Value) -> Value {
         value @ Value::Integer(_) => (Some("integer"), value.clone()),
         value @ Value::Float(_) => (Some("float"), value.clone()),
         value @ Value::Boolean(_) => (Some("boolean"), value.clone()),
-        Value::Map(map) => (
+        Value::Object(object) => (
             None,
-            map.iter()
+            object
+                .iter()
                 .map(|(key, value)| (key.clone(), tag_type_externally(value)))
                 .collect::<BTreeMap<String, Value>>()
                 .into(),
@@ -82,6 +104,7 @@ fn tag_type_externally(value: &Value) -> Value {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,3 +250,4 @@ mod tests {
         }
     ];
 }
+*/
