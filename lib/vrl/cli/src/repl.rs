@@ -13,9 +13,7 @@ use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
-    static ref ERRORS: Vec<String> = (100..=110)
-        .map(|i| i.to_string())
-        .collect();
+    static ref ERRORS: Vec<String> = (100..=110).map(|i| i.to_string()).collect();
 }
 
 const HELP_TEXT: &str = r#"
@@ -310,11 +308,10 @@ fn show_error_docs(line: &str, pattern: &Regex) {
     let matches = pattern.captures(line).unwrap();
     let error_code = matches.get(1).unwrap().as_str();
 
-    if ERRORS.iter().any(|e| e == &error_code) {
+    if ERRORS.iter().any(|e| e == error_code) {
         let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
         open_url(&error_code_url);
     } else {
         println!("error code {} not recognized", error_code);
     }
 }
-
