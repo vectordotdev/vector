@@ -1,5 +1,6 @@
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, StreamExt};
+use indoc::indoc;
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
@@ -469,199 +470,199 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                     }),
                 );
 
-                let toml_cfg = r##"
-##
-## company-api
-##
+                let toml_cfg = indoc! {r#"
+                    ##
+                    ## company-api
+                    ##
 
-[transforms.company_api]
-type = "field_filter"
-inputs = ["in"]
-field = "appname"
-value = "company-api"
+                    [transforms.company_api]
+                    type = "field_filter"
+                    inputs = ["in"]
+                    field = "appname"
+                    value = "company-api"
 
-[transforms.company_api_json]
-type = "json_parser"
-inputs = ["company_api"]
-drop_invalid = true
+                    [transforms.company_api_json]
+                    type = "json_parser"
+                    inputs = ["company_api"]
+                    drop_invalid = true
 
-[transforms.company_api_timestamp]
-type = "split"
-inputs = ["company_api_json"]
-field = "timestamp"
-field_names = ["timestamp"]
-separator = "."
+                    [transforms.company_api_timestamp]
+                    type = "split"
+                    inputs = ["company_api_json"]
+                    field = "timestamp"
+                    field_names = ["timestamp"]
+                    separator = "."
 
-[transforms.company_api_timestamp.types]
-timestamp = "timestamp|%s"
+                    [transforms.company_api_timestamp.types]
+                    timestamp = "timestamp|%s"
 
-[transforms.company_api_metadata]
-type = "lua"
-inputs = ["company_api_timestamp"]
-source = """
-event["metadata_trace_id"] = event["metadata.trace_id"]
-event["metadata_guild_id"] = event["metadata.guild_id"]
-event["metadata_channel_id"] = event["metadata.channel_id"]
-event["metadata_method"] = event["metadata.method"]
-"""
+                    [transforms.company_api_metadata]
+                    type = "lua"
+                    inputs = ["company_api_timestamp"]
+                    source = """
+                    event["metadata_trace_id"] = event["metadata.trace_id"]
+                    event["metadata_guild_id"] = event["metadata.guild_id"]
+                    event["metadata_channel_id"] = event["metadata.channel_id"]
+                    event["metadata_method"] = event["metadata.method"]
+                    """
 
-[transforms.company_api_rename]
-type = "rename_fields"
-inputs = ["company_api_metadata"]
+                    [transforms.company_api_rename]
+                    type = "rename_fields"
+                    inputs = ["company_api_metadata"]
 
-[transforms.company_api_rename.fields]
-timestamp = "time"
-host = "hostname"
-# "metadata.trace_id" = "metadata_trace_id"
-# "metadata.guild_id" = "metadata_guild_id"
-# "metadata.channel_id" = "metadata_channel_id"
-# "metadata.method" = "metadata_method"
+                    [transforms.company_api_rename.fields]
+                    timestamp = "time"
+                    host = "hostname"
+                    # "metadata.trace_id" = "metadata_trace_id"
+                    # "metadata.guild_id" = "metadata_guild_id"
+                    # "metadata.channel_id" = "metadata_channel_id"
+                    # "metadata.method" = "metadata_method"
 
-##
-## company-admin
-##
+                    ##
+                    ## company-admin
+                    ##
 
-[transforms.company_admin]
-type = "field_filter"
-inputs = ["in"]
-field = "appname"
-value = "company-admin"
+                    [transforms.company_admin]
+                    type = "field_filter"
+                    inputs = ["in"]
+                    field = "appname"
+                    value = "company-admin"
 
-[transforms.company_admin_json]
-type = "json_parser"
-inputs = ["company_admin"]
-drop_invalid = true
+                    [transforms.company_admin_json]
+                    type = "json_parser"
+                    inputs = ["company_admin"]
+                    drop_invalid = true
 
-[transforms.company_admin_timestamp]
-type = "split"
-inputs = ["company_admin_json"]
-field = "timestamp"
-field_names = ["timestamp"]
-separator = "."
+                    [transforms.company_admin_timestamp]
+                    type = "split"
+                    inputs = ["company_admin_json"]
+                    field = "timestamp"
+                    field_names = ["timestamp"]
+                    separator = "."
 
-[transforms.company_admin_timestamp.types]
-timestamp = "timestamp|%s"
+                    [transforms.company_admin_timestamp.types]
+                    timestamp = "timestamp|%s"
 
-[transforms.company_admin_metadata]
-type = "lua"
-inputs = ["company_admin_timestamp"]
-source = """
-event["metadata_trace_id"] = event["metadata.trace_id"]
-event["metadata_method"] = event["metadata.method"]
-"""
+                    [transforms.company_admin_metadata]
+                    type = "lua"
+                    inputs = ["company_admin_timestamp"]
+                    source = """
+                    event["metadata_trace_id"] = event["metadata.trace_id"]
+                    event["metadata_method"] = event["metadata.method"]
+                    """
 
-[transforms.company_admin_rename]
-type = "rename_fields"
-inputs = ["company_admin_metadata"]
+                    [transforms.company_admin_rename]
+                    type = "rename_fields"
+                    inputs = ["company_admin_metadata"]
 
-[transforms.company_admin_rename.fields]
-timestamp = "time"
-host = "hostname"
-# "metadata.trace_id" = "metadata_trace_id"
-# "metadata.method" = "metadata_method"
+                    [transforms.company_admin_rename.fields]
+                    timestamp = "time"
+                    host = "hostname"
+                    # "metadata.trace_id" = "metadata_trace_id"
+                    # "metadata.method" = "metadata_method"
 
-##
-## company-media-proxy
-##
+                    ##
+                    ## company-media-proxy
+                    ##
 
-[transforms.company_media_proxy]
-type = "field_filter"
-inputs = ["in"]
-field = "appname"
-value = "company-media-proxy"
+                    [transforms.company_media_proxy]
+                    type = "field_filter"
+                    inputs = ["in"]
+                    field = "appname"
+                    value = "company-media-proxy"
 
-[transforms.company_media_proxy_json]
-type = "json_parser"
-inputs = ["company_media_proxy"]
-drop_invalid = true
+                    [transforms.company_media_proxy_json]
+                    type = "json_parser"
+                    inputs = ["company_media_proxy"]
+                    drop_invalid = true
 
-[transforms.company_media_proxy_timestamp]
-type = "split"
-inputs = ["company_media_proxy_json"]
-field = "ts"
-field_names = ["ts"]
-separator = "."
+                    [transforms.company_media_proxy_timestamp]
+                    type = "split"
+                    inputs = ["company_media_proxy_json"]
+                    field = "ts"
+                    field_names = ["ts"]
+                    separator = "."
 
-[transforms.company_media_proxy_timestamp.types]
-ts = "timestamp|%s"
+                    [transforms.company_media_proxy_timestamp.types]
+                    ts = "timestamp|%s"
 
-[transforms.company_media_proxy_rename]
-type = "rename_fields"
-inputs = ["company_media_proxy_timestamp"]
+                    [transforms.company_media_proxy_rename]
+                    type = "rename_fields"
+                    inputs = ["company_media_proxy_timestamp"]
 
-[transforms.company_media_proxy_rename.fields]
-ts = "time"
-host = "hostname"
+                    [transforms.company_media_proxy_rename.fields]
+                    ts = "time"
+                    host = "hostname"
 
-##
-## company-unfurler
-##
+                    ##
+                    ## company-unfurler
+                    ##
 
-[transforms.company_unfurler]
-type = "field_filter"
-inputs = ["in"]
-field = "appname"
-value = "company-unfurler"
+                    [transforms.company_unfurler]
+                    type = "field_filter"
+                    inputs = ["in"]
+                    field = "appname"
+                    value = "company-unfurler"
 
-[transforms.company_unfurler_hostname]
-type = "rename_fields"
-inputs = ["company_unfurler"]
+                    [transforms.company_unfurler_hostname]
+                    type = "rename_fields"
+                    inputs = ["company_unfurler"]
 
-[transforms.company_unfurler_hostname.fields]
-host = "hostname"
+                    [transforms.company_unfurler_hostname.fields]
+                    host = "hostname"
 
-[transforms.company_unfurler_json]
-type = "json_parser"
-inputs = ["company_unfurler_hostname"]
-drop_invalid = true
+                    [transforms.company_unfurler_json]
+                    type = "json_parser"
+                    inputs = ["company_unfurler_hostname"]
+                    drop_invalid = true
 
-[transforms.company_unfurler_timestamp]
-type = "coercer"
-inputs = ["company_unfurler_json"]
+                    [transforms.company_unfurler_timestamp]
+                    type = "coercer"
+                    inputs = ["company_unfurler_json"]
 
-[transforms.company_unfurler_timestamp.types]
-ts = "timestamp"
+                    [transforms.company_unfurler_timestamp.types]
+                    ts = "timestamp"
 
-[transforms.company_unfurler_rename]
-type = "rename_fields"
-inputs = ["company_unfurler_timestamp"]
+                    [transforms.company_unfurler_rename]
+                    type = "rename_fields"
+                    inputs = ["company_unfurler_timestamp"]
 
-[transforms.company_unfurler_rename.fields]
-ts = "time"
+                    [transforms.company_unfurler_rename.fields]
+                    ts = "time"
 
-[transforms.company_unfurler_filter]
-type = "field_filter"
-inputs = ["company_unfurler_rename"]
-field = "msg"
-value = "unfurl"
+                    [transforms.company_unfurler_filter]
+                    type = "field_filter"
+                    inputs = ["company_unfurler_rename"]
+                    field = "msg"
+                    value = "unfurl"
 
-##
-## audit
-##
+                    ##
+                    ## audit
+                    ##
 
-[transforms.audit]
-type = "field_filter"
-inputs = ["in"]
-field = "appname"
-value = "audit"
+                    [transforms.audit]
+                    type = "field_filter"
+                    inputs = ["in"]
+                    field = "appname"
+                    value = "audit"
 
-[transforms.audit_timestamp]
-type = "coercer"
-inputs = ["audit"]
+                    [transforms.audit_timestamp]
+                    type = "coercer"
+                    inputs = ["audit"]
 
-[transforms.audit_timestamp.types]
-timestamp = "timestamp"
+                    [transforms.audit_timestamp.types]
+                    timestamp = "timestamp"
 
-[transforms.audit_rename]
-type = "rename_fields"
-inputs = ["audit_timestamp"]
+                    [transforms.audit_rename]
+                    type = "rename_fields"
+                    inputs = ["audit_timestamp"]
 
-[transforms.audit_rename.fields]
-appname = "tag"
-host = "hostname"
-message = "content"
-timestamp = "time"
-"##;
+                    [transforms.audit_rename.fields]
+                    appname = "tag"
+                    host = "hostname"
+                    message = "content"
+                    timestamp = "time"
+                "#};
 
                 let parsed =
                     config::format::deserialize(toml_cfg, Some(config::Format::TOML)).unwrap();
