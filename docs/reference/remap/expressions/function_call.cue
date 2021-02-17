@@ -10,7 +10,7 @@ remap: expressions: function_call: {
 		be [handled](\(urls.vrl_errors_reference)) and null is returned.
 
 		Functions can _only_ return a single value. If multiple values are relevant, you should wrap them in a data
-		structure fit to hold them, such as an array or map (note that VRL doesn't support tuples).
+		structure fit to hold them, such as an array or object (note that VRL doesn't support tuples).
 		"""
 
 	grammar: {

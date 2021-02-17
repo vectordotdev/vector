@@ -30,7 +30,7 @@ remap: functions: parse_regex_all: {
 		types: ["array"]
 		rules: [
 			"Matches will return all capture groups corresponding to the leftmost matches in the text.",
-			"If no match is found an empty map is returned.",
+			"If no match is found an error is raised.",
 		]
 	}
 

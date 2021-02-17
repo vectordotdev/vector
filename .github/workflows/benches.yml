@@ -1,7 +1,19 @@
 name: Benchmark Suite
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - ".github/workflows/benches.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain"
   push:
     branches:
       - master
