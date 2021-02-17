@@ -5,8 +5,9 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{Program, Runtime};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -50,23 +51,18 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Self> {
-        let accepts = TypeConstraint {
-            allow_any: true,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::all(),
-                ..Default::default()
-            },
-        };
+        // TODO(jean): re-add this to VRL
+        // let accepts = TypeConstraint {
+        //     allow_any: true,
+        //     type_def: TypeDef {
+        //         fallible: true,
+        //         kind: value::Kind::all(),
+        //         ..Default::default()
+        //     },
+        // };
 
-        let (program, _) = Program::new(
-            config.source.clone(),
-            &remap_functions::all(),
-            Some(accepts),
-            false,
-        )
-        .map_err(|diagnostics| {
-            remap::Formatter::new(&config.source, diagnostics)
+        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+            Formatter::new(&config.source, diagnostics)
                 .colored()
                 .to_string()
         })?;
@@ -82,8 +78,8 @@ impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let mut runtime = Runtime::default();
         let result = match event {
-            Event::Log(ref mut event) => runtime.run(event, &self.program),
-            Event::Metric(ref mut event) => runtime.run(event, &self.program),
+            Event::Log(ref mut event) => runtime.resolve(event, &self.program),
+            Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
         };
 
         if let Err(error) = result {

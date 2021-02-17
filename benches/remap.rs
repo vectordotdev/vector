@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use remap::prelude::*;
 use vector::transforms::{
     add_fields::AddFields,
     coercer::CoercerConfig,
@@ -14,6 +13,7 @@ use vector::{
     event::{Event, Value},
     test_util::runtime,
 };
+use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
@@ -41,10 +41,11 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: add fields with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: r#".foo = "bar"
-            .bar = "baz"
-            .copy = .copy_from"#
-                    .to_string(),
+                source: indoc! {r#".foo = "bar"
+                    .bar = "baz"
+                    .copy = string!(.copy_from)
+                "#}
+                .to_string(),
                 drop_on_err: true,
             })
             .unwrap(),
@@ -104,7 +105,7 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: parse JSON with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: ".bar = parse_json!(.foo)".to_owned(),
+                source: ".bar = parse_json!(string!(.foo))".to_owned(),
                 drop_on_err: false,
             })
             .unwrap(),
@@ -168,11 +169,11 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: r#"
-                .number = to_int!(.number)
-                .bool = to_bool!(.bool)
-                .timestamp = parse_timestamp!(.timestamp, format: "%d/%m/%Y:%H:%M:%S %z")
-                "#
+                source: indoc! {r#"
+                    .number = to_int!(.number)
+                    .bool = to_bool!(.bool)
+                    .timestamp = parse_timestamp!(string!(.timestamp), format: "%d/%m/%Y:%H:%M:%S %z")
+                "#}
                 .to_owned(),
                 drop_on_err: true,
             })
@@ -203,15 +204,14 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with coercer", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
-                toml::from_str::<CoercerConfig>(
-                    r#"drop_unspecified = false
+                toml::from_str::<CoercerConfig>(indoc! {r#"
+                        drop_unspecified = false
 
-                   [types]
-                   number = "int"
-                   bool = "bool"
-                   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-                   "#,
-                )
+                        [types]
+                        number = "int"
+                        bool = "bool"
+                        timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+                   "#})
                 .unwrap()
                 .build()
                 .await

@@ -1,0 +1,11 @@
+# result: [true, false, false, false, "nope"]
+
+[
+    true && true,
+    false && true,
+    true && false,
+    false && false,
+
+    # fallible
+    true && "foo" ?? "nope",
+]

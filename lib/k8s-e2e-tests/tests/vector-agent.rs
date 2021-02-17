@@ -1,4 +1,5 @@
 use futures::{SinkExt, StreamExt};
+use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
@@ -8,44 +9,44 @@ use std::str::FromStr;
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
-const HELM_VALUES_STDOUT_SINK: &str = r#"
-sinks:
-  stdout:
-    type: "console"
-    inputs: ["kubernetes_logs"]
-    target: "stdout"
-    encoding: "json"
-"#;
+const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
+    sinks:
+      stdout:
+        type: "console"
+        inputs: ["kubernetes_logs"]
+        target: "stdout"
+        encoding: "json"
+"#};
 
-const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = r#"
-sinks:
-  stdout:
-    type: "console"
-    inputs: ["kubernetes_logs"]
-    rawConfig: |
-      target = "stdout"
-      encoding = "json"
-"#;
+const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = indoc! {r#"
+    sinks:
+      stdout:
+        type: "console"
+        inputs: ["kubernetes_logs"]
+        rawConfig: |
+          target = "stdout"
+          encoding = "json"
+"#};
 
-const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = r#"
-extraConfigDirSources:
-- configMap:
-    name: vector-agent-config
-"#;
+const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = indoc! {r#"
+    extraConfigDirSources:
+    - configMap:
+        name: vector-agent-config
+"#};
 
-const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: vector-agent-config
-data:
-  vector.toml: |
-    [sinks.stdout]
-        type = "console"
-        inputs = ["kubernetes_logs"]
-        target = "stdout"
-        encoding = "json"
-"#;
+const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: vector-agent-config
+    data:
+      vector.toml: |
+        [sinks.stdout]
+            type = "console"
+            inputs = ["kubernetes_logs"]
+            target = "stdout"
+            encoding = "json"
+"#};
 
 /// This test validates that vector-agent picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
@@ -738,12 +739,12 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    const CONFIG: &str = r#"
-kubernetesLogsSource:
-  rawConfig: |
-    extra_label_selector = "my_custom_negative_label_selector!=my_val"
-    extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
-"#;
+    const CONFIG: &str = indoc! {r#"
+        kubernetesLogsSource:
+          rawConfig: |
+            extra_label_selector = "my_custom_negative_label_selector!=my_val"
+            extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
+    "#};
 
     let vector = framework
         .vector(
@@ -1063,11 +1064,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    const CONFIG: &str = r#"
-kubernetesLogsSource:
-  rawConfig: |
-    exclude_paths_glob_patterns = ["/var/log/pods/test-vector-test-pod_test-pod_*/excluded/**"]
-"#;
+    const CONFIG: &str = indoc! {r#"
+        kubernetesLogsSource:
+          rawConfig: |
+            exclude_paths_glob_patterns = ["/var/log/pods/test-vector-test-pod_test-pod_*/excluded/**"]
+    "#};
 
     let vector = framework
         .vector(

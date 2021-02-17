@@ -47,14 +47,18 @@ members = [
   "lib/k8s-test-framework",
   "lib/portpicker",
   "lib/prometheus-parser",
-  "lib/remap-cli",
-  "lib/remap-functions",
-  "lib/remap-lang",
-  "lib/remap-tests",
   "lib/shared",
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/vrl/cli",
+  "lib/vrl/compiler",
+  "lib/vrl/core",
+  "lib/vrl/diagnostic",
+  "lib/vrl/parser",
+  "lib/vrl/stdlib",
+  "lib/vrl/tests",
+  "lib/vrl/proptests",
 ]
 
 [dependencies]
@@ -64,10 +68,10 @@ derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
-remap-cli = { path = "lib/remap-cli", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1"
@@ -86,9 +90,12 @@ tracing-subscriber = "0.2.15"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = "0.13.0-alpha.13"
-metrics-tracing-context = "0.1.0-alpha.7"
-metrics-util = "0.4.0-alpha.10"
+metrics = "=0.13.0-alpha.13"
+metrics-tracing-context = "=0.1.0-alpha.7"
+metrics-util = "=0.4.0-alpha.10"
+# Indirect dependency; benchmark regression detected; pinning until
+# https://github.com/timberio/vector/issues/6412 is resolved
+metrics-macros = "=0.1.0-alpha.9"
 
 # Aws
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
@@ -120,8 +127,8 @@ goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.4.10", optional = true }
-async-graphql-warp = { version = "2.4.10", optional = true }
+async-graphql = { version = "=2.5.0", optional = true }
+async-graphql-warp = { version = "=2.5.0", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
@@ -130,14 +137,14 @@ num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
 
-# Remap Lang
-remap = { package = "remap-lang", path = "lib/remap-lang" }
-remap-functions = { path = "lib/remap-functions" }
+# VRL Lang
+vrl = { path = "lib/vrl/core" }
+vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
 anyhow = "1.0.37"
 async-compression = { version = "0.3.7", features = ["tokio-02", "gzip", "zstd"] }
-avro-rs = { version = "0.12.0", optional = true }
+avro-rs = { version = "0.13.0", optional = true }
 base64 = { version = "0.13.0", optional = true }
 bloom = { version = "0.3.2", optional = true }
 bollard = { version = "0.9.1", features = ["ssl"], optional = true }
@@ -207,7 +214,7 @@ syslog = { version = "5", optional = true }
 syslog_loose = { version = "0.10.0", optional = true }
 # Indirect dependency; pinning until
 # https://github.com/timberio/vector/issues/6005 is resolved
-thread_local = "= 1.0.1"
+thread_local = "=1.0.1"
 tokio-postgres = { version = "0.5.5", features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = "0.5.8"
 typetag = "0.1.6"
@@ -242,6 +249,7 @@ approx = "0.4.0"
 assert_cmd = "1.0.2"
 base64 = "0.13"
 criterion = "0.3"
+httpmock = "0.5.2"
 libc = "0.2.80"
 libz-sys = "1.1.2"
 matches = "0.1.8"
@@ -303,9 +311,6 @@ wasm = ["lucet-runtime", "lucet-wasi", "lucetc", "vector-wasm"]
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
 kubernetes = ["evmap", "k8s-openapi"]
-
-# VRL
-vrl-cli = ["remap-cli"]
 
 # API
 api = [
@@ -534,7 +539,7 @@ sinks-loki = ["bytesize", "uuid"]
 sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
-sinks-prometheus = ["snap", "sources-utils-tls"]
+sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]
 sinks-pulsar = ["avro-rs", "pulsar"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
@@ -657,7 +662,5 @@ required-features = ["metrics-benches"]
 tower-layer = "=0.3.0"
 
 [patch.crates-io]
-# TODO: update to next 0.12.x (after 0.12.0, if any)
-avro-rs = { version = "0.12.0", git = "https://github.com/flavray/avro-rs", rev = "f28acbbb9860bd62cb24ead83878d7526d075454", optional = true }
 # TODO: update to the next 0.13.x (after 0.13.10, if any) or 0.14 (or higher)
 hyper = { version = "0.13", git = "https://github.com/hyperium/hyper", rev = "d7495a75abca34646b1d6d047589c1b8110d0fa5" }

@@ -8,6 +8,7 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures::{stream, SinkExt, StreamExt};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -53,11 +54,11 @@ inventory::submit! {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"host_key = "hostname"
-            token = "${HUMIO_TOKEN}"
-            encoding.codec = "json""#,
-        )
+        toml::from_str(indoc! {r#"
+                host_key = "hostname"
+                token = "${HUMIO_TOKEN}"
+                encoding.codec = "json"
+            "#})
         .unwrap()
     }
 }
@@ -112,6 +113,7 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -121,25 +123,21 @@ mod tests {
 
     #[test]
     fn test_endpoint_field() {
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             endpoint = "https://localhost:9200/"
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             host = "https://localhost:9200/"
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
@@ -147,13 +145,11 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = test_util::next_addr();

@@ -1,11 +1,12 @@
 package metadata
 
 components: sources: [Name=string]: {
-	kind: "source"
+	kind:     "source"
+	features: _
 
 	configuration: {
-		if sources[Name].features.collect != _|_ {
-			if sources[Name].features.collect.checkpoint.enabled {
+		if features.collect != _|_ {
+			if features.collect.checkpoint.enabled {
 				data_dir: {
 					common:      false
 					description: "The directory used to persist file checkpoint positions. By default, the global `data_dir` option is used. Please make sure the Vector project has write permissions to this dir."
@@ -19,7 +20,7 @@ components: sources: [Name=string]: {
 			}
 		}
 
-		if sources[Name].features.multiline.enabled {
+		if features.multiline.enabled {
 			multiline: {
 				common:      false
 				description: "Multiline parsing configuration. If not specified, multiline parsing is disabled."
@@ -70,8 +71,8 @@ components: sources: [Name=string]: {
 			}
 		}
 
-		if sources[Name].features.encoding != _|_ {
-			if sources[Name].features.encoding.enabled {
+		if features.encoding != _|_ {
+			if features.encoding.enabled {
 				encoding: {
 					common:      false
 					description: "Configures the encoding specific source behavior."
@@ -92,21 +93,21 @@ components: sources: [Name=string]: {
 			}
 		}
 
-		if sources[Name].features.collect != _|_ {
-			if sources[Name].features.collect.tls != _|_ {
-				if sources[Name].features.collect.tls.enabled {
+		if features.collect != _|_ {
+			if features.collect.tls != _|_ {
+				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
-						can_enable:             sources[Name].features.collect.tls.can_enable
-						can_verify_certificate: sources[Name].features.collect.tls.can_enable
-						can_verify_hostname:    sources[Name].features.collect.tls.can_verify_hostname
-						enabled_default:        sources[Name].features.collect.tls.enabled_default
+						can_enable:             features.collect.tls.can_enable
+						can_verify_certificate: features.collect.tls.can_enable
+						can_verify_hostname:    features.collect.tls.can_verify_hostname
+						enabled_default:        features.collect.tls.enabled_default
 					}}
 				}
 			}
 		}
 
-		if sources[Name].features.receive != _|_ {
-			if sources[Name].features.receive.receive_buffer_size != _|_ {
+		if features.receive != _|_ {
+			if features.receive.receive_buffer_size != _|_ {
 				send_buffer_bytes: {
 					common:      false
 					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
@@ -114,11 +115,11 @@ components: sources: [Name=string]: {
 					type: uint: {
 						examples: [65536]
 					}
-					relevant_when: sources[Name].features.receive.receive_buffer_bytes.relevant_when
+					relevant_when: features.receive.receive_buffer_bytes.relevant_when
 				}
 			}
 
-			if sources[Name].features.receive.keepalive != _|_ {
+			if features.receive.keepalive != _|_ {
 				keepalive: {
 					common:      false
 					description: "Configures the TCP keepalive behavior for the connection to the source."
@@ -140,11 +141,11 @@ components: sources: [Name=string]: {
 				}
 			}
 
-			if sources[Name].features.receive.tls.enabled {
+			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_enable:             sources[Name].features.receive.tls.can_enable
-					can_verify_certificate: sources[Name].features.receive.tls.can_enable
-					enabled_default:        sources[Name].features.receive.tls.enabled_default
+					can_enable:             features.receive.tls.can_enable
+					can_verify_certificate: features.receive.tls.can_enable
+					enabled_default:        features.receive.tls.enabled_default
 				}}
 			}
 		}
@@ -189,8 +190,8 @@ components: sources: [Name=string]: {
 				  """
 		}
 
-		if sources[Name].features.collect != _|_ {
-			if sources[Name].features.collect.checkpoint.enabled {
+		if features.collect != _|_ {
+			if features.collect.checkpoint.enabled {
 				checkpointing: {
 					title: "Checkpointing"
 					body: """
@@ -213,16 +214,16 @@ components: sources: [Name=string]: {
 				"""
 		}
 
-		if sources[Name].features.collect != _|_ {
-			if sources[Name].features.collect.tls != _|_ {
-				if sources[Name].features.collect.tls.enabled {
+		if features.collect != _|_ {
+			if features.collect.tls != _|_ {
+				if features.collect.tls.enabled {
 					tls: _tls
 				}
 			}
 		}
 
-		if sources[Name].features.receive != _|_ {
-			if sources[Name].features.receive.tls.enabled {
+		if features.receive != _|_ {
+			if features.receive.tls.enabled {
 				tls: _tls
 			}
 		}

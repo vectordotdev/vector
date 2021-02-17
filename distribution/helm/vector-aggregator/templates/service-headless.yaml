@@ -7,8 +7,6 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    {{- if eq (include "vector-aggregator.servicePortsPresent" .) "true" -}}
-      {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
-    {{- end }}
+  {{- include "vector-aggregator.headlessServicePorts" . | nindent 2 }}
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}

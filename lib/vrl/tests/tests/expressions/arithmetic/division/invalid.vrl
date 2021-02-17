@@ -1,0 +1,219 @@
+# result: [
+#     "unable to divide value type \"integer\" by \"boolean\"",
+#     "unable to divide value type \"integer\" by \"boolean\"",
+#     "unable to divide value type \"integer\" by \"null\"",
+#     "unable to divide value type \"integer\" by \"array\"",
+#     "unable to divide value type \"integer\" by \"object\"",
+#     "unable to divide value type \"integer\" by \"regex\"",
+#     "unable to divide value type \"integer\" by \"timestamp\"",
+#
+#     "unable to divide value type \"float\" by \"string\"",
+#     "unable to divide value type \"float\" by \"boolean\"",
+#     "unable to divide value type \"float\" by \"boolean\"",
+#     "unable to divide value type \"float\" by \"null\"",
+#     "unable to divide value type \"float\" by \"array\"",
+#     "unable to divide value type \"float\" by \"object\"",
+#     "unable to divide value type \"float\" by \"regex\"",
+#     "unable to divide value type \"float\" by \"timestamp\"",
+#
+#     "unable to divide value type \"string\" by \"string\"",
+#     "unable to divide value type \"string\" by \"float\"",
+#     "unable to divide value type \"string\" by \"boolean\"",
+#     "unable to divide value type \"string\" by \"boolean\"",
+#     "unable to divide value type \"string\" by \"null\"",
+#     "unable to divide value type \"string\" by \"array\"",
+#     "unable to divide value type \"string\" by \"object\"",
+#     "unable to divide value type \"string\" by \"regex\"",
+#     "unable to divide value type \"string\" by \"timestamp\"",
+#
+#     "unable to divide value type \"boolean\" by \"string\"",
+#     "unable to divide value type \"boolean\" by \"integer\"",
+#     "unable to divide value type \"boolean\" by \"float\"",
+#     "unable to divide value type \"boolean\" by \"boolean\"",
+#     "unable to divide value type \"boolean\" by \"boolean\"",
+#     "unable to divide value type \"boolean\" by \"null\"",
+#     "unable to divide value type \"boolean\" by \"array\"",
+#     "unable to divide value type \"boolean\" by \"object\"",
+#     "unable to divide value type \"boolean\" by \"regex\"",
+#     "unable to divide value type \"boolean\" by \"timestamp\"",
+#
+#     "unable to divide value type \"null\" by \"string\"",
+#     "unable to divide value type \"null\" by \"integer\"",
+#     "unable to divide value type \"null\" by \"float\"",
+#     "unable to divide value type \"null\" by \"boolean\"",
+#     "unable to divide value type \"null\" by \"boolean\"",
+#     "unable to divide value type \"null\" by \"null\"",
+#     "unable to divide value type \"null\" by \"array\"",
+#     "unable to divide value type \"null\" by \"object\"",
+#     "unable to divide value type \"null\" by \"regex\"",
+#     "unable to divide value type \"null\" by \"timestamp\"",
+#
+#     "unable to divide value type \"array\" by \"string\"",
+#     "unable to divide value type \"array\" by \"integer\"",
+#     "unable to divide value type \"array\" by \"float\"",
+#     "unable to divide value type \"array\" by \"boolean\"",
+#     "unable to divide value type \"array\" by \"boolean\"",
+#     "unable to divide value type \"array\" by \"null\"",
+#     "unable to divide value type \"array\" by \"array\"",
+#     "unable to divide value type \"array\" by \"object\"",
+#     "unable to divide value type \"array\" by \"regex\"",
+#     "unable to divide value type \"array\" by \"timestamp\"",
+#
+#     "unable to divide value type \"object\" by \"string\"",
+#     "unable to divide value type \"object\" by \"integer\"",
+#     "unable to divide value type \"object\" by \"float\"",
+#     "unable to divide value type \"object\" by \"boolean\"",
+#     "unable to divide value type \"object\" by \"boolean\"",
+#     "unable to divide value type \"object\" by \"null\"",
+#     "unable to divide value type \"object\" by \"array\"",
+#     "unable to divide value type \"object\" by \"object\"",
+#     "unable to divide value type \"object\" by \"regex\"",
+#     "unable to divide value type \"object\" by \"timestamp\"",
+#
+#     "unable to divide value type \"regex\" by \"string\"",
+#     "unable to divide value type \"regex\" by \"integer\"",
+#     "unable to divide value type \"regex\" by \"float\"",
+#     "unable to divide value type \"regex\" by \"boolean\"",
+#     "unable to divide value type \"regex\" by \"boolean\"",
+#     "unable to divide value type \"regex\" by \"null\"",
+#     "unable to divide value type \"regex\" by \"array\"",
+#     "unable to divide value type \"regex\" by \"object\"",
+#     "unable to divide value type \"regex\" by \"regex\"",
+#     "unable to divide value type \"regex\" by \"timestamp\"",
+#
+#     "unable to divide value type \"timestamp\" by \"string\"",
+#     "unable to divide value type \"timestamp\" by \"integer\"",
+#     "unable to divide value type \"timestamp\" by \"float\"",
+#     "unable to divide value type \"timestamp\" by \"boolean\"",
+#     "unable to divide value type \"timestamp\" by \"boolean\"",
+#     "unable to divide value type \"timestamp\" by \"null\"",
+#     "unable to divide value type \"timestamp\" by \"array\"",
+#     "unable to divide value type \"timestamp\" by \"object\"",
+#     "unable to divide value type \"timestamp\" by \"regex\"",
+#     "unable to divide value type \"timestamp\" by \"timestamp\""
+# ]
+
+ok, err1 = 1 / true
+ok, err2 = 1 / false
+ok, err3 = 1 / null
+ok, err4 = 1 / []
+ok, err5 = 1 / {}
+ok, err6 = 1 / r'foo'
+ok, err7 = 1 / now()
+
+integer_errs = [err1, err2, err3, err4, err5, err6, err7]
+
+ok, err1 = 1.0 / "foo"
+ok, err2 = 1.0 / true
+ok, err3 = 1.0 / false
+ok, err4 = 1.0 / null
+ok, err5 = 1.0 / []
+ok, err6 = 1.0 / {}
+ok, err7 = 1.0 / r'foo'
+ok, err8 = 1.0 / now()
+
+float_errs = [err1, err2, err3, err4, err5, err6, err7, err8]
+
+ok, err1 = "foo" / "foo"
+ok, err2 = "foo" / 1.0
+ok, err3 = "foo" / true
+ok, err4 = "foo" / false
+ok, err5 = "foo" / null
+ok, err6 = "foo" / []
+ok, err7 = "foo" / {}
+ok, err8 = "foo" / r'foo'
+ok, err9 = "foo" / now()
+
+string_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9]
+
+ok, err1  = true / "foo"
+ok, err2  = true / 1
+ok, err3  = true / 1.0
+ok, err4  = true / true
+ok, err5  = true / false
+ok, err6  = true / null
+ok, err7  = true / []
+ok, err8  = true / {}
+ok, err9  = true / r'foo'
+ok, err10 = true / now()
+
+bool_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = null / "foo"
+ok, err2  = null / 1
+ok, err3  = null / 1.0
+ok, err4  = null / true
+ok, err5  = null / false
+ok, err6  = null / null
+ok, err7  = null / []
+ok, err8  = null / {}
+ok, err9  = null / r'foo'
+ok, err10 = null / now()
+
+null_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = [] / "foo"
+ok, err2  = [] / 1
+ok, err3  = [] / 1.0
+ok, err4  = [] / true
+ok, err5  = [] / false
+ok, err6  = [] / null
+ok, err7  = [] / []
+ok, err8  = [] / {}
+ok, err9  = [] / r'foo'
+ok, err10 = [] / now()
+
+array_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = {} / "foo"
+ok, err2  = {} / 1
+ok, err3  = {} / 1.0
+ok, err4  = {} / true
+ok, err5  = {} / false
+ok, err6  = {} / null
+ok, err7  = {} / []
+ok, err8  = {} / {}
+ok, err9  = {} / r'foo'
+ok, err10 = {} / now()
+
+object_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = r'' / "foo"
+ok, err2  = r'' / 1
+ok, err3  = r'' / 1.0
+ok, err4  = r'' / true
+ok, err5  = r'' / false
+ok, err6  = r'' / null
+ok, err7  = r'' / []
+ok, err8  = r'' / {}
+ok, err9  = r'' / r'foo'
+ok, err10 = r'' / now()
+
+regex_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+ok, err1  = to_timestamp(0) / "foo"
+ok, err2  = to_timestamp(0) / 1
+ok, err3  = to_timestamp(0) / 1.0
+ok, err4  = to_timestamp(0) / true
+ok, err5  = to_timestamp(0) / false
+ok, err6  = to_timestamp(0) / null
+ok, err7  = to_timestamp(0) / []
+ok, err8  = to_timestamp(0) / {}
+ok, err9  = to_timestamp(0) / r'foo'
+ok, err10 = to_timestamp(0) / now()
+
+timestamp_errs = [err1, err2, err3, err4, err5, err6, err7, err8, err9, err10]
+
+errs = [
+    integer_errs,
+    float_errs,
+    string_errs,
+    bool_errs,
+    null_errs,
+    array_errs,
+    object_errs,
+    regex_errs,
+    timestamp_errs,
+]
+
+flatten(errs)

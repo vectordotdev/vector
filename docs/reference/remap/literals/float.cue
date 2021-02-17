@@ -11,19 +11,19 @@ remap: literals: float: {
 		"""
 
 	characteristics: {
-		human_readable: {
-			title: "Human readable"
-			description: """
-				Floats can leverage `_` characters, instead of `,`, to make them human readable. For example,
-				`1_000_000`.
-				"""
-		}
-
 		limits: {
 			title: "Limits"
 			description: """
 				Floats in VRL can range from `-1.7976931348623157E+308f64` to `1.7976931348623157E+308f64`. Floats outside that
 				range are wrapped.
+				"""
+		}
+
+		underscores: {
+			title: "Underscores"
+			description: """
+				Floats can use underscore (`_`) characters instead of `,` to make them human readable. For
+				example, `1_000_000`.
 				"""
 		}
 	}

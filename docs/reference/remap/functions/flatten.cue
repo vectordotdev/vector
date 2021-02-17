@@ -9,14 +9,14 @@ remap: functions: flatten: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The array or map to flatten."
+			description: "The array or object to flatten."
 			required:    true
-			type: ["array", "map"]
+			type: ["array", "object"]
 		},
 	]
 	internal_failure_reasons: []
 	return: {
-		types: ["array", "map"]
+		types: ["array", "object"]
 		rules: [
 			"The return type will match the `value` type.",
 		]
@@ -31,7 +31,7 @@ remap: functions: flatten: {
 			return: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 		},
 		{
-			title: "Flatten map"
+			title: "Flatten object"
 			source: #"""
 				flatten({
 					"parent1": {
