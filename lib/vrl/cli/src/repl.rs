@@ -1,5 +1,6 @@
 use crate::Error;
 use indoc::indoc;
+use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::completion::Completer;
@@ -11,11 +12,18 @@ use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
+// Create a list of all possible error values for potential docs lookup
+lazy_static! {
+    static ref ERRORS: Vec<String> = (100..=110).map(|i| i.to_string()).collect();
+}
+
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
+    let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Runtime::default());
@@ -33,6 +41,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                 print_function_list()
             }
             Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help error <code>"
+            Ok(line) if error_docs_regex.is_match(line) => show_error_docs(line, &error_docs_regex),
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
@@ -245,14 +255,28 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     }
 }
 
+fn show_error_docs(line: &str, pattern: &Regex) {
+    // As in show_func_docs, unwrap is okay here
+    let matches = pattern.captures(line).unwrap();
+    let error_code = matches.get(1).unwrap().as_str();
+
+    if ERRORS.iter().any(|e| e == error_code) {
+        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
+        open_url(&error_code_url);
+    } else {
+        println!("error code {} not recognized", error_code);
+    }
+}
+
 const HELP_TEXT: &str = indoc! {r#"
     VRL REPL commands:
-      help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-      help docs         Navigate to the VRL docs on the Vector website
-      help docs <func>  Navigate to the VRL docs for the specified function
-      next              Load the next object or create a new one
-      prev              Load the previous object
-      exit              Terminate the program
+      help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+      help docs          Navigate to the VRL docs on the Vector website
+      help docs <func>   Navigate to the VRL docs for the specified function
+      help error <code>  Navigate to the docs for a specific error code
+      next               Load the next object or create a new one
+      prev               Load the previous object
+      exit               Terminate the program
 "#};
 
 const BANNER_TEXT: &str = indoc! {r#"
