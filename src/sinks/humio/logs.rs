@@ -152,6 +152,7 @@ mod integration_tests {
     };
     use chrono::Utc;
     use futures::stream;
+    use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom, future::ready};
 
@@ -304,20 +305,20 @@ mod integration_tests {
 
         let params = json!({
         "query": format!(
-            r#"
-mutation {{
-  createRepository(name:"{}") {{
-    repository {{
-      name
-      type
-      ingestTokens {{
-        name
-        token
-      }}
-    }}
-  }}
-}}
-"#,
+            indoc!{ r#"
+                mutation {{
+                  createRepository(name:"{}") {{
+                    repository {{
+                      name
+                      type
+                      ingestTokens {{
+                        name
+                        token
+                      }}
+                    }}
+                  }}
+                }}
+            "#},
             name
         ),
         });

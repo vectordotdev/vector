@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, SamplingMode, Throughput};
+use indoc::indoc;
 use vector::{
     config,
     test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
@@ -18,52 +19,52 @@ fn benchmark_add_fields(c: &mut Criterion) {
     let configs: Vec<(&str, &str)> = vec![
         (
             "remap",
-            r#"
-[transforms.last]
-  type = "remap"
-  inputs = ["in"]
-  source = """
-    .four = 4
-    .five = 4
-  """
-            "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "remap"
+                  inputs = ["in"]
+                  source = """
+                  .four = 4
+                  .five = 4
+                  """
+            "#},
         ),
         (
             "native",
-            r#"
-[transforms.last]
-  type = "add_fields"
-  inputs = ["in"]
-  fields.four = 4
-  fields.five = 5
-            "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "add_fields"
+                  inputs = ["in"]
+                  fields.four = 4
+                  fields.five = 5
+            "#},
         ),
         (
             "lua",
-            r#"
-[transforms.last]
-  type = "lua"
-  inputs = ["in"]
-  version = "2"
-  source = """
-  function process(event, emit)
-    event.log.four = 4
-    event.log.five = 5
-    emit(event)
-  end
-  """
-  hooks.process = "process"
-            "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "lua"
+                  inputs = ["in"]
+                  version = "2"
+                  source = """
+                  function process(event, emit)
+                    event.log.four = 4
+                    event.log.five = 5
+                    emit(event)
+                  end
+                  """
+                  hooks.process = "process"
+            "#},
         ),
         (
             "wasm",
-            r#"
-[transforms.last]
-  type = "wasm"
-  inputs = ["in"]
-  module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
-  artifact_cache = "target/artifacts/"
-        "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "wasm"
+                  inputs = ["in"]
+                  module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
+                  artifact_cache = "target/artifacts/"
+            "#},
         ),
     ];
 
@@ -79,52 +80,52 @@ fn benchmark_parse_json(c: &mut Criterion) {
     let configs: Vec<(&str, &str)> = vec![
         (
             "remap",
-            r#"
-[transforms.last]
-  type = "remap"
-  inputs = ["in"]
-  source = """
-    . = parse_json!(string!(.message))
-  """
-            "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "remap"
+                  inputs = ["in"]
+                  source = """
+                  . = parse_json!(string!(.message))
+                  """
+            "#},
         ),
         (
             "native",
-            r#"
-[transforms.last]
-  type = "json_parser"
-  inputs = ["in"]
-  field = "message"
-            "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "json_parser"
+                  inputs = ["in"]
+                  field = "message"
+            "#},
         ),
         (
             "lua",
-            r#"
-[transforms.last]
-  type = "lua"
-  inputs = ["in"]
-  version = "2"
-  search_dirs = ["./benches/lua_deps"]
-  source = """
-  local json = require "json"
+            indoc! {r#"
+                [transforms.last]
+                  type = "lua"
+                  inputs = ["in"]
+                  version = "2"
+                  search_dirs = ["benches/lua_deps"]
+                  source = """
+                  local json = require "json"
 
-  function process(event, emit)
-    event.log = json.decode(event.log.message)
-    emit(event)
-  end
-  """
-  hooks.process = "process"
-        "#,
+                  function process(event, emit)
+                    event.log = json.decode(event.log.message)
+                    emit(event)
+                  end
+                  """
+                  hooks.process = "process"
+            "#},
         ),
         (
             "wasm",
-            r#"
-[transforms.last]
-  type = "wasm"
-  inputs = ["in"]
-  module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
-  artifact_cache = "target/artifacts/"
-        "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "wasm"
+                  inputs = ["in"]
+                  module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+                  artifact_cache = "target/artifacts/"
+            "#},
         ),
     ];
 
@@ -139,65 +140,65 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     let configs: Vec<(&str, &str)> = vec![
         (
             "remap",
-            r#"
-[transforms.last]
-  type = "remap"
-  inputs = ["in"]
-  source = """
-    . = parse_syslog!(string!(.message))
-  """
-         "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "remap"
+                  inputs = ["in"]
+                  source = """
+                  . = parse_syslog!(string!(.message))
+                  """
+            "#},
         ),
         (
             "native",
-            r#"
-[transforms.last]
-  type = "regex_parser"
-  inputs = ["in"]
-  field = "message"
-  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
-  types.appname = "string"
-  types.facility = "string"
-  types.hostname = "string"
-  types.level = "string"
-  types.message = "string"
-  types.msgid = "string"
-  types.procid = "int"
-  types.timestamp = "timestamp|%F"
-         "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "regex_parser"
+                  inputs = ["in"]
+                  field = "message"
+                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
+                  types.appname = "string"
+                  types.facility = "string"
+                  types.hostname = "string"
+                  types.level = "string"
+                  types.message = "string"
+                  types.msgid = "string"
+                  types.procid = "int"
+                  types.timestamp = "timestamp|%F"
+            "#},
         ),
         (
             "lua",
-            r#"
-[transforms.last]
-  type = "lua"
-  inputs = ["in"]
-  version = "2"
-  source = """
-  local function parse_syslog(message)
-    local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
-    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
+            indoc! {r#"
+                [transforms.last]
+                  type = "lua"
+                  inputs = ["in"]
+                  version = "2"
+                  source = """
+                  local function parse_syslog(message)
+                    local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
+                    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
-  end
+                    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
+                  end
 
-  function process(event, emit)
-    event.log = parse_syslog(event.log.message)
-    emit(event)
-  end
-  """
-  hooks.process = "process"
-        "#,
+                  function process(event, emit)
+                    event.log = parse_syslog(event.log.message)
+                    emit(event)
+                  end
+                  """
+                  hooks.process = "process"
+            "#},
         ),
         (
             "wasm",
-            r#"
-[transforms.last]
-  type = "wasm"
-  inputs = ["in"]
-  module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
-  artifact_cache = "target/artifacts/"
-        "#,
+            indoc! {r#"
+                [transforms.last]
+                  type = "wasm"
+                  inputs = ["in"]
+                  module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
+                  artifact_cache = "target/artifacts/"
+            "#},
         ),
     ];
 
@@ -244,23 +245,23 @@ fn benchmark_configs(
     group.sampling_mode(SamplingMode::Flat);
 
     let source_config = format!(
-        r#"
-[sources.{}]
-  type = "socket"
-  mode = "tcp"
-  address = "{}"
-"#,
+        indoc! {r#"
+            [sources.{}]
+              type = "socket"
+              mode = "tcp"
+              address = "{}"
+        "#},
         input_name, in_addr
     );
     let sink_config = format!(
-        r#"
-[sinks.out]
-  inputs = ["{}"]
-  type = "socket"
-  mode = "tcp"
-  encoding.codec = "json"
-  address = "{}"
-"#,
+        indoc! {r#"
+            [sinks.out]
+              inputs = ["{}"]
+              type = "socket"
+              mode = "tcp"
+              encoding.codec = "json"
+              address = "{}"
+        "#},
         output_name, out_addr
     );
 
