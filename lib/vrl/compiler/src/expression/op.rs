@@ -94,8 +94,10 @@ impl Expression for Op {
             // null || ...
             Or if lhs_kind.is_null() => rhs_def,
 
+            // not null || ...
             Or if !lhs_kind.contains(K::Null) => lhs_def,
 
+            // ... || ...
             Or if !lhs_kind.is_boolean() => {
                 // We can remove Null from the lhs since we know that if the lhs is Null
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
@@ -334,17 +336,17 @@ mod tests {
 
         add_other {
             expr: |_| op(Add, (), ()),
-            want: TypeDef::new().fallible().scalar(Kind::Bytes | Kind::Integer | Kind::Float),
+            want: TypeDef::new().fallible().bytes().add_integer().add_float(),
         }
 
         remainder {
             expr: |_| op(Rem, (), ()),
-            want: TypeDef::new().fallible().scalar(Kind::Integer | Kind::Float),
+            want: TypeDef::new().fallible().integer().add_float(),
         }
 
         subtract {
             expr: |_| op(Sub, (), ()),
-            want: TypeDef::new().fallible().scalar(Kind::Integer | Kind::Float),
+            want: TypeDef::new().fallible().integer().add_float(),
         }
 
         divide {
@@ -411,7 +413,7 @@ mod tests {
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
             },
-            want: TypeDef::new().scalar(Kind::Float | Kind::Boolean),
+            want: TypeDef::new().float().add_boolean(),
         }
 
         error_or_fallible {
@@ -449,7 +451,7 @@ mod tests {
                 }.into()),
                 opcode: Err,
             },
-            want: TypeDef::new().scalar(Kind::Float | Kind::Bytes),
+            want: TypeDef::new().float().add_bytes(),
         }
 
         or_nullable {
@@ -463,7 +465,7 @@ mod tests {
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
             },
-            want: TypeDef::new().scalar(Kind::Bytes),
+            want: TypeDef::new().bytes(),
         }
 
         or_not_nullable {
@@ -477,7 +479,7 @@ mod tests {
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
             },
-            want: TypeDef::new().scalar(Kind::Bytes | Kind::Integer),
+            want: TypeDef::new().bytes().add_integer(),
         }
     ];
 }

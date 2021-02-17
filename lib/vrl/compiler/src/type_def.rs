@@ -27,15 +27,12 @@ impl Sub<Kind> for TypeDef {
 
     /// Removes the given kinds from this type definition.
     fn sub(mut self, other: Kind) -> Self::Output {
-        let kind = match self.kind {
+        self.kind = match self.kind {
             KindInfo::Unknown => KindInfo::Unknown,
             KindInfo::Known(kinds) => {
-                // Note, it would be much nicer to use retain here, but that is unfortunately still in nightly.
                 KindInfo::Known(kinds.into_iter().filter(|k| k.to_kind() != other).collect())
             }
         };
-
-        self.kind = kind;
 
         self
     }
