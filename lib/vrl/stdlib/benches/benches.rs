@@ -47,8 +47,7 @@ criterion_group!(
               parse_common_log,
               parse_duration,
               parse_glog,
-              // TODO: Cannot pass a literal to bench_function
-              //parse_grok,
+              parse_grok,
               parse_key_value,
               parse_json,
               parse_regex,
@@ -58,7 +57,7 @@ criterion_group!(
               parse_tokens,
               parse_url,
               push,
-              // TODO: Cannot pass a literal to bench_function
+              // TODO: Has not been ported to vrl/stdlib yet
               //redact,
               replace,
               round,
