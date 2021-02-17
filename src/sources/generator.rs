@@ -5,7 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use fakelogs::*;
+use fakedata::logs::*;
 use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};

@@ -42,7 +42,7 @@ members = [
   ".",
   "lib/codec",
   "lib/derive_is_enum_variant",
-  "lib/fakelogs",
+  "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
@@ -66,7 +66,7 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
-fakelogs = { path = "lib/fakelogs", optional = true }
+fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
@@ -369,7 +369,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
-sources-generator = ["fakelogs"]
+sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
