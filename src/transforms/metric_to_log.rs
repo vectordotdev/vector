@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn transform_counter() {
         let counter = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         )
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn transform_gauge() {
         let gauge = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
         )
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn transform_set() {
         let set = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn transform_distribution() {
         let distro = Metric::new(
-            "distro".into(),
+            "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 2.0 => 20],
@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn transform_histogram() {
         let histo = Metric::new(
-            "histo".into(),
+            "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 10, 2.0 => 20],
@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn transform_summary() {
         let summary = Metric::new(
-            "summary".into(),
+            "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],

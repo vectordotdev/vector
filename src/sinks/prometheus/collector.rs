@@ -1,9 +1,9 @@
 use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
-    prometheus::{proto, METRIC_NAME_LABEL},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use indexmap::map::IndexMap;
+use prometheus_parser::{proto, METRIC_NAME_LABEL};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 

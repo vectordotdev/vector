@@ -153,7 +153,7 @@ pub enum SubCommand {
 
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
-    VRL(remap_cli::Opts),
+    VRL(vrl_cli::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

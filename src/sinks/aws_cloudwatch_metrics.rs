@@ -6,14 +6,14 @@ use crate::{
     },
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
-        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
         BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -143,21 +143,22 @@ impl CloudWatchMetricsSvc {
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::<AwsCloudwatchMetricNormalize>::new(
-            batch.size,
-        ));
+        let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+        let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
-            .with_flat_map(move |mut event: Event| {
-                let namespace = event
-                    .as_mut_metric()
-                    .series
-                    .name
-                    .namespace
-                    .take()
-                    .unwrap_or_else(|| default_namespace.clone());
-                stream::iter(Some(PartitionInnerBuffer::new(event, namespace))).map(Ok)
+            .with_flat_map(move |event: Event| {
+                stream::iter(normalizer.apply(event).map(|mut event| {
+                    let namespace = event
+                        .as_mut_metric()
+                        .series
+                        .name
+                        .namespace
+                        .take()
+                        .unwrap_or_else(|| default_namespace.clone());
+                    Ok(PartitionInnerBuffer::new(event, namespace))
+                }))
             });
 
         Ok(super::VectorSink::Sink(Box::new(sink)))
@@ -309,12 +310,12 @@ mod tests {
     fn encode_events_basic_counter() {
         let events = vec![
             Metric::new(
-                "exception_total".into(),
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             ),
             Metric::new(
-                "bytes_out".into(),
+                "bytes_out",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 2.5 },
             )
@@ -322,7 +323,7 @@ mod tests {
                 Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789),
             )),
             Metric::new(
-                "healthcheck".into(),
+                "healthcheck",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -367,7 +368,7 @@ mod tests {
     #[test]
     fn encode_events_absolute_gauge() {
         let events = vec![Metric::new(
-            "temperature".into(),
+            "temperature",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         )];
@@ -385,7 +386,7 @@ mod tests {
     #[test]
     fn encode_events_distribution() {
         let events = vec![Metric::new(
-            "latency".into(),
+            "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![11.0 => 100, 12.0 => 50],
@@ -407,7 +408,7 @@ mod tests {
     #[test]
     fn encode_events_set() {
         let events = vec![Metric::new(
-            "users".into(),
+            "users",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
@@ -505,7 +506,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events).map(Into::into);
+        let stream = stream::iter(events);
         sink.run(stream).await.unwrap();
     }
 
@@ -522,11 +523,11 @@ mod integration_tests {
             for _ in 0..100 {
                 let event = Event::Metric(
                     Metric::new(
-                        "counter".to_string(),
+                        "counter",
                         MetricKind::Incremental,
                         MetricValue::Counter { value: 1.0 },
                     )
-                    .with_namespace(Some(namespace.to_string())),
+                    .with_namespace(Some(*namespace)),
                 );
                 events.push(event);
             }
@@ -534,7 +535,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events).map(Into::into);
+        let stream = stream::iter(events);
         sink.run(stream).await.unwrap();
     }
 }

@@ -6,6 +6,11 @@ installation: _interfaces: apt: {
 		[Advanced Package Tool](\(urls.apt)), or APT, is a free package manager
 		that handles the installation and removal of software on Debian,
 		Ubuntu, and other Linux distributions.
+
+		Our APT repositories are provided by
+		[Cloudsmith](\(urls.cloudsmith)) and you
+		can find [instructions for manually adding
+		the repositories](\(urls.cloudsmith_apt)).
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]

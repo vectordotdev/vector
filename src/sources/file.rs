@@ -92,7 +92,7 @@ pub enum FingerprintConfig {
     Checksum {
         // Deprecated name
         #[serde(alias = "fingerprint_bytes")]
-        bytes: usize,
+        bytes: Option<usize>,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
@@ -121,10 +121,19 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
-            } => FingerprintStrategy::Checksum {
-                bytes,
-                ignored_header_bytes,
-            },
+            } => {
+                let bytes = match bytes {
+                    Some(bytes) => {
+                        warn!(message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
+                        bytes
+                    }
+                    None => 256,
+                };
+                FingerprintStrategy::Checksum {
+                    bytes,
+                    ignored_header_bytes,
+                }
+            }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
@@ -146,7 +155,7 @@ impl Default for FileConfig {
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             },
             ignore_not_found: false,
@@ -228,8 +237,13 @@ pub fn file_source(
         config.read_from,
     );
 
-    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
-        .expect("invalid glob patterns");
+    let paths_provider = Glob::new(
+        &config.include,
+        &config.exclude,
+        MatchOptions::default(),
+        FileSourceInternalEventsEmitter,
+    )
+    .expect("invalid glob patterns");
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -425,7 +439,7 @@ mod tests {
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 8,
+                bytes: Some(8),
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
@@ -461,7 +475,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             }
         );
@@ -487,7 +501,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 128,
+                bytes: Some(128),
                 ignored_header_bytes: 512,
             }
         );

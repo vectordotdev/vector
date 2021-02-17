@@ -294,7 +294,7 @@ mod test {
     #[test]
     fn test_encode_counter() {
         let metric1 = Metric::new(
-            "counter".to_owned(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.5 },
         )
@@ -309,7 +309,7 @@ mod test {
     #[test]
     fn test_encode_absolute_counter() {
         let metric1 = Metric::new(
-            "counter".to_owned(),
+            "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.5 },
         );
@@ -324,7 +324,7 @@ mod test {
     #[test]
     fn test_encode_gauge() {
         let metric1 = Metric::new(
-            "gauge".to_owned(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: -1.5 },
         )
@@ -339,7 +339,7 @@ mod test {
     #[test]
     fn test_encode_absolute_gauge() {
         let metric1 = Metric::new(
-            "gauge".to_owned(),
+            "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.5 },
         )
@@ -354,7 +354,7 @@ mod test {
     #[test]
     fn test_encode_distribution() {
         let metric1 = Metric::new(
-            "distribution".to_owned(),
+            "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.5 => 1],
@@ -372,7 +372,7 @@ mod test {
     #[test]
     fn test_encode_set() {
         let metric1 = Metric::new(
-            "set".to_owned(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["abc".to_owned()].into_iter().collect(),
@@ -409,23 +409,23 @@ mod test {
         let events = vec![
             Event::Metric(
                 Metric::new(
-                    "counter".to_owned(),
+                    "counter",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.5 },
                 )
-                .with_namespace(Some("vector".into()))
+                .with_namespace(Some("vector"))
                 .with_tags(Some(tags())),
             ),
             Event::Metric(
                 Metric::new(
-                    "histogram".to_owned(),
+                    "histogram",
                     MetricKind::Incremental,
                     MetricValue::Distribution {
                         samples: crate::samples![2.0 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )
-                .with_namespace(Some("vector".into())),
+                .with_namespace(Some("vector")),
             ),
         ];
         let (mut tx, rx) = mpsc::channel(1);

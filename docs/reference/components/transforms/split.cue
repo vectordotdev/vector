@@ -32,9 +32,11 @@ components: transforms: split: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `split`
-			function](\(urls.vector_remap_transform)#split). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
+			\(split._remap_deprecation_notice)
+
+			```vrl
+			.message = split(.message)
+			```
 			""",
 		]
 		notices: []
