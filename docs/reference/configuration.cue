@@ -133,5 +133,34 @@ configuration: {
 				```
 				"""
 		}
+		wildcards: {
+			title: "Wildcards in identifiers"
+			body: """
+				Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports
+				them as the last character. For example:
+
+				```toml
+				[sources.app1_logs]
+				type = "file"
+				includes = ["/var/log/app1.log"]
+
+				[sources.app2_logs]
+				type = "file"
+				includes = ["/var/log/app.log"]
+
+				[sources.system_logs]
+				type = "file"
+				includes = ["/var/log/system.log"]
+
+				[sinks.app_logs]
+				type = "datadog_logs"
+				inputs = ["app*"]
+
+				[sinks.archive]
+				type = "aws_s3"
+				inputs = ["app*", "system_logs"]
+				```
+				"""
+		}
 	}
 }

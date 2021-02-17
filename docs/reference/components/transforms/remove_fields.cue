@@ -32,9 +32,11 @@ components: transforms: remove_fields: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `del`
-			function](\(urls.vector_remap_transform)#del). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
+			\(remove_fields._remap_deprecation_notice)
+
+			```vrl
+			del(.level)
+			```
 			""",
 		]
 		notices: []

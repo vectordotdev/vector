@@ -84,7 +84,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
   type = "remap"
   inputs = ["in"]
   source = """
-    . = parse_json!(.message)
+    . = parse_json!(string!(.message))
   """
             "#,
         ),
@@ -104,7 +104,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
   type = "lua"
   inputs = ["in"]
   version = "2"
-  search_dirs = ["benches/lua_deps"]
+  search_dirs = ["./benches/lua_deps"]
   source = """
   local json = require "json"
 
@@ -144,7 +144,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
   type = "remap"
   inputs = ["in"]
   source = """
-    . = parse_syslog!(.message)
+    . = parse_syslog!(string!(.message))
   """
          "#,
         ),

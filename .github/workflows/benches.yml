@@ -1,7 +1,19 @@
 name: Benchmark Suite
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - ".github/workflows/benches.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain"
   push:
     branches:
       - master
@@ -32,7 +44,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.6.0
+      - uses: styfle/cancel-workflow-action@0.8.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -7,45 +7,47 @@ import (
 components: sinks: [Name=string]: {
 	kind: "sink"
 
+	features: _
+
 	configuration: {
-		if sinks[Name].features.send != _|_ && sinks[Name].features.send.batch != _|_ {
-			if sinks[Name].features.send.batch.enabled {
+		if features.send != _|_ && features.send.batch != _|_ {
+			if features.send.batch.enabled {
 				batch: {
-					common:      sinks[Name].features.send.batch.common
+					common:      features.send.batch.common
 					description: "Configures the sink batching behavior."
 					required:    false
 					type: object: {
 						examples: []
 						options: {
-							if sinks[Name].features.send.batch.max_bytes != null {
+							if features.send.batch.max_bytes != null {
 								max_bytes: {
 									common:      true
 									description: "The maximum size of a batch, in bytes, before it is flushed."
 									required:    false
 									type: uint: {
-										default: sinks[Name].features.send.batch.max_bytes
+										default: features.send.batch.max_bytes
 										unit:    "bytes"
 									}
 								}
 							}
-							if sinks[Name].features.send.batch.max_events != null {
+							if features.send.batch.max_events != null {
 								max_events: {
 									common:      true
 									description: "The maximum size of a batch, in events, before it is flushed."
 									required:    false
 									type: uint: {
-										default: sinks[Name].features.send.batch.max_events
+										default: features.send.batch.max_events
 										unit:    "events"
 									}
 								}
 							}
-							if sinks[Name].features.send.batch.timeout_secs != null {
+							if features.send.batch.timeout_secs != null {
 								timeout_secs: {
 									common:      true
 									description: "The maximum age of a batch before it is flushed."
 									required:    false
 									type: uint: {
-										default: sinks[Name].features.send.batch.timeout_secs
+										default: features.send.batch.timeout_secs
 										unit:    "seconds"
 									}
 								}
@@ -56,7 +58,7 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.buffer.enabled {
+		if features.buffer.enabled {
 			buffer: {
 				common:      false
 				description: "Configures the sink specific buffer behavior."
@@ -114,20 +116,20 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.compression.enabled {
+		if features.send != _|_ {
+			if features.send.compression.enabled {
 				compression: {
 					common:      true
 					description: "The compression strategy used to compress the encoded event data before transmission."
 					required:    false
 					type: string: {
-						default: sinks[Name].features.send.compression.default
+						default: features.send.compression.default
 						enum: {
-							if list.Contains(sinks[Name].features.send.compression.algorithms, "none") {
+							if list.Contains(features.send.compression.algorithms, "none") {
 								none:   "No compression."
 								syntax: "literal"
 							}
-							if list.Contains(sinks[Name].features.send.compression.algorithms, "gzip") {
+							if list.Contains(features.send.compression.algorithms, "gzip") {
 								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
 							}
 						}
@@ -137,24 +139,24 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.encoding.enabled {
+		if features.send != _|_ {
+			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
 					required:    true
 					type: object: options: {
-						if sinks[Name].features.send.encoding.codec.enabled {
+						if features.send.encoding.codec.enabled {
 							codec: {
 								description: "The encoding codec used to serialize the events before outputting."
 								required:    true
 								type: string: {
-									examples: sinks[Name].features.send.encoding.codec.enum
+									examples: features.send.encoding.codec.enum
 									syntax:   "literal"
 								}
 							}
 						}
 
-						if sinks[Name].features.healthcheck.enabled {except_fields: {
+						if features.healthcheck.enabled {except_fields: {
 							common:      false
 							description: "Prevent the sink from encoding the specified labels."
 							required:    false
@@ -199,8 +201,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.healthcheck != _|_ {
-			if sinks[Name].features.healthcheck.enabled {
+		if features.healthcheck != _|_ {
+			if features.healthcheck.enabled {
 				healthcheck: {
 					common:      true
 					description: "Health check options for the sink."
@@ -220,8 +222,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.request.enabled {
+		if features.send != _|_ {
+			if features.send.request.enabled {
 				request: {
 					common:      false
 					description: "Configures the sink request behavior."
@@ -259,15 +261,15 @@ components: sinks: [Name=string]: {
 							}
 							concurrency: {
 								common: true
-								if sinks[Name].features.send.request.adaptive_concurrency {
+								if features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time, or \"adaptive\" to allow Vector to automatically set the limit based on current network and service conditions."
 								}
-								if !sinks[Name].features.send.request.adaptive_concurrency {
+								if !features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time."
 								}
 								required: false
 								type: uint: {
-									default: sinks[Name].features.send.request.concurrency
+									default: features.send.request.concurrency
 									unit:    "requests"
 								}
 							}
@@ -276,7 +278,7 @@ components: sinks: [Name=string]: {
 								description: "The time window, in seconds, used for the `rate_limit_num` option."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.request.rate_limit_duration_secs
+									default: features.send.request.rate_limit_duration_secs
 									unit:    "seconds"
 								}
 							}
@@ -285,7 +287,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.request.rate_limit_num
+									default: features.send.request.rate_limit_num
 									unit:    null
 								}
 							}
@@ -303,7 +305,7 @@ components: sinks: [Name=string]: {
 								description: "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.request.retry_initial_backoff_secs
+									default: features.send.request.retry_initial_backoff_secs
 									unit:    "seconds"
 								}
 							}
@@ -312,7 +314,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum amount of time, in seconds, to wait between retries."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.request.retry_max_duration_secs
+									default: features.send.request.retry_max_duration_secs
 									unit:    "seconds"
 								}
 							}
@@ -321,12 +323,12 @@ components: sinks: [Name=string]: {
 								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.request.timeout_secs
+									default: features.send.request.timeout_secs
 									unit:    "seconds"
 								}
 							}
 
-							if sinks[Name].features.send.request.headers {
+							if features.send.request.headers {
 								headers: {
 									common:      false
 									description: "Options for custom headers."
@@ -349,8 +351,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.send_buffer_size != _|_ {
+		if features.send != _|_ {
+			if features.send.send_buffer_size != _|_ {
 				send_buffer_bytes: {
 					common:      false
 					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
@@ -358,11 +360,11 @@ components: sinks: [Name=string]: {
 					type: uint: {
 						examples: [65536]
 					}
-					relevant_when: sinks[Name].features.send.send_buffer_bytes.relevant_when
+					relevant_when: features.send.send_buffer_bytes.relevant_when
 				}
 			}
 
-			if sinks[Name].features.send.keepalive != _|_ {
+			if features.send.keepalive != _|_ {
 				keepalive: {
 					common:      false
 					description: "Configures the TCP keepalive behavior for the connection to the sink."
@@ -384,22 +386,22 @@ components: sinks: [Name=string]: {
 				}
 			}
 
-			if sinks[Name].features.send.tls.enabled {
+			if features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
-					can_enable:             sinks[Name].features.send.tls.can_enable
-					can_verify_certificate: sinks[Name].features.send.tls.can_enable
-					can_verify_hostname:    sinks[Name].features.send.tls.can_verify_hostname
-					enabled_default:        sinks[Name].features.send.tls.enabled_default
+					can_enable:             features.send.tls.can_enable
+					can_verify_certificate: features.send.tls.can_enable
+					can_verify_hostname:    features.send.tls.can_verify_hostname
+					enabled_default:        features.send.tls.enabled_default
 				}}
 			}
 		}
 	}
 
 	how_it_works: {
-		if sinks[Name].features.buffer.enabled {
-			if sinks[Name].features.send != _|_ {
-				if sinks[Name].features.send.batch != _|_ {
-					if sinks[Name].features.send.batch.enabled {
+		if features.buffer.enabled {
+			if features.send != _|_ {
+				if features.send.batch != _|_ {
+					if features.send.batch.enabled {
 						buffers_batches: {
 							title: "Buffers & batches"
 							body: #"""
@@ -422,7 +424,7 @@ components: sinks: [Name=string]: {
 				}
 			}
 
-			if sinks[Name].features.send == _|_ {
+			if features.send == _|_ {
 				buffers: {
 					title: "Buffers"
 					body: """
@@ -437,7 +439,7 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.healthcheck.enabled {
+		if features.healthcheck.enabled {
 			healthchecks: {
 				title: "Health checks"
 				body: """
@@ -471,8 +473,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.request.enabled {
+		if features.send != _|_ {
+			if features.send.request.enabled {
 				partitioning: _ | *{
 					title: "Partitioning"
 					body: """
@@ -493,8 +495,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.request.enabled {
+		if features.send != _|_ {
+			if features.send.request.enabled {
 				rate_limits: {
 					title: "Rate limits & adapative concurrency"
 					body:  null
@@ -550,8 +552,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if sinks[Name].features.send != _|_ {
-			if sinks[Name].features.send.tls.enabled {
+		if features.send != _|_ {
+			if features.send.tls.enabled {
 				transport_layer_security: {
 					title: "Transport Layer Security (TLS)"
 					body:  """

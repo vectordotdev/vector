@@ -1,3 +1,5 @@
+package metadata
+
 remap: functions: to_bool: {
 	category: "Coerce"
 	description: """

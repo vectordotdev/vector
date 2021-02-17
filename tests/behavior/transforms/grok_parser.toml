@@ -13,7 +13,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .timestamp == "12/Dec/2015:18:32:56 +0100" && \
+        .timestamp == "12/Dec/2015:18:32:56 +0100" &&
         .message == "hello"
       '''
 
@@ -32,6 +32,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nested.timestamp == "12/Dec/2015:18:32:56 +0100" && \
+        .nested.timestamp == "12/Dec/2015:18:32:56 +0100" &&
         .doubly.nested.message == "hello"
       '''

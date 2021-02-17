@@ -1,0 +1,4 @@
+# result: [{ "ok": 1.0 }, null]
+
+.ok, err = 1 / 1
+[., err]

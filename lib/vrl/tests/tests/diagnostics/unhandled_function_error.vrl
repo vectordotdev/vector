@@ -1,0 +1,16 @@
+# result:
+#
+# error[E100]: unhandled error
+#   ┌─ :2:1
+#   │
+# 2 │ parse_json("true")
+#   │ ^^^^^^^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = learn more at: https://errors.vrl.dev/100
+
+parse_json("true")

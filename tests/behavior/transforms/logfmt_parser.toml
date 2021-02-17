@@ -17,9 +17,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .code == 1234 && \
-        .flag == true && \
-        .number == 42.3 && \
+        .code == 1234 &&
+        .flag == true &&
+        .number == 42.3 &&
         .rest == "word"
       '''
 
@@ -42,8 +42,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nested.code == 1234 && \
-        .nested.flag == true && \
-        .nested.number == 42.3 && \
+        .nested.code == 1234 &&
+        .nested.flag == true &&
+        .nested.number == 42.3 &&
         .nested.rest == "word"
       '''
