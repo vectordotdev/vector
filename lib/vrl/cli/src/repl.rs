@@ -11,6 +11,13 @@ use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
+// Create a list of all possible error values for potential docs lookup
+lazy_static! {
+    static ref ERRORS: Vec<String> = (100..=110)
+        .map(|i| i.to_string())
+        .collect();
+}
+
 const HELP_TEXT: &str = r#"
 VRL REPL commands:
   help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
@@ -23,12 +30,6 @@ VRL REPL commands:
 "#;
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
-
-lazy_static! {
-    static ref ERRORS: Vec<String> = (100..=110)
-        .map(|i| i.to_string())
-        .collect();
-}
 
 pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
     let mut index = 0;
