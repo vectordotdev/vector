@@ -1,6 +1,6 @@
 use crate::Error;
-use lazy_static::lazy_static;
 use indoc::indoc;
+use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::completion::Completer;

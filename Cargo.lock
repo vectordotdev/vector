@@ -2130,7 +2130,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "fakedata_generator",
- "rand 0.8.2",
+ "rand 0.8.3",
 ]
 
 [[package]]
