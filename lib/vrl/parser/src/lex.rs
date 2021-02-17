@@ -5,7 +5,8 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 pub type Tok<'input> = Token<&'input str>;
-pub type Spanned<'input, Loc> = Result<(Loc, Tok<'input>, Loc), Error>;
+pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
+pub type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -447,7 +448,7 @@ impl StringLiteral<&str> {
 // -----------------------------------------------------------------------------
 
 impl<'input> Iterator for Lexer<'input> {
-    type Item = Spanned<'input, usize>;
+    type Item = SpannedResult<'input, usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
         use Token::*;
@@ -461,7 +462,7 @@ impl<'input> Iterator for Lexer<'input> {
             // represent a physical character, instead it is a boundary marker.
             if self.query_start(start) {
                 // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                return self.token2(start, start + 1, LQuery);
+                return Some(Ok(self.token2(start, start + 1, LQuery)));
             }
 
             // Check if we need to emit a `RQuery` token.
@@ -470,7 +471,7 @@ impl<'input> Iterator for Lexer<'input> {
             // represent a physical character, instead it is a boundary marker.
             if let Some(pos) = self.query_end(start) {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return self.token2(pos, pos + 1, RQuery);
+                return Some(Ok(self.token2(pos, pos + 1, RQuery)));
             }
 
             // Advance the internal iterator and emit the next token, or loop
@@ -479,26 +480,28 @@ impl<'input> Iterator for Lexer<'input> {
                 let result = match ch {
                     '"' => Some(self.string_literal(start)),
 
-                    ';' => self.token(start, SemiColon),
-                    '\n' => self.token(start, Newline),
-                    '\\' => self.token(start, Escape),
+                    ';' => Some(Ok(self.token(start, SemiColon))),
+                    '\n' => Some(Ok(self.token(start, Newline))),
+                    '\\' => Some(Ok(self.token(start, Escape))),
 
-                    '(' => self.open(start, LParen),
-                    '[' => self.open(start, LBracket),
-                    '{' => self.open(start, LBrace),
-                    '}' => self.close(start, RBrace),
-                    ']' => self.close(start, RBracket),
-                    ')' => self.close(start, RParen),
+                    '(' => Some(Ok(self.open(start, LParen))),
+                    '[' => Some(Ok(self.open(start, LBracket))),
+                    '{' => Some(Ok(self.open(start, LBrace))),
+                    '}' => Some(Ok(self.close(start, RBrace))),
+                    ']' => Some(Ok(self.close(start, RBracket))),
+                    ')' => Some(Ok(self.close(start, RParen))),
 
-                    '.' => self.token(start, Dot),
-                    ':' => self.token(start, Colon),
-                    ',' => self.token(start, Comma),
+                    '.' => Some(Ok(self.token(start, Dot))),
+                    ':' => Some(Ok(self.token(start, Colon))),
+                    ',' => Some(Ok(self.token(start, Comma))),
 
-                    '_' if self.test_peek(char::is_alphabetic) => Some(self.internal_test(start)),
-                    '_' => self.token(start, Underscore),
+                    '_' if self.test_peek(char::is_alphabetic) => {
+                        Some(Ok(self.internal_test(start)))
+                    }
+                    '_' => Some(Ok(self.token(start, Underscore))),
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
-                        self.token(start, Bang)
+                        Some(Ok(self.token(start, Bang)))
                     }
 
                     '#' => {
@@ -510,14 +513,14 @@ impl<'input> Iterator for Lexer<'input> {
                     's' if self.test_peek(|ch| ch == '\'') => Some(self.raw_string_literal(start)),
                     't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
 
-                    ch if is_ident_start(ch) => Some(self.identifier_or_function_call(start)),
+                    ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
                         Some(self.numeric_literal(start))
                     }
-                    ch if is_operator(ch) => Some(self.operator(start)),
+                    ch if is_operator(ch) => Some(Ok(self.operator(start))),
                     ch if ch.is_whitespace() => continue,
 
-                    ch => self.token(start, InvalidToken(ch)),
+                    ch => Some(Ok(self.token(start, InvalidToken(ch)))),
                 };
 
                 // dbg!(&result); // NOTE: uncomment this for debugging
@@ -529,7 +532,7 @@ impl<'input> Iterator for Lexer<'input> {
             // queries.
             } else if let Some(end) = self.rquery_indices.pop() {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return self.token2(end, end + 1, RQuery);
+                return Some(Ok(self.token2(end, end + 1, RQuery)));
             }
 
             return None;
@@ -542,7 +545,7 @@ impl<'input> Iterator for Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 impl<'input> Lexer<'input> {
-    fn open(&mut self, start: usize, token: Token<&'input str>) -> Option<Spanned<'input, usize>> {
+    fn open(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
         match &token {
             Token::LParen => self.open_parens += 1,
             Token::LBracket => self.open_brackets += 1,
@@ -553,7 +556,7 @@ impl<'input> Lexer<'input> {
         self.token(start, token)
     }
 
-    fn close(&mut self, start: usize, token: Token<&'input str>) -> Option<Spanned<'input, usize>> {
+    fn close(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
         match &token {
             Token::RParen => self.open_parens = self.open_parens.saturating_sub(1),
             Token::RBracket => self.open_brackets = self.open_brackets.saturating_sub(1),
@@ -564,7 +567,7 @@ impl<'input> Lexer<'input> {
         self.token(start, token)
     }
 
-    fn token(&mut self, start: usize, token: Token<&'input str>) -> Option<Spanned<'input, usize>> {
+    fn token(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
         let end = self.next_index();
         self.token2(start, end, token)
     }
@@ -574,8 +577,8 @@ impl<'input> Lexer<'input> {
         start: usize,
         end: usize,
         token: Token<&'input str>,
-    ) -> Option<Spanned<'input, usize>> {
-        Some(Ok((start, token, end)))
+    ) -> Spanned<'input, usize> {
+        (start, token, end)
     }
 
     fn query_end(&mut self, start: usize) -> Option<usize> {
@@ -640,7 +643,7 @@ impl<'input> Lexer<'input> {
         let mut end = 0;
         while let Some((pos, ch)) = chars.next() {
             let take_until_end =
-                |result: Spanned<'input, usize>,
+                |result: SpannedResult<'input, usize>,
                  last_char: &mut Option<char>,
                  end: &mut usize,
                  chars: &mut Peekable<CharIndices<'input>>| {
@@ -735,7 +738,7 @@ impl<'input> Lexer<'input> {
                     while let Some((pos, ch)) = chars.peek() {
                         let pos = *pos;
 
-                        let literal_check = |result: Spanned<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
+                        let literal_check = |result: SpannedResult<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
                             Err(_) => Err(()),
                             Ok((_, _, new)) => {
                                 #[allow(clippy::while_let_on_iterator)]
@@ -854,7 +857,7 @@ impl<'input> Lexer<'input> {
         true
     }
 
-    fn string_literal(&mut self, start: usize) -> Spanned<'input, usize> {
+    fn string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let content_start = self.next_index();
 
         loop {
@@ -876,19 +879,19 @@ impl<'input> Lexer<'input> {
         Err(Error::StringLiteral { start })
     }
 
-    fn regex_literal(&mut self, start: usize) -> Spanned<'input, usize> {
+    fn regex_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         self.quoted_literal(start, Token::RegexLiteral)
     }
 
-    fn raw_string_literal(&mut self, start: usize) -> Spanned<'input, usize> {
+    fn raw_string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         self.quoted_literal(start, |c| Token::StringLiteral(StringLiteral::Raw(c)))
     }
 
-    fn timestamp_literal(&mut self, start: usize) -> Spanned<'input, usize> {
+    fn timestamp_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         self.quoted_literal(start, Token::TimestampLiteral)
     }
 
-    fn numeric_literal(&mut self, start: usize) -> Spanned<'input, usize> {
+    fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
         match self.peek() {
@@ -928,7 +931,7 @@ impl<'input> Lexer<'input> {
             Token::ident(ident)
         };
 
-        Ok((start, token, end))
+        (start, token, end)
     }
 
     fn operator(&mut self, start: usize) -> Spanned<'input, usize> {
@@ -941,21 +944,21 @@ impl<'input> Lexer<'input> {
             op => Token::Operator(op),
         };
 
-        Ok((start, token, end))
+        (start, token, end)
     }
 
     fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
         self.bump();
         let (end, test) = self.take_while(start, char::is_alphabetic);
 
-        Ok((start, Token::InternalTest(test), end))
+        (start, Token::InternalTest(test), end)
     }
 
     fn quoted_literal(
         &mut self,
         start: usize,
         tok: impl Fn(&'input str) -> Tok<'input>,
-    ) -> Spanned<'input, usize> {
+    ) -> SpannedResult<'input, usize> {
         self.bump();
         let content_start = self.next_index();
 
@@ -1122,7 +1125,7 @@ mod test {
     use super::*;
     use crate::lex::Token::*;
 
-    fn lexer(input: &str) -> impl Iterator<Item = Spanned<'_, usize>> + '_ {
+    fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
         Box::new(std::iter::from_fn(move || Some(lexer.next()?)))
     }
