@@ -1,6 +1,7 @@
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{stream, SinkExt, Stream, StreamExt};
 use indexmap::IndexMap;
+use indoc::indoc;
 use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
@@ -32,15 +33,15 @@ fn bench_add_fields(c: &mut Criterion) {
         }),
         ("v2", {
             let config = format!(
-                r#"
-hooks.process = """
-function (event, emit)
-event.log['{}'] = '{}'
+                indoc! {r#"
+                    hooks.process = """
+                    function (event, emit)
+                      event.log['{}'] = '{}'
 
-emit(event)
-end
-"""
-"#,
+                      emit(event)
+                    end
+                    """
+                "#},
                 key, value
             );
             Transform::task(
@@ -111,25 +112,24 @@ fn bench_field_filter(c: &mut Criterion) {
             })
         }),
         ("v1", {
-            let source = String::from(
-                r#"
-if event["the_field"] ~= "0" then
-    event = nil
-end
-"#,
-            );
+            let source = String::from(indoc! {r#"
+                if event["the_field"] ~= "0" then
+                    event = nil
+                end
+            "#});
             Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
-            let config = r#"
-hooks.process = """
-function (event, emit)
-    if event.log["the_field"] == "0" then
-      emit(event)
-    end
-end
-"""
-"#;
+            let config = indoc! {r#"
+                hooks.process = """
+                function (event, emit)
+                  if event.log["the_field"] ~= "0" then
+                    event = nil
+                  end
+                  emit(event)
+                end
+                """
+            "#};
             Transform::task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
             )

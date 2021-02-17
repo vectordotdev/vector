@@ -15,6 +15,7 @@ regex = "1"
 reqwest = { version = "0.10", features = ["json"] }
 serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+indoc = "1.0.3"
 
 [features]
 e2e-tests = []
