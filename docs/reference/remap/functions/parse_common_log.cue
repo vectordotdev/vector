@@ -31,7 +31,7 @@ remap: functions: parse_common_log: {
 		"`timestamp_format` is not a valid format string",
 		"timestamp in `value` fails to parse via the provided `timestamp_format`",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{

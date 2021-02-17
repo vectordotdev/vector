@@ -23,7 +23,7 @@ remap: functions: parse_aws_vpc_flow_log: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted AWS VPC Flow log",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{

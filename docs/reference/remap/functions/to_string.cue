@@ -22,7 +22,7 @@ remap: functions: to_string: {
 			#"If `value` is an float then its string representation is returned."#,
 			#"If `value` is an boolean then `"true"` or `"false"` is returned."#,
 			#"If `value` is an timestamp then its RFC3339 representation is returned."#,
-			#"If `value` is a map then it is encoded into JSON."#,
+			#"If `value` is an object then it is encoded into JSON."#,
 			#"If `value` is a list then it is encoded into JSON."#,
 		]
 	}

@@ -54,7 +54,7 @@ remap: expressions: assignment: {
 				description: """
 					If the `target` is a variable, the `expression` can be any expression.
 
-					If the `target` is a path, the `expression` can be any expression that returns a supported map
+					If the `target` is a path, the `expression` can be any expression that returns a supported object
 					value type (i.e. not a regular expression).
 					"""
 			}
