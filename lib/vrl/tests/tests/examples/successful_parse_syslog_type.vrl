@@ -4,4 +4,4 @@
 .message = to_string!(.message)
 result = parse_syslog!(.message)
 sha = sha3(value: result.message)
-sha + (result.appname || "<no app name>") ?? ""
+sha + (result.appname || "<no app name>")
