@@ -67,7 +67,7 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // peers -- but this is acceptable.
     //
     // The implementation here is a spin lock on the `gauge` value with the
-    // critical section being solely for updating the `gague` value by `add` and
+    // critical section being solely for updating the `gauge` value by `add` and
     // calling `emitter`. If we suffer priority inversion at higher peer counts
     // we might consider the use of a mutex, which will participate in the OS's
     // scheduler. See [this
