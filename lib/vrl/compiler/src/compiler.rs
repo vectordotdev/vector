@@ -204,12 +204,32 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    fn rewrite_to_merge(
+        &mut self,
+        span: diagnostic::Span,
+        target: &Node<ast::AssignmentTarget>,
+        expr: Box<Node<ast::Expr>>,
+    ) -> Box<Node<Expr>> {
+        Box::new(Node::new(
+            span,
+            Expr::Op(self.compile_op(Node::new(
+                span,
+                ast::Op(
+                    Box::new(Node::new(target.span(), target.inner().to_expr(span))),
+                    Node::new(span, ast::Opcode::Merge),
+                    expr,
+                ),
+            ))),
+        ))
+    }
+
     fn compile_assignment(&mut self, node: Node<ast::Assignment>) -> Assignment {
         use assignment::Variant;
         use ast::Assignment::*;
 
         self.state.snapshot();
-        let (_span, assignment) = node.take();
+        let assignment = node.into_inner();
 
         let node = match assignment {
             Single { target, op, expr } => {
@@ -223,21 +243,7 @@ impl<'a> Compiler<'a> {
                         Node::new(span, Variant::Single { target, expr })
                     }
                     AssignmentOp::Merge => {
-                        let expr = Box::new(Node::new(
-                            span,
-                            Expr::Op(self.compile_op(Node::new(
-                                span,
-                                ast::Op(
-                                    Box::new(Node::new(
-                                        target.span(),
-                                        target.inner().to_expr(span),
-                                    )),
-                                    Node::new(span, ast::Opcode::Merge),
-                                    expr,
-                                ),
-                            ))),
-                        ));
-
+                        let expr = self.rewrite_to_merge(span, &target, expr);
                         Node::new(span, Variant::Single { target, expr })
                     }
                 }
@@ -249,24 +255,13 @@ impl<'a> Compiler<'a> {
                     AssignmentOp::Assign => {
                         let expr =
                             Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
-
                         let node = Variant::Infallible { ok, err, expr };
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
-                        let expr = Box::new(Node::new(
-                            span,
-                            Expr::Op(self.compile_op(Node::new(
-                                span,
-                                ast::Op(
-                                    Box::new(Node::new(ok.span(), ok.inner().to_expr(span))),
-                                    Node::new(span, ast::Opcode::Merge),
-                                    expr,
-                                ),
-                            ))),
-                        ));
-
+                        let expr = self.rewrite_to_merge(span, &ok, expr);
                         let node = Variant::Infallible { ok, err, expr };
+
                         Node::new(span, node)
                     }
                 }
