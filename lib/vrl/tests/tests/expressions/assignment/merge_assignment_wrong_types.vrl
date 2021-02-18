@@ -1,0 +1,53 @@
+# result:
+# error[E652]: can only merge objects
+#   ┌─ :4:6
+#   │
+# 4 │ . |= 32
+#   │      -- this expression must resolve to an object
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#
+# error[E652]: can only merge objects
+#   ┌─ :5:6
+#   │
+# 5 │ . |= "oops"
+#   │      ------ this expression must resolve to an object
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#
+# error[E652]: can only merge objects
+#   ┌─ :6:6
+#   │
+# 6 │ . |= [ "oh", "dear" ]
+#   │      ---------------- this expression must resolve to an object
+#   │
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#
+# error[E652]: can only merge objects
+#    ┌─ :10:1
+#    │
+# 10 │ x |= { "ook": 32 }
+#    │ - this expression must resolve to an object
+#    │
+#    = see language documentation at: https://vector.dev/docs/reference/vrl/
+#
+# error[E652]: can only merge objects
+#    ┌─ :11:1
+#    │
+# 11 │ x |= 32
+#    │ -    -- this expression must resolve to an object
+#    │ │
+#    │ this expression must resolve to an object
+#    │
+#    = see language documentation at: https://vector.dev/docs/reference/vrl/
+   
+. = { "ook": 23 }
+
+. |= 32
+. |= "oops"
+. |= [ "oh", "dear" ]
+
+x = "oh no"
+
+x |= { "ook": 32 }
+x |= 32
