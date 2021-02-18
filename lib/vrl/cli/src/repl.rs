@@ -14,7 +14,11 @@ use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
-    static ref ERRORS: Vec<String> = (100..=110).map(|i| i.to_string()).collect();
+    static ref ERRORS: Vec<String> =
+        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 601, 620, 630, 640, 650, 660]
+            .iter()
+            .map(|i| i.to_string())
+            .collect();
 }
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
