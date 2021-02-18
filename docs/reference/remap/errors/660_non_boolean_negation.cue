@@ -8,8 +8,8 @@ remap: errors: "660": {
 		"""
 
 	rationale: """
-		Only non-Boolean values can be used with the negation operator (`!`). The expression `!false`, for example,
-		produces `true`, whereas `!"hello"` is a meaningless non-expression.
+		Only Boolean values can be used with the negation operator (`!`). The expression `!false`, for example, produces
+		`true`, whereas `!"hello"` is a meaningless non-expression.
 		"""
 
 	resolution: """
