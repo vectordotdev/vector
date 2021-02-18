@@ -803,25 +803,25 @@ pub enum AssignmentTarget {
 }
 
 impl AssignmentTarget {
-    pub fn into_expr(self, span: Span) -> Expr {
+    pub fn to_expr(&self, span: Span) -> Expr {
         match self {
             AssignmentTarget::Noop => Expr::Literal(Node::new(span, Literal::Null)),
-            AssignmentTarget::Query(query) => Expr::Query(Node::new(span, query)),
+            AssignmentTarget::Query(query) => Expr::Query(Node::new(span, query.clone())),
             AssignmentTarget::Internal(ident, Some(path)) => Expr::Query(Node::new(
                 span,
                 Query {
-                    target: Node::new(span, QueryTarget::Internal(ident)),
-                    path: Node::new(span, path),
+                    target: Node::new(span, QueryTarget::Internal(ident.clone())),
+                    path: Node::new(span, path.clone()),
                 },
             )),
             AssignmentTarget::Internal(ident, None) => {
-                Expr::Variable(Node::new(span, ident))
+                Expr::Variable(Node::new(span, ident.clone()))
             }
             AssignmentTarget::External(path) => Expr::Query(Node::new(
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.unwrap_or(Path(Vec::new()))),
+                    path: Node::new(span, path.clone().unwrap_or(Path(Vec::new()))),
                 },
             )),
         }

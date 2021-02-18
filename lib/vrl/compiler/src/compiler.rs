@@ -228,7 +228,10 @@ impl<'a> Compiler<'a> {
                             Expr::Op(self.compile_op(Node::new(
                                 span,
                                 ast::Op(
-                                    Box::new(target.clone().map(|target| target.into_expr(span))),
+                                    Box::new(Node::new(
+                                        target.span(),
+                                        target.inner().to_expr(span),
+                                    )),
                                     Node::new(span, ast::Opcode::Union),
                                     expr,
                                 ),
@@ -256,7 +259,7 @@ impl<'a> Compiler<'a> {
                             Expr::Op(self.compile_op(Node::new(
                                 span,
                                 ast::Op(
-                                    Box::new(ok.clone().map(|target| target.into_expr(&span))),
+                                    Box::new(Node::new(ok.span(), ok.inner().to_expr(span))),
                                     Node::new(span, ast::Opcode::Union),
                                     expr,
                                 ),
