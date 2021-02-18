@@ -1,7 +1,7 @@
 package metadata
 
 remap: errors: "660": {
-	title:       "Non-Boolean negation"
+	title: "Non-Boolean negation"
 	description: """
 		Only non-Boolean values can be used with the negation operator (`!`). The expression `!false`, for example,
 		produces `true`, whereas `!"hello"` is a meaningless non-expression.

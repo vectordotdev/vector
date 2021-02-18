@@ -15,7 +15,7 @@ remap: {
 	}
 
 	errors: [Code=string]: #Error & {
-		code: strconv.ParseInt(Code, 0, 8)
+		code: strconv.ParseInt(Code, 0, 16)
 	}
 
 	_fail_safe_blurb: """
