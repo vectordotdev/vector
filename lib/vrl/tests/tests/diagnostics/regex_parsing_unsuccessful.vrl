@@ -6,7 +6,7 @@
 # 2 │ r'['
 #   │ ^^^^ regex parse error: unclosed character class: [
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
 #   = learn more at: https://errors.vrl.dev/101
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
 r'['
