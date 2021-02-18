@@ -98,7 +98,7 @@ impl Expression for ParseKeyValueFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().object::<(), Kind>(map! {
+        TypeDef::new().fallible().object::<(), Kind>(map! {
             (): Kind::all()
         })
     }

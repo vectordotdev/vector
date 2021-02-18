@@ -46,7 +46,7 @@ impl Expression for ParseSyslogFn {
         let value = self.value.resolve(ctx)?;
         let message = value.unwrap_bytes_utf8_lossy();
 
-        let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
+        let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
 
         Ok(message_to_value(parsed))
     }
