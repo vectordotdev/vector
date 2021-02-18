@@ -192,8 +192,8 @@ impl Value {
         Ok(value)
     }
 
-    pub fn try_union(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Union(self.kind(), rhs.kind());
+    pub fn try_merge(self, rhs: Self) -> Result<Self, Error> {
+        let err = || Error::Merge(self.kind(), rhs.kind());
 
         let value = match (&self, &rhs) {
             (Value::Object(lhv), Value::Object(rhv)) => lhv

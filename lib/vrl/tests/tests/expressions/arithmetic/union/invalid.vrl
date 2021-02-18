@@ -1,7 +1,7 @@
 # result: [
-#     "unable to union \"object\" <= \"integer\"",
-#     "unable to union \"object\" <= \"array\"",
-#     "unable to union \"object\" <= \"string\""
+#     "unable to merge \"object\" <= \"integer\"",
+#     "unable to merge \"object\" <= \"array\"",
+#     "unable to merge \"object\" <= \"string\""
 # ]
 
 ok, err1 = { "foo": 43 } | 34

@@ -21,7 +21,6 @@ pub(in crate::mapping) enum Operator {
     LessOrEqual,
     And,
     Or,
-    Union,
 }
 
 #[derive(Debug)]

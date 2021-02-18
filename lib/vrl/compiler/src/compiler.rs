@@ -232,7 +232,7 @@ impl<'a> Compiler<'a> {
                                         target.span(),
                                         target.inner().to_expr(span),
                                     )),
-                                    Node::new(span, ast::Opcode::Union),
+                                    Node::new(span, ast::Opcode::Merge),
                                     expr,
                                 ),
                             ))),
@@ -260,7 +260,7 @@ impl<'a> Compiler<'a> {
                                 span,
                                 ast::Op(
                                     Box::new(Node::new(ok.span(), ok.inner().to_expr(span))),
-                                    Node::new(span, ast::Opcode::Union),
+                                    Node::new(span, ast::Opcode::Merge),
                                     expr,
                                 ),
                             ))),

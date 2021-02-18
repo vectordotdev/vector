@@ -56,8 +56,8 @@ pub enum Error {
     #[error("unable to compare {0} <= {1}")]
     Le(Kind, Kind),
 
-    #[error("unable to union {0} <= {1}")]
-    Union(Kind, Kind),
+    #[error("unable to merge {0} <= {1}")]
+    Merge(Kind, Kind),
 }
 
 impl DiagnosticError for Error {
@@ -80,7 +80,7 @@ impl DiagnosticError for Error {
             Ge(..) => 312,
             Lt(..) => 313,
             Le(..) => 314,
-            Union(..) => 315,
+            Merge(..) => 315,
         }
     }
 }

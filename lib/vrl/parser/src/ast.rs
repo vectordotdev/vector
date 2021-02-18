@@ -651,7 +651,7 @@ pub enum Opcode {
     Gt,
     Le,
     Lt,
-    Union,
+    Merge,
 }
 
 impl fmt::Display for Opcode {
@@ -670,7 +670,7 @@ impl Opcode {
             Add => "+",
             Sub => "-",
             Rem => "%",
-            Union => "|",
+            Merge => "|",
 
             Or => "||",
             And => "&&",
@@ -713,7 +713,7 @@ impl FromStr for Opcode {
             ">" => Gt,
             "<=" => Le,
             "<" => Lt,
-            "|" => Union,
+            "|" => Merge,
 
             _ => return std::result::Result::Err(()),
         };
