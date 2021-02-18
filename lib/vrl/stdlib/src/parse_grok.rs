@@ -116,155 +116,135 @@ impl Expression for ParseGrokFn {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
+    use shared::btreemap;
 
-    test_function![
-        parse_grok => ParseGrok;
+    remap::test_type_def![string {
+        expr: |_| ParseGrokFn {
+            value: Literal::from("foo").boxed(),
+            pattern: Arc::new(
+                grok::Grok::with_patterns()
+                    .compile("%{LOGLEVEL:level}", true)
+                    .unwrap()
+            ),
+            remove_empty: Some(Literal::from(false).boxed()),
+        },
+        def: TypeDef {
+            kind: value::Kind::Map,
+            fallible: true,
+            ..Default::default()
+        },
+    }];
 
-        test {
-            args: func_args![
-                value: value!("2020-10-02T23:22:12.223222Z info Hello world"),
-                pattern: value!("%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"),
-            ],
-            want: Ok(value!(
-                {
-                    timestamp: "2020-10-02T23:22:12.223222Z",
-                    level: "info",
-                    message: "Hello world"
-                }
-            )),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all(),
-            }),
+    #[test]
+    fn check_invalid_grok_error() {
+        let mut arguments = ArgumentList::default();
+        arguments.insert(
+            "value",
+            expression::Argument::new(
+                Box::new(Literal::from("foo").into()),
+                |_| true,
+                "value",
+                "parse_grok",
+            )
+            .into(),
+        );
+        arguments.insert(
+            "pattern",
+            expression::Argument::new(
+                Box::new(Literal::from("%{NOG}").into()),
+                |_| true,
+                "pattern",
+                "parse_grok",
+            )
+            .into(),
+        );
+
+        let error = ParseGrok.compile(arguments);
+
+        assert_eq!(Error::Call("The given pattern definition name \"NOG\" could not be found in the definition map".to_string()), error.unwrap_err());
+    }
+
+    #[test]
+    fn check_parse_grok() {
+        let cases = vec![
+            (
+                btreemap! { "message" => "an ungrokkable message" },
+                Err("function call error: unable to parse input with grok pattern".into()),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                        .to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z an ungrokkable message" },
+                Err("function call error: unable to parse input with grok pattern".into()),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                        .to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z info Hello world" },
+                Ok(Value::from(btreemap! {
+                    "timestamp" => "2020-10-02T23:22:12.223222Z",
+                    "level" => "info",
+                    "message" => "Hello world",
+                })),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                        .to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z" },
+                Ok(Value::from(btreemap! {
+                    "timestamp" => "2020-10-02T23:22:12.223222Z",
+                    "level" => "",
+                })),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
+                    None,
+                )
+                .unwrap(),
+            ),
+            (
+                btreemap! { "message" => "2020-10-02T23:22:12.223222Z" },
+                Ok(Value::from(
+                    btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
+                )),
+                ParseGrokFn::new(
+                    Box::new(Path::from("message")),
+                    "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
+                    Some(Literal::from(true).boxed()),
+                )
+                .unwrap(),
+            ),
+        ];
+
+        let mut state = state::Program::default();
+
+        for (object, exp, func) in cases {
+            let mut object = Value::Map(object);
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
         }
-    ];
+    }
 }
-
-//     vrl::test_type_def![string {
-//         expr: |_| ParseGrokFn {
-//             value: Literal::from("foo").boxed(),
-//             pattern: Arc::new(
-//                 grok::Grok::with_patterns()
-//                     .compile("%{LOGLEVEL:level}", true)
-//                     .unwrap()
-//             ),
-//             remove_empty: Some(Literal::from(false).boxed()),
-//         },
-//         def: TypeDef {
-//             kind: value::Kind::Array,
-//             ..Default::default()
-//         },
-//     }];
-
-//     #[test]
-//     fn check_invalid_grok_error() {
-//         let mut arguments = ArgumentList::default();
-//         arguments.insert(
-//             "value",
-//             expression::Argument::new(
-//                 Box::new(Literal::from("foo").into()),
-//                 |_| true,
-//                 "value",
-//                 "parse_grok",
-//             )
-//             .into(),
-//         );
-//         arguments.insert(
-//             "pattern",
-//             expression::Argument::new(
-//                 Box::new(Literal::from("%{NOG}").into()),
-//                 |_| true,
-//                 "pattern",
-//                 "parse_grok",
-//             )
-//             .into(),
-//         );
-
-//         let error = ParseGrok.compile(arguments);
-
-//         assert_eq!(Error::Call("The given pattern definition name \"NOG\" could not be found in the definition map".to_string()), error.unwrap_err());
-//     }
-
-//     #[test]
-//     fn check_parse_grok() {
-//         let cases = vec![
-//             (
-//                 map!["message": "an ungrokkable message"],
-//                 Ok(Value::from(map![])),
-//                 ParseGrokFn::new(
-//                     Box::new(Path::from("message")),
-//                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-//                         .to_string(),
-//                     None,
-//                 )
-//                 .unwrap(),
-//             ),
-//             (
-//                 map!["message": "2020-10-02T23:22:12.223222Z an ungrokkable message"],
-//                 Ok(Value::from(map![])),
-//                 ParseGrokFn::new(
-//                     Box::new(Path::from("message")),
-//                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-//                         .to_string(),
-//                     None,
-//                 )
-//                 .unwrap(),
-//             ),
-//             (
-//                 map!["message": "2020-10-02T23:22:12.223222Z info Hello world"],
-//                 Ok(Value::from(
-//                     map!["timestamp": "2020-10-02T23:22:12.223222Z",
-//                          "level": "info",
-//                          "message": "Hello world"],
-//                 )),
-//                 ParseGrokFn::new(
-//                     Box::new(Path::from("message")),
-//                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
-//                         .to_string(),
-//                     None,
-//                 )
-//                 .unwrap(),
-//             ),
-//             (
-//                 map!["message": "2020-10-02T23:22:12.223222Z"],
-//                 Ok(Value::from(
-//                     map!["timestamp": "2020-10-02T23:22:12.223222Z",
-//                          "level": ""
-//                     ],
-//                 )),
-//                 ParseGrokFn::new(
-//                     Box::new(Path::from("message")),
-//                     "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
-//                     None,
-//                 )
-//                 .unwrap(),
-//             ),
-//             (
-//                 map!["message": "2020-10-02T23:22:12.223222Z"],
-//                 Ok(Value::from(
-//                     map!["timestamp": "2020-10-02T23:22:12.223222Z",
-//                     ],
-//                 )),
-//                 ParseGrokFn::new(
-//                     Box::new(Path::from("message")),
-//                     "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})".to_string(),
-//                     Some(Literal::from(true).boxed()),
-//                 )
-//                 .unwrap(),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object = Value::Map(object);
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+*/
