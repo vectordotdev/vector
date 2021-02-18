@@ -32,7 +32,7 @@ remap: literals: object: {
 				"field2": some_variable,
 				"field3": { "subfield": "some value" }
 			}
-			"""
+			""",
 
 	]
 }

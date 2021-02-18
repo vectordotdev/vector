@@ -44,6 +44,6 @@ remap: expressions: variable: {
 				my_object.one
 				"""#
 			return: 1
-		}
+		},
 	]
 }

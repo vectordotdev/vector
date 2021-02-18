@@ -109,14 +109,20 @@ remap: expressions: assignment: {
 			source: #"""
 				parsed, err = parse_json("{\"Hello\": \"World!\"}")
 				"""#
-			return: Hello: "World!"
+			output: log: {
+				parsed: {"Hello": "World"}
+				err: null
+			}
 		},
 		{
 			title: "Fallible assignment (error)"
 			source: #"""
 				parsed, err = parse_json("malformed")
 				"""#
-			return: "function call error for "parse_json" at (14:37): unable to parse json: expected value at line 1 column 1"
+			output: log: {
+				parsed: null
+				err:    #"function call error for "parse_json" at (14:37): unable to parse json: expected value at line 1 column 1"#
+			}
 		},
 	]
 }
