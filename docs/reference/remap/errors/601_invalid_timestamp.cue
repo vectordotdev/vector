@@ -6,6 +6,8 @@ remap: errors: "601": {
 		The provided [timestamp](\(urls.vrl_expressions)#\(remap.literals.timestamp.anchor)) is malformed.
 		"""
 
+	rationale: "Invalid timestamps don't compile."
+
 	resolution: """
 		Bring the timestamp in conformance with [RFC 3339](\(urls.rfc_3339)) format.
 		"""

@@ -2,7 +2,12 @@ package metadata
 
 remap: errors: "650": {
 	title: "Chained comparison operators"
+
 	description: """
+		You've chained multiple comparison operators together in a way that can't result in a valid expression.
+		"""
+
+	rationale: """
 		Comparison operators can only operate on two operands, e.g. `1 != 2`. Chaining them together, as in
 		`1 != 2 != 3`, produces a meaningless non-expression.
 		"""

@@ -3,7 +3,12 @@ package metadata
 remap: errors: "630": {
 	title: "Fallible argument"
 	description: """
-		In VRL, expressions that you pass to functions as arguments need to be infallible.
+		You've passed a fallible expression as an argument to a function.
+		"""
+
+	rationale: """
+		In VRL, expressions that you pass to functions as arguments need to be infallible themselves. Otherwise, the
+		outcome of the function would be indeterminate.
 		"""
 
 	resolution: """
