@@ -12,9 +12,8 @@ remap: literals: object: {
 		ordering: {
 			title: "Ordering"
 			description: """
-				Objects are ordered alphabetically by the key in ascending order. Therefore, operations, such as
-				encoding into JSON, will produce a string with keys that are alphabetically ordered in ascending
-				fashion.
+				Objects are ordered alphabetically by the key in ascending order. Therefore, operations like
+				encoding into JSON produce a string with keys that are in ascending alphabetical order.
 				"""
 		}
 	}
