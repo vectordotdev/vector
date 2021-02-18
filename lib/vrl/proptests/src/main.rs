@@ -236,13 +236,13 @@ fn expr() -> impl Strategy<Value = Expr> {
                 node(o),
                 Box::new(node(r))
             )))),
-            (assignment_target(), assignment_op(), inner.clone()).prop_map(|(target, op, expr)| container(
-                Expr::Assignment(node(Assignment::Single {
+            (assignment_target(), assignment_op(), inner.clone()).prop_map(|(target, op, expr)| {
+                container(Expr::Assignment(node(Assignment::Single {
                     target: node(target),
                     op,
                     expr: Box::new(node(expr)),
-                }))
-            )),
+                })))
+            }),
             (ident(), prop::bool::ANY, prop::collection::vec(inner, 1..3)).prop_map(
                 |(ident, abort_on_error, arguments)| {
                     Expr::FunctionCall(node(FunctionCall {
