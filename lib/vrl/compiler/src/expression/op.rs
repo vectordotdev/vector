@@ -93,6 +93,7 @@ impl Expression for Op {
             Ge => lhs?.try_ge(rhs()?),
             Lt => lhs?.try_lt(rhs()?),
             Le => lhs?.try_le(rhs()?),
+            Union => lhs?.try_union(rhs()?),
         }
         .map_err(Into::into)
     }
@@ -127,6 +128,20 @@ impl Expression for Op {
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
                 (lhs_def - K::Null).merge(rhs_def)
             }
+
+            Or => merged_def,
+
+            // {} | {}
+            Union if lhs_kind.is_object() && rhs_kind.is_object() => merged_def,
+
+            // ... | ...
+            Union  => merged_def.fallible(),
+
+            // ok ?? ...
+            Err if lhs_def.is_infallible() => lhs_def,
+
+            // ok/err ?? ok
+            Err if rhs_def.is_infallible() => merged_def.infallible(),
 
             // ... || ...
             Or => merged_def,

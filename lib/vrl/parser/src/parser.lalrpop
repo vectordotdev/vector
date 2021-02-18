@@ -40,6 +40,7 @@ extern {
         "?" => Token::Question,
         "|" => Token::Pipe,
         "=" => Token::Equals,
+        "|=" => Token::MergeEquals,
         "," => Token::Comma,
         "_" => Token::Underscore,
         ":" => Token::Colon,
@@ -58,6 +59,7 @@ extern {
         ">=" => Token::Operator(">="),
         "==" => Token::Operator("=="),
         "!=" => Token::Operator("!="),
+        "|" => Token::Operator("|"),
 
         "&&" => Token::Operator("&&"),
         "||" => Token::Operator("||"),
@@ -244,13 +246,18 @@ Assignment: Node<Assignment> = {
 
 AssignmentSingle: Assignment = {
     <target: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Single { target, expr },
+        <expr: Box<Expr>> => Assignment::Single { target, op: AssignmentOp::Assign, expr },
+    <target: Sp<AssignmentTarget>> "|="
+        <expr: Box<Expr>> => Assignment::Single { target, op: AssignmentOp::Merge, expr },
 }
 
 AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
         <err: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, expr},
+        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op: AssignmentOp::Assign, expr},
+    <ok: Sp<AssignmentTarget>> ","
+        <err: Sp<AssignmentTarget>> "|="
+        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op: AssignmentOp::Merge, expr},
 }
 
 #[inline]
@@ -294,6 +301,7 @@ Compare: Expr = {
 };
 
 Add: Expr = {
+    Op<Add, "|", Factor>,
     Op<Add, "+", Factor>,
     Op<Add, "-", Factor>,
     Factor,

@@ -260,6 +260,7 @@ pub enum Token<S> {
     Escape,
 
     Equals,
+    MergeEquals,
     Bang,
     Pipe,
     Question,
@@ -339,6 +340,7 @@ impl<S> Token<S> {
             Escape => Escape,
 
             Equals => Equals,
+            MergeEquals => MergeEquals,
             Bang => Bang,
             Pipe => Pipe,
             Question => Question,
@@ -391,6 +393,7 @@ where
             Escape => "Escape",
 
             Equals => "Equals",
+            MergeEquals => "MergeEquals",
             Bang => "Bang",
             Pipe => "Pipe",
             Question => "Question",
@@ -936,7 +939,7 @@ impl<'input> Lexer<'input> {
 
         let token = match op {
             "=" => Token::Equals,
-            "|" => Token::Pipe,
+            "|=" => Token::MergeEquals,
             "?" => Token::Question,
             op => Token::Operator(op),
         };
