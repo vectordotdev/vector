@@ -434,7 +434,7 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
     if let Some(filename) = filename.to_str() {
-        if filename.find(PEM_START_MARKER).is_some() {
+        if filename.contains(PEM_START_MARKER) {
             return Ok((Vec::from(filename), "inline text".into()));
         }
     }

@@ -192,10 +192,13 @@ impl<'a> Compiler<'a> {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
-        let lhs = self.compile_expr(*lhs);
-        let rhs = self.compile_expr(*rhs);
+        let lhs_span = lhs.span();
+        let lhs = Node::new(lhs_span, self.compile_expr(*lhs));
 
-        Op::new(lhs, opcode, rhs).unwrap_or_else(|err| {
+        let rhs_span = rhs.span();
+        let rhs = Node::new(rhs_span, self.compile_expr(*rhs));
+
+        Op::new(lhs, opcode, rhs, &self.state).unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             Op::noop()
         })

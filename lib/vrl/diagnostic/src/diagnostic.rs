@@ -118,12 +118,13 @@ impl From<Box<dyn DiagnosticError>> for Diagnostic {
 impl From<Diagnostic> for diagnostic::Diagnostic<()> {
     fn from(diag: Diagnostic) -> Self {
         let mut notes = diag.notes.to_vec();
-        notes.push(Note::SeeLangDocs);
 
         // not all codes have a page on the site yet
         if diag.code >= 100 && diag.code <= 110 {
             notes.push(Note::SeeCodeDocs(diag.code));
         }
+
+        notes.push(Note::SeeLangDocs);
 
         diagnostic::Diagnostic {
             severity: diag.severity.into(),

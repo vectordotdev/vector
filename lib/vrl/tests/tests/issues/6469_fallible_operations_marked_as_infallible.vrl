@@ -3,8 +3,8 @@
 # error[E100]: unhandled error
 #   ┌─ :2:1
 #   │
-# 2 │ parse_json("true")
-#   │ ^^^^^^^^^^^^^^^^^^
+# 2 │ 5 + to_int(.foo)
+#   │ ^^^^^^^^^^^^^^^^
 #   │ │
 #   │ expression can result in runtime error
 #   │ handle the error case to ensure runtime success
@@ -13,4 +13,4 @@
 #   = learn more at: https://errors.vrl.dev/100
 #   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
-parse_json("true")
+5 + to_int(.foo)

@@ -1,5 +1,5 @@
 use crate::expression::{FunctionArgument, Noop};
-use crate::function::ArgumentList;
+use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 use diagnostic::{DiagnosticError, Label, Note};
@@ -120,10 +120,12 @@ impl FunctionCall {
             let expr_kind = argument.type_def(state).kind();
             if !parameter.kind().contains(expr_kind) {
                 return Err(Error::InvalidArgumentKind {
-                    keyword: parameter.keyword,
+                    function_ident: function.identifier(),
+                    abort_on_error,
+                    arguments_fmt,
+                    parameter: *parameter,
                     got: expr_kind,
-                    expected: parameter.kind(),
-                    expr_span: argument.span(),
+                    argument,
                     argument_span,
                 });
             }
@@ -266,6 +268,7 @@ impl PartialEq for FunctionCall {
 // -----------------------------------------------------------------------------
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("call to undefined function")]
     Undefined {
@@ -302,10 +305,12 @@ pub enum Error {
 
     #[error("invalid argument type")]
     InvalidArgumentKind {
-        keyword: &'static str,
+        function_ident: &'static str,
+        abort_on_error: bool,
+        arguments_fmt: Vec<String>,
+        parameter: Parameter,
         got: Kind,
-        expected: Kind,
-        expr_span: Span,
+        argument: FunctionArgument,
         argument_span: Span,
     },
 
@@ -427,12 +432,16 @@ impl DiagnosticError for Error {
             }
 
             InvalidArgumentKind {
-                expr_span,
-                argument_span,
-                keyword,
+                parameter,
                 got,
-                expected,
+                argument,
+                argument_span,
+                ..
             } => {
+                let keyword = parameter.keyword;
+                let expected = parameter.kind();
+                let expr_span = argument.span();
+
                 // TODO: extract this out into a helper
                 let kind_str = |kind: &Kind| {
                     if kind.is_any() {
@@ -453,7 +462,7 @@ impl DiagnosticError for Error {
                         format!(
                             r#"but the parameter "{}" expects {}"#,
                             keyword,
-                            kind_str(expected)
+                            kind_str(&expected)
                         ),
                         argument_span,
                     ),
@@ -475,6 +484,70 @@ impl DiagnosticError for Error {
 
         match self {
             AbortInfallible { .. } | FallibleArgument { .. } => vec![Note::SeeErrorDocs],
+            InvalidArgumentKind {
+                function_ident,
+                abort_on_error,
+                arguments_fmt,
+                parameter,
+                argument,
+                ..
+            } => {
+                // TODO: move this into a generic helper function
+                let guard = match parameter.kind() {
+                    Kind::Bytes => format!("string!({})", argument),
+                    Kind::Integer => format!("int!({})", argument),
+                    Kind::Float => format!("float!({})", argument),
+                    Kind::Boolean => format!("bool!({})", argument),
+                    Kind::Object => format!("object!({})", argument),
+                    Kind::Array => format!("array!({})", argument),
+                    Kind::Timestamp => format!("timestamp!({})", argument),
+                    _ => return vec![],
+                };
+
+                let coerce = match parameter.kind() {
+                    Kind::Bytes => Some(format!(r#"to_string({}) ?? "default""#, argument)),
+                    Kind::Integer => Some(format!("to_int({}) ?? 0", argument)),
+                    Kind::Float => Some(format!("to_float({}) ?? 0", argument)),
+                    Kind::Boolean => Some(format!("to_bool({}) ?? false", argument)),
+                    Kind::Timestamp => Some(format!("to_timestamp({}) ?? now()", argument)),
+                    _ => None,
+                };
+
+                let args = {
+                    let mut args = String::new();
+                    let mut iter = arguments_fmt.iter().peekable();
+                    while let Some(arg) = iter.next() {
+                        args.push_str(arg);
+                        if iter.peek().is_some() {
+                            args.push_str(", ");
+                        }
+                    }
+
+                    args
+                };
+
+                let abort = if *abort_on_error { "!" } else { "" };
+
+                let mut notes = vec![];
+
+                let call = format!("{}{}({}))", function_ident, abort, args);
+
+                notes.append(&mut Note::solution(
+                    "guard against invalid type at runtime",
+                    vec![format!("{} = {}", argument, guard), call.clone()],
+                ));
+
+                if let Some(coerce) = coerce {
+                    notes.append(&mut Note::solution(
+                        "coerce with default value",
+                        vec![format!("{} = {}", argument, coerce), call],
+                    ))
+                }
+
+                notes.push(Note::SeeErrorDocs);
+
+                notes
+            }
             _ => vec![],
         }
     }

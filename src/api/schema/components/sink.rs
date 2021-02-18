@@ -109,7 +109,7 @@ impl Sink {
 
     /// Sink metrics
     pub async fn metrics(&self) -> metrics::SinkMetrics {
-        metrics::by_component_name(self.get_name()).to_sink_metrics(self.get_component_type())
+        metrics::by_component_name(self.get_name()).into_sink_metrics(self.get_component_type())
     }
 }
 
