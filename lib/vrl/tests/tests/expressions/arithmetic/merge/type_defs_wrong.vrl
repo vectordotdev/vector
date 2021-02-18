@@ -1,28 +1,6 @@
-# result:
-# error[E110]: invalid argument type
-#   ┌─ :7:10
-#   │
-# 7 │ contains(z.ook, "nork") &&
-#   │          ^^^^^
-#   │          │
-#   │          this expression resolves to the exact type "integer"
-#   │          but the parameter "value" expects the exact type "string"
-#   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/110
-#
-# error[E110]: invalid argument type
-#   ┌─ :8:10
-#   │
-# 8 │ contains(z.nook, "nork")
-#   │          ^^^^^^
-#   │          │
-#   │          this expression resolves to the exact type "integer"
-#   │          but the parameter "value" expects the exact type "string"
-#   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/110
-#
+# result: ~
+# invalid argument type
+# invalid argument type
 
 x = { "ook": 1 }
 y = { "nook": 2 }

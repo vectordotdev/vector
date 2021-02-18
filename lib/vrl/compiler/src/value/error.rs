@@ -56,7 +56,7 @@ pub enum Error {
     #[error("unable to compare {0} <= {1}")]
     Le(Kind, Kind),
 
-    #[error("unable to merge {0} <= {1}")]
+    #[error("unable to merge {1} into {0}")]
     Merge(Kind, Kind),
 }
 

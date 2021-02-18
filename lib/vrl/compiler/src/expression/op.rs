@@ -293,13 +293,13 @@ impl DiagnosticError for Error {
             MergeNonObjects { lhs_span, rhs_span } => {
                 let mut labels = Vec::new();
                 if let Some(lhs_span) = lhs_span {
-                    labels.push(Label::context(
+                    labels.push(Label::primary(
                         "this expression must resolve to an object",
                         lhs_span,
                     ));
                 }
                 if let Some(rhs_span) = rhs_span {
-                    labels.push(Label::context(
+                    labels.push(Label::primary(
                         "this expression must resolve to an object",
                         rhs_span,
                     ));

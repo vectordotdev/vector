@@ -1,28 +1,7 @@
-# result:
-# error[E652]: can only merge objects
-#   ┌─ :2:22
-#   │
-# 2 │ ok = { "foo": 43 } | 34
-#   │                      -- this expression must resolve to an object
-#   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#
-# error[E652]: can only merge objects
-#   ┌─ :3:22
-#   │
-# 3 │ ok = { "foo": 43 } | [ 1, 2, 3 ]
-#   │                      ----------- this expression must resolve to an object
-#   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#
-# error[E652]: can only merge objects
-#   ┌─ :4:22
-#   │
-# 4 │ ok = { "foo": 43 } | "ook"
-#   │                      ----- this expression must resolve to an object
-#   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#
+# result: ~
+# can only merge objects
+# can only merge objects
+# can only merge objects
 
 ok = { "foo": 43 } | 34
 ok = { "foo": 43 } | [ 1, 2, 3 ]

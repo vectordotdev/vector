@@ -244,20 +244,22 @@ Assignment: Node<Assignment> = {
     Sp<AssignmentInfallible>,
 };
 
+AssignmentOp: AssignmentOp = {
+    "=" => AssignmentOp::Assign,
+    "|=" => AssignmentOp::Merge,
+}
+
 AssignmentSingle: Assignment = {
-    <target: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Single { target, op: AssignmentOp::Assign, expr },
-    <target: Sp<AssignmentTarget>> "|="
-        <expr: Box<Expr>> => Assignment::Single { target, op: AssignmentOp::Merge, expr },
+    <target: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        <expr: Box<Expr>> => Assignment::Single { target, op, expr },
 }
 
 AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
-        <err: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op: AssignmentOp::Assign, expr},
-    <ok: Sp<AssignmentTarget>> ","
-        <err: Sp<AssignmentTarget>> "|="
-        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op: AssignmentOp::Merge, expr},
+        <err: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op, expr},
 }
 
 #[inline]
