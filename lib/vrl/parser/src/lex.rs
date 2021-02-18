@@ -262,7 +262,6 @@ pub enum Token<S> {
     Equals,
     MergeEquals,
     Bang,
-    Pipe,
     Question,
 
     /// The {L,R}Query token is an "instruction" token. It does not represent
@@ -342,7 +341,6 @@ impl<S> Token<S> {
             Equals => Equals,
             MergeEquals => MergeEquals,
             Bang => Bang,
-            Pipe => Pipe,
             Question => Question,
 
             LQuery => LQuery,
@@ -395,7 +393,6 @@ where
             Equals => "Equals",
             MergeEquals => "MergeEquals",
             Bang => "Bang",
-            Pipe => "Pipe",
             Question => "Question",
 
             LQuery => "LQuery",
@@ -1421,7 +1418,7 @@ mod test {
                 (r#"    ~           "#, Dot),
                 (r#"     ~          "#, LParen),
                 (r#"      ~~~       "#, Identifier("bar")),
-                (r#"          ~     "#, Pipe),
+                (r#"          ~     "#, Operator("|")),
                 (r#"            ~~~ "#, Identifier("baz")),
                 (r#"               ~"#, RParen),
                 (r#"               ~"#, RQuery),
@@ -1443,7 +1440,7 @@ mod test {
                 (r#"  ~                        "#, Dot),
                 (r#"   ~                       "#, LParen),
                 (r#"    ~                      "#, Identifier("b")),
-                (r#"      ~                    "#, Pipe),
+                (r#"      ~                    "#, Operator("|")),
                 (r#"        ~                  "#, Identifier("c")),
                 (r#"           ~               "#, RParen),
                 (r#"            ~              "#, Dot),
