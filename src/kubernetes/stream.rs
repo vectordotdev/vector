@@ -121,7 +121,12 @@ mod tests {
 
         {
             let err = out_stream.next().await.unwrap().unwrap_err();
-            assert!(matches!(err, Error::Reading { source: hyper::Error { .. } }));
+            assert!(matches!(
+                err,
+                Error::Reading {
+                    source: hyper::Error { .. }
+                }
+            ));
         }
 
         assert!(out_stream.next().await.is_none());
@@ -139,7 +144,12 @@ mod tests {
 
         {
             let err = out_stream.next().await.unwrap().unwrap_err();
-            assert!(matches!(err, Error::Parsing { source: response::Error::Json(_) }));
+            assert!(matches!(
+                err,
+                Error::Parsing {
+                    source: response::Error::Json(_)
+                }
+            ));
         }
 
         assert!(out_stream.next().await.is_none());

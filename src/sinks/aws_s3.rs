@@ -701,7 +701,7 @@ mod integration_tests {
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,
-            HealthcheckError::UnknownBucket{ .. }
+            HealthcheckError::UnknownBucket { .. }
         );
     }
 

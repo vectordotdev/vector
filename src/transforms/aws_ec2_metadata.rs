@@ -180,12 +180,12 @@ impl TaskTransform for Ec2MetadataTransform {
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |event| ready(inner.transform_one(event))))
+        Box::pin(task.filter_map(move |event| ready(Some(inner.transform_one(event)))))
     }
 }
 
 impl Ec2MetadataTransform {
-    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
+    fn transform_one(&mut self, mut event: Event) -> Event {
         let log = event.as_mut_log();
 
         if let Some(read_ref) = self.state.read() {
@@ -196,7 +196,7 @@ impl Ec2MetadataTransform {
             });
         }
 
-        Some(event)
+        event
     }
 }
 

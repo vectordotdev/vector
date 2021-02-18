@@ -69,13 +69,13 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
         emitter(new_value);
         // Try to update gauge to new value and releasing writes to gauge metric in the process.
         // Otherwise acquire new writes to gauge metric.
-        let latest = gauge.compare_and_swap(value, new_value, Ordering::AcqRel);
-        if value == latest {
+        value = match gauge.compare_exchange(value, new_value, Ordering::AcqRel, Ordering::Acquire)
+        {
             // Success
-            break;
+            Ok(_) => break,
+            // Try again with new value
+            Err(v) => v,
         }
-        // Try again with new value
-        value = latest;
     }
 
     // In the worst case scenario we will emit `n^2 / 2` times when there are `n` parallel
