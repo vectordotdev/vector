@@ -24,7 +24,7 @@ remap: expressions: path: {
 			path_segments: {
 				description: """
 					`path_segments` denote a segment of a nested path. Each segment must be delimited by a `.` character
-					and only contain alpha-numeric characters, `_`, and `@` (`a-zA-Z0-9_@`). Segments that contain
+					and only contain alpha-numeric characters and `_` (`a-zA-Z0-9_`). Segments that contain
 					characters outside of this range must be quoted.
 					"""
 				characteristics: {
