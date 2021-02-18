@@ -31,8 +31,7 @@ remap: expressions: path: {
 					array_elements: {
 						title: "Array element paths"
 						description: """
-							Array elements can be accessed by their index. Negative indices are currently _not_
-							supported:
+							Array elements can be accessed by their index:
 
 							```vrl
 							.array[0]
