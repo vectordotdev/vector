@@ -48,6 +48,23 @@ impl Op {
             }
         }
 
+        if let ast::Opcode::Merge = opcode {
+            if !(lhs.type_def(state).is_object() && rhs.type_def(state).is_object()) {
+                return Err(Error::MergeNonObjects {
+                    lhs_span: if lhs.type_def(state).is_object() {
+                        None
+                    } else {
+                        Some(lhs_span)
+                    },
+                    rhs_span: if rhs.type_def(state).is_object() {
+                        None
+                    } else {
+                        Some(rhs_span)
+                    },
+                });
+            }
+        }
+
         Ok(Op {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
@@ -136,15 +153,6 @@ impl Expression for Op {
 
             // ... | ...
             Merge => merged_def.fallible(),
-
-            // ok ?? ...
-            Err if lhs_def.is_infallible() => lhs_def,
-
-            // ok/err ?? ok
-            Err if rhs_def.is_infallible() => merged_def.infallible(),
-
-            // ... || ...
-            Or => merged_def,
 
             // null && ...
             And if lhs_kind.is_null() => rhs_def.scalar(K::Boolean),
@@ -240,6 +248,12 @@ pub enum Error {
         op_span: Span,
     },
 
+    #[error("can only merge objects")]
+    MergeNonObjects {
+        lhs_span: Option<Span>,
+        rhs_span: Option<Span>,
+    },
+
     #[error("fallible operation")]
     Expr(#[from] expression::Error),
 }
@@ -251,6 +265,7 @@ impl DiagnosticError for Error {
         match self {
             ChainedComparison { .. } => 650,
             ErrInfallible { .. } => 651,
+            MergeNonObjects { .. } => 652,
             Expr(err) => err.code(),
         }
     }
@@ -278,6 +293,23 @@ impl DiagnosticError for Error {
                 Label::context("this expression never resolves", rhs_span),
                 Label::context("remove this error coalesce operation", op_span),
             ],
+            MergeNonObjects { lhs_span, rhs_span } => {
+                let mut labels = Vec::new();
+                if let Some(lhs_span) = lhs_span {
+                    labels.push(Label::context(
+                        "this expression must resolve to an object",
+                        lhs_span,
+                    ));
+                }
+                if let Some(rhs_span) = rhs_span {
+                    labels.push(Label::context(
+                        "this expression must resolve to an object",
+                        rhs_span,
+                    ));
+                }
+
+                labels
+            }
             Expr(err) => err.labels(),
         }
     }
