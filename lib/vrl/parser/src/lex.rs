@@ -261,8 +261,8 @@ pub enum Token<S> {
     Escape,
 
     Equals,
+    MergeEquals,
     Bang,
-    Pipe,
     Question,
 
     /// The {L,R}Query token is an "instruction" token. It does not represent
@@ -340,8 +340,8 @@ impl<S> Token<S> {
             Escape => Escape,
 
             Equals => Equals,
+            MergeEquals => MergeEquals,
             Bang => Bang,
-            Pipe => Pipe,
             Question => Question,
 
             LQuery => LQuery,
@@ -392,8 +392,8 @@ where
             Escape => "Escape",
 
             Equals => "Equals",
+            MergeEquals => "MergeEquals",
             Bang => "Bang",
-            Pipe => "Pipe",
             Question => "Question",
 
             LQuery => "LQuery",
@@ -939,7 +939,7 @@ impl<'input> Lexer<'input> {
 
         let token = match op {
             "=" => Token::Equals,
-            "|" => Token::Pipe,
+            "|=" => Token::MergeEquals,
             "?" => Token::Question,
             op => Token::Operator(op),
         };
@@ -1421,7 +1421,7 @@ mod test {
                 (r#"    ~           "#, Dot),
                 (r#"     ~          "#, LParen),
                 (r#"      ~~~       "#, Identifier("bar")),
-                (r#"          ~     "#, Pipe),
+                (r#"          ~     "#, Operator("|")),
                 (r#"            ~~~ "#, Identifier("baz")),
                 (r#"               ~"#, RParen),
                 (r#"               ~"#, RQuery),
@@ -1443,7 +1443,7 @@ mod test {
                 (r#"  ~                        "#, Dot),
                 (r#"   ~                       "#, LParen),
                 (r#"    ~                      "#, Identifier("b")),
-                (r#"      ~                    "#, Pipe),
+                (r#"      ~                    "#, Operator("|")),
                 (r#"        ~                  "#, Identifier("c")),
                 (r#"           ~               "#, RParen),
                 (r#"            ~              "#, Dot),
