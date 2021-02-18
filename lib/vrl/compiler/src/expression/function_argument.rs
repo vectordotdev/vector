@@ -1,6 +1,7 @@
 use crate::expression::Expr;
 use crate::parser::{Ident, Node};
 use crate::{Parameter, Span};
+use std::fmt;
 use std::ops::Deref;
 
 #[derive(Debug, PartialEq)]
@@ -33,6 +34,12 @@ impl FunctionArgument {
 
     pub(crate) fn into_inner(self) -> Expr {
         self.expr.into_inner()
+    }
+}
+
+impl fmt::Display for FunctionArgument {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expr.fmt(f)
     }
 }
 
