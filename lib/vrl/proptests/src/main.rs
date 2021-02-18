@@ -3,9 +3,9 @@
 use diagnostic::Span;
 use ordered_float::NotNan;
 use parser::ast::{
-    Assignment, AssignmentTarget, Block, Container, Expr, Field, FunctionArgument, FunctionCall,
-    Group, Ident, IfStatement, Literal, Node, Op, Opcode, Path, PathSegment, Predicate, Program,
-    Query, QueryTarget, RootExpr,
+    Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, Field, FunctionArgument,
+    FunctionCall, Group, Ident, IfStatement, Literal, Node, Op, Opcode, Path, PathSegment,
+    Predicate, Program, Query, QueryTarget, RootExpr,
 };
 use proptest::prelude::*;
 
@@ -189,6 +189,10 @@ fn assignment_target() -> impl Strategy<Value = AssignmentTarget> {
     ]
 }
 
+fn assignment_op() -> impl Strategy<Value = AssignmentOp> {
+    prop_oneof![Just(AssignmentOp::Assign), Just(AssignmentOp::Merge),]
+}
+
 fn opcode() -> impl Strategy<Value = Opcode> {
     prop_oneof![
         Just(Opcode::Mul),
@@ -232,9 +236,10 @@ fn expr() -> impl Strategy<Value = Expr> {
                 node(o),
                 Box::new(node(r))
             )))),
-            (assignment_target(), inner.clone()).prop_map(|(target, expr)| container(
+            (assignment_target(), assignment_op(), inner.clone()).prop_map(|(target, op, expr)| container(
                 Expr::Assignment(node(Assignment::Single {
                     target: node(target),
+                    op,
                     expr: Box::new(node(expr)),
                 }))
             )),

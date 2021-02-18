@@ -826,7 +826,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or(Path(Vec::new()))),
+                    path: Node::new(span, path.clone().unwrap_or_else(|| Path(Vec::new()))),
                 },
             )),
         }

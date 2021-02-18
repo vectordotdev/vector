@@ -40,7 +40,7 @@
 #    │ this expression must resolve to an object
 #    │
 #    = see language documentation at: https://vector.dev/docs/reference/vrl/
-   
+
 . = { "ook": 23 }
 
 . |= 32
