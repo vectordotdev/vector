@@ -9,11 +9,12 @@ remap: errors: "650": {
 
 	rationale: """
 		Comparison operators can only operate on two operands, e.g. `1 != 2`. Chaining them together, as in
-		`1 != 2 != 3`, produces a meaningless non-expression.
+		`1 < 2 < 3`, produces a meaningless non-expression.
 		"""
 
 	resolution: """
-		Use comparison operators only on a left-hand- and a right-hand-side value.
+		Use comparison operators only on a left-hand- and a right-hand-side value. You *can* chain comparisons together
+		provided that expressions are properly grouped. Thus, `1 == (1 == 1)` is a valid expression that yields `false`.
 		"""
 
 	examples: [
