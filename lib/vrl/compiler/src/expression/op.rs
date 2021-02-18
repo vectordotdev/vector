@@ -115,9 +115,6 @@ impl Expression for Op {
             // ... ?? ...
             Err => merged_def,
 
-            // catch-all to make sure fallible lhs is not ignored
-            _ if lhs_def.is_fallible() => merged_def,
-
             // null || ...
             Or if lhs_kind.is_null() => rhs_def,
 
