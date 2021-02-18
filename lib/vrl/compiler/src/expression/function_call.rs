@@ -268,6 +268,7 @@ impl PartialEq for FunctionCall {
 // -----------------------------------------------------------------------------
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("call to undefined function")]
     Undefined {
