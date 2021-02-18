@@ -27,6 +27,13 @@ remap: literals: object: {
 				"field3": { "field4": "value5" }
 			}
 			""",
+		"""
+			{
+				"field1": .some_path,
+				"field2": some_variable,
+				"field3": { "subfield": "some value" }
+			}
+			"""
 
 	]
 }
