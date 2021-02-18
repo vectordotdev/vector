@@ -766,7 +766,12 @@ impl fmt::Display for AssignmentOp {
 
 impl fmt::Debug for AssignmentOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+        use AssignmentOp::*;
+
+        match self {
+            Assign => write!(f, "AssignmentOp(=)"),
+            Merge => write!(f, "AssignmentOp(|=)"),
+        }
     }
 }
 
@@ -786,9 +791,9 @@ impl fmt::Debug for Assignment {
         use Assignment::*;
 
         match self {
-            Single { target, op, expr } => write!(f, "{:?} {} {:?}", target, op, expr),
+            Single { target, op, expr } => write!(f, "{:?} {:?} {:?}", target, op, expr),
             Infallible { ok, err, op, expr } => {
-                write!(f, "Ok({:?}), Err({:?}) {} {:?}", ok, err, op, expr)
+                write!(f, "Ok({:?}), Err({:?}) {:?} {:?}", ok, err, op, expr)
             }
         }
     }

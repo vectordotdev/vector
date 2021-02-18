@@ -148,11 +148,8 @@ impl Expression for Op {
 
             Or => merged_def,
 
-            // {} | {}
-            Merge if lhs_kind.is_object() && rhs_kind.is_object() => merged_def,
-
             // ... | ...
-            Merge => merged_def.fallible(),
+            Merge => merged_def,
 
             // null && ...
             And if lhs_kind.is_null() => rhs_def.scalar(K::Boolean),

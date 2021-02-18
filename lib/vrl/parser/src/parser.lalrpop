@@ -293,15 +293,19 @@ Equal: Expr = {
 };
 
 Compare: Expr = {
-    Op<Compare, ">=", Add>,
-    Op<Compare, ">", Add>,
-    Op<Compare, "<=", Add>,
-    Op<Compare, "<", Add>,
-    Add,
+    Op<Compare, ">=", Merge>,
+    Op<Compare, ">", Merge>,
+    Op<Compare, "<=", Merge>,
+    Op<Compare, "<", Merge>,
+    Merge,
 };
 
+Merge: Expr = {
+    Op<Merge, "|", Add>,
+    Add,
+}
+
 Add: Expr = {
-    Op<Add, "|", Factor>,
     Op<Add, "+", Factor>,
     Op<Add, "-", Factor>,
     Factor,

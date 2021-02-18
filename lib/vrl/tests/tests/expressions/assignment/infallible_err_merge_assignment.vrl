@@ -1,5 +1,5 @@
-# result: function call error for "parse_json" at (28:52): unable to parse json: EOF while parsing an object at line 1 column 9
+# result: function call error for "parse_syslog" at (28:65): unable to parse input as valid syslog message
 
 . = { "onk": 1 }
-., err |= parse_json(s'{"ook": 2')
+., err |= parse_syslog(s'not a syslog message')
 err
