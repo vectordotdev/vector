@@ -116,7 +116,7 @@ remap: expressions: assignment: {
 			source: #"""
 				parsed, err = parse_json("malformed")
 				"""#
-			return: null
+			return: "function call error for "parse_json" at (14:37): unable to parse json: expected value at line 1 column 1"
 		},
 	]
 }
