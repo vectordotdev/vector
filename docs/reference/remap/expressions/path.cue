@@ -149,7 +149,7 @@ remap: expressions: path: {
 			title: "Quoted path"
 			input: log: "parent.key.with.special characters": child: "Hello, World!"
 			source: #"""
-				.\"parent.key.with.special characters\".child
+				."parent.key.with.special characters".child
 				"""#
 			return: "Hello, World!"
 		},
