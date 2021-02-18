@@ -314,6 +314,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 }
             }
             ast::AssignmentTarget::Internal(ident, path) => Internal(ident, path.map(Into::into)),
+            ast::AssignmentTarget::External(path) => External(path.map(Into::into)),
         };
 
         Ok(target)

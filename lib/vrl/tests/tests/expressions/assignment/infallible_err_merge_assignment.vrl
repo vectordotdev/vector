@@ -1,0 +1,5 @@
+# result: function call error for "parse_json" at (28:52): unable to parse json: EOF while parsing an object at line 1 column 9
+
+. = { "onk": 1 }
+., err |= parse_json(s'{"ook": 2')
+err

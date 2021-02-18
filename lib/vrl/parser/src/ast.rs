@@ -799,23 +799,31 @@ pub enum AssignmentTarget {
     Noop,
     Query(Query),
     Internal(Ident, Option<Path>),
+    External(Option<Path>),
 }
 
 impl AssignmentTarget {
-    pub fn into_expr(self, span: &Span) -> Expr {
+    pub fn into_expr(self, span: Span) -> Expr {
         match self {
-            AssignmentTarget::Noop => Expr::Literal(Node::new(span.clone(), Literal::Null)),
-            AssignmentTarget::Query(query) => Expr::Query(Node::new(span.clone(), query)),
+            AssignmentTarget::Noop => Expr::Literal(Node::new(span, Literal::Null)),
+            AssignmentTarget::Query(query) => Expr::Query(Node::new(span, query)),
             AssignmentTarget::Internal(ident, Some(path)) => Expr::Query(Node::new(
-                span.clone(),
+                span,
                 Query {
-                    target: Node::new(span.clone(), QueryTarget::Internal(ident)),
-                    path: Node::new(span.clone(), path),
+                    target: Node::new(span, QueryTarget::Internal(ident)),
+                    path: Node::new(span, path),
                 },
             )),
             AssignmentTarget::Internal(ident, None) => {
-                Expr::Variable(Node::new(span.clone(), ident))
+                Expr::Variable(Node::new(span, ident))
             }
+            AssignmentTarget::External(path) => Expr::Query(Node::new(
+                span,
+                Query {
+                    target: Node::new(span, QueryTarget::External),
+                    path: Node::new(span, path.unwrap_or(Path(Vec::new()))),
+                },
+            )),
         }
     }
 }
@@ -829,6 +837,8 @@ impl fmt::Display for AssignmentTarget {
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
+            External(Some(path)) => path.fmt(f),
+            External(_) => f.write_str("."),
         }
     }
 }
@@ -842,6 +852,8 @@ impl fmt::Debug for AssignmentTarget {
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "Internal({}{})", ident, path),
             Internal(ident, _) => write!(f, "Internal({})", ident),
+            External(Some(path)) => write!(f, "External({})", path),
+            External(_) => f.write_str("External(.)"),
         }
     }
 }
