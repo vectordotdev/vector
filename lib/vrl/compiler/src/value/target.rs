@@ -164,14 +164,14 @@ impl Value {
                 .as_object()
                 .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
             Index(index) => self.as_array().and_then(|array| {
-                let index = *index;
-
-                if index < 0 {
-                    let index = index % array.len() as i64;
-                    array.get(index.abs() as usize)
-                } else {
-                    array.get(index as usize)
+                let len = array.len() as i64;
+                if *index >= len || index.abs() - 1 >= len {
+                    return None;
                 }
+
+                index
+                    .checked_rem_euclid(len)
+                    .and_then(|i| array.get(i as usize))
             }),
         }
     }
@@ -198,15 +198,14 @@ impl Value {
                     .and_then(move |field| map.get_mut(field.as_str()))
             }),
             Index(index) => self.as_array_mut().and_then(|array| {
-                let index = *index;
-
-                if index < 0 {
-                    let len = array.len();
-                    let index = index % len as i64;
-                    array.get_mut(index.abs() as usize)
-                } else {
-                    array.get_mut(index as usize)
+                let len = array.len() as i64;
+                if *index >= len || index.abs() - 1 >= len {
+                    return None;
                 }
+
+                index
+                    .checked_rem_euclid(len)
+                    .and_then(move |i| array.get_mut(i as usize))
             }),
         }
     }
@@ -256,15 +255,15 @@ impl Value {
                         .and_then(|map| map.remove(field.as_str()))
                 }),
 
-            Index(index) => self.as_array_mut().map(|array| {
-                let index = *index;
-
-                if index < 0 {
-                    let index = index % array.len() as i64;
-                    array.remove(index.abs() as usize)
-                } else {
-                    array.remove(index as usize)
+            Index(index) => self.as_array_mut().and_then(|array| {
+                let len = array.len() as i64;
+                if *index >= len || index.abs() - 1 >= len {
+                    return None;
                 }
+
+                index
+                    .checked_rem_euclid(len)
+                    .map(|i| array.remove(i as usize))
             }),
         };
     }
@@ -342,16 +341,49 @@ impl Value {
                 handle_field(field, new)
             }
 
-            Index(index) => match self {
-                // If the current value is an array, we need to either swap out
-                // an existing value, or append the new value to the array.
-                Value::Array(array) => {
-                    let index = *index;
+            Index(index) => {
+                let array = match self {
+                    Value::Array(array) => array,
+                    _ => {
+                        *self = Value::Array(vec![]);
+                        self.as_array_mut().unwrap()
+                    }
+                };
 
-                    // If the array has less items than needed, we'll fill it in
-                    // with `Null` values.
-                    if index > 0i64 && array.len() < index as usize {
-                        array.resize(index as usize, Value::Null);
+                let index = *index;
+
+                // If we're dealing with a negative index, we either need to
+                // replace an existing value, or insert to the front of the
+                // array.
+                if index.is_negative() {
+                    let abs = index.abs() as usize;
+
+                    // left-padded with null values
+                    for _ in 1..abs - array.len() {
+                        array.insert(0, Value::Null)
+                    }
+
+                    match rest.first() {
+                        None => {
+                            array.insert(0, new);
+                            return;
+                        }
+                        Some(next) => match next {
+                            Index(_) => array.insert(0, Value::Array(vec![])),
+                            _ => array.insert(0, BTreeMap::default().into()),
+                        },
+                    };
+
+                    array
+                        .first_mut()
+                        .expect("exists")
+                        .insert_by_segments(rest, new);
+                } else {
+                    let index = index as usize;
+
+                    // right-padded with null values
+                    if array.len() < index {
+                        array.resize(index, Value::Null);
                     }
 
                     match rest.first() {
@@ -363,39 +395,14 @@ impl Value {
                             Index(_) => array.push(Value::Array(vec![])),
                             _ => array.push(BTreeMap::default().into()),
                         },
-                    };
+                    }
 
                     array
                         .last_mut()
                         .expect("exists")
                         .insert_by_segments(rest, new);
                 }
-
-                // Any non-array value is swapped out with an array.
-                _ => {
-                    let index = *index;
-                    let mut array = Vec::with_capacity(index as usize + 1);
-                    array.resize(index as usize, Value::Null);
-
-                    match rest.first() {
-                        None => {
-                            array.push(new);
-                            return *self = array.into();
-                        }
-                        Some(next) => match next {
-                            Index(_) => array.push(Value::Array(vec![])),
-                            _ => array.push(BTreeMap::default().into()),
-                        },
-                    };
-
-                    array
-                        .last_mut()
-                        .expect("exists")
-                        .insert_by_segments(rest, new);
-
-                    *self = array.into();
-                }
-            },
+            }
         }
     }
 }

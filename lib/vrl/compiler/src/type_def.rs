@@ -176,7 +176,12 @@ impl KindInfo {
                     self = KindInfo::Known(set);
                 }
                 Segment::Index(index) => {
-                    let index = *index as usize;
+                    let index = if index.is_negative() {
+                        0
+                    } else {
+                        *index as usize
+                    };
+
                     let mut map = BTreeMap::default();
                     map.insert(Index::Index(index), self);
 
