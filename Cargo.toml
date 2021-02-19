@@ -618,6 +618,7 @@ shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-promethe
 benches = ["leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
+statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-lua", "transforms-remap", "transforms-wasm"]
@@ -657,6 +658,11 @@ required-features = ["metrics-benches"]
 name = "metrics_off"
 harness = false
 required-features = ["metrics-benches"]
+
+[[bench]]
+name = "distribution_statistic"
+harness = false
+required-features = ["statistic-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"
