@@ -5,7 +5,7 @@ releases: "0.12.0": {
 	codename:    "Vector Remap Language"
 	description: """
 		The Vector team is pleased to announce 0.12.0. This release	introduces the [**Vector Remap Language**](\(urls.vrl_reference)),
-		an expression-oriented language designed for transforming obervability data (logs and metrics) in a
+		an expression-oriented language designed for transforming observability data (logs and metrics) in a
 		[safe](\(urls.vrl_safety)) and [performant](\(urls.vrl_performance)) manner.
 
 		Check out the [VRL announcement post](\(urls.vrl_announcement)) for more details as well as the

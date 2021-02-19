@@ -21,7 +21,8 @@ remap: literals: regular_expression: {
 		flags: {
 			title:       "Flags"
 			description: #"""
-				Regular expressions allow for flags. Flags can be combined, as in `r'pattern'xmi`, `r'pattern'im`, etc.
+				Regular expressions allow for flags. Flags can be combined, as in `r'(?ixm)pattern'`,
+                `r'(?im)pattern'`, etc.
 
 				To learn more about regular expressions in Rust—and by extension in VRL—we strongly	recommend the
 				in-browser [Rustexp expression editor and tester](\#(urls.regex_tester)).
@@ -35,14 +36,14 @@ remap: literals: regular_expression: {
 		named_captures: {
 			title: "Named Captures"
 			description: #"""
-				Regular Expressions support named capture groups, allowing extractions to be keyed by their name.
-				Named captures should be preceded with a `?P<name>` declaraction. For example:
+				Regular expressions support named capture groups, allowing extractions to be associated with keys.
+				Named captures should be preceded with a `?P<name>` declaraction. This regex, for example...
 
 				```vrl
 				r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'
 				```
 
-				Will extract captures with the `y`, `m`, and `d` keys.
+				...extracts captures with the `y`, `m`, and `d` keys.
 				"""#
 		}
 	}

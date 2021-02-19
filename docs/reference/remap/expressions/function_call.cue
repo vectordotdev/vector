@@ -80,13 +80,14 @@ remap: expressions: function_call: {
 							Function arguments enforce type safety when the type of the value supplied is known:
 
 							```vrl
-							number = round("not a number") # fails at compile time
+							round("not a number") # fails at compile time
 							```
 
 							If the type of the value is not known, you need to handle the potential argument error:
 
 							```vrl
-							number, err = round(.message)
+                            number = int(.message) ?? 0
+							round(number)
 							```
 
 							See the [errors reference](\(urls.vrl_errors_reference)) for more info.
