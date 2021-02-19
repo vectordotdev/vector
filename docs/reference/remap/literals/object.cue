@@ -12,9 +12,8 @@ remap: literals: object: {
 		ordering: {
 			title: "Ordering"
 			description: """
-				Objects are ordered alphabetically by the key in ascending order. Therefore, operations, such as
-				encoding into JSON, will produce a string with keys that are alphabetically ordered in ascending
-				fashion.
+				Object fields are ordered alphabetically by the key in ascending order. Therefore, operations like
+				encoding into JSON produce a string with keys that are in ascending alphabetical order.
 				"""
 		}
 	}
@@ -25,6 +24,13 @@ remap: literals: object: {
 				"field1": "value1",
 				"field2": [ "value2", "value3", "value4" ],
 				"field3": { "field4": "value5" }
+			}
+			""",
+		"""
+			{
+				"field1": .some_path,
+				"field2": some_variable,
+				"field3": { "subfield": "some value" }
 			}
 			""",
 

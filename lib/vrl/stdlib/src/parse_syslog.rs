@@ -46,7 +46,7 @@ impl Expression for ParseSyslogFn {
         let value = self.value.resolve(ctx)?;
         let message = value.unwrap_bytes_utf8_lossy();
 
-        let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
+        let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
 
         Ok(message_to_value(parsed))
     }
@@ -130,146 +130,136 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//     use chrono::prelude::*;
+/*
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::prelude::*;
+    use shared::btreemap;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: value::Kind::Map, ..Default::default() },
-//         }
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { kind: Kind::Map,
+                           fallible: true,
+                           inner_type_def: inner_type_def(),
+            },
+        }
 
-//         value_non_string {
-//             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
-//             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
-//         }
+        value_non_string {
+            expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
+        }
 
-//         value_optional {
-//             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
-//             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
-//         }
-//     ];
+        value_optional {
+            expr: |_| ParseSyslogFn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true,
+                           kind: Kind::Map,
+                           inner_type_def: inner_type_def(),
+            },
+        }
+    ];
 
-//     #[test]
-//     fn parses() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok(map![
-//                         "severity": "notice",
-//                         "facility": "user",
-//                         "timestamp": chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
-//                         "hostname": "dynamicwireless.name",
-//                         "appname": "non",
-//                         "procid": 2426,
-//                         "msgid": "ID931",
-//                         "exampleSDID@32473.iut": "3",
-//                         "exampleSDID@32473.eventSource": "Application",
-//                         "exampleSDID@32473.eventID": "1011",
-//                         "message": "Try to override the THX port, maybe it will reboot the neural interface!",
-//                 ]),
-//                 ParseSyslogFn::new(Box::new(Literal::from(
-//                     r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#,
-//                 ))),
-//             ),
-//             (
-//                 map![],
-//                 Ok(map![
-//                         "message": "not much of a syslog message",
-//                 ]),
-//                 ParseSyslogFn::new(Box::new(Literal::from(r#"not much of a syslog message"#))),
-//             ),
-//             (
-//                 map![],
-//                 Ok(map![
-//                         "facility": "local0",
-//                         "severity": "notice",
-//                         "message": "Proxy sticky-servers started.",
-//                         "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-//                         "appname": "haproxy",
-//                         "procid": 73411
-//                 ]),
-//                 ParseSyslogFn::new(Box::new(Literal::from(
-//                     r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
-//                 ))),
-//             ),
-//             (
-//                 map![],
-//                 Ok(map![
-//                         "message": "I am missing a pri.",
-//                         "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
-//                         "appname": "haproxy",
-//                         "procid": 73411
-//                 ]),
-//                 ParseSyslogFn::new(Box::new(Literal::from(
-//                     r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#,
-//                 ))),
-//             ),
-//         ];
+    remap::test_function![
+        parse_syslog => ParseSyslog;
 
-//         let mut state = state::Program::default();
+        valid {
+            args: func_args![value: r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#],
+            want: Ok(btreemap! {
+                "severity" => "notice",
+                "facility" => "user",
+                "timestamp" => chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
+                "hostname" => "dynamicwireless.name",
+                "appname" => "non",
+                "procid" => 2426,
+                "msgid" => "ID931",
+                "exampleSDID@32473.iut" => "3",
+                "exampleSDID@32473.eventSource" => "Application",
+                "exampleSDID@32473.eventID" => "1011",
+                "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
+            })
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        invalid {
+            args: func_args![value: "not much of a syslog message"],
+            want: Err("function call error: unable to parse input as valid syslog message".to_string())
+        }
 
-//             assert_eq!(got, exp.map(Into::into));
-//         }
-//     }
+        haproxy {
+            args: func_args![value: r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#],
+            want: Ok(btreemap! {
+                    "facility" => "local0",
+                    "severity" => "notice",
+                    "message" => "Proxy sticky-servers started.",
+                    "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                    "appname" => "haproxy",
+                    "procid" => 73411,
+            })
+        }
 
-//     #[test]
-//     fn handles_empty_sd_element() {
-//         fn there_is_map_called_empty(value: Value) -> Result<bool> {
-//             match value {
-//                 Value::Map(map) => {
-//                     Ok(map.iter().find(|(key, _)| (&key[..]).starts_with("empty")) == None)
-//                 }
-//                 _ => Err("Result was not a map".into()),
-//             }
-//         }
+        missing_pri {
+            args: func_args![value: r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#],
+            want: Ok(btreemap! {
+                "message" => "I am missing a pri.",
+                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                "appname" => "haproxy",
+                "procid" => 73411,
+            })
+        }
+    ];
 
-//         let mut state = state::Program::default();
-//         let mut object: Value = map![].into();
+    #[test]
+    fn handles_empty_sd_element() {
+        fn there_is_map_called_empty(value: Value) -> Result<bool> {
+            match value {
+                Value::Map(map) => {
+                    Ok(map.iter().find(|(key, _)| (&key[..]).starts_with("empty")) == None)
+                }
+                _ => Err("Result was not a map".into()),
+            }
+        }
 
-//         let msg = format!(
-//             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-//             r#"[empty]"#
-//         );
+        let mut state = state::Program::default();
+        let mut object: Value = btreemap! {}.into();
 
-//         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-//         let value = query.resolve(&mut ctx).unwrap();
-//         assert!(there_is_map_called_empty(value).unwrap());
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[empty]"#
+        );
 
-//         let msg = format!(
-//             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-//             r#"[non_empty x="1"][empty]"#
-//         );
+        let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
+        let value = query.execute(&mut state, &mut object).unwrap();
+        assert!(there_is_map_called_empty(value).unwrap());
 
-//         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-//         let value = query.resolve(&mut ctx).unwrap();
-//         assert!(there_is_map_called_empty(value).unwrap());
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[non_empty x="1"][empty]"#
+        );
 
-//         let msg = format!(
-//             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-//             r#"[empty][non_empty x="1"]"#
-//         );
+        let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
+        let value = query.execute(&mut state, &mut object).unwrap();
+        assert!(there_is_map_called_empty(value).unwrap());
 
-//         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-//         let value = query.resolve(&mut ctx).unwrap();
-//         assert!(there_is_map_called_empty(value).unwrap());
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[empty][non_empty x="1"]"#
+        );
 
-//         let msg = format!(
-//             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-//             r#"[empty not_really="testing the test"]"#
-//         );
+        let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
+        let value = query.execute(&mut state, &mut object).unwrap();
+        assert!(there_is_map_called_empty(value).unwrap());
 
-//         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-//         let value = query.resolve(&mut ctx).unwrap();
-//         assert!(!there_is_map_called_empty(value).unwrap());
-//     }
-// }
+        let msg = format!(
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
+            r#"[empty not_really="testing the test"]"#
+        );
+
+        let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
+        let value = query.execute(&mut state, &mut object).unwrap();
+        assert!(!there_is_map_called_empty(value).unwrap());
+    }
+}
+*/

@@ -1,5 +1,5 @@
-use crate::Error;
 use indoc::indoc;
+use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::completion::Completer;
@@ -11,11 +11,29 @@ use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
-const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+// Create a list of all possible error values for potential docs lookup
+lazy_static! {
+    static ref ERRORS: Vec<String> = (100..=110).map(|i| i.to_string()).collect();
+}
 
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
+const RESERVED_TERMS: &[&str] = &[
+    "next",
+    "prev",
+    "exit",
+    "quit",
+    "help",
+    "help functions",
+    "help funcs",
+    "help fs",
+    "help docs",
+];
+
+pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
+    let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Runtime::default());
@@ -33,6 +51,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                 print_function_list()
             }
             Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help error <code>"
+            Ok(line) if error_docs_regex.is_match(line) => show_error_docs(line, &error_docs_regex),
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
@@ -82,8 +102,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn resolve(
@@ -111,19 +129,29 @@ fn resolve(
 struct Repl {
     highlighter: MatchingBracketHighlighter,
     validator: MatchingBracketValidator,
-    hinter: HistoryHinter,
+    history_hinter: HistoryHinter,
     colored_prompt: String,
+    hints: Vec<&'static str>,
 }
 
 impl Repl {
     fn new() -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
-            hinter: HistoryHinter {},
+            history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
             validator: MatchingBracketValidator::new(),
+            hints: initial_hints(),
         }
     }
+}
+
+fn initial_hints() -> Vec<&'static str> {
+    stdlib::all()
+        .into_iter()
+        .map(|f| f.identifier())
+        .chain(RESERVED_TERMS.iter().copied())
+        .collect()
 }
 
 impl Helper for Repl {}
@@ -135,7 +163,33 @@ impl Hinter for Repl {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        self.hinter.hint(line, pos, ctx)
+        if pos < line.len() {
+            return None;
+        }
+
+        let mut hints: Vec<String> = Vec::new();
+
+        // Add all function names to the hints
+        let mut func_names = stdlib::all()
+            .iter()
+            .map(|f| f.identifier().into())
+            .collect::<Vec<String>>();
+
+        hints.append(&mut func_names);
+
+        // Check history first
+        if let Some(hist) = self.history_hinter.hint(line, pos, ctx) {
+            return Some(hist);
+        }
+
+        // Then check the other built-in hints
+        self.hints.iter().find_map(|hint| {
+            if pos > 0 && hint.starts_with(&line[..pos]) {
+                Some(String::from(&hint[pos..]))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -190,13 +244,11 @@ impl Validator for Repl {
 
 fn print_function_list() {
     let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
-    let all_funcs = stdlib::all();
-
     let num_columns = 3;
 
     let mut func_table = Table::new();
     func_table.set_format(table_format);
-    all_funcs
+    stdlib::all()
         .chunks(num_columns)
         .map(|funcs| {
             // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
@@ -238,21 +290,35 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if stdlib::all().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
         open_url(&func_url);
     } else {
         println!("function name {} not recognized", func_name);
     }
 }
 
+fn show_error_docs(line: &str, pattern: &Regex) {
+    // As in show_func_docs, unwrap is okay here
+    let matches = pattern.captures(line).unwrap();
+    let error_code = matches.get(1).unwrap().as_str();
+
+    if ERRORS.iter().any(|e| e == error_code) {
+        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
+        open_url(&error_code_url);
+    } else {
+        println!("error code {} not recognized", error_code);
+    }
+}
+
 const HELP_TEXT: &str = indoc! {r#"
     VRL REPL commands:
-      help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-      help docs         Navigate to the VRL docs on the Vector website
-      help docs <func>  Navigate to the VRL docs for the specified function
-      next              Load the next object or create a new one
-      prev              Load the previous object
-      exit              Terminate the program
+      help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+      help docs          Navigate to the VRL docs on the Vector website
+      help docs <func>   Navigate to the VRL docs for the specified function
+      help error <code>  Navigate to the docs for a specific error code
+      next               Load the next object or create a new one
+      prev               Load the previous object
+      exit               Terminate the program
 "#};
 
 const BANNER_TEXT: &str = indoc! {r#"

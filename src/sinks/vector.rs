@@ -74,7 +74,7 @@ impl SinkConfig for VectorSinkConfig {
             self.send_buffer_bytes,
         );
 
-        sink_config.build(cx, encode_event)
+        sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
     fn input_type(&self) -> DataType {
@@ -92,7 +92,7 @@ enum HealthcheckError {
     ConnectError { source: std::io::Error },
 }
 
-fn encode_event(event: Event) -> Option<Bytes> {
+fn encode_event(event: Event) -> Bytes {
     let event = proto::EventWrapper::from(event);
     let event_len = event.encoded_len();
     let full_len = event_len + 4;
@@ -101,7 +101,7 @@ fn encode_event(event: Event) -> Option<Bytes> {
     out.put_u32(event_len as u32);
     event.encode(&mut out).unwrap();
 
-    Some(out.into())
+    out.into()
 }
 
 #[cfg(test)]

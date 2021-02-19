@@ -9,7 +9,7 @@
 #   │           too many function arguments
 #   │           this function takes a maximum of 1 argument
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
 #   = learn more at: https://errors.vrl.dev/106
+#   = see language documentation at: https://vector.dev/docs/reference/vrl/
 
 to_string("foo", "bar")

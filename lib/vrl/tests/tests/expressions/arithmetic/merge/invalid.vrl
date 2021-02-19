@@ -1,0 +1,8 @@
+# result: ~
+# can only merge objects
+# can only merge objects
+# can only merge objects
+
+ok = { "foo": 43 } | 34
+ok = { "foo": 43 } | [ 1, 2, 3 ]
+ok = { "foo": 43 } | "ook"

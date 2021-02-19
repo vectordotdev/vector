@@ -247,22 +247,22 @@ mod tests {
     test_type_def![
         value_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: None },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_non_string {
             expr: |_| ParseCommonLogFn { value: Literal::from(1).boxed(), timestamp_format: None },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         timestamp_format_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: Some(Literal::from("foo").boxed()) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         timestamp_format_non_string {
             expr: |_| ParseCommonLogFn { value: Literal::from("foo").boxed(), timestamp_format: Some(Literal::from(1).boxed()) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
     ];
 }
