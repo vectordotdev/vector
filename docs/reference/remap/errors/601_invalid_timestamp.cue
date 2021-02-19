@@ -3,7 +3,8 @@ package metadata
 remap: errors: "601": {
 	title:       "Invalid timestamp"
 	description: """
-		The provided [timestamp](\(urls.vrl_expressions)#\(remap.literals.timestamp.anchor)) is malformed.
+		The provided [timestamp literal](\(urls.vrl_expressions)#\(remap.literals.timestamp.anchor)) is properly
+		formed (i.e. it uses `t'...'` syntax) but the timestamp doesn't adhere to [RFC 3339](\(urls.rfc_3339)) format.
 		"""
 
 	rationale: "Invalid timestamps don't compile."
