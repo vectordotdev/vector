@@ -1,4 +1,3 @@
-use crate::Error;
 use indoc::indoc;
 use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
@@ -20,7 +19,7 @@ lazy_static! {
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
 
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -92,8 +91,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn resolve(

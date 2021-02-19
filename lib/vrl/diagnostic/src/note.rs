@@ -11,6 +11,21 @@ pub enum Note {
 
     #[doc(hidden)]
     SeeDocs(String, String),
+    #[doc(hidden)]
+    Basic(String),
+}
+
+impl Note {
+    pub fn solution(title: impl Into<String>, content: Vec<impl Into<String>>) -> Vec<Self> {
+        let mut notes = vec![Self::Basic(format!("try: {}", title.into()))];
+
+        notes.push(Self::Basic(" ".to_owned()));
+        for line in content {
+            notes.push(Self::Basic(format!("    {}", line.into())));
+        }
+        notes.push(Self::Basic(" ".to_owned()));
+        notes
+    }
 }
 
 impl fmt::Display for Note {
@@ -35,6 +50,7 @@ impl fmt::Display for Note {
                     kind, path
                 )
             }
+            Basic(string) => write!(f, "{}", string),
         }
     }
 }

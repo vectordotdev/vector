@@ -376,7 +376,7 @@ mod tests {
         assert_downcast_matches!(
             super::validate_headers(&config.request.headers, &None).unwrap_err(),
             BuildError,
-            BuildError::InvalidHeaderName{..}
+            BuildError::InvalidHeaderName { .. }
         );
     }
 

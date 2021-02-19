@@ -3,7 +3,7 @@ use crate::{Function, Program, State};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
+use parser::ast::{self, AssignmentOp, Node};
 use std::convert::TryFrom;
 
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
@@ -204,26 +204,69 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    fn rewrite_to_merge(
+        &mut self,
+        span: diagnostic::Span,
+        target: &Node<ast::AssignmentTarget>,
+        expr: Box<Node<ast::Expr>>,
+    ) -> Box<Node<Expr>> {
+        Box::new(Node::new(
+            span,
+            Expr::Op(self.compile_op(Node::new(
+                span,
+                ast::Op(
+                    Box::new(Node::new(target.span(), target.inner().to_expr(span))),
+                    Node::new(span, ast::Opcode::Merge),
+                    expr,
+                ),
+            ))),
+        ))
+    }
+
     fn compile_assignment(&mut self, node: Node<ast::Assignment>) -> Assignment {
         use assignment::Variant;
         use ast::Assignment::*;
 
         self.state.snapshot();
+        let assignment = node.into_inner();
 
-        let node = node.map(|assignment| match assignment {
-            Single { target, expr } => {
+        let node = match assignment {
+            Single { target, op, expr } => {
                 let span = expr.span();
-                let expr = Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
 
-                Variant::Single { target, expr }
+                match op {
+                    AssignmentOp::Assign => {
+                        let expr =
+                            Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
+
+                        Node::new(span, Variant::Single { target, expr })
+                    }
+                    AssignmentOp::Merge => {
+                        let expr = self.rewrite_to_merge(span, &target, expr);
+                        Node::new(span, Variant::Single { target, expr })
+                    }
+                }
             }
-            Infallible { ok, err, expr } => {
+            Infallible { ok, err, op, expr } => {
                 let span = expr.span();
-                let expr = Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
 
-                Variant::Infallible { ok, err, expr }
+                match op {
+                    AssignmentOp::Assign => {
+                        let expr =
+                            Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
+                        let node = Variant::Infallible { ok, err, expr };
+                        Node::new(span, node)
+                    }
+                    AssignmentOp::Merge => {
+                        let expr = self.rewrite_to_merge(span, &ok, expr);
+                        let node = Variant::Infallible { ok, err, expr };
+
+                        Node::new(span, node)
+                    }
+                }
             }
-        });
+        };
 
         Assignment::new(node, &mut self.state).unwrap_or_else(|err| {
             self.state.rollback();

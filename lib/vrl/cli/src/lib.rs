@@ -18,7 +18,6 @@ pub enum Error {
     #[error("json error")]
     Json(#[from] serde_json::Error),
 
-    #[cfg(not(feature = "repl"))]
     #[error("repl feature disabled, program input required")]
     ReplFeature,
 }
