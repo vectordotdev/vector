@@ -27,7 +27,7 @@ format = "syslog"
 interval = 1
 
 # Parse Apache formatted logs
-# See the Remap reference: https://vector.dev/docs/reference/remap/
+# See the Remap reference: https://vector.dev/docs/reference/vrl/
 [transforms.parse_logs]
 type = "remap"
 source = '''
@@ -45,4 +45,4 @@ type = "internal_metrics"
 # Print it all out for inspection
 [sinks.print]
 type = "console"
-inptus = ["parse_logs", "host_metrics", "internal_metrics"]
+inputs = ["parse_logs", "host_metrics", "internal_metrics"]

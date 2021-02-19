@@ -1,3 +1,5 @@
+package metadata
+
 remap: functions: to_timestamp: {
 	category: "Coerce"
 	description: """

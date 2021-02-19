@@ -23,6 +23,7 @@ impl SplitFn {
 }
 
 impl Function for SplitFn {
+    #[allow(clippy::collapsible_match)] // I expect this file to be going away shortly
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let string = {
             let bytes = required_value!(ctx, self.path, Value::Bytes(v) => v);
@@ -71,10 +72,7 @@ impl Function for SplitFn {
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| {
-                    matches!(v, QueryValue::Value(Value::Bytes(_))
-                             | QueryValue::Regex(_))
-                },
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Regex(_)),
                 required: true,
             },
             Parameter {

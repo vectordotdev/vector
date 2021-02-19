@@ -1,0 +1,17 @@
+# result: ~
+# can only merge objects
+# can only merge objects
+# can only merge objects
+# can only merge objects
+# can only merge objects
+
+. = { "ook": 23 }
+
+. |= 32
+. |= "oops"
+. |= [ "oh", "dear" ]
+
+x = "oh no"
+
+x |= { "ook": 32 }
+x |= 32

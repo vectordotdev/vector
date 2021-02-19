@@ -173,18 +173,7 @@ impl Batch for MetricsBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics
-            .0
-            .into_iter()
-            .map(|e| {
-                let mut metric = e.0;
-                if let MetricValue::Distribution { samples, statistic } = metric.data.value {
-                    let samples = compress_distribution(samples);
-                    metric.data.value = MetricValue::Distribution { samples, statistic };
-                };
-                metric
-            })
-            .collect()
+        self.metrics.0.into_iter().map(finish_metric).collect()
     }
 
     fn num_items(&self) -> usize {
@@ -265,7 +254,7 @@ impl MetricSet {
     pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
         match metric.data.kind {
             MetricKind::Absolute => Some(metric),
-            MetricKind::Incremental => self.incremental_to_absolute(metric),
+            MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
         }
     }
 
@@ -281,7 +270,7 @@ impl MetricSet {
     /// Convert the incremental metric into an absolute one, using the
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
-    fn incremental_to_absolute(&mut self, metric: Metric) -> Option<Metric> {
+    fn incremental_to_absolute(&mut self, metric: Metric) -> Metric {
         let mut entry = MetricEntry(metric.into_absolute());
         let mut existing = self.0.take(&entry).unwrap_or_else(|| {
             // Start from zero value if the entry is not found.
@@ -290,7 +279,7 @@ impl MetricSet {
         existing.data.value.add(&entry.data.value);
         entry.data.value = existing.data.value.clone();
         self.0.insert(existing);
-        Some(entry.0)
+        entry.0
     }
 
     /// Convert the absolute metric into an incremental by calculating
@@ -313,6 +302,15 @@ impl MetricSet {
             }
         }
     }
+}
+
+fn finish_metric(metric: MetricEntry) -> Metric {
+    let mut metric = metric.0;
+    if let MetricValue::Distribution { samples, statistic } = metric.data.value {
+        let samples = compress_distribution(samples);
+        metric.data.value = MetricValue::Distribution { samples, statistic };
+    }
+    metric
 }
 
 fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {

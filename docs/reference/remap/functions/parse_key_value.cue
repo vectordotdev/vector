@@ -39,7 +39,7 @@ remap: functions: parse_key_value: {
 	internal_failure_reasons: [
 		"`value` is not a properly formatted key/value string",
 	]
-	return: types: ["map"]
+	return: types: ["object"]
 
 	examples: [
 		{

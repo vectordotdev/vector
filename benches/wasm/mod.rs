@@ -1,6 +1,7 @@
 use criterion::criterion_main;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use futures::{stream, SinkExt, Stream, StreamExt};
+use indoc::indoc;
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path, pin::Pin};
 use vector::{
@@ -28,12 +29,10 @@ pub fn protobuf(c: &mut Criterion) {
     c.bench_function("wasm/protobuf", |b| {
         let transform = Box::new(
             Wasm::new(
-                toml::from_str(
-                    r#"
-                module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
-                artifact_cache = "target/artifacts/"
-                "#,
-                )
+                toml::from_str(indoc! {r#"
+                    module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
+                    artifact_cache = "target/artifacts/"
+                "#})
                 .unwrap(),
             )
             .unwrap(),
@@ -60,15 +59,15 @@ pub fn add_fields(criterion: &mut Criterion) {
             Transform::task(
                 vector::transforms::lua::v2::Lua::new(
                     &toml::from_str(
-                        r#"
-hooks.process = """
-function (event, emit)
-event.log.test_key = "test_value"
-event.log.test_key2 = "test_value2"
-emit(event)
-end
-"""
-"#,
+                        indoc! {r#"
+                            hooks.process = """
+                            function (event, emit)
+                              event.log.test_key = "test_value"
+                              event.log.test_key2 = "test_value2"
+                              emit(event)
+                            end
+                            """
+                        "#},
                     )
                     .unwrap(),
                 )
@@ -79,10 +78,10 @@ end
             "remap",
             Transform::function(
                 vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
-                    source: r#"
-.test_key = "test_value"
-.test_key2 = "test_value2"
-"#
+                    source: indoc! {r#"
+                        .test_key = "test_value"
+                        .test_key2 = "test_value2"
+                    "#}
                     .to_string(),
                     drop_on_err: false,
                 })
@@ -94,10 +93,10 @@ end
             Transform::task(
                 Wasm::new(
                     toml::from_str(
-                        r#"
-module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
-artifact_cache = "target/artifacts/"
-"#,
+                        indoc! {r#"
+                            module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
+                            artifact_cache = "target/artifacts/"
+                        "#},
                     )
                     .unwrap(),
                 )

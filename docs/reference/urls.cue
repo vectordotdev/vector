@@ -151,7 +151,6 @@ urls: {
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "\(vector_repo)/blob/master/proto/event.proto"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"
-	expression_oriented_language:                             "\(wikipedia)/wiki/Expression-oriented_programming_language"
 	externally_tagged_representation:                         "https://serde.rs/enum-representations.html#externally-tagged"
 	fail_safe:                                                "https://en.wikipedia.org/wiki/Fail-safe"
 	ffi:                                                      "https://en.wikipedia.org/wiki/Foreign_function_interface"

@@ -10,7 +10,7 @@ remap: expressions: function_call: {
 		be [handled](\(urls.vrl_errors_reference)) and null is returned.
 
 		Functions can _only_ return a single value. If multiple values are relevant, you should wrap them in a data
-		structure fit to hold them, such as an array or map (note that VRL doesn't support tuples).
+		structure fit to hold them, such as an array or object (note that VRL doesn't support tuples).
 		"""
 
 	grammar: {
@@ -80,13 +80,14 @@ remap: expressions: function_call: {
 							Function arguments enforce type safety when the type of the value supplied is known:
 
 							```vrl
-							number = round("not a number") # fails at compile time
+							round("not a number") # fails at compile time
 							```
 
 							If the type of the value is not known, you need to handle the potential argument error:
 
 							```vrl
-							number, err = round(.message)
+							number = int(.message) ?? 0
+							round(number)
 							```
 
 							See the [errors reference](\(urls.vrl_errors_reference)) for more info.

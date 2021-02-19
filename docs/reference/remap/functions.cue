@@ -27,7 +27,7 @@ remap: {
 		examples?: [remap.#Example, ...remap.#Example]
 	}
 
-	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Debug" | "Enumerate" | "Event" | "Hash" | "IP" | "Map" | "Number" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
+	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Debug" | "Enumerate" | "Event" | "Hash" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
 
 	functions: [Name=string]: #Function & {
 		name: Name

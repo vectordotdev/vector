@@ -1,3 +1,5 @@
+package metadata
+
 remap: functions: to_int: {
 	category: "Coerce"
 	description: """
