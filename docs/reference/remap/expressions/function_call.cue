@@ -86,7 +86,7 @@ remap: expressions: function_call: {
 							If the type of the value is not known, you need to handle the potential argument error:
 
 							```vrl
-                            number = int(.message) ?? 0
+							number = int(.message) ?? 0
 							round(number)
 							```
 

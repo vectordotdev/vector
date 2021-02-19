@@ -22,7 +22,7 @@ remap: literals: regular_expression: {
 			title:       "Flags"
 			description: #"""
 				Regular expressions allow for flags. Flags can be combined, as in `r'(?ixm)pattern'`,
-                `r'(?im)pattern'`, etc.
+				`r'(?im)pattern'`, etc.
 
 				To learn more about regular expressions in Rust—and by extension in VRL—we strongly	recommend the
 				in-browser [Rustexp expression editor and tester](\#(urls.regex_tester)).
