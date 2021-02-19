@@ -14,14 +14,15 @@ remap: errors: "650": {
 
 	resolution: """
 		Use comparison operators only on a left-hand- and a right-hand-side value. You *can* chain comparisons together
-		provided that expressions are properly grouped. Thus, `1 == (1 == 1)` is a valid expression that yields `false`.
+		provided that the expressions are properly grouped. While `a == b == c`, for example, isn't valid,
+		`a == b && b == c` *is* valid because it involves distinct Boolean expressions.
 		"""
 
 	examples: [
 		{
 			"title": "\(title)"
 			source: #"""
-				1 == 1 == 1
+				1 == 1 == 2
 				"""#
 			raises: compiletime: #"""
 				error: \#(title)
@@ -32,8 +33,8 @@ remap: errors: "650": {
 				│
 				"""#
 			diff: #"""
-				- 	1 == 1 == 1
-				+# 	1 == 1
+				- 	1 == 1 == 2
+				+# 	(1 == 1) && (1 == 2)
 				"""#
 		},
 	]
