@@ -441,6 +441,7 @@ impl ElasticSearchCommon {
 
     fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
         let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.hostname = uri.host().map(|s| s.to_owned());
         if use_params {
             for (key, value) in &self.query_params {
                 request.add_param(key, value);
