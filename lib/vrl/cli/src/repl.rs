@@ -18,7 +18,6 @@ lazy_static! {
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
-const FUNCTIONS_ROOT_URL: &str = "https://vector.dev/docs/reference/vrl/functions";
 const RESERVED_TERMS: &[&str; 9] = &[
     "next",
     "prev",
@@ -30,15 +29,6 @@ const RESERVED_TERMS: &[&str; 9] = &[
     "help fs",
     "help docs",
 ];
-const HELP_TEXT: &str = r#"
-VRL REPL commands:
-  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  help docs         Navigate to the VRL docs on the Vector website
-  help docs <func>  Navigate to the VRL docs for the specified function
-  next              Load the next object or create a new one
-  prev              Load the previous object
-  exit              Terminate the program
-"#;
 
 pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
