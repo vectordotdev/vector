@@ -18,7 +18,7 @@ lazy_static! {
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
-const RESERVED_TERMS: &[&str; 9] = &[
+const RESERVED_TERMS: &[&str] = &[
     "next",
     "prev",
     "exit",
@@ -147,18 +147,11 @@ impl Repl {
 }
 
 fn initial_hints() -> Vec<&'static str> {
-    let mut hints: Vec<&'static str> = Vec::with_capacity(stdlib::all().len());
-
-    let mut func_names = stdlib::all()
-        .iter()
+    stdlib::all()
+        .into_iter()
         .map(|f| f.identifier())
-        .collect::<Vec<&'static str>>();
-
-    hints.append(&mut func_names);
-
-    RESERVED_TERMS.iter().for_each(|t| hints.push(t));
-
-    hints
+        .chain(RESERVED_TERMS.iter().copied())
+        .collect()
 }
 
 impl Helper for Repl {}
@@ -190,16 +183,13 @@ impl Hinter for Repl {
         }
 
         // Then check the other built-in hints
-        self.hints
-            .iter()
-            .filter_map(|hint| {
-                if pos > 0 && hint.starts_with(&line[..pos]) {
-                    Some(String::from(&hint[pos..]))
-                } else {
-                    None
-                }
-            })
-            .next()
+        self.hints.iter().find_map(|hint| {
+            if pos > 0 && hint.starts_with(&line[..pos]) {
+                Some(String::from(&hint[pos..]))
+            } else {
+                None
+            }
+        })
     }
 }
 
