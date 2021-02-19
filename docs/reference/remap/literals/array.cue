@@ -10,7 +10,7 @@ remap: literals: array: {
 		#"["first", "second", "third"]"#,
 		#"["mixed", 1, 1.0, true, false, {"foo": "bar"}]"#,
 		#"["first-level", ["second-level", ["third-level"]]"#,
-		#"[.field1, .field2, variable_1, variable_2]"#,
+		#"[.field1, .field2, to_int!("2"), variable_1]"#,
 		#"""
 			[
 				"expressions",

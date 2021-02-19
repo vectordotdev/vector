@@ -107,7 +107,7 @@ remap: expressions: assignment: {
 		{
 			title: "Fallible assignment (success)"
 			source: #"""
-				parsed, err = parse_json("{\"Hello\": \"World!\"}")
+				.parsed, .err = parse_json("{\"Hello\": \"World!\"}")
 				"""#
 			output: log: {
 				parsed: {"Hello": "World"}
@@ -117,7 +117,7 @@ remap: expressions: assignment: {
 		{
 			title: "Fallible assignment (error)"
 			source: #"""
-				parsed, err = parse_json("malformed")
+				.parsed, .err = parse_json("malformed")
 				"""#
 			output: log: {
 				parsed: null
