@@ -35,7 +35,6 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 [dev-dependencies]
 anyhow = "1"
 criterion = "0.3"
-shared = { path = "../../shared", features = ["btreemap"] }
 
 [features]
 default = [
