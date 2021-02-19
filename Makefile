@@ -279,7 +279,7 @@ test: ## Run the unit test suite
 test-components: ## Test with all components enabled
 # TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches language-benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
