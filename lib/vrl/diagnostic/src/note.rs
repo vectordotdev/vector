@@ -1,5 +1,7 @@
 use std::fmt;
 
+const VRL_DOCS_ROOT_URL: &str = "https://vrl.dev";
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Note {
     Hint(String),
@@ -44,10 +46,16 @@ impl fmt::Display for Note {
             SeeLangDocs => SeeDocs("language".to_owned(), "".to_owned()).fmt(f),
             SeeCodeDocs(code) => write!(f, "learn more at: https://errors.vrl.dev/{}", code),
             SeeDocs(kind, path) => {
+                let url = if path.is_empty() {
+                    VRL_DOCS_ROOT_URL.into()
+                } else {
+                    format!("{}/{}", VRL_DOCS_ROOT_URL, path)
+                };
+
                 write!(
                     f,
-                    "see {} documentation at: https://vector.dev/docs/reference/vrl/{}",
-                    kind, path
+                    "see {} documentation at {}",
+                    kind, url
                 )
             }
             Basic(string) => write!(f, "{}", string),
