@@ -27,9 +27,6 @@ pub enum Error {
     #[error("json error")]
     Json(#[from] serde_json::Error),
 
-    #[error("toml error: {0}")]
-    Toml(#[from] toml::de::Error),
-
     #[cfg(not(feature = "repl"))]
     #[error("repl feature disabled, program input required")]
     ReplFeature,

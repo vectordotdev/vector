@@ -33,7 +33,7 @@ pub fn tutorial() -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new("> ")));
 
-    let mut tutorials = load_tutorials_from_toml()?.tutorials;
+    let mut tutorials = load_tutorials_from_toml().tutorials;
 
     // Tutorial intro
     clear_screen();
@@ -177,13 +177,10 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     );
 }
 
-fn load_tutorials_from_toml() -> Result<Tutorials, Error> {
+fn load_tutorials_from_toml() -> Tutorials {
     let toml_file = std::include_str!("../tutorials.toml");
 
-    match toml::from_str(toml_file) {
-        Ok(tuts) => Ok(tuts),
-        Err(err) => Err(Error::Toml(err)),
-    }
+    toml::from_str(toml_file).unwrap()
 }
 
 #[cfg(unix)]
