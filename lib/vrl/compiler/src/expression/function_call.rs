@@ -300,7 +300,7 @@ pub enum Error {
         error: Box<dyn DiagnosticError>,
     },
 
-    #[error("cannot abort function that never fails")]
+    #[error("can't abort function that never fails")]
     AbortInfallible { ident_span: Span, abort_span: Span },
 
     #[error("invalid argument type")]
@@ -426,7 +426,7 @@ impl DiagnosticError for Error {
                 abort_span,
             } => {
                 vec![
-                    Label::primary("this function cannot fail", ident_span),
+                    Label::primary("this function can't fail", ident_span),
                     Label::context("remove this abort-instruction", abort_span),
                 ]
             }

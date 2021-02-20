@@ -447,7 +447,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             UnneededNoop(target_span) => vec![
-                Label::primary("this no-op assignment is useless", self.expr_span),
+                Label::primary("this no-op assignment has no effect", self.expr_span),
                 Label::context("either assign to a path or variable here", *target_span),
                 Label::context("or remove the assignment", self.assignment_span),
             ],
@@ -462,7 +462,7 @@ impl DiagnosticError for Error {
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
                 Label::primary("this error assignment is unneeded", err_span),
-                Label::context("because this expression cannot fail", self.expr_span),
+                Label::context("because this expression can't fail", self.expr_span),
                 Label::context(format!("use: {} = {}", target, expr), ok_span),
             ],
             InvalidTarget(span) => vec![

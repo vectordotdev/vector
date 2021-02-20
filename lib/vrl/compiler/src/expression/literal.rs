@@ -269,7 +269,7 @@ pub enum ErrorVariant {
     #[error("invalid timestamp")]
     InvalidTimestamp(#[from] chrono::ParseError),
 
-    #[error("float literal cannot be nan")]
+    #[error("float literal can't be NaN")]
     NanFloat,
 }
 
