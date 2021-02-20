@@ -5,14 +5,20 @@ use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Deserialize)]
 struct Tutorial {
-    // Making this a string allows for 1.1, 2.5, etc.
-    number: String,
+    section: usize,
+    id: usize,
     title: String,
     help_text: String,
     // The URL endpoint (https://vrl.dev/:endpoint) for finding out more
     docs: String,
     correct_answer: Value,
     initial_event: Value,
+}
+
+impl Tutorial {
+    fn number(&self) -> String {
+        format!("{}.{}", self.section, self.id)
+    }
 }
 
 #[derive(Deserialize)]
@@ -167,7 +173,7 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 
     println!(
         "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
-        tut.number, tut.title, tut.help_text, tut.initial_event
+        tut.number(), tut.title, tut.help_text, tut.initial_event
     );
 }
 

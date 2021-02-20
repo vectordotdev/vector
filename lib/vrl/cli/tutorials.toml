@@ -1,5 +1,6 @@
 [[tutorials]]
-number = "1.1"
+section = 1
+id = 1
 title = "Assigning values to fields"
 docs = "expressions/#assignment"
 help_text = """
@@ -15,7 +16,8 @@ correct_answer = { message = "hello" }
 initial_event = {}
 
 [[tutorials]]
-number = "1.2"
+section = 1
+id = 2
 title = "Deleting fields"
 docs = "functions/#del"
 help_text = """
@@ -31,7 +33,8 @@ correct_answer = { three = 3 }
 initial_event = { one = 1, two = 2, three = 3 }
 
 [[tutorials]]
-number = "2.1"
+section = 2
+id = 1
 title = "Parsing JSON"
 docs = "functions/#parse_json"
 help_text = """
@@ -49,7 +52,8 @@ correct_answer = { severity = "info", message = "Coast is clear" }
 initial_event = { message = '{"severity":"info","message":"Coast is clear"}', timestamp = "2021-02-16T00:25:12.728003Z" }
 
 [[tutorials]]
-number = "2.2"
+section = 2
+id = 2
 title = "Parsing Syslog"
 docs = "functions/#parse_syslog"
 help_text = """
