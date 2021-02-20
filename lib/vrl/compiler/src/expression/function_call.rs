@@ -530,7 +530,7 @@ impl DiagnosticError for Error {
 
                 let mut notes = vec![];
 
-                let call = format!("{}{}({}))", function_ident, abort, args);
+                let call = format!("{}{}({})", function_ident, abort, args);
 
                 notes.append(&mut Note::solution(
                     "guard against invalid type at runtime",
