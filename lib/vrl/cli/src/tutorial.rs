@@ -1,13 +1,16 @@
-use super::{Error, Repl};
+use super::{open_url, Error, Repl};
 use rustyline::{error::ReadlineError, Editor};
 use serde::Deserialize;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Deserialize)]
 struct Tutorial {
-    number: String, // Making this a string allows for 1.1, 2.5, etc.
+    // Making this a string allows for 1.1, 2.5, etc.
+    number: String,
     title: String,
     help_text: String,
+    // The URL endpoint (https://vrl.dev/:endpoint) for finding out more
+    docs: String,
     correct_answer: Value,
     initial_event: Value,
 }
@@ -63,6 +66,15 @@ pub fn tutorial() -> Result<(), Error> {
 
                         index = index.saturating_sub(1);
                         print_tutorial_help_text(index, &tutorials);
+                    }
+                    "docs" => {
+                        let tut = &tutorials[index];
+                        let endpoint = &tut.docs;
+                        let docs_url = format!("https://vrl.dev/{}", endpoint);
+
+                        open_url(&docs_url);
+
+                        clear_screen();
                     }
                     command => {
                         let tut = &mut tutorials[index];

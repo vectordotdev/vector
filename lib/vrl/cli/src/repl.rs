@@ -1,4 +1,4 @@
-use super::{Editor, Error, Repl};
+use super::{open_url, Editor, Error, Repl};
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::error::ReadlineError;
@@ -180,16 +180,6 @@ fn print_function_list() {
 
 fn print_help_text() {
     println!("{}", HELP_TEXT);
-}
-
-fn open_url(url: &str) {
-    if let Err(err) = webbrowser::open(url) {
-        println!(
-            "couldn't open default web browser: {}\n\
-            you can access the desired documentation at {}",
-            err, url
-        );
-    }
 }
 
 fn show_func_docs(line: &str, pattern: &Regex) {

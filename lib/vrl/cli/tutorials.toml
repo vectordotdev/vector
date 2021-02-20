@@ -1,6 +1,7 @@
 [[tutorials]]
 number = "1.1"
 title = "Assigning values to fields"
+docs = "expressions/#assignment"
 help_text = """
 In VRL, you can assign values to fields like this:
 
@@ -16,6 +17,7 @@ initial_event = {}
 [[tutorials]]
 number = "1.2"
 title = "Deleting fields"
+docs = "functions/#del"
 help_text = """
 You can delete fields from events using the `del` function:
 
@@ -31,6 +33,7 @@ initial_event = { one = 1, two = 2, three = 3 }
 [[tutorials]]
 number = "2.1"
 title = "Parsing JSON"
+docs = "functions/#parse_json"
 help_text = """
 You can parse inputs to JSON in VRL using the `parse_json` function:
 
@@ -48,6 +51,7 @@ initial_event = { message = '{"severity":"info","message":"Coast is clear"}', ti
 [[tutorials]]
 number = "2.2"
 title = "Parsing Syslog"
+docs = "functions/#parse_syslog"
 help_text = """
 You can parse Syslog messages into named fields using the `parse_syslog` function:
 
