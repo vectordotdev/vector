@@ -533,13 +533,13 @@ impl DiagnosticError for Error {
                 let call = format!("{}{}({})", function_ident, abort, args);
 
                 notes.append(&mut Note::solution(
-                    "ensure appropriate type at runtime",
+                    "ensuring an appropriate type at runtime",
                     vec![format!("{} = {}", argument, guard), call.clone()],
                 ));
 
                 if let Some(coerce) = coerce {
                     notes.append(&mut Note::solution(
-                        "use default value as a fallback",
+                        "using a default value as a fallback",
                         vec![format!("{} = {}", argument, coerce), call],
                     ))
                 }
