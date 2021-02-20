@@ -41,13 +41,13 @@ impl fmt::Display for Note {
                 if url.is_empty() {
                     write!(f, "hint: {}", hint)
                 } else {
-                    write!(f, "hint: {}\nsee: {}", hint, url)
+                    write!(f, "hint: {}\n    see: {}", hint, url)
                 }
             },
             CoerceValue => {
                 let coerce_funcs_url = format!("{}/#coerce-functions", VRL_FUNCS_ROOT_URL);
 
-                Hint("coerce the value to the appropriate type using a coercion functions".to_owned(), coerce_funcs_url).fmt(f)
+                Hint("coerce the value to the required type using a coercion function".to_owned(), coerce_funcs_url).fmt(f)
             }
             SeeFunctionDocs(ident) => {
                 let func_url = format!("{}/{}", VRL_FUNCS_ROOT_URL, ident);
