@@ -1,6 +1,6 @@
 use chrono::{DateTime, Datelike, Utc};
 use std::collections::BTreeMap;
-use syslog_loose::{IncompleteDate, Message, ProcId};
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -24,7 +24,7 @@ impl Function for ParseSyslog {
             title: "parse syslog",
             source: r#"encode_json(parse_syslog!(s'<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!'))"#,
             result: Ok(
-                r#"s'{"appname":"non","exampleSDID@32473.eventID":"1011","exampleSDID@32473.eventSource":"Application","exampleSDID@32473.iut":"3","facility":"user","hostname":"dynamicwireless.name","message":"Try to override the THX port, maybe it will reboot the neural interface!","msgid":"ID931","procid":2426,"severity":"notice","timestamp":"2020-03-13T20:45:38.119+00:00"}'"#,
+                r#"s'{"appname":"non","exampleSDID@32473.eventID":"1011","exampleSDID@32473.eventSource":"Application","exampleSDID@32473.iut":"3","facility":"user","hostname":"dynamicwireless.name","message":"Try to override the THX port, maybe it will reboot the neural interface!","msgid":"ID931","procid":2426,"severity":"notice","timestamp":"2020-03-13T20:45:38.119+00:00", "version": 1}'"#,
             ),
         }]
     }
@@ -86,6 +86,10 @@ fn message_to_value(message: Message<&str>) -> Value {
         result.insert("facility".to_string(), facility.as_str().to_owned().into());
     }
 
+    if let Protocol::RFC5424(version) = message.protocol {
+        result.insert("version".to_string(), version.into());
+    }
+
     if let Some(app_name) = message.appname {
         result.insert("appname".to_string(), app_name.to_owned().into());
     }
@@ -126,7 +130,8 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
         "appname": Kind::Bytes | Kind::Null,
         "msgid": Kind::Bytes | Kind::Null,
         "timestamp": Kind::Timestamp | Kind::Null,
-        "procid": Kind::Bytes | Kind::Integer | Kind::Null
+        "procid": Kind::Bytes | Kind::Integer | Kind::Null,
+        "version": Kind::Integer | Kind::Null
     }
 }
 
@@ -180,6 +185,7 @@ mod tests {
                 "exampleSDID@32473.eventSource" => "Application",
                 "exampleSDID@32473.eventID" => "1011",
                 "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
+                "version" => 1,
             })
         }
 
