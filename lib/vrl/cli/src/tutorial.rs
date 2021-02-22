@@ -266,12 +266,6 @@ Type `start` and hit Enter to begin.
 "#;
 
 fn tutorials() -> Vec<Tutorial> {
-    let example_timestamp = Value::Timestamp(
-        DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z")
-            .unwrap()
-            .into(),
-    );
-
     let assignment_tut = Tutorial {
         section: 1,
         id: 1,
@@ -343,6 +337,7 @@ fn tutorials() -> Vec<Tutorial> {
 
             HINT:
             - The coercion functions are fallible, so be sure to handle errors!
+            - Use the "funcs" command to see a list of all VRL functions
         "#},
         initial_event: value![{"boolean": "yes", "integer": "1337", "float": "42.5", "string": true}],
         correct_answer: value![{"boolean": true, "integer": 1337, "float": 42.5, "string": "true"}],
@@ -367,6 +362,10 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
     };
 
+    let t1 = "2020-12-19T21:48:09.004Z";
+    let ts1 = make_timestamp(t1);
+    let msg1 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t1);
+
     let parse_syslog_tut = Tutorial {
         section: 2,
         id: 2,
@@ -385,8 +384,8 @@ fn tutorials() -> Vec<Tutorial> {
             - `parse_syslog` is fallible, so make sure to handle potential errors!
             - `parse_syslog` can only take a string
         "#},
-        initial_event: value![{"message": "<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet", "timestamp": "2020-12-19T21:48:09.004Z"}],
-        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": example_timestamp, "version": 3}],
+        initial_event: value![{"message": msg1, "timestamp": t1}],
+        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": ts1, "version": 3}],
     };
 
     let parse_key_value_tut = Tutorial {
@@ -412,6 +411,29 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
     };
 
+    let t2 = "2021-02-19T21:48:09.004Z";
+    let ts2 = make_timestamp(t2);
+    let msg2 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t2);
+
+    let transform_syslog_tut = Tutorial {
+        section: 3,
+        id: 1,
+        title: "Transforming Syslog logs",
+        docs: "functions/#parse_syslog",
+        help_text: indoc! {r#"
+            Thus far, we've mostly *parsed* events from one format into another. Now
+            we're going to start *transforming* events.
+
+            TASK:
+            - Parse the `message` field (Syslog format) into named fields
+            - Set the `severity` field to "info"
+            - Delete the `version`, `msgid`, and `procid` fields
+            - Convert the `message` field to all lowercase using `downcase`
+        "#},
+        initial_event: value![{"message": msg2, "timestamp": t2}],
+        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "tps report missing cover sheet", "severity": "info", "timestamp": ts2}],
+    };
+
     vec![
         assignment_tut,
         deleting_fields_tut,
@@ -420,5 +442,12 @@ fn tutorials() -> Vec<Tutorial> {
         parse_json_tut,
         parse_syslog_tut,
         parse_key_value_tut,
+        transform_syslog_tut,
     ]
+}
+
+fn make_timestamp(ts: &str) -> Value {
+    Value::Timestamp(DateTime::parse_from_rfc3339(ts)
+        .unwrap()
+        .into())
 }
