@@ -101,7 +101,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Role{..}));
+        assert!(matches!(config.auth, AWSAuthentication::Role { .. }));
     }
 
     #[test]
@@ -130,6 +130,6 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(config.auth, AWSAuthentication::Static{..}));
+        assert!(matches!(config.auth, AWSAuthentication::Static { .. }));
     }
 }

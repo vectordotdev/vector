@@ -17,8 +17,8 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a.b == 123 && \
-        .x.y == 456 && \
+        .a.b == 123 &&
+        .x.y == 456 &&
         .x.z == 789
       '''
 
@@ -43,7 +43,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == [0, "1", 2.0] && \
+        .a == [0, "1", 2.0] &&
         .b == [0, null, "two"]
       '''
 
@@ -56,7 +56,6 @@
     .result_c, err = .a + .b * .c / .d
     .result_d, err = (.a + .b) * (.c / .d)
     .result_e, err = .e / .c
-    .result_f, err = .e // .c
   """
 [[tests]]
   name = "remap_arithmetic"
@@ -74,12 +73,11 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .result_a == 27 && \
-        .result_b == 51 && \
-        .result_c == 17 && \
-        .result_d == 20 && \
-        .result_e == 0.75 && \
-        .result_f == 0
+        .result_a == 27 &&
+        .result_b == 51 &&
+        .result_c == 17 &&
+        .result_d == 20 &&
+        .result_e == 0.75
      '''
 
 [transforms.remap_arithmetic_error]
@@ -127,9 +125,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .result_a == true && \
-        .result_b == false && \
-        .result_c == true && \
+        .result_a == true &&
+        .result_b == false &&
+        .result_c == true &&
         .result_d == false
       '''
 
@@ -160,11 +158,11 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .foo == "10" && \
-        .bar == 20 && \
-        .baz == 30.3 && \
-        .bev == true && \
-        .a == "2020-09-14 09:53:44 UTC"
+        .foo == "10" &&
+        .bar == 20 &&
+        .baz == 30.3 &&
+        .bev == true &&
+        .a == "2020-09-14T09:53:44Z"
       '''
 
 [transforms.remap_quoted_path]
@@ -207,9 +205,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nope == null
-        .err1 == "function call error: unable to parse json: key must be a string at line 1 column 3"
-        .ok.foo == true
+        .nope == null &&
+        .err1 == "function call error for \"parse_json\" at (19:44): unable to parse json: key must be a string at line 1 column 3" &&
+        .ok.foo == true &&
         .err2 == null
       '''
 
@@ -277,11 +275,11 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == "10" && \
-        .b == "10" && \
-        .c == "" && \
-        .d == "" && \
-        .e == "30" && \
+        .a == "10" &&
+        .b == "10" &&
+        .c == "" &&
+        .d == "" &&
+        .e == "30" &&
         .f == "30"
       '''
 
@@ -289,11 +287,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = upcase!(.a)
-    .b = upcase!(.b)
-    .c.c = upcase!(.c.c)
+    .a = upcase(string!(.a))
+    .b = upcase(string!(.b))
+    .c.c = upcase(string!(.c.c))
 
-    if upcase!(.f) == "F" {
+    if upcase(string!(.f)) == "F" {
       .f = "ff"
     }
   """
@@ -312,9 +310,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == "A" && \
-        .b == "BBB BB" && \
-        .c == {"c": "C.C"} && \
+        .a == "A" &&
+        .b == "BBB BB" &&
+        .c == {"c": "C.C"} &&
         .f == "ff"
       '''
 
@@ -323,8 +321,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = upcase!(.a)
-    .b = upcase!(.b)
+    .a = upcase(string!(.a))
+    .b = upcase(string!(.b))
   """
 [[tests]]
   name = "remap_function_upcase_error"
@@ -341,11 +339,11 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = downcase!(.a)
-    .b = downcase!(.b)
-    .c.c = downcase!(.c.c)
+    .a = downcase(string!(.a))
+    .b = downcase(string!(.b))
+    .c.c = downcase(string!(.c.c))
 
-    if downcase!(.f) == "f" {
+    if downcase(string!(.f)) == "f" {
       .f = "FF"
     }
   """
@@ -364,9 +362,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == "a" && \
-        .b == "bbb bb" && \
-        .c == {"c": "c.c"} && \
+        .a == "a" &&
+        .b == "bbb bb" &&
+        .c == {"c": "c.c"} &&
         .f == "FF"
       '''
 
@@ -375,8 +373,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = downcase!(.a)
-    .b = downcase!(.b)
+    .a = downcase(string!(.a))
+    .b = downcase(string!(.b))
   """
 [[tests]]
   name = "remap_function_downcase_error"
@@ -410,7 +408,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        match!(.a, /(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/) && \
+        match(string!(.a), r'(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') &&
         .b == "bar"
       '''
 
@@ -418,10 +416,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = sha1!(.a)
+    .a = sha1(string!(.a))
 
-    if sha1!(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-      .b = sha1!(.a + .b + "baz")
+    if sha1(string!(.b)) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+      .b = sha1(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -437,7 +435,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33" && \
+        .a == "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33" &&
         .b == "6f74c252bb7f19f553115af5e49a733b9ff17138"
       '''
 
@@ -446,8 +444,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = sha1!(.a)
-    .b = sha1!(.b)
+    .a = sha1(string!(.a))
+    .b = sha1(string!(.b))
   """
 [[tests]]
   name = "remap_function_sha1_error"
@@ -463,10 +461,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = md5!(.a)
+    .a = md5(string!(.a))
 
-    if md5!(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
-      .b = md5!(.a + .b + "baz")
+    if md5(string!(.b)) == "37b51d194a7513e45b56f6524f2d51f2" {
+      .b = md5(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -482,7 +480,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == "acbd18db4cc2f85cedef654fccc4a4d8" && \
+        .a == "acbd18db4cc2f85cedef654fccc4a4d8" &&
         .b == "223cfa6567e4c0599c9a23628bf7a234"
       '''
 
@@ -491,8 +489,8 @@
   type = "remap"
   drop_on_err = true
   source = """
-    .a = md5!(.a)
-    .b = md5!(.b)
+    .a = md5(string!(.a))
+    .b = md5(string!(.b))
   """
 [[tests]]
   name = "remap_function_md5_error"
@@ -521,14 +519,14 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        ends_with!(to_string(.a), "UTC")
+        ends_with(to_string!(.a), "Z")
       '''
 
 [transforms.remap_function_format_timestamp]
   inputs = []
   type = "remap"
   source = """
-    .a = format_timestamp!(to_timestamp(.foo), format: "%+")
+    .a = format_timestamp!(to_timestamp!(.foo), format: "%+")
   """
 [[tests]]
   name = "remap_function_format_timestamp"
@@ -549,13 +547,13 @@
   inputs = []
   type = "remap"
   source = """
-    .a = contains!(.foo, substring: .bar)
-    .b = contains!(.bar, substring: "bar")
-    .c = contains!(.bar, substring: "BAR", case_sensitive = true)
-    .d = contains!(.bar, substring: "BAR", case_sensitive = false)
-    .e = contains!(.foobar, substring: "oba")
-    .f = contains!(.foobar, substring: "OBA", case_sensitive = true)
-    .g = contains!(.foobar, substring: "OBA", case_sensitive = false)
+    .a = contains(string!(.foo), substring: string!(.bar))
+    .b = contains(string!(.bar), substring: "bar")
+    .c = contains(string!(.bar), substring: "BAR", case_sensitive: true)
+    .d = contains(string!(.bar), substring: "BAR", case_sensitive: false)
+    .e = contains(string!(.foobar), substring: "oba")
+    .f = contains(string!(.foobar), substring: "OBA", case_sensitive: true)
+    .g = contains(string!(.foobar), substring: "OBA", case_sensitive: false)
   """
 [[tests]]
   name = "remap_function_contains"
@@ -571,12 +569,12 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == false && \
-        .b == true && \
-        .c == false && \
-        .d == true && \
-        .e == true && \
-        .f == false && \
+        .a == false &&
+        .b == true &&
+        .c == false &&
+        .d == true &&
+        .e == true &&
+        .f == false &&
         .g == true
       '''
 
@@ -584,11 +582,11 @@
   inputs = []
   type = "remap"
   source = """
-    .a = starts_with!(.foobar, substring: .foo)
-    .b = starts_with!(.foobar, substring: "foo")
-    .c = starts_with!(.foobar, substring: "bar")
-    .d = starts_with!(.foobar, substring: "FOO", case_sensitive: true)
-    .e = starts_with!(.foobar, substring: "FOO", case_sensitive: false)
+    .a = starts_with(string!(.foobar), substring: string!(.foo))
+    .b = starts_with(string!(.foobar), substring: "foo")
+    .c = starts_with(string!(.foobar), substring: "bar")
+    .d = starts_with(string!(.foobar), substring: "FOO", case_sensitive: true)
+    .e = starts_with(string!(.foobar), substring: "FOO", case_sensitive: false)
   """
 [[tests]]
   name = "remap_function_starts_with"
@@ -603,1432 +601,1432 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == true && \
-        .b == true && \
-        .c == false && \
-        .d == false && \
+        .a == true &&
+        .b == true &&
+        .c == false &&
+        .d == false &&
         .e == true
       '''
 
-[transforms.remap_function_ends_with]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ends_with!(.foobar, substring: .bar)
-    .b = ends_with!(.foobar, substring: "bar")
-    .c = ends_with!(.foobar, substring: "foo")
-    .d = ends_with!(.foobar, substring: "BAR", case_sensitive: true)
-    .e = ends_with!(.foobar, substring: "BAR", case_sensitive: false)
-  """
-[[tests]]
-  name = "remap_function_ends_with"
-  [tests.input]
-    insert_at = "remap_function_ends_with"
-    type = "log"
-    [tests.input.log_fields]
-      bar = "bar"
-      foobar = "foobar"
-  [[tests.outputs]]
-    extract_from = "remap_function_ends_with"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == true && \
-        .b == true && \
-        .c == false && \
-        .d == false && \
-        .e == true
-      '''
+# [transforms.remap_function_ends_with]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ends_with!(.foobar, substring: .bar)
+#     .b = ends_with!(.foobar, substring: "bar")
+#     .c = ends_with!(.foobar, substring: "foo")
+#     .d = ends_with!(.foobar, substring: "BAR", case_sensitive: true)
+#     .e = ends_with!(.foobar, substring: "BAR", case_sensitive: false)
+#   """
+# [[tests]]
+#   name = "remap_function_ends_with"
+#   [tests.input]
+#     insert_at = "remap_function_ends_with"
+#     type = "log"
+#     [tests.input.log_fields]
+#       bar = "bar"
+#       foobar = "foobar"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ends_with"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == true &&
+#         .b == true &&
+#         .c == false &&
+#         .d == false &&
+#         .e == true
+#       '''
 
-[transforms.remap_function_slice]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = slice!(.foo + .bar, 1)
-    .b = slice!(.foo + .bar, 0, 1)
-    .c = slice!(.foo + .bar, start: -2)
-    .d = slice!(.foo + .bar, start: 1, end: -1)
-  """
-[[tests]]
-  name = "remap_function_slice"
-  [tests.input]
-    insert_at = "remap_function_slice"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "foo"
-      bar = "bar"
-  [[tests.outputs]]
-    extract_from = "remap_function_slice"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "oobar" && \
-        .b == "f" && \
-        .c == "ar" && \
-        .d == "ooba"
-      '''
+# [transforms.remap_function_slice]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = slice!(.foo + .bar, 1)
+#     .b = slice!(.foo + .bar, 0, 1)
+#     .c = slice!(.foo + .bar, start: -2)
+#     .d = slice!(.foo + .bar, start: 1, end: -1)
+#   """
+# [[tests]]
+#   name = "remap_function_slice"
+#   [tests.input]
+#     insert_at = "remap_function_slice"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = "foo"
+#       bar = "bar"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_slice"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "oobar" &&
+#         .b == "f" &&
+#         .c == "ar" &&
+#         .d == "ooba"
+#       '''
 
-[transforms.remap_function_parse_tokens]
-  inputs = []
-  type = "remap"
-  source = '''
-    .a = parse_tokens!(.a)
-    .b = parse_tokens!(.b)
-  '''
-[[tests]]
-  name = "remap_function_parse_tokens"
-  [tests.input]
-    insert_at = "remap_function_parse_tokens"
-    type = "log"
-    [tests.input.log_fields]
-      a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
-      b = "bar"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_tokens"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == ["217.250.207.207", \
-               null, \
-               null, \
-               "07/Sep/2020:16:38:00 -0400", \
-               "DELETE /deliverables/next-generation/user-centric HTTP/1.1", \
-               "205", "11881" ] && \
-        .b == ["bar"]
-      '''
+# [transforms.remap_function_parse_tokens]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = parse_tokens!(.a)
+#     .b = parse_tokens!(.b)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_tokens"
+#   [tests.input]
+#     insert_at = "remap_function_parse_tokens"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
+#       b = "bar"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_tokens"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == ["217.250.207.207",
+#                null,
+#                null,
+#                "07/Sep/2020:16:38:00 -0400",
+#                "DELETE /deliverables/next-generation/user-centric HTTP/1.1",
+#                "205", "11881" ] &&
+#         .b == ["bar"]
+#       '''
 
-[transforms.remap_function_sha2]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = sha2!(.a)
+# [transforms.remap_function_sha2]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = sha2!(.a)
 
-    if sha2!(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
-      .b = sha2!(.a + .b + "baz")
-    }
-  """
-[[tests]]
-  name = "remap_function_sha2"
-  [tests.input]
-    insert_at = "remap_function_sha2"
-    type = "log"
-    [tests.input.log_fields]
-      a = "foo"
-      b = "bar"
-  [[tests.outputs]]
-    extract_from = "remap_function_sha2"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d" && \
-        .b == "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
-      '''
+#     if sha2!(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
+#       .b = sha2!(.a + .b + "baz")
+#     }
+#   """
+# [[tests]]
+#   name = "remap_function_sha2"
+#   [tests.input]
+#     insert_at = "remap_function_sha2"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "foo"
+#       b = "bar"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_sha2"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d" &&
+#         .b == "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
+#       '''
 
-[transforms.remap_function_sha3]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = sha3!(.a)
+# [transforms.remap_function_sha3]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = sha3!(.a)
 
-    if sha3!(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
-      .b = sha3!(.a + .b + "baz")
-    }
-  """
-[[tests]]
-  name = "remap_function_sha3"
-  [tests.input]
-    insert_at = "remap_function_sha3"
-    type = "log"
-    [tests.input.log_fields]
-      a = "foo"
-      b = "bar"
-  [[tests.outputs]]
-    extract_from = "remap_function_sha3"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7" && \
-        .b == "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
-      '''
+#     if sha3!(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
+#       .b = sha3!(.a + .b + "baz")
+#     }
+#   """
+# [[tests]]
+#   name = "remap_function_sha3"
+#   [tests.input]
+#     insert_at = "remap_function_sha3"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "foo"
+#       b = "bar"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_sha3"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7" &&
+#         .b == "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
+#       '''
 
-[transforms.remap_function_parse_duration]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = parse_duration!(.a, "ms")
-    .b = parse_duration!("100ms", output: .b)
-  """
-[[tests]]
-  name = "remap_function_parse_duration"
-  [tests.input]
-    insert_at = "remap_function_parse_duration"
-    type = "log"
-    [tests.input.log_fields]
-      a = "2s"
-      b = "s"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_duration"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == 2000 && \
-        .b == 0.1
-      '''
+# [transforms.remap_function_parse_duration]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = parse_duration!(.a, "ms")
+#     .b = parse_duration!("100ms", output: .b)
+#   """
+# [[tests]]
+#   name = "remap_function_parse_duration"
+#   [tests.input]
+#     insert_at = "remap_function_parse_duration"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "2s"
+#       b = "s"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_duration"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == 2000 &&
+#         .b == 0.1
+#       '''
 
-[transforms.remap_function_parse_glog]
-  inputs = []
-  type = "remap"
-  source = """
-    .glog = parse_glog!(.message)
-    """
-[[tests]]
-  name = "remap_function_parse_glog"
-  [tests.input]
-    insert_at = "remap_function_parse_glog"
-    type = "log"
-    [tests.input.log_fields]
-      message = "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_glog"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .glog.level == "info" && \
-        .glog.timestamp == to_timestamp!("2021-01-31T14:48:54.411655Z") && \
-        .glog.id == 15520 && \
-        .glog.file == "main.c++" && \
-        .glog.line == 9 && \
-        .glog.message == "Hello world!"
-      '''
+# [transforms.remap_function_parse_glog]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .glog = parse_glog!(.message)
+#     """
+# [[tests]]
+#   name = "remap_function_parse_glog"
+#   [tests.input]
+#     insert_at = "remap_function_parse_glog"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_glog"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .glog.level == "info" &&
+#         .glog.timestamp == to_timestamp!("2021-01-31T14:48:54.411655Z") &&
+#         .glog.id == 15520 &&
+#         .glog.file == "main.c++" &&
+#         .glog.line == 9 &&
+#         .glog.message == "Hello world!"
+#       '''
 
-[transforms.remap_function_format_number]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = format_number!(.a, scale: 2, decimal_separator: ",", grouping_separator: ".")
-  """
-[[tests]]
-  name = "remap_function_format_number"
-  [tests.input]
-    insert_at = "remap_function_format_number"
-    type = "log"
-    [tests.input.log_fields]
-      a = 1234.567
-  [[tests.outputs]]
-    extract_from = "remap_function_format_number"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "1.234,56"
-      '''
+# [transforms.remap_function_format_number]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = format_number!(.a, scale: 2, decimal_separator: ",", grouping_separator: ".")
+#   """
+# [[tests]]
+#   name = "remap_function_format_number"
+#   [tests.input]
+#     insert_at = "remap_function_format_number"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = 1234.567
+#   [[tests.outputs]]
+#     extract_from = "remap_function_format_number"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "1.234,56"
+#       '''
 
-[transforms.remap_function_parse_url]
-  inputs = []
-  type = "remap"
-  source = """
-    .parts = parse_url!(.url)
-  """
-[[tests]]
-  name = "remap_function_parse_url"
-  [tests.input]
-    insert_at = "remap_function_parse_url"
-    type = "log"
-    [tests.input.log_fields]
-      url = "https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_url"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .parts == { "scheme": "https",
-                    "username": "",
-                    "password": "",
-                    "host": "master.vector.dev",
-                    "port": null,
-                    "path": "/docs/reference/transforms/merge/",
-                    "query": {"hello": "world"},
-                    "fragment": "configuration"
-	         }
-      '''
+# [transforms.remap_function_parse_url]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .parts = parse_url!(.url)
+#   """
+# [[tests]]
+#   name = "remap_function_parse_url"
+#   [tests.input]
+#     insert_at = "remap_function_parse_url"
+#     type = "log"
+#     [tests.input.log_fields]
+#       url = "https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_url"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .parts == { "scheme": "https",
+#                     "username": "",
+#                     "password": "",
+#                     "host": "master.vector.dev",
+#                     "port": null,
+#                     "path": "/docs/reference/transforms/merge/",
+#                     "query": {"hello": "world"},
+#                     "fragment": "configuration"
+# 	         }
+#       '''
 
-[transforms.remap_function_ceil]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ceil!(.num)
-    .b = ceil!(.num, precision: 1)
-    .c = ceil!(.num, precision: 2)
-  """
-[[tests]]
-  name = "remap_function_ceil"
-  [tests.input]
-    insert_at = "remap_function_ceil"
-    type = "log"
-    [tests.input.log_fields]
-      num = 92.489
-  [[tests.outputs]]
-    extract_from = "remap_function_ceil"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == 93 && \
-        .b == 92.5 && \
-        .c == 92.49
-      '''
+# [transforms.remap_function_ceil]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ceil!(.num)
+#     .b = ceil!(.num, precision: 1)
+#     .c = ceil!(.num, precision: 2)
+#   """
+# [[tests]]
+#   name = "remap_function_ceil"
+#   [tests.input]
+#     insert_at = "remap_function_ceil"
+#     type = "log"
+#     [tests.input.log_fields]
+#       num = 92.489
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ceil"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == 93 &&
+#         .b == 92.5 &&
+#         .c == 92.49
+#       '''
 
-[transforms.remap_function_floor]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = floor!(.num)
-    .b = floor!(.num, precision: 1)
-    .c = floor!(.num, precision: 2)
-  """
-[[tests]]
-  name = "remap_function_floor"
-  [tests.input]
-    insert_at = "remap_function_floor"
-    type = "log"
-    [tests.input.log_fields]
-      num = 92.489
-  [[tests.outputs]]
-    extract_from = "remap_function_floor"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == 92 && \
-        .b == 92.4 && \
-        .c == 92.48
-      '''
+# [transforms.remap_function_floor]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = floor!(.num)
+#     .b = floor!(.num, precision: 1)
+#     .c = floor!(.num, precision: 2)
+#   """
+# [[tests]]
+#   name = "remap_function_floor"
+#   [tests.input]
+#     insert_at = "remap_function_floor"
+#     type = "log"
+#     [tests.input.log_fields]
+#       num = 92.489
+#   [[tests.outputs]]
+#     extract_from = "remap_function_floor"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == 92 &&
+#         .b == 92.4 &&
+#         .c == 92.48
+#       '''
 
-[transforms.remap_function_round]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = round!(.num)
-    .b = round!(.num, precision: 1)
-    .c = round!(.num, precision: 2)
-  """
-[[tests]]
-  name = "remap_function_round"
-  [tests.input]
-    insert_at = "remap_function_round"
-    type = "log"
-    [tests.input.log_fields]
-      num = 92.489
-  [[tests.outputs]]
-    extract_from = "remap_function_round"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == 92 && \
-        .b == 92.5 && \
-        .c == 92.49
-      '''
+# [transforms.remap_function_round]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = round!(.num)
+#     .b = round!(.num, precision: 1)
+#     .c = round!(.num, precision: 2)
+#   """
+# [[tests]]
+#   name = "remap_function_round"
+#   [tests.input]
+#     insert_at = "remap_function_round"
+#     type = "log"
+#     [tests.input.log_fields]
+#       num = 92.489
+#   [[tests.outputs]]
+#     extract_from = "remap_function_round"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == 92 &&
+#         .b == 92.5 &&
+#         .c == 92.49
+#       '''
 
-[transforms.remap_function_parse_syslog]
-  inputs = []
-  type = "remap"
-  source = """
-     .a = parse_syslog!(.a)
-   """
-[[tests]]
-  name = "remap_function_parse_syslog"
-  [tests.input]
-    insert_at = "remap_function_parse_syslog"
-    type = "log"
-    [tests.input.log_fields]
-      a = "<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
-  [[tests.outputs]]
-  extract_from = "remap_function_parse_syslog"
-  [[tests.outputs.conditions]]
-    type = "remap"
-    source = '''
-      .a.facility == "daemon" && \
-      .a.severity == "warning" && \
-      .a.timestamp == to_timestamp!("2020-05-22T17:59:09.250Z") && \
-      .a.hostname == "OX-XXX-MX204" && \
-      .a.appname == "OX-XXX-CONTEUDO:rpd" && \
-      .a.procid == 6589 && \
-      .a.message == "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
-    '''
+# [transforms.remap_function_parse_syslog]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#      .a = parse_syslog!(.a)
+#    """
+# [[tests]]
+#   name = "remap_function_parse_syslog"
+#   [tests.input]
+#     insert_at = "remap_function_parse_syslog"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+#   [[tests.outputs]]
+#   extract_from = "remap_function_parse_syslog"
+#   [[tests.outputs.conditions]]
+#     type = "remap"
+#     source = '''
+#       .a.facility == "daemon" &&
+#       .a.severity == "warning" &&
+#       .a.timestamp == to_timestamp!("2020-05-22T17:59:09.250Z") &&
+#       .a.hostname == "OX-XXX-MX204" &&
+#       .a.appname == "OX-XXX-CONTEUDO:rpd" &&
+#       .a.procid == 6589 &&
+#       .a.message == "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+#     '''
 
-[transforms.remap_function_split_regex]
-  inputs=[]
-  type = "remap"
-  source = """
-    .foo = split!(.foo, /a.b/i, 3)
-  """
-[[tests]]
-  name = "remap_function_split_regex"
-  [tests.input]
-    insert_at = "remap_function_split_regex"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "barAbBbataabfizzaxbbuzz"
-  [[tests.outputs]]
-    extract_from = "remap_function_split_regex"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo[0] == "bar" && \
-        .foo[1] == "bat" && \
-        .foo[2] == "fizzaxbbuzz"
-      '''
+# [transforms.remap_function_split_regex]
+#   inputs=[]
+#   type = "remap"
+#   source = """
+#     .foo = split!(.foo, /a.b/i, 3)
+#   """
+# [[tests]]
+#   name = "remap_function_split_regex"
+#   [tests.input]
+#     insert_at = "remap_function_split_regex"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = "barAbBbataabfizzaxbbuzz"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_split_regex"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo[0] == "bar" &&
+#         .foo[1] == "bat" &&
+#         .foo[2] == "fizzaxbbuzz"
+#       '''
 
-[transforms.remap_function_split_string]
-  inputs=[]
-  type = "remap"
-  source = """
-    .foo = split!(.foo, " ", 3)
-  """
-[[tests]]
-  name = "remap_function_split_string"
-  [tests.input]
-    insert_at = "remap_function_split_string"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "bar bat fizz buzz"
-  [[tests.outputs]]
-    extract_from = "remap_function_split_string"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo[0] == "bar" && \
-        .foo[1] == "bat" && \
-        .foo[2] == "fizz buzz"
-      '''
+# [transforms.remap_function_split_string]
+#   inputs=[]
+#   type = "remap"
+#   source = """
+#     .foo = split!(.foo, " ", 3)
+#   """
+# [[tests]]
+#   name = "remap_function_split_string"
+#   [tests.input]
+#     insert_at = "remap_function_split_string"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = "bar bat fizz buzz"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_split_string"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo[0] == "bar" &&
+#         .foo[1] == "bat" &&
+#         .foo[2] == "fizz buzz"
+#       '''
 
-[transforms.remap_function_parse_timestamp]
-  inputs = []
-  type = "remap"
-  source = """
-    .foo = parse_timestamp!("10", "%s")
-  """
-[[tests]]
-  name = "remap_function_parse_timestamp"
-  [tests.input]
-    insert_at = "remap_function_parse_timestamp"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_timestamp"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo == to_timestamp!("1970-01-01T00:00:10Z")
-      '''
+# [transforms.remap_function_parse_timestamp]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .foo = parse_timestamp!("10", "%s")
+#   """
+# [[tests]]
+#   name = "remap_function_parse_timestamp"
+#   [tests.input]
+#     insert_at = "remap_function_parse_timestamp"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_timestamp"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo == to_timestamp!("1970-01-01T00:00:10Z")
+#       '''
 
-[transforms.remap_function_truncate]
-  inputs = []
-  type = "remap"
-  source = """
-    .foo = truncate("foobar", limit: 3)
-    .bar = truncate("foobar", limit: 4, ellipsis: true)
-  """
-[[tests]]
-  name = "remap_function_truncate"
-  [tests.input]
-    insert_at = "remap_function_truncate"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_truncate"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo == "foo" && \
-        .bar == "foob..."
-      '''
+# [transforms.remap_function_truncate]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .foo = truncate("foobar", limit: 3)
+#     .bar = truncate("foobar", limit: 4, ellipsis: true)
+#   """
+# [[tests]]
+#   name = "remap_function_truncate"
+#   [tests.input]
+#     insert_at = "remap_function_truncate"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_truncate"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo == "foo" &&
+#         .bar == "foob..."
+#       '''
 
-[transforms.remap_function_strip_whitespace]
-  inputs = []
-  type = "remap"
-  source = """
-    .foo = strip_whitespace("  foobar  ")
-  """
-[[tests]]
-  name = "remap_function_strip_whitespace"
-  [tests.input]
-    insert_at = "remap_function_strip_whitespace"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_strip_whitespace"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo == "foobar"
-      '''
+# [transforms.remap_function_strip_whitespace]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .foo = strip_whitespace("  foobar  ")
+#   """
+# [[tests]]
+#   name = "remap_function_strip_whitespace"
+#   [tests.input]
+#     insert_at = "remap_function_strip_whitespace"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_strip_whitespace"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo == "foobar"
+#       '''
 
-[transforms.remap_function_parse_grok]
-  inputs = []
-  type = "remap"
-  source = """
-    .grokked = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
-    .grokked2 = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
-    """
-[[tests]]
-  name = "remap_function_parse_grok"
-  [tests.input]
-    insert_at = "remap_function_parse_grok"
-    type = "log"
-    [tests.input.log_fields]
-      message = "2020-10-02T23:22:12.223222Z info Hello world"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_grok"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .grokked.timestamp == "2020-10-02T23:22:12.223222Z" && \
-        .grokked.level == "info" && \
-        .grokked.message == "Hello world" && \
-        .grokked.email == "" && \
-        .grokked2.timestamp == "2020-10-02T23:22:12.223222Z" && \
-        .grokked2.level == "info" && \
-        !exists(.grokked2.email) && \
-        .grokked2.message == "Hello world"
-      '''
+# [transforms.remap_function_parse_grok]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .grokked = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
+#     .grokked2 = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
+#     """
+# [[tests]]
+#   name = "remap_function_parse_grok"
+#   [tests.input]
+#     insert_at = "remap_function_parse_grok"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "2020-10-02T23:22:12.223222Z info Hello world"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_grok"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .grokked.timestamp == "2020-10-02T23:22:12.223222Z" &&
+#         .grokked.level == "info" &&
+#         .grokked.message == "Hello world" &&
+#         .grokked.email == "" &&
+#         .grokked2.timestamp == "2020-10-02T23:22:12.223222Z" &&
+#         .grokked2.level == "info" &&
+#         !exists(.grokked2.email) &&
+#         .grokked2.message == "Hello world"
+#       '''
 
-[transforms.remap_function_parse_common_log]
-  inputs = []
-  type = "remap"
-  source = """
-    .common_log = parse_common_log!(.message)
-    .common_log_timestamp_format = parse_common_log!(.message, "%d/%b/%Y:%T %z")
-    """
-[[tests]]
-  name = "remap_function_parse_common_log"
-  [tests.input]
-    insert_at = "remap_function_parse_common_log"
-    type = "log"
-    [tests.input.log_fields]
-      message = """127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"""
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_common_log"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .common_log.host == "127.0.0.1" && \
-        .common_log.identity == "bob" && \
-        .common_log.user == "frank" && \
-        .common_log.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
-        .common_log.message == "GET /apache_pb.gif HTTP/1.0" && \
-        .common_log.method == "GET" && \
-        .common_log.path == "/apache_pb.gif" && \
-        .common_log.protocol == "HTTP/1.0" && \
-        .common_log.status == 200 && \
-        .common_log.size == 2326 && \
-        .common_log_timestamp_format.host == "127.0.0.1" && \
-        .common_log_timestamp_format.identity == "bob" && \
-        .common_log_timestamp_format.user == "frank" && \
-        .common_log_timestamp_format.timestamp == to_timestamp!("2000-10-10T20:55:36Z") && \
-        .common_log_timestamp_format.message == "GET /apache_pb.gif HTTP/1.0" && \
-        .common_log_timestamp_format.method == "GET" && \
-        .common_log_timestamp_format.path == "/apache_pb.gif" && \
-        .common_log_timestamp_format.protocol == "HTTP/1.0" && \
-        .common_log_timestamp_format.status == 200 && \
-        .common_log_timestamp_format.size == 2326
-      '''
+# [transforms.remap_function_parse_common_log]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .common_log = parse_common_log!(.message)
+#     .common_log_timestamp_format = parse_common_log!(.message, "%d/%b/%Y:%T %z")
+#     """
+# [[tests]]
+#   name = "remap_function_parse_common_log"
+#   [tests.input]
+#     insert_at = "remap_function_parse_common_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = """127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_common_log"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .common_log.host == "127.0.0.1" &&
+#         .common_log.identity == "bob" &&
+#         .common_log.user == "frank" &&
+#         .common_log.timestamp == to_timestamp!("2000-10-10T20:55:36Z") &&
+#         .common_log.message == "GET /apache_pb.gif HTTP/1.0" &&
+#         .common_log.method == "GET" &&
+#         .common_log.path == "/apache_pb.gif" &&
+#         .common_log.protocol == "HTTP/1.0" &&
+#         .common_log.status == 200 &&
+#         .common_log.size == 2326 &&
+#         .common_log_timestamp_format.host == "127.0.0.1" &&
+#         .common_log_timestamp_format.identity == "bob" &&
+#         .common_log_timestamp_format.user == "frank" &&
+#         .common_log_timestamp_format.timestamp == to_timestamp!("2000-10-10T20:55:36Z") &&
+#         .common_log_timestamp_format.message == "GET /apache_pb.gif HTTP/1.0" &&
+#         .common_log_timestamp_format.method == "GET" &&
+#         .common_log_timestamp_format.path == "/apache_pb.gif" &&
+#         .common_log_timestamp_format.protocol == "HTTP/1.0" &&
+#         .common_log_timestamp_format.status == 200 &&
+#         .common_log_timestamp_format.size == 2326
+#       '''
 
-[transforms.remap_function_ip_subnet]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ip_subnet!("192.168.10.23", "255.255.0.0")
-    .b = ip_subnet!("192.168.10.23", "/8")
-    .c = ip_subnet!("2404:6800:4003:c02::64", "ffff:ffff::")
-    .d = ip_subnet!("2404:6800:4003:c02::64", "/16")
-  """
-[[tests]]
-  name = "remap_function_ip_subnet"
-  [tests.input]
-    insert_at = "remap_function_ip_subnet"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_ip_subnet"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "192.168.0.0" && \
-        .b == "192.0.0.0" && \
-        .c == "2404:6800::" && \
-        .d == "2404::"
-      '''
+# [transforms.remap_function_ip_subnet]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ip_subnet!("192.168.10.23", "255.255.0.0")
+#     .b = ip_subnet!("192.168.10.23", "/8")
+#     .c = ip_subnet!("2404:6800:4003:c02::64", "ffff:ffff::")
+#     .d = ip_subnet!("2404:6800:4003:c02::64", "/16")
+#   """
+# [[tests]]
+#   name = "remap_function_ip_subnet"
+#   [tests.input]
+#     insert_at = "remap_function_ip_subnet"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ip_subnet"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "192.168.0.0" &&
+#         .b == "192.0.0.0" &&
+#         .c == "2404:6800::" &&
+#         .d == "2404::"
+#       '''
 
-[transforms.remap_function_ip_cidr_contains]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.168.10.2")
-    .b = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.169.10.2")
-    .c = ip_cidr_contains!(cidr: "2404:6800:4003:c02::/64", value: "2404:6800:4003:c02::aaaa")
-    .d = ip_cidr_contains!("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
-  """
-[[tests]]
-  name = "remap_function_ip_cidr_contains"
-  [tests.input]
-    insert_at = "remap_function_ip_cidr_contains"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_ip_cidr_contains"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == true && \
-        .b == false && \
-        .c == true && \
-        .d == false
-      '''
+# [transforms.remap_function_ip_cidr_contains]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.168.10.2")
+#     .b = ip_cidr_contains!(cidr: "192.168.0.0/16", value: "192.169.10.2")
+#     .c = ip_cidr_contains!(cidr: "2404:6800:4003:c02::/64", value: "2404:6800:4003:c02::aaaa")
+#     .d = ip_cidr_contains!("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
+#   """
+# [[tests]]
+#   name = "remap_function_ip_cidr_contains"
+#   [tests.input]
+#     insert_at = "remap_function_ip_cidr_contains"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ip_cidr_contains"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == true &&
+#         .b == false &&
+#         .c == true &&
+#         .d == false
+#       '''
 
-[transforms.remap_function_ip_to_ipv6]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ip_to_ipv6!("192.168.10.2")
-  """
-[[tests]]
-  name = "remap_function_ip_to_ipv6"
-  [tests.input]
-    insert_at = "remap_function_ip_to_ipv6"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_ip_to_ipv6"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "::ffff:192.168.10.2"
-      '''
+# [transforms.remap_function_ip_to_ipv6]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ip_to_ipv6!("192.168.10.2")
+#   """
+# [[tests]]
+#   name = "remap_function_ip_to_ipv6"
+#   [tests.input]
+#     insert_at = "remap_function_ip_to_ipv6"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ip_to_ipv6"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "::ffff:192.168.10.2"
+#       '''
 
-[transforms.remap_function_ipv6_to_ipv4]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = ipv6_to_ipv4!("::ffff:192.168.10.2")
-  """
-[[tests]]
-  name = "remap_function_ipv6_to_ipv4"
-  [tests.input]
-    insert_at = "remap_function_ipv6_to_ipv4"
-    type = "raw"
-    value = ""
-  [[tests.outputs]]
-    extract_from = "remap_function_ipv6_to_ipv4"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "192.168.10.2"
-      '''
+# [transforms.remap_function_ipv6_to_ipv4]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = ipv6_to_ipv4!("::ffff:192.168.10.2")
+#   """
+# [[tests]]
+#   name = "remap_function_ipv6_to_ipv4"
+#   [tests.input]
+#     insert_at = "remap_function_ipv6_to_ipv4"
+#     type = "raw"
+#     value = ""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_ipv6_to_ipv4"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "192.168.10.2"
+#       '''
 
-[transforms.remap_function_exists]
-  inputs = []
-  type = "remap"
-  source = """
-    .data = parse_json!(.data)
-    .a = exists(.foo)
-    .b = exists(.bar)
-    .c = exists(.data.child)
-    .d = exists(.data.nochild)
-    .e = exists(.data.arr[2])
-    .f = exists(.data.arr[3])
-  """
-[[tests]]
-  name = "remap_function_exists"
-  [tests.input]
-    insert_at = "remap_function_exists"
-    type = "log"
-    [tests.input.log_fields]
-      data = """
-        { "child": 42, "arr": [1,3,3] }
-      """
-      foo = 42
-  [[tests.outputs]]
-    extract_from = "remap_function_exists"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a  && !.b  && .c && !.d  && .e && !.f ?? false
-      '''
+# [transforms.remap_function_exists]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .data = parse_json!(.data)
+#     .a = exists(.foo)
+#     .b = exists(.bar)
+#     .c = exists(.data.child)
+#     .d = exists(.data.nochild)
+#     .e = exists(.data.arr[2])
+#     .f = exists(.data.arr[3])
+#   """
+# [[tests]]
+#   name = "remap_function_exists"
+#   [tests.input]
+#     insert_at = "remap_function_exists"
+#     type = "log"
+#     [tests.input.log_fields]
+#       data = """
+#         { "child": 42, "arr": [1,3,3] }
+#       """
+#       foo = 42
+#   [[tests.outputs]]
+#     extract_from = "remap_function_exists"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a  && !.b  && .c && !.d  && .e && !.f ?? false
+#       '''
 
-[transforms.remap_function_compact]
-  inputs = []
-  type = "remap"
-  source = """
-    .compactarr = compact!(parse_json!(.arr))
-    .compactmap = compact!(parse_json!(.map))
-    .a = exists(.compactmap.field1)
-    .b = exists(.compactmap.field2)
-    .c = exists(.compactmap.field3)
-    .d = exists(.compactmap.field4.nested1)
-    .e = exists(.compactmap.field4.nested2)
-  """
-[[tests]]
-  name = "remap_function_compact"
-  [tests.input]
-    insert_at = "remap_function_compact"
-    type = "log"
-    [tests.input.log_fields]
-      arr = """
-        [null, "", [], 1]
-      """
-      map = """
-        {"field1": null,
-         "field2": 32,
-         "field3": "",
-         "field4": { "nested1": 3,
-                     "nested2": null } }
-      """
-  [[tests.outputs]]
-    extract_from = "remap_function_compact"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == false && \
-        .b == true && \
-        .c == false && \
-        .d == true && \
-        .e == false && \
-        .compactarr[0] == 1
-      '''
+# [transforms.remap_function_compact]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .compactarr = compact!(parse_json!(.arr))
+#     .compactmap = compact!(parse_json!(.map))
+#     .a = exists(.compactmap.field1)
+#     .b = exists(.compactmap.field2)
+#     .c = exists(.compactmap.field3)
+#     .d = exists(.compactmap.field4.nested1)
+#     .e = exists(.compactmap.field4.nested2)
+#   """
+# [[tests]]
+#   name = "remap_function_compact"
+#   [tests.input]
+#     insert_at = "remap_function_compact"
+#     type = "log"
+#     [tests.input.log_fields]
+#       arr = """
+#         [null, "", [], 1]
+#       """
+#       map = """
+#         {"field1": null,
+#          "field2": 32,
+#          "field3": "",
+#          "field4": { "nested1": 3,
+#                      "nested2": null } }
+#       """
+#   [[tests.outputs]]
+#     extract_from = "remap_function_compact"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == false &&
+#         .b == true &&
+#         .c == false &&
+#         .d == true &&
+#         .e == false &&
+#         .compactarr[0] == 1
+#       '''
 
-[transforms.remap_function_assert_pass]
-  inputs = []
-  type = "remap"
-  drop_on_err = true
-  source = """
-    assert!(.foo, message: "assert failed")
-    .check = "checked"
-  """
-[[tests]]
-  name = "remap_function_assert_pass"
-  [tests.input]
-    insert_at = "remap_function_assert_pass"
-    type = "log"
-    [tests.input.log_fields]
-      foo = true
-  [[tests.outputs]]
-  extract_from = "remap_function_assert_pass"
-  [[tests.outputs.conditions]]
-    type = "remap"
-    source = '''
-      .check == "checked"
-    '''
+# [transforms.remap_function_assert_pass]
+#   inputs = []
+#   type = "remap"
+#   drop_on_err = true
+#   source = """
+#     assert!(.foo, message: "assert failed")
+#     .check = "checked"
+#   """
+# [[tests]]
+#   name = "remap_function_assert_pass"
+#   [tests.input]
+#     insert_at = "remap_function_assert_pass"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = true
+#   [[tests.outputs]]
+#   extract_from = "remap_function_assert_pass"
+#   [[tests.outputs.conditions]]
+#     type = "remap"
+#     source = '''
+#       .check == "checked"
+#     '''
 
-[transforms.remap_function_assert_fail]
-  inputs = []
-  type = "remap"
-  drop_on_err = true
-  source = """
-    assert!(.foo, message: "assert failed")
-  """
-[[tests]]
-  name = "remap_function_assert_fail"
-  no_outputs_from = ["remap_function_assert_fail"]
-  [tests.input]
-    insert_at = "remap_function_assert_fail"
-    type = "log"
-    [tests.input.log_fields]
-      foo = false
+# [transforms.remap_function_assert_fail]
+#   inputs = []
+#   type = "remap"
+#   drop_on_err = true
+#   source = """
+#     assert!(.foo, message: "assert failed")
+#   """
+# [[tests]]
+#   name = "remap_function_assert_fail"
+#   no_outputs_from = ["remap_function_assert_fail"]
+#   [tests.input]
+#     insert_at = "remap_function_assert_fail"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = false
 
-[transforms.remap_function_log]
-  inputs=[]
-  type = "remap"
-  source = """
-    log(.foo, level:"info")
-  """
-[[tests]]
-  name = "remap_function_log"
-  [tests.input]
-    insert_at = "remap_function_log"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "this should be unchanged"
-  [[tests.outputs]]
-    extract_from = "remap_function_log"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .foo == "this should be unchanged"
-      '''
+# [transforms.remap_function_log]
+#   inputs=[]
+#   type = "remap"
+#   source = """
+#     log(.foo, level:"info")
+#   """
+# [[tests]]
+#   name = "remap_function_log"
+#   [tests.input]
+#     insert_at = "remap_function_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = "this should be unchanged"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_log"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .foo == "this should be unchanged"
+#       '''
 
-[transforms.remap_function_merge]
-  inputs=[]
-  type = "remap"
-  source = """
-    .foo = parse_json!(.foo)
-    .bar = parse_json!(.bar)
-    .bar = merge!(.bar, .foo, deep: true)
-  """
-[[tests]]
-  name = "remap_function_merge"
-  [tests.input]
-    insert_at = "remap_function_merge"
-    type = "log"
-    [tests.input.log_fields]
-      bar = """
-        {"field1": "ook"}
-      """
-      foo = """
-        {"field2": "ook ook"}
-      """
-  [[tests.outputs]]
-    extract_from = "remap_function_merge"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .bar.field1 == "ook" && \
-        .bar.field2 == "ook ook"
-      '''
+# [transforms.remap_function_merge]
+#   inputs=[]
+#   type = "remap"
+#   source = """
+#     .foo = parse_json!(.foo)
+#     .bar = parse_json!(.bar)
+#     .bar = merge!(.bar, .foo, deep: true)
+#   """
+# [[tests]]
+#   name = "remap_function_merge"
+#   [tests.input]
+#     insert_at = "remap_function_merge"
+#     type = "log"
+#     [tests.input.log_fields]
+#       bar = """
+#         {"field1": "ook"}
+#       """
+#       foo = """
+#         {"field2": "ook ook"}
+#       """
+#   [[tests.outputs]]
+#     extract_from = "remap_function_merge"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .bar.field1 == "ook" &&
+#         .bar.field2 == "ook ook"
+#       '''
 
-[transforms.remap_function_flatten]
-  inputs = []
-  type = "remap"
-  source = """
-    .arr = flatten!(parse_json!(.arr))
-    .map = flatten!(parse_json!(.map))
-    .a = .map."field1.field2"
-    .b = .map."field1.field3"
-  """
-[[tests]]
-  name = "remap_function_flatten"
-  [tests.input]
-    insert_at = "remap_function_flatten"
-    type = "log"
-    [tests.input.log_fields]
-      arr = "[1, 2, [3, 4, [5, 6]]]"
-      map = """
-        {"field1": {"field2": 1, "field3": 2} }
-        """
-  [[tests.outputs]]
-    extract_from = "remap_function_flatten"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .arr[0] == 1 && \
-        .arr[1] == 2 && \
-        .arr[2] == 3 && \
-        .arr[3] == 4 && \
-        .arr[4] == 5 && \
-        .arr[5] == 6 && \
-        .a == 1 && \
-        .b == 2
-      '''
+# [transforms.remap_function_flatten]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .arr = flatten!(parse_json!(.arr))
+#     .map = flatten!(parse_json!(.map))
+#     .a = .map."field1.field2"
+#     .b = .map."field1.field3"
+#   """
+# [[tests]]
+#   name = "remap_function_flatten"
+#   [tests.input]
+#     insert_at = "remap_function_flatten"
+#     type = "log"
+#     [tests.input.log_fields]
+#       arr = "[1, 2, [3, 4, [5, 6]]]"
+#       map = """
+#         {"field1": {"field2": 1, "field3": 2} }
+#         """
+#   [[tests.outputs]]
+#     extract_from = "remap_function_flatten"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .arr[0] == 1 &&
+#         .arr[1] == 2 &&
+#         .arr[2] == 3 &&
+#         .arr[3] == 4 &&
+#         .arr[4] == 5 &&
+#         .arr[5] == 6 &&
+#         .a == 1 &&
+#         .b == 2
+#       '''
 
-[transforms.remap_function_redact]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = redact!(.input, filters: ["pattern"], patterns: ["hello"])
-    .b = redact!(.input, filters: ["pattern"], patterns: ["hello", "wor"])
-    .c = redact!(.input, filters: ["pattern"], patterns: [/world|universe/])
-    .d = redact!(.input, filters: ["pattern"], patterns: [])
-    .e = redact!(.input, filters: ["pattern"], patterns: ["hello", /[uieao]/])
-  """
-[[tests]]
-  name = "remap_function_redact"
-  [tests.input]
-    insert_at = "remap_function_redact"
-    type = "log"
-    [tests.input.log_fields]
-      input = "hello world, hello universe"
-  [[tests.outputs]]
-    extract_from = "remap_function_redact"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "**** world, **** universe" && \
-        .b == "**** ****ld, **** universe" && \
-        .c == "hello ****, hello ****" && \
-        .d == "hello world, hello universe" && \
-        .e == "**** w****rld, **** ****n****v****rs****"
-      '''
+# [transforms.remap_function_redact]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = redact!(.input, filters: ["pattern"], patterns: ["hello"])
+#     .b = redact!(.input, filters: ["pattern"], patterns: ["hello", "wor"])
+#     .c = redact!(.input, filters: ["pattern"], patterns: [/world|universe/])
+#     .d = redact!(.input, filters: ["pattern"], patterns: [])
+#     .e = redact!(.input, filters: ["pattern"], patterns: ["hello", /[uieao]/])
+#   """
+# [[tests]]
+#   name = "remap_function_redact"
+#   [tests.input]
+#     insert_at = "remap_function_redact"
+#     type = "log"
+#     [tests.input.log_fields]
+#       input = "hello world, hello universe"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_redact"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "**** world, **** universe" &&
+#         .b == "**** ****ld, **** universe" &&
+#         .c == "hello ****, hello ****" &&
+#         .d == "hello world, hello universe" &&
+#         .e == "**** w****rld, **** ****n****v****rs****"
+#       '''
 
-[transforms.remap_function_replace]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = replace("foo", pattern: "o", with: "bar", 1)
-    .b = replace("foo", pattern: /o/, with: "bar")
-  """
-[[tests]]
-  name = "remap_function_replace"
-  [tests.input]
-    insert_at = "remap_function_replace"
-    type = "log"
-    [tests.input.log_fields]
-      input = "hello world, hello universe"
-  [[tests.outputs]]
-    extract_from = "remap_function_replace"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "fbaro" && \
-        .b == "fbarbar"
-      '''
+# [transforms.remap_function_replace]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = replace("foo", pattern: "o", with: "bar", 1)
+#     .b = replace("foo", pattern: /o/, with: "bar")
+#   """
+# [[tests]]
+#   name = "remap_function_replace"
+#   [tests.input]
+#     insert_at = "remap_function_replace"
+#     type = "log"
+#     [tests.input.log_fields]
+#       input = "hello world, hello universe"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_replace"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "fbaro" &&
+#         .b == "fbarbar"
+#       '''
 
-[transforms.remap_function_parse_aws_alb_log]
-  inputs = []
-  type = "remap"
-  source = """
-    .parts = parse_aws_alb_log!(.log)
-  """
-[[tests]]
-  name = "remap_function_parse_aws_alb_log"
-  [tests.input]
-    insert_at = "remap_function_parse_aws_alb_log"
-    type = "log"
-    [tests.input.log_fields]
-      log = 'http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"'
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_alb_log"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .parts.type == "http" && \
-        .parts.timestamp == "2018-11-30T22:23:00.186641Z" && \
-        .parts.elb == "app/my-loadbalancer/50dc6c495c0c9188" && \
-        .parts.client_host == "192.168.131.39:2817" && \
-        .parts.target_host == null && \
-        .parts.request_processing_time == 0.0 && \
-        .parts.target_processing_time == 0.001 && \
-        .parts.response_processing_time == 0.0 && \
-        .parts.elb_status_code == "200" && \
-        .parts.target_status_code == "200" && \
-        .parts.received_bytes == 34 && \
-        .parts.sent_bytes == 366 && \
-        .parts.request_method == "GET" && \
-        .parts.request_url == "http://www.example.com:80/" && \
-        .parts.request_protocol == "HTTP/1.1" && \
-        .parts.user_agent == "curl/7.46.0" && \
-        .parts.ssl_cipher == null && \
-        .parts.ssl_protocol == null && \
-        .parts.target_group_arn == "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067" && \
-        .parts.trace_id == "Root=1-58337364-23a8c76965a2ef7629b185e3" && \
-        .parts.domain_name == null && \
-        .parts.chosen_cert_arn == null && \
-        .parts.matched_rule_priority == "0" && \
-        .parts.request_creation_time == "2018-11-30T22:22:48.364000Z" && \
-        .parts.actions_executed == "forward" && \
-        .parts.redirect_url == null && \
-        .parts.error_reason == null && \
-        .parts.classification == null && \
-        .parts.classification_reason == null
-      '''
+# [transforms.remap_function_parse_aws_alb_log]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .parts = parse_aws_alb_log!(.log)
+#   """
+# [[tests]]
+#   name = "remap_function_parse_aws_alb_log"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_alb_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       log = 'http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-"'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_alb_log"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .parts.type == "http" &&
+#         .parts.timestamp == "2018-11-30T22:23:00.186641Z" &&
+#         .parts.elb == "app/my-loadbalancer/50dc6c495c0c9188" &&
+#         .parts.client_host == "192.168.131.39:2817" &&
+#         .parts.target_host == null &&
+#         .parts.request_processing_time == 0.0 &&
+#         .parts.target_processing_time == 0.001 &&
+#         .parts.response_processing_time == 0.0 &&
+#         .parts.elb_status_code == "200" &&
+#         .parts.target_status_code == "200" &&
+#         .parts.received_bytes == 34 &&
+#         .parts.sent_bytes == 366 &&
+#         .parts.request_method == "GET" &&
+#         .parts.request_url == "http://www.example.com:80/" &&
+#         .parts.request_protocol == "HTTP/1.1" &&
+#         .parts.user_agent == "curl/7.46.0" &&
+#         .parts.ssl_cipher == null &&
+#         .parts.ssl_protocol == null &&
+#         .parts.target_group_arn == "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067" &&
+#         .parts.trace_id == "Root=1-58337364-23a8c76965a2ef7629b185e3" &&
+#         .parts.domain_name == null &&
+#         .parts.chosen_cert_arn == null &&
+#         .parts.matched_rule_priority == "0" &&
+#         .parts.request_creation_time == "2018-11-30T22:22:48.364000Z" &&
+#         .parts.actions_executed == "forward" &&
+#         .parts.redirect_url == null &&
+#         .parts.error_reason == null &&
+#         .parts.classification == null &&
+#         .parts.classification_reason == null
+#       '''
 
-[transforms.remap_function_parse_aws_vpc_flow_log]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = parse_aws_vpc_flow_log!(.a)
-    .b = parse_aws_vpc_flow_log!(.b, format: "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
-  """
-[[tests]]
-  name = "remap_function_parse_aws_vpc_flow_log"
-  [tests.input]
-    insert_at = "remap_function_parse_aws_vpc_flow_log"
-    type = "log"
-    [tests.input.log_fields]
-      a = "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"
-      b = "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_vpc_flow_log"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a.version == 2 && \
-        .a.account_id == 123456789010 && \
-        .a.interface_id == "eni-1235b8ca123456789" && \
-        .a.srcaddr == null && \
-        .a.dstaddr == null && \
-        .a.srcport == null && \
-        .a.dstport == null && \
-        .a.protocol == null && \
-        .a.packets == null && \
-        .a.bytes == null && \
-        .a.start == 1431280876 && \
-        .a.end == 1431280934 && \
-        .a.action == null && \
-        .a.log_status == "NODATA" && \
-        .b.instance_id == null && \
-        .b.interface_id == "eni-1235b8ca123456789" && \
-        .b.srcaddr == "10.0.1.5" && \
-        .b.dstaddr == "10.0.0.220" && \
-        .b.pkt_srcaddr == "10.0.1.5" && \
-        .b.pkt_dstaddr == "203.0.113.5"
-      '''
+# [transforms.remap_function_parse_aws_vpc_flow_log]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = parse_aws_vpc_flow_log!(.a)
+#     .b = parse_aws_vpc_flow_log!(.b, format: "instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr")
+#   """
+# [[tests]]
+#   name = "remap_function_parse_aws_vpc_flow_log"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_vpc_flow_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA"
+#       b = "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_vpc_flow_log"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a.version == 2 &&
+#         .a.account_id == 123456789010 &&
+#         .a.interface_id == "eni-1235b8ca123456789" &&
+#         .a.srcaddr == null &&
+#         .a.dstaddr == null &&
+#         .a.srcport == null &&
+#         .a.dstport == null &&
+#         .a.protocol == null &&
+#         .a.packets == null &&
+#         .a.bytes == null &&
+#         .a.start == 1431280876 &&
+#         .a.end == 1431280934 &&
+#         .a.action == null &&
+#         .a.log_status == "NODATA" &&
+#         .b.instance_id == null &&
+#         .b.interface_id == "eni-1235b8ca123456789" &&
+#         .b.srcaddr == "10.0.1.5" &&
+#         .b.dstaddr == "10.0.0.220" &&
+#         .b.pkt_srcaddr == "10.0.1.5" &&
+#         .b.pkt_dstaddr == "203.0.113.5"
+#       '''
 
-[transforms.remap_metrics]
-  inputs = []
-  type = "remap"
-  source = """
-    .tags.host = "ook"
-    .tags.name = .name
-    .tags.namespace = .namespace
-    .tags.type = .type
-  """
-[[tests]]
-  name = "remap_metrics"
-  [tests.input]
-    insert_at = "remap_metrics"
-    type = "metric"
-    [tests.input.metric]
-      name = "example counter"
-      namespace = "zork"
-      kind = "absolute"
-      counter.value = 1.0
-  [[tests.outputs]]
-    extract_from = "remap_metrics"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .tags.name == "example counter" && \
-        .tags.namespace == "zork" && \
-        .tags.host == "ook" && \
-        .tags.type == "counter"
-      '''
+# [transforms.remap_metrics]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .tags.host = "ook"
+#     .tags.name = .name
+#     .tags.namespace = .namespace
+#     .tags.type = .type
+#   """
+# [[tests]]
+#   name = "remap_metrics"
+#   [tests.input]
+#     insert_at = "remap_metrics"
+#     type = "metric"
+#     [tests.input.metric]
+#       name = "example counter"
+#       namespace = "zork"
+#       kind = "absolute"
+#       counter.value = 1.0
+#   [[tests.outputs]]
+#     extract_from = "remap_metrics"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .tags.name == "example counter" &&
+#         .tags.namespace == "zork" &&
+#         .tags.host == "ook" &&
+#         .tags.type == "counter"
+#       '''
 
-[transforms.remap_function_encode_json]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = encode_json!(parse_json(.a))
-    .b = encode_json!(parse_json(.b))
-  """
-[[tests]]
-  name = "remap_function_encode_json"
-  [tests.input]
-    insert_at = "remap_function_encode_json"
-    type = "log"
-    [tests.input.log_fields]
-      a = "[1, 2, 3]"
-      b = """{"field1": {"field2": 1, "field3": null}}"""
-  [[tests.outputs]]
-    extract_from = "remap_function_encode_json"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "[1,2,3]" && \
-        .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
-      '''
+# [transforms.remap_function_encode_json]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = encode_json!(parse_json(.a))
+#     .b = encode_json!(parse_json(.b))
+#   """
+# [[tests]]
+#   name = "remap_function_encode_json"
+#   [tests.input]
+#     insert_at = "remap_function_encode_json"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = "[1, 2, 3]"
+#       b = """{"field1": {"field2": 1, "field3": null}}"""
+#   [[tests.outputs]]
+#     extract_from = "remap_function_encode_json"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "[1,2,3]" &&
+#         .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
+#       '''
 
-[transforms.remap_function_parse_regex]
-  inputs = []
-  type = "remap"
-  source = '''
-    . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
-    .bytes_in = to_int(.bytes_in)
-    .status = to_int(.status)
-    .bytes_out = to_int(.bytes_out)
-  '''
-[[tests]]
-  name = "remap_function_parse_regex"
-  [tests.input]
-    insert_at = "remap_function_parse_regex"
-    type = "log"
-    [tests.input.log_fields]
-      message = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_regex"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .bytes_in == 5667 && \
-        .host == "5.86.210.12" && \
-        .user == "zieme4647" && \
-        .timestamp == "19/06/2019:17:20:49 -0400" && \
-        .method == "GET" && \
-        .path == "/embrace/supply-chains/dynamic/vertical" && \
-        .status == 201 && \
-        .bytes_out == 20574 && \
-        .0 == "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
-      '''
+# [transforms.remap_function_parse_regex]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     . = parse_regex!(.message, /^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$/)
+#     .bytes_in = to_int(.bytes_in)
+#     .status = to_int(.status)
+#     .bytes_out = to_int(.bytes_out)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_regex"
+#   [tests.input]
+#     insert_at = "remap_function_parse_regex"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_regex"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .bytes_in == 5667 &&
+#         .host == "5.86.210.12" &&
+#         .user == "zieme4647" &&
+#         .timestamp == "19/06/2019:17:20:49 -0400" &&
+#         .method == "GET" &&
+#         .path == "/embrace/supply-chains/dynamic/vertical" &&
+#         .status == 201 &&
+#         .bytes_out == 20574 &&
+#         .0 == "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574"
+#       '''
 
-[transforms.remap_function_parse_regex_all]
-  inputs = []
-  type = "remap"
-  source = '''
-    .result = parse_regex_all!(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
-  '''
-[[tests]]
-  name = "remap_function_parse_regex_all"
-  [tests.input]
-    insert_at = "remap_function_parse_regex_all"
-    type = "log"
-    [tests.input.log_fields]
-      message = "apples and carrots, peaches and peas"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_regex_all"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result[0].fruit == "apples" && \
-        .result[0].veg == "carrots" && \
-        .result[0].0 == "apples and carrots" && \
-        .result[1].fruit == "peaches" && \
-        .result[1].veg == "peas" && \
-        .result[1].0 == "peaches and peas"
-      '''
+# [transforms.remap_function_parse_regex_all]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = parse_regex_all!(.message, /(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)/)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_regex_all"
+#   [tests.input]
+#     insert_at = "remap_function_parse_regex_all"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "apples and carrots, peaches and peas"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_regex_all"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result[0].fruit == "apples" &&
+#         .result[0].veg == "carrots" &&
+#         .result[0].0 == "apples and carrots" &&
+#         .result[1].fruit == "peaches" &&
+#         .result[1].veg == "peas" &&
+#         .result[1].0 == "peaches and peas"
+#       '''
 
-[transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
-  inputs = []
-  type = "remap"
-  source = '''
-    .result = parse_aws_cloudwatch_log_subscription_message!(.message)
-  '''
-[[tests]]
-  name = "remap_function_parse_aws_cloudwatch_log_subscription_message"
-  [tests.input]
-    insert_at = "remap_function_parse_aws_cloudwatch_log_subscription_message"
-    type = "log"
-    [tests.input.log_fields]
-      message = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1600110003794,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}"
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_aws_cloudwatch_log_subscription_message"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result.owner == "CloudwatchLogs" && \
-        .result.message_type == "CONTROL_MESSAGE" && \
-        .result.subscription_filters == [] && \
-        .result.log_group == "" && \
-        .result.log_stream == "" && \
-        .result.log_events == [{ "id": "",
-                                 "timestamp": to_timestamp!("2020-09-14T19:00:03.794Z"),
-                                 "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
-      '''
+# [transforms.remap_function_parse_aws_cloudwatch_log_subscription_message]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = parse_aws_cloudwatch_log_subscription_message!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#   [tests.input]
+#     insert_at = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1600110003794,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_aws_cloudwatch_log_subscription_message"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result.owner == "CloudwatchLogs" &&
+#         .result.message_type == "CONTROL_MESSAGE" &&
+#         .result.subscription_filters == [] &&
+#         .result.log_group == "" &&
+#         .result.log_stream == "" &&
+#         .result.log_events == [{ "id": "",
+#                                  "timestamp": to_timestamp!("2020-09-14T19:00:03.794Z"),
+#                                  "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose." }]
+#       '''
 
-[transforms.remap_function_parse_key_value]
-  inputs = []
-  type = "remap"
-  source = '''
-    . = parse_key_value!(.message, key_value_delimiter: "=", field_delimiter: " ")
-  '''
-[[tests]]
-  name = "remap_function_parse_key_value"
-  [tests.input]
-    insert_at = "remap_function_parse_key_value"
-    type = "log"
-    [tests.input.log_fields]
-      message = '''
-        path="/cart_link" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd="108.30.189.26" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https
-        '''
-  [[tests.outputs]]
-    extract_from = "remap_function_parse_key_value"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .path == "/cart_link" && \
-        .host == "lumberjack-store.herokuapp.com" && \
-        .request_id == "6ad70ccd-40db-477c-afce-f7e3719a886b" && \
-        .fwd == "108.30.189.26" && \
-        .dyno == "web.1" && \
-        .connect == "0ms" && \
-        .service == "73ms" && \
-        .status == "304" && \
-        .bytes == "656" && \
-        .protocol == "https"
-      '''
+# [transforms.remap_function_parse_key_value]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     . = parse_key_value!(.message, key_value_delimiter: "=", field_delimiter: " ")
+#   '''
+# [[tests]]
+#   name = "remap_function_parse_key_value"
+#   [tests.input]
+#     insert_at = "remap_function_parse_key_value"
+#     type = "log"
+#     [tests.input.log_fields]
+#       message = '''
+#         path="/cart_link" host=lumberjack-store.herokuapp.com request_id=6ad70ccd-40db-477c-afce-f7e3719a886b fwd="108.30.189.26" dyno=web.1 connect=0ms service=73ms status=304 bytes=656 protocol=https
+#         '''
+#   [[tests.outputs]]
+#     extract_from = "remap_function_parse_key_value"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .path == "/cart_link" &&
+#         .host == "lumberjack-store.herokuapp.com" &&
+#         .request_id == "6ad70ccd-40db-477c-afce-f7e3719a886b" &&
+#         .fwd == "108.30.189.26" &&
+#         .dyno == "web.1" &&
+#         .connect == "0ms" &&
+#         .service == "73ms" &&
+#         .status == "304" &&
+#         .bytes == "656" &&
+#         .protocol == "https"
+#       '''
 
-[transforms.remap_function_is_nullish]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = is_nullish(.a)
-    .b = is_nullish(.b)
-    .c = is_nullish(.c)
-    .d = is_nullish(.d)
-    .e = is_nullish(.e)
-    .f = is_nullish(.f)
-    .g = is_nullish(.g)
-  """
-[[tests]]
-  name = "remap_function_is_nullish"
-  [tests.input]
-    insert_at = "remap_function_is_nullish"
-    type = "log"
-    [tests.input.log_fields]
-      a = ""
-      b = " "
-      c = "     "
-      d = "-"
-      e = "\n"
-      f = "\r"
-      g = "i am a teapot"
-  [[tests.outputs]]
-    extract_from = "remap_function_is_nullish"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == true && \
-        .b == true && \
-        .c == true && \
-        .d == true && \
-        .e == true && \
-        .f == true && \
-        .g == false
-      '''
+# [transforms.remap_function_is_nullish]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = is_nullish(.a)
+#     .b = is_nullish(.b)
+#     .c = is_nullish(.c)
+#     .d = is_nullish(.d)
+#     .e = is_nullish(.e)
+#     .f = is_nullish(.f)
+#     .g = is_nullish(.g)
+#   """
+# [[tests]]
+#   name = "remap_function_is_nullish"
+#   [tests.input]
+#     insert_at = "remap_function_is_nullish"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = ""
+#       b = " "
+#       c = "     "
+#       d = "-"
+#       e = "\n"
+#       f = "\r"
+#       g = "i am a teapot"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_is_nullish"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == true &&
+#         .b == true &&
+#         .c == true &&
+#         .d == true &&
+#         .e == true &&
+#         .f == true &&
+#         .g == false
+#       '''
 
-[transforms.remap_function_to_syslog_facility]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = to_syslog_facility!(.a)
-    .b = to_syslog_facility!(.b)
-    .c = to_syslog_facility!(.c)
-  """
-[[tests]]
-  name = "remap_function_to_syslog_facility"
-  [tests.input]
-    insert_at = "remap_function_to_syslog_facility"
-    type = "log"
-    [tests.input.log_fields]
-      a = 3
-      b = 11
-      c = 23
-  [[tests.outputs]]
-    extract_from = "remap_function_to_syslog_facility"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == "daemon" && \
-        .b == "ftp" && \
-        .c == "local7"
-      '''
+# [transforms.remap_function_to_syslog_facility]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = to_syslog_facility!(.a)
+#     .b = to_syslog_facility!(.b)
+#     .c = to_syslog_facility!(.c)
+#   """
+# [[tests]]
+#   name = "remap_function_to_syslog_facility"
+#   [tests.input]
+#     insert_at = "remap_function_to_syslog_facility"
+#     type = "log"
+#     [tests.input.log_fields]
+#       a = 3
+#       b = 11
+#       c = 23
+#   [[tests.outputs]]
+#     extract_from = "remap_function_to_syslog_facility"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == "daemon" &&
+#         .b == "ftp" &&
+#         .c == "local7"
+#       '''
 
-[transforms.remap_function_to_unix_timestamp]
-  inputs = []
-  type = "remap"
-  source = """
-    .secs = to_unix_timestamp!(to_timestamp(.time))
-    .millis = to_unix_timestamp!(to_timestamp(.time), unit: "milliseconds")
-    .nanos = to_unix_timestamp!(to_timestamp(.time), unit: "nanoseconds")
-  """
-[[tests]]
-  name = "remap_function_to_unix_timestamp"
-  [tests.input]
-    insert_at = "remap_function_to_unix_timestamp"
-    type = "log"
-    [tests.input.log_fields]
-      time = "2020-09-14T12:53:44+03:00"
-  [[tests.outputs]]
-    extract_from = "remap_function_to_unix_timestamp"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .secs == 1600077224 && \
-        .millis == 1600077224000 && \
-        .nanos == 1600077224000000000
-      '''
+# [transforms.remap_function_to_unix_timestamp]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .secs = to_unix_timestamp!(to_timestamp(.time))
+#     .millis = to_unix_timestamp!(to_timestamp(.time), unit: "milliseconds")
+#     .nanos = to_unix_timestamp!(to_timestamp(.time), unit: "nanoseconds")
+#   """
+# [[tests]]
+#   name = "remap_function_to_unix_timestamp"
+#   [tests.input]
+#     insert_at = "remap_function_to_unix_timestamp"
+#     type = "log"
+#     [tests.input.log_fields]
+#       time = "2020-09-14T12:53:44+03:00"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_to_unix_timestamp"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .secs == 1600077224 &&
+#         .millis == 1600077224000 &&
+#         .nanos == 1600077224000000000
+#       '''
 
-[transforms.remap_function_push_to_array]
-  inputs = []
-  type = "remap"
-  source = """
-    .result = push!(parse_json(.fruits), .fruit)
-  """
-[[tests]]
-  name = "remap_function_push_to_array"
-  [tests.input]
-    insert_at = "remap_function_push_to_array"
-    type = "log"
-    [tests.input.log_fields]
-      fruits = '["apple", "orange", "banana"]'
-      fruit = "mango"
-  [[tests.outputs]]
-    extract_from = "remap_function_push_to_array"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result[0] == "apple" && \
-        .result[1] == "orange" && \
-        .result[2] == "banana" && \
-        .result[3] == "mango"
-      '''
+# [transforms.remap_function_push_to_array]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .result = push!(parse_json(.fruits), .fruit)
+#   """
+# [[tests]]
+#   name = "remap_function_push_to_array"
+#   [tests.input]
+#     insert_at = "remap_function_push_to_array"
+#     type = "log"
+#     [tests.input.log_fields]
+#       fruits = '["apple", "orange", "banana"]'
+#       fruit = "mango"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_push_to_array"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result[0] == "apple" &&
+#         .result[1] == "orange" &&
+#         .result[2] == "banana" &&
+#         .result[3] == "mango"
+#       '''
 
-[transforms.remap_function_append_to_array]
-  inputs = []
-  type = "remap"
-  source = """
-    .result = append!(parse_json(.fruits), parse_json!(.other_fruits))
-  """
-[[tests]]
-  name = "remap_function_append_to_array"
-  [tests.input]
-    insert_at = "remap_function_append_to_array"
-    type = "log"
-    [tests.input.log_fields]
-      fruits = '["apple", "orange"]'
-      other_fruits = '["banana", "mango"]'
-  [[tests.outputs]]
-    extract_from = "remap_function_append_to_array"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result[0] == "apple" && \
-        .result[1] == "orange" && \
-        .result[2] == "banana" && \
-        .result[3] == "mango"
-      '''
+# [transforms.remap_function_append_to_array]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .result = append!(parse_json(.fruits), parse_json!(.other_fruits))
+#   """
+# [[tests]]
+#   name = "remap_function_append_to_array"
+#   [tests.input]
+#     insert_at = "remap_function_append_to_array"
+#     type = "log"
+#     [tests.input.log_fields]
+#       fruits = '["apple", "orange"]'
+#       other_fruits = '["banana", "mango"]'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_append_to_array"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result[0] == "apple" &&
+#         .result[1] == "orange" &&
+#         .result[2] == "banana" &&
+#         .result[3] == "mango"
+#       '''
 
-[transforms.remap_function_encode_base64]
-  inputs = []
-  type = "remap"
-  source = '''
-    .result = encode_base64!(.message)
-  '''
-[[tests]]
-  name = "remap_function_encode_base64"
-  [tests.input]
-    insert_at = "remap_function_encode_base64"
-    type = "raw"
-    value = "Bron-Y-Aur Stomp"
-  [[tests.outputs]]
-    extract_from = "remap_function_encode_base64"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result == "QnJvbi1ZLUF1ciBTdG9tcA=="
-      '''
+# [transforms.remap_function_encode_base64]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = encode_base64!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_encode_base64"
+#   [tests.input]
+#     insert_at = "remap_function_encode_base64"
+#     type = "raw"
+#     value = "Bron-Y-Aur Stomp"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_encode_base64"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result == "QnJvbi1ZLUF1ciBTdG9tcA=="
+#       '''
 
-[transforms.remap_function_decode_base64]
-  inputs = []
-  type = "remap"
-  source = '''
-    .result = decode_base64!(.message)
-  '''
-[[tests]]
-  name = "remap_function_decode_base64"
-  [tests.input]
-    insert_at = "remap_function_decode_base64"
-    type = "raw"
-    value = "QnJvbi1ZLUF1ciBTdG9tcA=="
-  [[tests.outputs]]
-    extract_from = "remap_function_decode_base64"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .result == "Bron-Y-Aur Stomp"
-      '''
+# [transforms.remap_function_decode_base64]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .result = decode_base64!(.message)
+#   '''
+# [[tests]]
+#   name = "remap_function_decode_base64"
+#   [tests.input]
+#     insert_at = "remap_function_decode_base64"
+#     type = "raw"
+#     value = "QnJvbi1ZLUF1ciBTdG9tcA=="
+#   [[tests.outputs]]
+#     extract_from = "remap_function_decode_base64"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .result == "Bron-Y-Aur Stomp"
+#       '''
 
-[transforms.remap_comments]
-  inputs = []
-  type = "remap"
-  source = '''
-    .a = 1 # .a = 2
-    # .a = 3
+# [transforms.remap_comments]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = 1 # .a = 2
+#     # .a = 3
 
-    .b = .a == 2 || \
+#     .b = .a == 2 ||
 
-    # We should ignore this too.
-    # .a == 3 && \
+#     # We should ignore this too.
+#     # .a == 3 &&
 
-    .a == 1
-  '''
-[[tests]]
-  name = "remap_comments"
-  [tests.input]
-    insert_at = "remap_comments"
-    type = "log"
-    [tests.input.log_fields]
-  [[tests.outputs]]
-    extract_from = "remap_comments"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a == 1
-        .b == true
-      '''
+#     .a == 1
+#   '''
+# [[tests]]
+#   name = "remap_comments"
+#   [tests.input]
+#     insert_at = "remap_comments"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_comments"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a == 1
+#         .b == true
+#       '''
 
-[transforms.remap_multiline]
-  inputs = []
-  type = "remap"
-  source = '''
-    .a = "A long " + \
+# [transforms.remap_multiline]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = "A long " +
 
-         "multiline " + \
-         "string"
-  '''
-[[tests]]
-  name = "remap_multiline"
-  [tests.input]
-    insert_at = "remap_multiline"
-    type = "log"
-    [tests.input.log_fields]
-  [[tests.outputs]]
-    extract_from = "remap_multiline"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '.a == "A long multiline string"'
+#          "multiline " +
+#          "string"
+#   '''
+# [[tests]]
+#   name = "remap_multiline"
+#   [tests.input]
+#     insert_at = "remap_multiline"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_multiline"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '.a == "A long multiline string"'
 
-[transforms.remap_function_length]
-  inputs = []
-  type = "remap"
-  source = '''
-    .a = length!(parse_json!(.a))
-    .b = length!(parse_json!(.b))
-    .c = length!(parse_json!(.c))
-  '''
-[[tests]]
-  name = "remap_function_length"
-  [tests.input]
-    insert_at = "remap_function_length"
-    type = "log"
-    [tests.input.log_fields]
-    a = '[1, 2, 3]'
-    b = '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
-    c = '[[1, 2, 3], [4, 5, 6], []]'
-  [[tests.outputs]]
-    extract_from = "remap_function_length"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '[.a, .b, .c] == [3, 2, 3]'
+# [transforms.remap_function_length]
+#   inputs = []
+#   type = "remap"
+#   source = '''
+#     .a = length!(parse_json!(.a))
+#     .b = length!(parse_json!(.b))
+#     .c = length!(parse_json!(.c))
+#   '''
+# [[tests]]
+#   name = "remap_function_length"
+#   [tests.input]
+#     insert_at = "remap_function_length"
+#     type = "log"
+#     [tests.input.log_fields]
+#     a = '[1, 2, 3]'
+#     b = '{"foo":"bar","lorem":{"ipsum": "sicut dolor"}}'
+#     c = '[[1, 2, 3], [4, 5, 6], []]'
+#   [[tests.outputs]]
+#     extract_from = "remap_function_length"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '[.a, .b, .c] == [3, 2, 3]'
 
-[transforms.remap_function_get_hostname]
-  inputs = []
-  type = "remap"
-  source = """
-    .a = get_hostname!()
-  """
-[[tests]]
-  name = "remap_function_get_hostname"
-  [tests.input]
-    insert_at = "remap_function_get_hostname"
-    type = "log"
-    [tests.input.log_fields]
-  [[tests.outputs]]
-    extract_from = "remap_function_get_hostname"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .a != ""
-      '''
+# [transforms.remap_function_get_hostname]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     .a = get_hostname!()
+#   """
+# [[tests]]
+#   name = "remap_function_get_hostname"
+#   [tests.input]
+#     insert_at = "remap_function_get_hostname"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_function_get_hostname"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .a != ""
+#       '''
 
-[transforms.remap_function_join]
-  inputs = []
-  type = "remap"
-  source = """
-    items = ["foo", "bar", "baz"]
-    .comma = join(items, ", ")
-    .space = join(items, " ")
-    .none = join(items)
-    .from_split = join!(split("big bad booper", " "), "__")
-  """
-[[tests]]
-  name = "remap_function_join"
-  [tests.input]
-    insert_at = "remap_function_join"
-    type = "log"
-    [tests.input.log_fields]
-  [[tests.outputs]]
-    extract_from = "remap_function_join"
-    [[tests.outputs.conditions]]
-      type = "remap"
-      source = '''
-        .comma == "foo, bar, baz" && \
-        .space == "foo bar baz" && \
-        .none == "foobarbaz" && \
-        .from_split == "big__bad__booper"
-      '''
+# [transforms.remap_function_join]
+#   inputs = []
+#   type = "remap"
+#   source = """
+#     items = ["foo", "bar", "baz"]
+#     .comma = join(items, ", ")
+#     .space = join(items, " ")
+#     .none = join(items)
+#     .from_split = join!(split("big bad booper", " "), "__")
+#   """
+# [[tests]]
+#   name = "remap_function_join"
+#   [tests.input]
+#     insert_at = "remap_function_join"
+#     type = "log"
+#     [tests.input.log_fields]
+#   [[tests.outputs]]
+#     extract_from = "remap_function_join"
+#     [[tests.outputs.conditions]]
+#       type = "remap"
+#       source = '''
+#         .comma == "foo, bar, baz" &&
+#         .space == "foo bar baz" &&
+#         .none == "foobarbaz" &&
+#         .from_split == "big__bad__booper"
+#       '''

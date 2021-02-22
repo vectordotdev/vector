@@ -1,0 +1,22 @@
+# result: [false, true, true, false, true, true, false, true, true, false, true, true, "nope"]
+
+[
+    1 >= 2,
+    2 >= 1,
+    2 >= 2,
+
+    1.0 >= 2,
+    2.0 >= 1,
+    2.0 >= 2,
+
+    1 >= 2.0,
+    2 >= 1.0,
+    2 >= 2.0,
+
+    1.0 >= 2.0,
+    2.0 >= 1.0,
+    2.0 >= 2.0,
+
+    # fallible
+    null >= 1 ?? "nope",
+]

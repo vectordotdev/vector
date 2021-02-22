@@ -406,24 +406,40 @@ async fn run_test(params: TestParams) -> TestResults {
         .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_observed_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_averaged_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
     if params.concurrency == Concurrency::Adaptive {
-        assert!(
-            matches!(metrics.get("adaptive_concurrency_limit").unwrap().data.value,
-                     MetricValue::Distribution { .. })
-        );
+        assert!(matches!(
+            metrics
+                .get("adaptive_concurrency_limit")
+                .unwrap()
+                .data
+                .value,
+            MetricValue::Distribution { .. }
+        ));
     }
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_in_flight")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
 
     TestResults { stats, cstats }
 }

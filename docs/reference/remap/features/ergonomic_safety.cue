@@ -1,11 +1,13 @@
 remap: features: ergonomic_safety: {
-	title:       "Ergonomic-safety"
+	title:       "Ergonomic safety"
 	description: """
-		VRL is ergonomically safe, preventing the production of slow and unmaintainable VRL programs. While VRL's
-		[compile-time checks](#\(features.compilation.anchor)) prevent runtime errors, they do not prevent more
-		ellusive problems that result from program complexity, like performance or maintainability problems. These
-		are pernicious problems that result in pipeline instability and high cost. To protect against this, VRL is
-		*intentionally* designed with the thoughtful ergonomics that come in the form of limitations.
+		VRL is ergonomically safe in that it makes it difficult to create slow or buggy VRL programs.
+		While VRL's [compile-time checks](#\(features.compilation.anchor)) prevent runtime errors, they can't prevent
+		some of the more elusive performance and maintainability problems that stem from program complexity—problems
+		that can result in observability pipeline instability and unexpected resource costs. To protect against these
+		more subtle ergonomic problems, VRL is a carefully *limited* language that offers only those features necessary
+		to transform observability data. Any features that are extraneous to that task or likely to result in degraded
+		ergonomics are omitted from the language by design.
 		"""
 
 	principles: {
@@ -17,43 +19,51 @@ remap: features: ergonomic_safety: {
 		internal_logging_limitation: {
 			title: "Internal logging limitation"
 			description: """
-				VRL programs do not produce internal logs that could otherwise saturate I/O.
+				VRL programs do produce internal logs but not a rate that's bound to saturate I/O.
 				"""
 		}
 		io_limitation: {
 			title: "I/O limitation"
 			description: """
-				VRL lacks access to I/O, an expensive task that requires careful caching implementation that commonly
-				contributes to performance problems.
+				VRL lacks access to system I/O, which tends to be computationally expensive, to require careful
+				caching, and to produce degraded performance.
 				"""
 		}
 		recursion_limitation: {
 			title: "Lack of recursion"
 			description: """
-				VRL lacks recursion capabilities, making it impossible to create infinite loops that could stall VRL
-				programs. This is one reason why VRL does not allow the ability to define custom functions.
+				VRL lacks recursion capabilities, making it impossible to create large or infinite loops that could
+				stall VRL programs or needlessly drain memory.
+				"""
+		}
+		no_custom_functions: {
+			title: "Lack of custom functions"
+			description: """
+				VRL requires you to use only its built-in functions and doesn't enable you to create your own. This
+				keeps VRL programs easy to debug and reason about.
 				"""
 		}
 		state_limitation: {
 			title: "Lack of state"
 			description: """
-				VRL lacks the ability to hold and maintain state across events. This prevents unbounded memory growth,
-				hard to debug production issues, and unexpected VRL program behavior.
+				VRL lacks the ability to hold and maintain state across events. This prevents things like unbounded
+				memory growth, hard-to-debug production issues, and unexpected program behavior.
 				"""
 		}
 		rate_limited_logging: {
-			title: "Rate-limiting logging"
+			title: "Rate-limited logging"
 			description: """
-				The VRL `log` function, by default, implements rate-limiting. This ensures that VRL programs that
-				invoke the `log` method do not accidentally saturate I/O.
+				The VRL `log` function implements rate limiting by default. This ensures that VRL programs invoking the
+				`log` method don't accidentally saturate I/O.
 				"""
 		}
 		purpose_built: {
-			title: "Purpose-built for observability"
+			title: "Purpose built for observability"
 			description: """
-				Conversely from limitations, VRL goes deep on purpose-built observability use cases, avoiding the
-				need for unsafe low-level constructs. Functions like `parse_syslog` and	`to_hive_partition` make
-				otherwise complex tasks simple and avoid the need for complex low-level constructs.
+				VRL is laser focused on observability use cases and *only* those use cases. This makes many
+				frustration- and complexity-producing constructs you find in other languages completely superfluous.
+				Functions like `parse_syslog` and `parse_key_value`, for example, make otherwise complex tasks simple
+				and prevent the need for complex low-level constructs.
 				"""
 		}
 	}

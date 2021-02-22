@@ -5,8 +5,8 @@
 //! This plugin emulates the behavior of the `json_parser` native transform for Vector as well as the
 //! `parse_json` function in Vector Remap Language.
 
-// Code comments have been removed from this module. The `add_fields` Wasm function is thoroughly
-// in case you need insight into what's going on here :)
+// Code comments have been removed from this module. The `add_fields` Wasm function is documented
+// pretty thoroughly in case you need insight into what's going on here :)
 
 #![deny(improper_ctypes)]
 use serde_json::Value;
@@ -30,11 +30,19 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
             .unwrap()
     };
 
-    let event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
+    // Perform the initial JSON parsing required to access the event, i.e.:
+    // {"message": "...", "timestamp": "..."}
+    let initial_event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
 
-    let output_buffer = serde_json::to_vec(&event).unwrap();
+    let log_message = initial_event.get("message").unwrap().to_string();
 
-    hostcall::emit(output_buffer).unwrap();
+    // This parses the extracted log message, which is assumed to be a valid JSON string, into JSON
+    let parsed_json: serde_json::Value = serde_json::from_str(&log_message).unwrap();
+
+    // Covert the output into bytes
+    let output = serde_json::to_vec(&parsed_json).unwrap();
+
+    hostcall::emit(output).unwrap();
 
     1
 }

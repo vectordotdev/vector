@@ -29,10 +29,14 @@ components: transforms: add_fields: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new
-			[`remap` transform](\(urls.vector_remap_transform)). The `remap`
-			transform provides a simple syntax for robust data transformation.
-			Let us know what you think!
+			\(add_fields._remap_deprecation_notice)
+
+			```vrl
+			.severity = "crit"
+			.status = 200
+			.success_codes = [200, 201, 202, 204]
+			.timestamp = now()
+			```
 			""",
 		]
 		notices: []

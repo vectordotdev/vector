@@ -94,6 +94,7 @@
 /lib/ @timberio/vector-support
 /lib/file-source/ @timberio/vector-core
 /lib/k8s-*/ @timberio/vector-kubernetes
+/lib/prometheus-parser/ @timberio/vector-integrations
 /lib/remap-*/ @timberio/vector-processing
 /lib/vector-api-*/ @timberio/vector-enterprise
 

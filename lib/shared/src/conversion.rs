@@ -184,11 +184,11 @@ fn parse_bool(s: &str) -> Result<bool, Error> {
 
 /// Does the format specifier have a time zone option?
 fn format_has_zone(fmt: &str) -> bool {
-    fmt.find("%Z").is_some()
-        || fmt.find("%z").is_some()
-        || fmt.find("%:z").is_some()
-        || fmt.find("%#z").is_some()
-        || fmt.find("%+").is_some()
+    fmt.contains("%Z")
+        || fmt.contains("%z")
+        || fmt.contains("%:z")
+        || fmt.contains("%#z")
+        || fmt.contains("%+")
 }
 
 /// Convert a timestamp with a non-UTC time zone into UTC

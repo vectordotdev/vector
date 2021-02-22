@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Value,
     internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -26,7 +26,7 @@ impl GenerateConfig for AnsiStripperConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self) -> Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
         let field = self
             .field
             .clone()

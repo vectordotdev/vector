@@ -14,11 +14,11 @@ pub enum SinkMetrics {
 }
 
 pub trait IntoSinkMetrics {
-    fn to_sink_metrics(self, component_type: &str) -> SinkMetrics;
+    fn into_sink_metrics(self, component_type: &str) -> SinkMetrics;
 }
 
 impl IntoSinkMetrics for Vec<Metric> {
-    fn to_sink_metrics(self, _component_type: &str) -> SinkMetrics {
+    fn into_sink_metrics(self, _component_type: &str) -> SinkMetrics {
         SinkMetrics::GenericSinkMetrics(generic::GenericSinkMetrics::new(self))
     }
 }

@@ -284,6 +284,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		events_in_total: {
+			description:       "The total number of events accepted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
@@ -346,6 +358,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
 				file: _file
+			}
+		}
+		glob_errors_total: {
+			description:       "The total number of errors encountered when globbing paths."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				path: _path
 			}
 		}
 		http_bad_requests_total: {
@@ -725,6 +745,10 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_path: {
+			description: "The path that produced the error."
+			required:    true
 		}
 	}
 }

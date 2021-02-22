@@ -4,7 +4,7 @@ remap: expressions: path: {
 	title: "Path"
 	description: """
 		A _path_ expression is a sequence of period-delimited segments that represent the location of a value
-		within a map.
+		within an object.
 		"""
 	return: """
 		Returns the value of the path location.
@@ -24,15 +24,14 @@ remap: expressions: path: {
 			path_segments: {
 				description: """
 					`path_segments` denote a segment of a nested path. Each segment must be delimited by a `.` character
-					and only contain alpha-numeric, `_`, and `@` characters (`a-zA-Z0-9_@`). Segments that contain
+					and only contain alpha-numeric characters and `_` (`a-zA-Z0-9_`). Segments that contain
 					characters outside of this range must be quoted.
 					"""
 				characteristics: {
 					array_elements: {
 						title: "Array element paths"
 						description: """
-							Array elements can be accessed by their index. Negative indice are currently _not_
-							supported:
+							Array elements can be accessed by their index:
 
 							```vrl
 							.array[0]
@@ -42,7 +41,7 @@ remap: expressions: path: {
 					coalescing: {
 						title:       "Path segment coalecing"
 						description: """
-							Path segments can be coalesced, allowing for the first non-null values to be used. This is
+							Path segments can be coalesced, allowing for the first non-null value to be used. This is
 							particularly useful when working with
 							[externally tagged](\(urls.externally_tagged_representation)) data:
 
@@ -54,13 +53,13 @@ remap: expressions: path: {
 					dynamic: {
 						title: "Dynamic paths"
 						description: """
-							⚠ Dynamic paths are currently not supported.
+							Dynamic paths are currently not supported.
 							"""
 					}
-					nested_maps: {
-						title: "Nested map paths"
+					nested_objects: {
+						title: "Nested object paths"
 						description: """
-							Nested map values are accessed by delimiting each ancestor path with `.`:
+							Nested object values are accessed by delimiting each ancestor path with `.`:
 
 							```vrl
 							.parent.child
@@ -150,7 +149,7 @@ remap: expressions: path: {
 			title: "Quoted path"
 			input: log: "parent.key.with.special characters": child: "Hello, World!"
 			source: #"""
-				.\"parent.key.with.special characters\".child
+				."parent.key.with.special characters".child
 				"""#
 			return: "Hello, World!"
 		},

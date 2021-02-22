@@ -6,14 +6,14 @@ use crate::{
     },
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
-        buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
         BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -143,21 +143,22 @@ impl CloudWatchMetricsSvc {
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::<AwsCloudwatchMetricNormalize>::new(
-            batch.size,
-        ));
+        let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+        let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
-            .with_flat_map(move |mut event: Event| {
-                let namespace = event
-                    .as_mut_metric()
-                    .series
-                    .name
-                    .namespace
-                    .take()
-                    .unwrap_or_else(|| default_namespace.clone());
-                stream::iter(Some(PartitionInnerBuffer::new(event, namespace))).map(Ok)
+            .with_flat_map(move |event: Event| {
+                stream::iter(normalizer.apply(event).map(|mut event| {
+                    let namespace = event
+                        .as_mut_metric()
+                        .series
+                        .name
+                        .namespace
+                        .take()
+                        .unwrap_or_else(|| default_namespace.clone());
+                    Ok(PartitionInnerBuffer::new(event, namespace))
+                }))
             });
 
         Ok(super::VectorSink::Sink(Box::new(sink)))
@@ -505,7 +506,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events).map(Into::into);
+        let stream = stream::iter(events);
         sink.run(stream).await.unwrap();
     }
 
@@ -534,7 +535,7 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events).map(Into::into);
+        let stream = stream::iter(events);
         sink.run(stream).await.unwrap();
     }
 }

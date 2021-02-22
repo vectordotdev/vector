@@ -1,0 +1,3 @@
+# result: "unable to divide by zero"
+
+ok, err = 1 / 0

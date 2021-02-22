@@ -56,6 +56,7 @@ impl Application {
             level => [
                 format!("vector={}", level),
                 format!("codec={}", level),
+                format!("vrl={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
@@ -119,7 +120,7 @@ impl Application {
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
+                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);

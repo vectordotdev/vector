@@ -1,0 +1,33 @@
+[package]
+name = "vrl-cli"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+license = "MPL-2.0"
+
+[[bin]]
+name = "vrl"
+path = "src/main.rs"
+
+[dependencies]
+vrl = { path = "../core" }
+bytes = "0.5.6"
+exitcode = "1"
+prettytable-rs = { version = "0.8", default-features = false, optional = true }
+regex = { version = "1", default-features = false, optional = true }
+rustyline = { version = "7", default-features = false, optional = true }
+serde_json = "1"
+structopt = { version = "0.3", default-features = false }
+thiserror = "1"
+webbrowser = { version = "0.5", default-features = false, optional = true }
+lazy_static = { version = "1", optional = true }
+indoc = "1.0.3"
+
+[dependencies.stdlib]
+package = "vrl-stdlib"
+path = "../stdlib"
+
+[features]
+default = ["repl"]
+repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]

@@ -85,7 +85,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   type = "remap"
                   inputs = ["in"]
                   source = """
-                  . = parse_json!(.message)
+                  . = parse_json!(string!(.message))
                   """
             "#},
         ),
@@ -115,7 +115,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   end
                   """
                   hooks.process = "process"
-        "#},
+            "#},
         ),
         (
             "wasm",
@@ -125,7 +125,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
                   artifact_cache = "target/artifacts/"
-        "#},
+            "#},
         ),
     ];
 
@@ -145,7 +145,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   type = "remap"
                   inputs = ["in"]
                   source = """
-                  . = parse_syslog!(.message)
+                  . = parse_syslog!(string!(.message))
                   """
             "#},
         ),

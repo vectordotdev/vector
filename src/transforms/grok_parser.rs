@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -38,7 +38,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -146,10 +146,11 @@ impl FunctionTransform for GrokParser {
 #[cfg(test)]
 mod tests {
     use super::GrokParserConfig;
-    use crate::event::LogEvent;
     use crate::{
-        config::{log_schema, TransformConfig},
-        event, Event,
+        config::{log_schema, GlobalOptions, TransformConfig},
+        event,
+        event::LogEvent,
+        Event,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -173,7 +174,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();
