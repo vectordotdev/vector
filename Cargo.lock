@@ -8250,16 +8250,17 @@ name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
+ "chrono",
  "exitcode",
+ "indoc",
  "prettytable-rs",
  "regex",
  "rustyline",
- "serde",
  "serde_json",
  "structopt 0.3.21",
  "thiserror",
- "toml",
  "vrl",
+ "vrl-compiler",
  "vrl-stdlib",
  "webbrowser",
 ]

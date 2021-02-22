@@ -1,29 +1,25 @@
 use super::{open_url, Error, Repl};
+use chrono::DateTime;
+use indoc::indoc;
 use rustyline::{error::ReadlineError, Editor};
-use serde::Deserialize;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl_compiler::value;
 
-#[derive(Deserialize)]
 struct Tutorial {
     section: usize,
     id: usize,
-    title: String,
-    help_text: String,
+    title: &'static str,
+    help_text: &'static str,
     // The URL endpoint (https://vrl.dev/:endpoint) for finding out more
-    docs: String,
-    correct_answer: Value,
+    docs: &'static str,
     initial_event: Value,
+    correct_answer: Value,
 }
 
 impl Tutorial {
     fn number(&self) -> String {
         format!("{}.{}", self.section, self.id)
     }
-}
-
-#[derive(Deserialize)]
-struct Tutorials {
-    tutorials: Vec<Tutorial>,
 }
 
 pub fn tutorial() -> Result<(), Error> {
@@ -33,11 +29,36 @@ pub fn tutorial() -> Result<(), Error> {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new("> ")));
 
-    let mut tutorials = load_tutorials_from_toml().tutorials;
+    let mut tutorials = tutorials();
 
     // Tutorial intro
     clear_screen();
-    println!("Welcome to the Vector Remap Language interactive tutorial!\n");
+    println!("{}", INTRO_TEXT);
+
+    // Wait for "next" to continue
+    {
+        let mut rl = Editor::<Repl>::new();
+
+        'intro: loop {
+            match rl.readline("> ").as_deref() {
+                Ok(line)
+                    if line == "exit" || line == "quit" =>
+                {
+                    println!("\nSee you next time! And don't forget to check out https://vrl.dev for more info!\n");
+                    return Ok(());
+                }
+                Ok(line) if line == "start" => {
+                    clear_screen();
+                    break 'intro;
+                }
+                _ => {
+                    println!("\nDidn't recognize that input. Type `next` and hit Enter to move on or `exit` to leave the VRL tutorial.\n");
+                    continue;
+                }
+            }
+        }
+    }
+
     print_tutorial_help_text(0, &tutorials);
 
     'outer: loop {
@@ -177,12 +198,6 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
     );
 }
 
-fn load_tutorials_from_toml() -> Tutorials {
-    let toml_file = std::include_str!("../tutorials.toml");
-
-    toml::from_str(toml_file).unwrap()
-}
-
 #[cfg(unix)]
 fn clear_screen() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
@@ -218,8 +233,100 @@ pub fn resolve_to_value(
 // Help text
 const HELP_TEXT: &str = r#"
 Tutorial commands:
+  docs     Open documentation for the current tutorial in your browser
   next     Load the next tutorial
   prev     Load the previous tutorial
-  exit     Exit the VRL interactive tutorial
-  cheat    Choose the coward's way out
+  exit     Exit the VRL interactive tutorial shell
 "#;
+
+const INTRO_TEXT: &str = r#"Welcome to the Vector Remap Language (VRL) interactive tutorial!
+
+VRL is a language for working with observability data (logs and metrics) in Vector. Here,
+you'll be guided through a series of tutorials that teach you how to use VRL by solving
+problems. Tutorial commands:
+
+  docs     Open documentation for the current tutorial in your browser
+  next     Load the next tutorial
+  prev     Load the previous tutorial
+  exit     Exit the VRL interactive tutorial shell
+
+Type `start` and hit Enter to begin.
+"#;
+
+fn tutorials() -> Vec<Tutorial> {
+    let assignment_tut = Tutorial {
+        section: 1,
+        id: 1,
+        title: "Assigning values to fields",
+        docs: "expressions/#assignment",
+        help_text: indoc! {r#"
+            In VRL, you can assign values to fields like this:
+
+            .field = "value"
+
+            TASK:
+            - Assign the string "hello" to the field `message`
+        "#},
+        initial_event: value![{}],
+        correct_answer: value![{"message": "hello"}],
+    };
+
+    let deleting_fields_tut = Tutorial {
+        section: 1,
+        id: 2,
+        title: "Deleting fields",
+        docs: "functions/#del",
+        help_text: indoc! {r#"
+            You can delete fields from events using the `del` function:
+
+            del(.field)
+
+            TASK:
+            - Delete fields `one` and `two`
+        "#},
+        initial_event: value![{"one": 1, "two": 2, "three": 3}],
+        correct_answer: value![{"three": 3}],
+    };
+
+    let parse_json_tut = Tutorial {
+        section: 2,
+        id: 1,
+        title: "Parsing JSON",
+        docs: "functions/#parse_json",
+        help_text: indoc! {r#"
+            You can parse inputs to JSON in VRL using the `parse_json` function:
+
+            parse_json(.field)
+
+            `parse_json` is fallible, so make sure to handle potential errors!
+
+            TASK:
+            - Set the value of the event to the `message` field parsed as JSON
+        "#},
+        initial_event: value![{"message": r#"{"severity":"info","message":"Coast is clear"}"#, "timestamp": "2021-02-16T00:25:12.728003Z"}],
+        correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
+    };
+
+    let parse_syslog_timestamp: Value = Value::Timestamp(DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z").unwrap().into());
+
+    let parse_syslog_tut = Tutorial {
+        section: 2,
+        id: 2,
+        title: "Parsing Syslog",
+        docs: "functions/#parse_syslog",
+        help_text: indoc! {r#"
+            You can parse Syslog messages into named fields using the `parse_syslog` function:
+
+            parse_syslog(.field)
+
+            `parse_syslog` is fallible, so make sure to handle potential errors!
+
+            TASK:
+            - Set the value of the event to the `message` field parsed from Syslog
+        "#},
+        initial_event: value![{"message": "<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet", "timestamp": "2020-12-19T21:48:09.004Z"}],
+        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": parse_syslog_timestamp}],
+    };
+
+    vec![assignment_tut, deleting_fields_tut, parse_json_tut, parse_syslog_tut]
+}
