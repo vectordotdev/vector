@@ -1,4 +1,4 @@
-use super::{open_url, Error, Repl};
+use super::{common::{open_url, Repl}, Error};
 use chrono::DateTime;
 use indoc::indoc;
 use rustyline::{error::ReadlineError, Editor};

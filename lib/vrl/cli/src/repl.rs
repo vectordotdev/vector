@@ -1,4 +1,4 @@
-use super::{open_url, Repl};
+use super::common::{open_url, Repl};
 use indoc::indoc;
 use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
