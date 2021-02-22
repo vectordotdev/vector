@@ -8,6 +8,6 @@
 # 3 │ │
 #   │ ╰^ unexpected error: invalid literal
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at https://vrl.dev
 
 s'foobar

@@ -1,5 +1,5 @@
 # result:
-# error[E652]: can only merge objects
+# error[E652]: only objects can be merged
 #   ┌─ :3:1
 #   │
 # 3 │ x |= 32
@@ -7,7 +7,7 @@
 #   │ │
 #   │ this expression must resolve to an object
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at https://vrl.dev
 
 x = "oh no"
 x |= 32

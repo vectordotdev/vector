@@ -461,7 +461,7 @@ impl DiagnosticError for Error {
                 Label::context(format!("{}, err = {}", target, expr), self.assignment_span),
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
-                Label::primary("this error assignment is unnecesssary", err_span),
+                Label::primary("this error assignment is unnecessary", err_span),
                 Label::context("because this expression can't fail", self.expr_span),
                 Label::context(format!("use: {} = {}", target, expr), ok_span),
             ],
