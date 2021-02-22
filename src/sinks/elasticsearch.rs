@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth, HttpError},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{

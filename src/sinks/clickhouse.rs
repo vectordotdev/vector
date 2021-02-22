@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth, HttpError},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},

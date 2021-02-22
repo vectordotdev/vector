@@ -3,7 +3,11 @@ use super::{
     sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
-use crate::{Event, buffers::Acker, http::{HttpClient, HttpError}};
+use crate::{
+    buffers::Acker,
+    http::{HttpClient, HttpError},
+    Event,
+};
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
 use http::StatusCode;
