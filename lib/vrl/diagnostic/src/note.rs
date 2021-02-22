@@ -37,9 +37,10 @@ impl fmt::Display for Note {
         match self {
             Hint(hint) => {
                 write!(f, "hint: {}", hint)
-            },
+            }
             CoerceValue => {
-                Hint("coerce the value to the required type using a coercion function".to_owned()).fmt(f)
+                Hint("coerce the value to the required type using a coercion function".to_owned())
+                    .fmt(f)
             }
             SeeFunctionDocs(ident) => {
                 let url = Urls::func_docs(ident);
@@ -48,21 +49,17 @@ impl fmt::Display for Note {
             SeeErrorDocs => {
                 let url = Urls::error_handling_url();
                 SeeDocs("error handling".to_owned(), url).fmt(f)
-            },
+            }
             SeeLangDocs => {
                 let url = Urls::vrl_root_url();
                 SeeDocs("language".to_owned(), url).fmt(f)
-            },
+            }
             SeeCodeDocs(code) => {
                 let url = Urls::error_code_url(code);
                 write!(f, "learn more about error code {} at {}", code, url)
-            },
+            }
             SeeDocs(kind, url) => {
-                write!(
-                    f,
-                    "see {} documentation at {}",
-                    kind, url
-                )
+                write!(f, "see {} documentation at {}", kind, url)
             }
             Basic(string) => write!(f, "{}", string),
         }

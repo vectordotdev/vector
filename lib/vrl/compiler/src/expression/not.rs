@@ -108,8 +108,14 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             NonBoolean(..) => {
-                vec![Note::CoerceValue, Note::SeeDocs("type coercion".to_owned(), Urls::func_docs("#coerce-functions"))]
-            },
+                vec![
+                    Note::CoerceValue,
+                    Note::SeeDocs(
+                        "type coercion".to_owned(),
+                        Urls::func_docs("#coerce-functions"),
+                    ),
+                ]
+            }
         }
     }
 }
