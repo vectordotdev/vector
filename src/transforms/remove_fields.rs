@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
     Event,
@@ -36,7 +36,7 @@ impl GenerateConfig for RemoveFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         RemoveFields::new(self.fields.clone(), self.drop_empty.unwrap_or(false))
             .map(Transform::function)
     }
