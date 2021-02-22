@@ -1,7 +1,6 @@
-use super::common::{open_url, Repl};
+use super::common::{open_url, print_function_list, Repl};
 use indoc::indoc;
 use lazy_static::lazy_static;
-use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::{error::ReadlineError, Editor};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
@@ -108,33 +107,6 @@ fn resolve_to_string(
         Ok(value) => value.to_string(),
         Err(err) => err.to_string(),
     }
-}
-
-fn print_function_list() {
-    let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
-    let num_columns = 3;
-
-    let mut func_table = Table::new();
-    func_table.set_format(table_format);
-    stdlib::all()
-        .chunks(num_columns)
-        .map(|funcs| {
-            // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
-            // values when num_columns is 3, this logic below is necessary to avoid panics caused
-            // by inappropriately calling funcs.get(_) on a None.
-            let mut ids: Vec<Cell> = Vec::new();
-
-            for n in 0..num_columns {
-                if let Some(v) = funcs.get(n) {
-                    ids.push(Cell::new(v.identifier()));
-                }
-            }
-
-            func_table.add_row(Row::new(ids));
-        })
-        .for_each(drop);
-
-    func_table.printstd();
 }
 
 fn print_help_text() {

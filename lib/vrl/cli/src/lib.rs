@@ -1,6 +1,7 @@
 pub mod cmd;
 #[cfg(feature = "repl")]
-mod repl;#[cfg(feature = "tutorial")]
+mod repl;
+#[cfg(feature = "tutorial")]
 mod tutorial;
 
 pub use cmd::{cmd, Opts};
@@ -25,6 +26,7 @@ pub enum Error {
 
 #[cfg(any(feature = "repl", feature = "tutorial"))]
 pub mod common {
+    use prettytable::{format, Cell, Row, Table};
     use rustyline::completion::Completer;
     use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
     use rustyline::hint::{Hinter, HistoryHinter};
@@ -168,5 +170,32 @@ pub mod common {
                 err, url
             );
         }
+    }
+
+    pub fn print_function_list() {
+        let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
+        let num_columns = 3;
+
+        let mut func_table = Table::new();
+        func_table.set_format(table_format);
+        stdlib::all()
+            .chunks(num_columns)
+            .map(|funcs| {
+                // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
+                // values when num_columns is 3, this logic below is necessary to avoid panics caused
+                // by inappropriately calling funcs.get(_) on a None.
+                let mut ids: Vec<Cell> = Vec::new();
+
+                for n in 0..num_columns {
+                    if let Some(v) = funcs.get(n) {
+                        ids.push(Cell::new(v.identifier()));
+                    }
+                }
+
+                func_table.add_row(Row::new(ids));
+            })
+            .for_each(drop);
+
+        func_table.printstd();
     }
 }

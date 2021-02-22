@@ -1,4 +1,7 @@
-use super::{common::{open_url, Repl}, Error};
+use super::{
+    common::{open_url, print_function_list, Repl},
+    Error,
+};
 use chrono::DateTime;
 use indoc::indoc;
 use rustyline::{error::ReadlineError, Editor};
@@ -104,6 +107,9 @@ pub fn tutorial() -> Result<(), Error> {
                         let help_text = tut.help_text;
 
                         println!("\n{}", help_text);
+                    }
+                    "funcs" => {
+                        print_function_list();
                     }
                     command => {
                         let tut = &mut tutorials[index];
@@ -241,6 +247,7 @@ Tutorial commands:
 
   .        Show the current value of the event
   docs     Open documentation for the current tutorial in your browser
+  funcs    Display a list of all VRL functions
   remind   Display the tutorial's help text again
   next     Load the next tutorial
   prev     Load the previous tutorial
@@ -252,20 +259,19 @@ interactive tutorial!
 
 VRL is a language for working with observability data (logs and metrics) in
 Vector. Here, you'll be guided through a series of tutorials that teach you how
-to use VRL by solving problems. Tutorial commands:
-
-  help     Show a list of commands and what they do
-  .        Show the current value of the event
-  docs     Open documentation for the current tutorial in your browser
-  remind   Display the tutorial's help text again
-  next     Load the next tutorial
-  prev     Load the previous tutorial
-  exit     Exit the VRL interactive tutorial shell
+to use VRL by solving problems. At any time, you can type `help` to get a list
+of available commands.
 
 Type `start` and hit Enter to begin.
 "#;
 
 fn tutorials() -> Vec<Tutorial> {
+    let example_timestamp = Value::Timestamp(
+        DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z")
+            .unwrap()
+            .into(),
+    );
+
     let assignment_tut = Tutorial {
         section: 1,
         id: 1,
@@ -274,7 +280,7 @@ fn tutorials() -> Vec<Tutorial> {
         help_text: indoc! {r#"
             In VRL, you can assign values to fields like this:
 
-            .field = "value"
+            > .field = "value"
 
             TASK:
             - Assign the string "hello" to the field `message`
@@ -291,7 +297,7 @@ fn tutorials() -> Vec<Tutorial> {
         help_text: indoc! {r#"
             You can delete fields from events using the `del` function:
 
-            del(.field)
+            > del(.field)
 
             TASK:
             - Delete fields `one` and `two` from the event
@@ -309,7 +315,7 @@ fn tutorials() -> Vec<Tutorial> {
             You can check whether a field has a value using the `exists`
             function:
 
-            exists(.field)
+            > exists(.field)
 
             TASK:
             - Make the event consist of just one `exists` field that indicates
@@ -333,7 +339,10 @@ fn tutorials() -> Vec<Tutorial> {
 
             TASK:
             - Coerce all of the fields in this event into the type suggested by
-              the key (i.e. convert key `boolean` into a Boolean and so on)
+              the key (convert the `boolean` field into a Boolean and so on)
+
+            HINT:
+            - The coercion functions are fallible, so be sure to handle errors!
         "#},
         initial_event: value![{"boolean": "yes", "integer": "1337", "float": "42.5", "string": true}],
         correct_answer: value![{"boolean": true, "integer": 1337, "float": 42.5, "string": "true"}],
@@ -347,7 +356,7 @@ fn tutorials() -> Vec<Tutorial> {
         help_text: indoc! {r#"
             You can parse inputs to JSON in VRL using the `parse_json` function:
 
-            parse_json(.field)
+            > parse_json(.field)
 
             `parse_json` is fallible, so make sure to handle potential errors!
 
@@ -358,38 +367,46 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
     };
 
-    let example_timestamp = Value::Timestamp(
-        DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z")
-            .unwrap()
-            .into(),
-    );
-
     let parse_syslog_tut = Tutorial {
         section: 2,
         id: 2,
         title: "Parsing Syslog",
         docs: "functions/#parse_syslog",
         help_text: indoc! {r#"
-            You can parse Syslog messages into named fields using the `parse_syslog` function:
+            You can parse Syslog messages into named fields using the `parse_syslog`
+            function:
 
-            parse_syslog(.field)
-
-            `parse_syslog` is fallible, so make sure to handle potential errors!
+            > parse_syslog(.field)
 
             TASK:
             - Set the value of the event to the `message` field parsed from Syslog
+
+            HINTS:
+            - `parse_syslog` is fallible, so make sure to handle potential errors!
+            - `parse_syslog` can only take a string
         "#},
         initial_event: value![{"message": "<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet", "timestamp": "2020-12-19T21:48:09.004Z"}],
-        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": example_timestamp}],
+        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": example_timestamp, "version": 3}],
     };
 
-    let parse_kv_tut = Tutorial {
+    let parse_key_value_tut = Tutorial {
         section: 2,
         id: 3,
         title: "Parsing key-value logs",
         docs: "functions/#parse_key_value",
         help_text: indoc! {r#"
+            You can parse key-value strings of the form "foo=bar bar=baz" into an
+            object using the `parse_key_value` function:
 
+            > parse_key_value(.field)
+
+            TASK:
+            - Set the value of the event to the `message` field parsed from key-value
+              format
+
+            HINTS:
+            - `parse_key_value` is fallible, so make sure to handle potential errors!
+            - `parse_key_value` can only take a string
         "#},
         initial_event: value![{"message": r#"@timestamp="2020-12-19T21:48:09.004Z" severity=info msg="Smooth sailing over here""#}],
         correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
@@ -402,6 +419,6 @@ fn tutorials() -> Vec<Tutorial> {
         type_coercion_tut,
         parse_json_tut,
         parse_syslog_tut,
-        parse_kv_tut,
+        parse_key_value_tut,
     ]
 }
