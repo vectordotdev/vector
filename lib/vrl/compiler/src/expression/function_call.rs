@@ -539,7 +539,7 @@ impl DiagnosticError for Error {
 
                 if let Some(coerce) = coerce {
                     notes.append(&mut Note::solution(
-                        "using a default value as a fallback",
+                        "coercing to an appropriate type and specifying a default value as a fallback in case coercion fails",
                         vec![format!("{} = {}", argument, coerce), call],
                     ))
                 }
