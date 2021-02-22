@@ -721,6 +721,8 @@ impl RunningTopology {
     pub fn config(&self) -> &Config {
         &self.config
     }
+
+    pub fn tap(&mut self, input_name: &str) {}
 }
 
 async fn handle_errors(

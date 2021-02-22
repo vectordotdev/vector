@@ -207,7 +207,7 @@ impl Application {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
 
-            // Using cfg_if flattens the scope.
+            // Using cfg_if flattens nesting.
             cfg_if::cfg_if! (
                 if #[cfg(feature = "api")] {
                     // Controller channel for the API server.
@@ -231,11 +231,19 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
-
             let signal = loop {
                 tokio::select! {
                     Some(msg) = api_rx.recv(), if api_server.is_some() => {
-                        println!("Got: {}", topology.config().api.enabled);
+                        use api::{ControlMessage, TapControl};
+
+                        match msg {
+                            ControlMessage::Tap(TapControl::Start(tap_sink, _)) => {
+                                println!("Started: {}", tap_sink);
+                            }
+                            ControlMessage::Tap(TapControl::Stop(tap_sink)) => {
+                                println!("Stopped: {}", tap_sink);
+                            }
+                        }
                     }
                     Some(signal) = signals.next() => {
                         if signal == SignalTo::Reload {

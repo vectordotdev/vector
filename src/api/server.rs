@@ -1,4 +1,4 @@
-use super::{handler, schema};
+use super::{handler, schema, ControlSender};
 use crate::config;
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
@@ -6,11 +6,8 @@ use async_graphql::{
 };
 use async_graphql_warp::{graphql_subscription_with_data, Response as GQLResponse};
 use std::{convert::Infallible, net::SocketAddr};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use warp::{filters::BoxedFilter, http::Response, Filter, Reply};
-
-type Sender = mpsc::Sender<String>;
-type Receiver = mpsc::Receiver<String>;
 
 pub struct Server {
     _shutdown: oneshot::Sender<()>,
@@ -20,7 +17,7 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: &config::Config, control_tx: Sender) -> Self {
+    pub fn start(config: &config::Config, control_tx: ControlSender) -> Self {
         let routes = make_routes(config.api.playground, control_tx);
 
         let (_shutdown, rx) = oneshot::channel();
@@ -53,9 +50,7 @@ impl Server {
     }
 }
 
-fn make_routes(playground: bool, control_tx: Sender) -> BoxedFilter<(impl Reply,)> {
-    // let control_tx = Arc::new(control_tx);
-
+fn make_routes(playground: bool, control_tx: ControlSender) -> BoxedFilter<(impl Reply,)> {
     // Build the GraphQL schema
     let schema = schema::build_schema().finish();
 
@@ -69,11 +64,14 @@ fn make_routes(playground: bool, control_tx: Sender) -> BoxedFilter<(impl Reply,
 
     // GraphQL query and subscription handler
     let graphql_handler = warp::path("graphql").and(
-        graphql_subscription_with_data(schema.clone(), move |_| async move {
-            let mut data = Data::default();
-            data.insert(control_tx);
-            Ok(data)
-        })
+        graphql_subscription_with_data(
+            schema.clone(),
+            Some(move |_| {
+                let mut data = Data::default();
+                data.insert(control_tx);
+                Ok(data)
+            }),
+        )
         .or(async_graphql_warp::graphql(schema).and_then(
             |(schema, request): (Schema<_, _, _>, Request)| async move {
                 Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
