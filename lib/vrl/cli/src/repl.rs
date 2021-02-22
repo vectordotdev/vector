@@ -170,6 +170,7 @@ fn show_error_docs(line: &str, pattern: &Regex) {
 
 const HELP_TEXT: &str = indoc! {r#"
     VRL REPL commands:
+      .                  Show the current value of the event
       help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
       help docs          Navigate to the VRL docs on the Vector website
       help docs <func>   Navigate to the VRL docs for the specified function
@@ -207,6 +208,7 @@ const BANNER_TEXT: &str = indoc! {r#"
     > To run the CLI in regular mode, add a program to your command.
     >
     > VRL REPL commands:
+    >   .                 Show the current value of the event
     >   help              Learn more about VRL
     >   next              Load the next object or create a new one
     >   prev              Load the previous object
