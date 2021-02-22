@@ -64,6 +64,8 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
                   artifact_cache = "target/artifacts/"
+                  options.four = 4
+                  options.five = 5
             "#},
         ),
     ];
