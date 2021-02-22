@@ -1,8 +1,8 @@
+use crate::timestamp;
 use super::{
     common::{open_url, print_function_list, Repl},
     Error,
 };
-use chrono::DateTime;
 use indoc::indoc;
 use rustyline::{error::ReadlineError, Editor};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
@@ -17,6 +17,7 @@ struct Tutorial {
     docs: &'static str,
     initial_event: Value,
     correct_answer: Value,
+    cheat: &'static str,
 }
 
 impl Tutorial {
@@ -107,6 +108,11 @@ pub fn tutorial() -> Result<(), Error> {
                         let help_text = tut.help_text;
 
                         println!("\n{}", help_text);
+                    }
+                    "cheat" => {
+                        let tut = &tutorials[index];
+                        let cheat_text = tut.cheat;
+                        println!("\nSince you insist on taking the easy way out...\n\n{}\n", cheat_text);
                     }
                     "funcs" => {
                         print_function_list();
@@ -249,6 +255,7 @@ Tutorial commands:
   docs     Open documentation for the current tutorial in your browser
   funcs    Display a list of all VRL functions
   remind   Display the tutorial's help text again
+  cheat    Take the easy way out and see how to solve the exercise
   next     Load the next tutorial
   prev     Load the previous tutorial
   exit     Exit the VRL interactive tutorial shell
@@ -258,7 +265,7 @@ const INTRO_TEXT: &str = r#"Welcome to the Vector Remap Language (VRL)
 interactive tutorial!
 
 VRL is a language for working with observability data (logs and metrics) in
-Vector. Here, you'll be guided through a series of tutorials that teach you how
+Vector. Here, you'll be guided through a series of exercises that teach you how
 to use VRL by solving problems. At any time, you can type `help` to get a list
 of available commands.
 
@@ -281,6 +288,7 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{}],
         correct_answer: value![{"message": "hello"}],
+        cheat: r#".message = "hello""#,
     };
 
     let deleting_fields_tut = Tutorial {
@@ -298,6 +306,7 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"one": 1, "two": 2, "three": 3}],
         correct_answer: value![{"three": 3}],
+        cheat: "del(.one); del(.two)",
     };
 
     let exists_tut = Tutorial {
@@ -320,6 +329,10 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"not_empty": "This value does exist!"}],
         correct_answer: value![{"exists": true}],
+        cheat: indoc! {r#"
+            .exists = exists(.not_empty)
+            del(.not_empty)
+        "#},
     };
 
     let type_coercion_tut = Tutorial {
@@ -341,6 +354,12 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"boolean": "yes", "integer": "1337", "float": "42.5", "string": true}],
         correct_answer: value![{"boolean": true, "integer": 1337, "float": 42.5, "string": "true"}],
+        cheat: indoc! {r#"
+            .boolean = to_bool!(.boolean)
+            .integer = to_int!(.integer)
+            .float = to_float!(.float)
+            .string = to_string!(.string)
+        "#},
     };
 
     let parse_json_tut = Tutorial {
@@ -360,10 +379,11 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"message": r#"{"severity":"info","message":"Coast is clear"}"#, "timestamp": "2021-02-16T00:25:12.728003Z"}],
         correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
+        cheat: ". = parse_json!(string!(.message))",
     };
 
     let t1 = "2020-12-19T21:48:09.004Z";
-    let ts1 = make_timestamp(t1);
+    let ts1 = timestamp!(t1);
     let msg1 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t1);
 
     let parse_syslog_tut = Tutorial {
@@ -386,6 +406,7 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"message": msg1, "timestamp": t1}],
         correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": ts1, "version": 3}],
+        cheat: ". = parse_syslog!(string!(.message))",
     };
 
     let parse_key_value_tut = Tutorial {
@@ -409,10 +430,11 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"message": r#"@timestamp="2020-12-19T21:48:09.004Z" severity=info msg="Smooth sailing over here""#}],
         correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
+        cheat: ". = parse_key_value!(string!(.message))",
     };
 
     let t2 = "2021-01-03T08:01:47.004Z";
-    let ts2 = make_timestamp(t2);
+    let ts2 = timestamp!(t2);
     let msg2 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t2);
 
     let transform_syslog_tut = Tutorial {
@@ -432,10 +454,16 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"message": msg2, "timestamp": t2}],
         correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "tps report missing cover sheet", "severity": "info", "timestamp": ts2}],
+        cheat: indoc! {r#"
+            . = parse_syslog!(string!(.message))
+            .severity = "info"
+            del(.version); del(.msgid); del(.procid)
+            .message = downcase(string!(.message))
+        "#},
     };
 
     let t3 = "2021-03-04T21:13:42.001Z";
-    let ts3 = make_timestamp(t3);
+    let ts3 = timestamp!(t3);
     let msg3 = "{\"status\":\"200\",\"method\":\"POST\",\"endpoint\":\"/purchases\",\"username\":\"tonydanza\",\"bytes\":\"1337\"}";
 
     let transform_json_tut = Tutorial {
@@ -454,6 +482,12 @@ fn tutorials() -> Vec<Tutorial> {
         "#},
         initial_event: value![{"message": msg3, "timestamp": ts3}],
         correct_answer: value![{"bytes": 1337, "endpoint": "/purchases", "method": "POST", "status": 200}],
+        cheat: indoc! {r#"
+            . = parse_json!(string!(.message))
+            del(.username)
+            .status = to_int!(.status)
+            .bytes = to_int!(.bytes)
+        "#},
     };
 
     vec![
@@ -469,8 +503,11 @@ fn tutorials() -> Vec<Tutorial> {
     ]
 }
 
-fn make_timestamp(ts: &str) -> Value {
-    Value::Timestamp(DateTime::parse_from_rfc3339(ts)
-        .unwrap()
-        .into())
+#[macro_export]
+macro_rules! timestamp {
+    ($ts:tt) => {
+        vrl::Value::Timestamp(chrono::DateTime::parse_from_rfc3339($ts)
+            .unwrap()
+            .into())
+    }
 }
