@@ -411,7 +411,7 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
     };
 
-    let t2 = "2021-02-19T21:48:09.004Z";
+    let t2 = "2021-01-03T08:01:47.004Z";
     let ts2 = make_timestamp(t2);
     let msg2 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t2);
 
@@ -425,13 +425,35 @@ fn tutorials() -> Vec<Tutorial> {
             we're going to start *transforming* events.
 
             TASK:
-            - Parse the `message` field (Syslog format) into named fields
+            - Parse the `message` field (Syslog format) into a VRL object and set the event to that value
             - Set the `severity` field to "info"
             - Delete the `version`, `msgid`, and `procid` fields
             - Convert the `message` field to all lowercase using `downcase`
         "#},
         initial_event: value![{"message": msg2, "timestamp": t2}],
         correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "tps report missing cover sheet", "severity": "info", "timestamp": ts2}],
+    };
+
+    let t3 = "2021-03-04T21:13:42.001Z";
+    let ts3 = make_timestamp(t3);
+    let msg3 = "{\"status\":\"200\",\"method\":\"POST\",\"endpoint\":\"/purchases\",\"username\":\"tonydanza\",\"bytes\":\"1337\"}";
+
+    let transform_json_tut = Tutorial {
+        section: 3,
+        id: 2,
+        title: "Transforming JSON logs",
+        docs: "functions/#parse_json",
+        help_text: indoc! {r#"
+            TASKS:
+            - Parse the `message` field (JSON string) into a VRL object and set the event to that value
+            - Delete the `username` field
+            - Convert the `status` and `bytes` fields to integers
+
+            HINT:
+            - Use the "funcs" command to see a list of all VRL functions
+        "#},
+        initial_event: value![{"message": msg3, "timestamp": ts3}],
+        correct_answer: value![{"bytes": 1337, "endpoint": "/purchases", "method": "POST", "status": 200}],
     };
 
     vec![
@@ -443,6 +465,7 @@ fn tutorials() -> Vec<Tutorial> {
         parse_syslog_tut,
         parse_key_value_tut,
         transform_syslog_tut,
+        transform_json_tut,
     ]
 }
 
