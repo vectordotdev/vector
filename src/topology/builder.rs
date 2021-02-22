@@ -7,13 +7,13 @@ use crate::{
     buffers,
     config::{DataType, SinkContext},
     event::Event,
-    internal_events::EventProcessed,
+    internal_events::{EventIn, EventOut, EventProcessed, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
     stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::{
     collections::HashMap,
     future::ready,
@@ -81,12 +81,16 @@ pub async fn build_pieces(
         // forcibly shut down. We accomplish this by select()-ing on the server Task with the
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
-        let server = future::try_select(server, force_shutdown_tripwire.unit_error().boxed())
-            .map_ok(|_| {
-                debug!("Finished.");
-                TaskOutput::Source
-            })
-            .map_err(|_| ());
+        let server = async {
+            emit!(EventZeroIn);
+            match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
+                Ok(_) => {
+                    debug!("Finished.");
+                    Ok(TaskOutput::Source)
+                }
+                Err(_) => Err(()),
+            }
+        };
         let server = Task::new(name, typetag, server);
 
         outputs.insert(name.clone(), control);
@@ -121,9 +125,11 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => input_rx
                 .filter(move |event| ready(filter_event_type(event, input_type)))
+                .inspect(|_| emit!(EventIn))
                 .flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
+                    emit!(EventOut { count: buf.len() });
                     emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
@@ -132,10 +138,14 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
                     .on_processed(|| emit!(EventProcessed));
                 t.transform(Box::pin(filtered))
                     .map(Ok)
-                    .forward(output)
+                    .forward(output.with(|event| async {
+                        emit!(EventOut { count: 1 });
+                        Ok(event)
+                    }))
                     .boxed()
             }
         }
@@ -207,6 +217,7 @@ pub async fn build_pieces(
             sink.run(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
                     .take_until_if(tripwire),
             )
             .await

@@ -228,4 +228,8 @@ components: sources: [Name=string]: {
 			}
 		}
 	}
+
+	telemetry: metrics: {
+		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+	}
 }

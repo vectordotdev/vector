@@ -23,14 +23,14 @@ fn utc_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
 }
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
-    reparse_groups(prometheus_parser::parse_text(packet)?)
+    prometheus_parser::parse_text(packet).map(reparse_groups)
 }
 
 pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
-    reparse_groups(prometheus_parser::parse_request(request)?)
+    prometheus_parser::parse_request(request).map(reparse_groups)
 }
 
-fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Event>, ParserError> {
+fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
     let mut result = Vec::new();
 
     for group in groups {
@@ -128,7 +128,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Result<Vec<Event>, ParserError> {
         }
     }
 
-    Ok(result)
+    result
 }
 
 #[cfg(test)]

@@ -190,17 +190,17 @@ mod tests {
     test_type_def![
         value_string {
             expr: |_| ParseGlogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_non_string {
             expr: |_| ParseGlogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
 
         value_optional {
             expr: |_| ParseGlogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: inner_type_def() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
         }
     ];
 }

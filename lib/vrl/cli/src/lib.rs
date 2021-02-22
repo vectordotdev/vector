@@ -2,7 +2,7 @@ use rustyline::completion::Completer;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
-use rustyline::{Context, Editor, Helper};
+use rustyline::{Context, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 pub mod cmd;
@@ -12,6 +12,18 @@ mod repl;
 mod tutorial;
 
 pub use cmd::{cmd, Opts};
+
+const RESERVED_TERMS: &[&str] = &[
+    "next",
+    "prev",
+    "exit",
+    "quit",
+    "help",
+    "help functions",
+    "help funcs",
+    "help fs",
+    "help docs",
+];
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -27,25 +39,26 @@ pub enum Error {
     #[error("json error")]
     Json(#[from] serde_json::Error),
 
-    #[cfg(not(feature = "repl"))]
     #[error("repl feature disabled, program input required")]
     ReplFeature,
 }
 
 pub struct Repl {
     highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
-    hinter: HistoryHinter,
+    history_hinter: HistoryHinter,
     colored_prompt: String,
+    validator: MatchingBracketValidator,
+    hints: Vec<&'static str>,
 }
 
 impl Repl {
-    pub fn new(prompt: &str) -> Self {
+    fn new(prompt: &str) -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
-            hinter: HistoryHinter {},
+            history_hinter: HistoryHinter {},
             colored_prompt: prompt.to_owned(),
             validator: MatchingBracketValidator::new(),
+            hints: initial_hints(),
         }
     }
 }
@@ -59,7 +72,33 @@ impl Hinter for Repl {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        self.hinter.hint(line, pos, ctx)
+        if pos < line.len() {
+            return None;
+        }
+
+        let mut hints: Vec<String> = Vec::new();
+
+        // Add all function names to the hints
+        let mut func_names = stdlib::all()
+            .iter()
+            .map(|f| f.identifier().into())
+            .collect::<Vec<String>>();
+
+        hints.append(&mut func_names);
+
+        // Check history first
+        if let Some(hist) = self.history_hinter.hint(line, pos, ctx) {
+            return Some(hist);
+        }
+
+        // Then check the other built-in hints
+        self.hints.iter().find_map(|hint| {
+            if pos > 0 && hint.starts_with(&line[..pos]) {
+                Some(String::from(&hint[pos..]))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -110,6 +149,15 @@ impl Validator for Repl {
     fn validate_while_typing(&self) -> bool {
         self.validator.validate_while_typing()
     }
+}
+
+
+fn initial_hints() -> Vec<&'static str> {
+    stdlib::all()
+        .into_iter()
+        .map(|f| f.identifier())
+        .chain(RESERVED_TERMS.iter().copied())
+        .collect()
 }
 
 pub fn open_url(url: &str) {

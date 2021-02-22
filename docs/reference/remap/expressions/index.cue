@@ -20,12 +20,6 @@ remap: expressions: index: {
 					"""
 
 				characteristics: {
-					negative_indices: {
-						title: "Negative indices"
-						description: """
-							Negative indices are currently _not_ supported.
-							"""
-					}
 					zero_based: {
 						title: "Zero-based indices"
 						description: """

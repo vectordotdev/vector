@@ -384,6 +384,7 @@ mod tests {
     use super::super::default_summary_quantiles;
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     fn encode_one<T: MetricCollector>(
@@ -448,10 +449,11 @@ mod tests {
     fn encodes_counter_text() {
         assert_eq!(
             encode_counter::<StringCollector>(),
-            r#"# HELP vector_hits hits
-# TYPE vector_hits counter
-vector_hits{code="200"} 10
-"#
+            indoc! { r#"
+                # HELP vector_hits hits
+                # TYPE vector_hits counter
+                vector_hits{code="200"} 10
+            "#}
         );
     }
 
@@ -477,10 +479,11 @@ vector_hits{code="200"} 10
     fn encodes_gauge_text() {
         assert_eq!(
             encode_gauge::<StringCollector>(),
-            r#"# HELP vector_temperature temperature
-# TYPE vector_temperature gauge
-vector_temperature{code="200"} -1.1
-"#
+            indoc! { r#"
+                # HELP vector_temperature temperature
+                # TYPE vector_temperature gauge
+                vector_temperature{code="200"} -1.1
+            "#}
         );
     }
 
@@ -506,10 +509,11 @@ vector_temperature{code="200"} -1.1
     fn encodes_set_text() {
         assert_eq!(
             encode_set::<StringCollector>(),
-            r#"# HELP vector_users users
-# TYPE vector_users gauge
-vector_users 1
-"#
+            indoc! { r#"
+                # HELP vector_users users
+                # TYPE vector_users gauge
+                vector_users 1
+            "#}
         );
     }
 
@@ -536,10 +540,11 @@ vector_users 1
     fn encodes_expired_set_text() {
         assert_eq!(
             encode_expired_set::<StringCollector>(),
-            r#"# HELP vector_users users
-# TYPE vector_users gauge
-vector_users 0
-"#
+            indoc! {r#"
+                # HELP vector_users users
+                # TYPE vector_users gauge
+                vector_users 0
+            "#}
         );
     }
 
@@ -566,15 +571,16 @@ vector_users 0
     fn encodes_distribution_text() {
         assert_eq!(
             encode_distribution::<StringCollector>(),
-            r#"# HELP vector_requests requests
-# TYPE vector_requests histogram
-vector_requests_bucket{le="0"} 0
-vector_requests_bucket{le="2.5"} 6
-vector_requests_bucket{le="5"} 8
-vector_requests_bucket{le="+Inf"} 8
-vector_requests_sum 15
-vector_requests_count 8
-"#
+            indoc! {r#"
+                # HELP vector_requests requests
+                # TYPE vector_requests histogram
+                vector_requests_bucket{le="0"} 0
+                vector_requests_bucket{le="2.5"} 6
+                vector_requests_bucket{le="5"} 8
+                vector_requests_bucket{le="+Inf"} 8
+                vector_requests_sum 15
+                vector_requests_count 8
+            "#}
         );
     }
 
@@ -611,15 +617,16 @@ vector_requests_count 8
     fn encodes_histogram_text() {
         assert_eq!(
             encode_histogram::<StringCollector>(),
-            r#"# HELP vector_requests requests
-# TYPE vector_requests histogram
-vector_requests_bucket{le="1"} 1
-vector_requests_bucket{le="2.1"} 3
-vector_requests_bucket{le="3"} 6
-vector_requests_bucket{le="+Inf"} 6
-vector_requests_sum 12.5
-vector_requests_count 6
-"#
+            indoc! {r#"
+                # HELP vector_requests requests
+                # TYPE vector_requests histogram
+                vector_requests_bucket{le="1"} 1
+                vector_requests_bucket{le="2.1"} 3
+                vector_requests_bucket{le="3"} 6
+                vector_requests_bucket{le="+Inf"} 6
+                vector_requests_sum 12.5
+                vector_requests_count 6
+            "#}
         );
     }
 
@@ -657,14 +664,14 @@ vector_requests_count 6
     fn encodes_summary_text() {
         assert_eq!(
             encode_summary::<StringCollector>(),
-            r#"# HELP ns_requests requests
-# TYPE ns_requests summary
-ns_requests{code="200",quantile="0.01"} 1.5
-ns_requests{code="200",quantile="0.5"} 2
-ns_requests{code="200",quantile="0.99"} 3
-ns_requests_sum{code="200"} 12
-ns_requests_count{code="200"} 6
-"#
+            indoc! {r#"# HELP ns_requests requests
+                # TYPE ns_requests summary
+                ns_requests{code="200",quantile="0.01"} 1.5
+                ns_requests{code="200",quantile="0.5"} 2
+                ns_requests{code="200",quantile="0.99"} 3
+                ns_requests_sum{code="200"} 12
+                ns_requests_count{code="200"} 6
+            "#}
         );
     }
 
@@ -702,19 +709,20 @@ ns_requests_count{code="200"} 6
     fn encodes_distribution_summary_text() {
         assert_eq!(
             encode_distribution_summary::<StringCollector>(),
-            r#"# HELP ns_requests requests
-# TYPE ns_requests summary
-ns_requests{code="200",quantile="0.5"} 2
-ns_requests{code="200",quantile="0.75"} 2
-ns_requests{code="200",quantile="0.9"} 3
-ns_requests{code="200",quantile="0.95"} 3
-ns_requests{code="200",quantile="0.99"} 3
-ns_requests_sum{code="200"} 15
-ns_requests_count{code="200"} 8
-ns_requests_min{code="200"} 1
-ns_requests_max{code="200"} 3
-ns_requests_avg{code="200"} 1.875
-"#
+            indoc! {r#"
+                # HELP ns_requests requests
+                # TYPE ns_requests summary
+                ns_requests{code="200",quantile="0.5"} 2
+                ns_requests{code="200",quantile="0.75"} 2
+                ns_requests{code="200",quantile="0.9"} 3
+                ns_requests{code="200",quantile="0.95"} 3
+                ns_requests{code="200",quantile="0.99"} 3
+                ns_requests_sum{code="200"} 15
+                ns_requests_count{code="200"} 8
+                ns_requests_min{code="200"} 1
+                ns_requests_max{code="200"} 3
+                ns_requests_avg{code="200"} 1.875
+            "#}
         );
     }
 
@@ -762,10 +770,11 @@ ns_requests_avg{code="200"} 1.875
     fn encodes_timestamp_text() {
         assert_eq!(
             encode_timestamp::<StringCollector>(),
-            r#"# HELP temperature temperature
-# TYPE temperature counter
-temperature 2 1234567890123
-"#
+            indoc! {r#"
+                # HELP temperature temperature
+                # TYPE temperature counter
+                temperature 2 1234567890123
+            "#}
         );
     }
 

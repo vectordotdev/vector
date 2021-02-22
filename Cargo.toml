@@ -42,6 +42,7 @@ members = [
   ".",
   "lib/codec",
   "lib/derive_is_enum_variant",
+  "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
@@ -65,6 +66,7 @@ members = [
 # Internal libs
 codec = { path = "lib/codec" }
 derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
+fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
@@ -161,7 +163,6 @@ dyn-clone = "1.0.3"
 encoding_rs = { version = "0.8", features = ["serde"] }
 evmap = { version = "10.0.2", features = ["bytes"], optional = true }
 exitcode = "1.1.2"
-fakedata_generator = { version = "0.2.4", optional = true }
 flate2 = "1.0.19"
 getset = "0.1.1"
 glob = "0.3.0"
@@ -368,7 +369,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
-sources-generator = ["sources-utils-fake"]
+sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
@@ -386,7 +387,6 @@ sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/udp"]
 sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose"]
-sources-utils-fake = ["fakedata_generator"]
 sources-utils-http = ["snap", "sources-utils-tls", "warp"]
 sources-utils-tcp-keepalive = []
 sources-utils-tcp-socket = []
@@ -618,6 +618,7 @@ shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-promethe
 benches = ["leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
+statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-lua", "transforms-remap", "transforms-wasm"]
@@ -657,6 +658,11 @@ required-features = ["metrics-benches"]
 name = "metrics_off"
 harness = false
 required-features = ["metrics-benches"]
+
+[[bench]]
+name = "distribution_statistic"
+harness = false
+required-features = ["statistic-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "=0.3.0"

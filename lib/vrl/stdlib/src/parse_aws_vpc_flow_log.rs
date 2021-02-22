@@ -130,6 +130,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
 
 type ParseResult<T> = std::result::Result<T, String>;
 
+#[allow(clippy::unnecessary_wraps)] // match other parse methods
 fn identity<'a>(_key: &'a str, value: &'a str) -> ParseResult<&'a str> {
     Ok(value)
 }

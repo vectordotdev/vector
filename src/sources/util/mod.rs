@@ -1,6 +1,4 @@
 mod encoding_config;
-#[cfg(feature = "sources-utils-fake")]
-pub mod fake;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
