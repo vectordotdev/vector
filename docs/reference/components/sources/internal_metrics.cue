@@ -284,6 +284,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		events_in_total: {
+			description:       "The total number of events accepted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
