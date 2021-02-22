@@ -20,36 +20,9 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
-    targets = benchmark_remap, upcase, downcase, parse_json
+    targets = benchmark_remap
 );
 criterion_main!(benches);
-
-bench_function! {
-    upcase => vrl_stdlib::Upcase;
-
-    literal_value {
-        args: func_args![value: "foo"],
-        want: Ok("FOO")
-    }
-}
-
-bench_function! {
-    downcase => vrl_stdlib::Downcase;
-
-    literal_value {
-        args: func_args![value: "FOO"],
-        want: Ok("foo")
-    }
-}
-
-bench_function! {
-    parse_json => vrl_stdlib::ParseJson;
-
-    literal_value {
-        args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(value!({"key": "value"})),
-    }
-}
 
 fn benchmark_remap(c: &mut Criterion) {
     let mut rt = runtime();
