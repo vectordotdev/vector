@@ -1069,7 +1069,7 @@ impl<'input> Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 fn is_ident_start(ch: char) -> bool {
-    matches!(ch, 'a'..='z')
+    matches!(ch, '@' | 'a'..='z')
 }
 
 fn is_ident_continue(ch: char) -> bool {
@@ -1346,6 +1346,25 @@ mod test {
                 (r#"            ~  "#, RQuery),
                 (r#"              ~"#, LQuery),
                 (r#"              ~"#, Dot),
+                (r#"              ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn ampersat_in_query() {
+        test(
+            data(r#".@foo .bar.@ook"#),
+            vec![
+                (r#"~              "#, LQuery),
+                (r#"~              "#, Dot),
+                (r#" ~~~~          "#, Identifier("@foo")),
+                (r#"    ~          "#, RQuery),
+                (r#"      ~        "#, LQuery),
+                (r#"      ~        "#, Dot),
+                (r#"       ~~~     "#, Identifier("bar")),
+                (r#"          ~    "#, Dot),
+                (r#"           ~~~~"#, Identifier("@ook")),
                 (r#"              ~"#, RQuery),
             ],
         );
