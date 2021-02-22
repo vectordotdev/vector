@@ -41,9 +41,7 @@ pub fn tutorial() -> Result<(), Error> {
 
         'intro: loop {
             match rl.readline("> ").as_deref() {
-                Ok(line)
-                    if line == "exit" || line == "quit" =>
-                {
+                Ok(line) if line == "exit" || line == "quit" => {
                     println!("\nSee you next time! And don't forget to check out https://vrl.dev for more info!\n");
                     return Ok(());
                 }
@@ -194,7 +192,10 @@ fn print_tutorial_help_text(index: usize, tutorials: &[Tutorial]) {
 
     println!(
         "Tutorial {}: {}\n\n{}\nInitial event object:\n{}\n",
-        tut.number(), tut.title, tut.help_text, tut.initial_event
+        tut.number(),
+        tut.title,
+        tut.help_text,
+        tut.initial_event
     );
 }
 
@@ -288,6 +289,23 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"three": 3}],
     };
 
+    let type_coercion_tut = Tutorial {
+        section: 1,
+        id: 3,
+        title: "Type coercion",
+        docs: "functions/#coerce-functions",
+        help_text: indoc! {r#"
+            You can coerce VRL values into other types using the `to_*` coercion
+            functions (`to_bool`, `to_string`, etc.).
+
+            TASK:
+            - Coerce all of the fields in this event into the type suggested by
+              the key (i.e. convert key `boolean` into a Boolean and so on)
+        "#},
+        initial_event: value![{"boolean": "yes", "integer": "1337", "float": "42.5", "string": true}],
+        correct_answer: value![{"boolean": true, "integer": 1337, "float": 42.5, "string": "true"}],
+    };
+
     let parse_json_tut = Tutorial {
         section: 2,
         id: 1,
@@ -307,7 +325,11 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
     };
 
-    let example_timestamp = Value::Timestamp(DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z").unwrap().into());
+    let example_timestamp = Value::Timestamp(
+        DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z")
+            .unwrap()
+            .into(),
+    );
 
     let parse_syslog_tut = Tutorial {
         section: 2,
@@ -340,5 +362,12 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
     };
 
-    vec![assignment_tut, deleting_fields_tut, parse_json_tut, parse_syslog_tut, parse_kv_tut]
+    vec![
+        assignment_tut,
+        deleting_fields_tut,
+        type_coercion_tut,
+        parse_json_tut,
+        parse_syslog_tut,
+        parse_kv_tut,
+    ]
 }
