@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
@@ -26,7 +26,7 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Transform::function(Coercer {
             types,
@@ -95,8 +95,11 @@ impl FunctionTransform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::CoercerConfig;
-    use crate::event::{LogEvent, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::{GlobalOptions, TransformConfig},
+        event::{LogEvent, Value},
+        Event,
+    };
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -125,7 +128,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let coercer = coercer.as_function();

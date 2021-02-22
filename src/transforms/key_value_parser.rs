@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -35,7 +35,7 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let conversions = parse_conversion_map(&self.types)?;
         let field = self
             .field
@@ -183,7 +183,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::TransformConfig,
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Value},
         Event,
     };
@@ -211,7 +211,7 @@ mod tests {
             trim_key,
             trim_value,
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
 

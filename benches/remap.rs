@@ -9,7 +9,7 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::TransformConfig,
+    config::{GlobalOptions, TransformConfig},
     event::{Event, Value},
     test_util::runtime,
 };
@@ -213,7 +213,7 @@ fn benchmark_remap(c: &mut Criterion) {
                         timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
                    "#})
                 .unwrap()
-                .build()
+                .build(&GlobalOptions::default())
                 .await
                 .unwrap()
             })
