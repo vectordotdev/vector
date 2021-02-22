@@ -307,7 +307,7 @@ fn tutorials() -> Vec<Tutorial> {
         correct_answer: value![{"severity": "info", "message": "Coast is clear"}],
     };
 
-    let parse_syslog_timestamp: Value = Value::Timestamp(DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z").unwrap().into());
+    let example_timestamp = Value::Timestamp(DateTime::parse_from_rfc3339("2020-12-19T21:48:09.004Z").unwrap().into());
 
     let parse_syslog_tut = Tutorial {
         section: 2,
@@ -325,8 +325,20 @@ fn tutorials() -> Vec<Tutorial> {
             - Set the value of the event to the `message` field parsed from Syslog
         "#},
         initial_event: value![{"message": "<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet", "timestamp": "2020-12-19T21:48:09.004Z"}],
-        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": parse_syslog_timestamp}],
+        correct_answer: value![{"appname": "su", "facility": "user", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "severity": "warning", "timestamp": example_timestamp}],
     };
 
-    vec![assignment_tut, deleting_fields_tut, parse_json_tut, parse_syslog_tut]
+    let parse_kv_tut = Tutorial {
+        section: 2,
+        id: 3,
+        title: "Parsing key-value logs",
+        docs: "functions/#parse_key_value",
+        help_text: indoc! {r#"
+
+        "#},
+        initial_event: value![{"message": r#"@timestamp="2020-12-19T21:48:09.004Z" severity=info msg="Smooth sailing over here""#}],
+        correct_answer: value![{"@timestamp": "2020-12-19T21:48:09.004Z", "msg": "Smooth sailing over here", "severity": "info"}],
+    };
+
+    vec![assignment_tut, deleting_fields_tut, parse_json_tut, parse_syslog_tut, parse_kv_tut]
 }
