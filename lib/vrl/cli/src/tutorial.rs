@@ -98,8 +98,12 @@ pub fn tutorial() -> Result<(), Error> {
                         let docs_url = format!("https://vrl.dev/{}", endpoint);
 
                         open_url(&docs_url);
+                    }
+                    "remind" => {
+                        let tut = &tutorials[index];
+                        let help_text = tut.help_text;
 
-                        clear_screen();
+                        println!("\n{}", help_text);
                     }
                     command => {
                         let tut = &mut tutorials[index];
@@ -234,8 +238,10 @@ pub fn resolve_to_value(
 // Help text
 const HELP_TEXT: &str = r#"
 Tutorial commands:
+
   .        Show the current value of the event
   docs     Open documentation for the current tutorial in your browser
+  remind   Display the tutorial's help text again
   next     Load the next tutorial
   prev     Load the previous tutorial
   exit     Exit the VRL interactive tutorial shell
@@ -248,8 +254,10 @@ VRL is a language for working with observability data (logs and metrics) in
 Vector. Here, you'll be guided through a series of tutorials that teach you how
 to use VRL by solving problems. Tutorial commands:
 
+  help     Show a list of commands and what they do
   .        Show the current value of the event
   docs     Open documentation for the current tutorial in your browser
+  remind   Display the tutorial's help text again
   next     Load the next tutorial
   prev     Load the previous tutorial
   exit     Exit the VRL interactive tutorial shell
