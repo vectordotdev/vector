@@ -40,7 +40,7 @@ pub fn tutorial() -> Result<(), Error> {
         let mut rl = Editor::<Repl>::new();
 
         'intro: loop {
-            match rl.readline("> ").as_deref() {
+            match rl.readline("🚀 ").as_deref() {
                 Ok(line) if line == "exit" || line == "quit" => {
                     println!("\nSee you next time! And don't forget to check out https://vrl.dev for more info!\n");
                     return Ok(());
@@ -139,7 +139,7 @@ pub fn tutorial() -> Result<(), Error> {
                                             let mut rl = Editor::<Repl>::new();
 
                                             'next: loop {
-                                                match rl.readline("> ").as_deref() {
+                                                match rl.readline("🚀 ").as_deref() {
                                                     Ok(line)
                                                         if line == "exit" || line == "quit" =>
                                                     {
@@ -240,11 +240,12 @@ Tutorial commands:
   exit     Exit the VRL interactive tutorial shell
 "#;
 
-const INTRO_TEXT: &str = r#"Welcome to the Vector Remap Language (VRL) interactive tutorial!
+const INTRO_TEXT: &str = r#"Welcome to the Vector Remap Language (VRL)
+interactive tutorial!
 
-VRL is a language for working with observability data (logs and metrics) in Vector. Here,
-you'll be guided through a series of tutorials that teach you how to use VRL by solving
-problems. Tutorial commands:
+VRL is a language for working with observability data (logs and metrics) in
+Vector. Here, you'll be guided through a series of tutorials that teach you how
+to use VRL by solving problems. Tutorial commands:
 
   docs     Open documentation for the current tutorial in your browser
   next     Load the next tutorial
@@ -283,15 +284,37 @@ fn tutorials() -> Vec<Tutorial> {
             del(.field)
 
             TASK:
-            - Delete fields `one` and `two`
+            - Delete fields `one` and `two` from the event
         "#},
         initial_event: value![{"one": 1, "two": 2, "three": 3}],
         correct_answer: value![{"three": 3}],
     };
 
-    let type_coercion_tut = Tutorial {
+    let exists_tut = Tutorial {
         section: 1,
         id: 3,
+        title: "Existence checking",
+        docs: "functions/#exists",
+        help_text: indoc! {r#"
+            You can check whether a field has a value using the `exists`
+            function:
+
+            exists(.field)
+
+            TASK:
+            - Make the event consist of just one `exists` field that indicates
+              whether the `not_empty` field exists
+
+            HINT:
+            - You may need to use the `del` function too!
+        "#},
+        initial_event: value![{"not_empty": "This value does exist!"}],
+        correct_answer: value![{"exists": true}],
+    };
+
+    let type_coercion_tut = Tutorial {
+        section: 1,
+        id: 4,
         title: "Type coercion",
         docs: "functions/#coerce-functions",
         help_text: indoc! {r#"
@@ -365,6 +388,7 @@ fn tutorials() -> Vec<Tutorial> {
     vec![
         assignment_tut,
         deleting_fields_tut,
+        exists_tut,
         type_coercion_tut,
         parse_json_tut,
         parse_syslog_tut,
