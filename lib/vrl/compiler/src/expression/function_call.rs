@@ -2,7 +2,7 @@ use crate::expression::{FunctionArgument, Noop};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
 
 #[derive(Clone)]
@@ -62,7 +62,7 @@ impl FunctionCall {
                 Span::new(start, end)
             };
 
-            return Err(Error::ArityMismatch {
+            return Err(Error::WrongNumberOfArgs {
                 arguments_span,
                 max: function.parameters().len(),
             });
@@ -277,8 +277,8 @@ pub enum Error {
         idents: Vec<&'static str>,
     },
 
-    #[error("function argument arity mismatch")]
-    ArityMismatch { arguments_span: Span, max: usize },
+    #[error("wrong number of function arguments")]
+    WrongNumberOfArgs { arguments_span: Span, max: usize },
 
     #[error("unknown function argument keyword")]
     UnknownKeyword {
@@ -324,7 +324,7 @@ impl DiagnosticError for Error {
 
         match self {
             Undefined { .. } => 105,
-            ArityMismatch { .. } => 106,
+            WrongNumberOfArgs { .. } => 106,
             UnknownKeyword { .. } => 108,
             Compilation { .. } => 610,
             RequiredArgument { .. } => 107,
@@ -364,7 +364,7 @@ impl DiagnosticError for Error {
                 vec
             }
 
-            ArityMismatch {
+            WrongNumberOfArgs {
                 arguments_span,
                 max,
             } => {
@@ -483,6 +483,9 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
+            WrongNumberOfArgs { .. } => vec![
+                Note::SeeDocs("function arguments".to_owned(), Urls::expression_docs_url("#arguments"))
+            ],
             AbortInfallible { .. } | FallibleArgument { .. } => vec![Note::SeeErrorDocs],
             InvalidArgumentKind {
                 function_ident,

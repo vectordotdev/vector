@@ -1,6 +1,6 @@
 # result:
 #
-# error[E106]: function argument arity mismatch
+# error[E106]: wrong number of function arguments
 #   ┌─ :2:11
 #   │
 # 2 │ to_string("foo", "bar")
@@ -9,6 +9,7 @@
 #   │           too many function arguments
 #   │           this function takes a maximum of 1 argument
 #   │
+#   = see function arguments documentation at https://vrl.dev/expressions/#arguments
 #   = learn more about error code 106 at https://errors.vrl.dev/106
 #   = see language documentation at https://vrl.dev
 
