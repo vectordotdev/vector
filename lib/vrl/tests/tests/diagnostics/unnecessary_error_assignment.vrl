@@ -9,7 +9,7 @@
 #   │ │   this error assignment is unnecessary
 #   │ use: ok = 5
 #   │
-#   = see error handling documentation at https://errors.vrl.dev/#handling
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 104 at https://errors.vrl.dev/104
 #   = see language documentation at https://vrl.dev
 

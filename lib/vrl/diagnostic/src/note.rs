@@ -52,14 +52,15 @@ impl fmt::Display for Note {
             }
             SeeLangDocs => {
                 let url = Urls::vrl_root_url();
-                SeeDocs("language".to_owned(), url).fmt(f)
+
+                write!(f, "see language documentation at {}", url)
             }
             SeeCodeDocs(code) => {
                 let url = Urls::error_code_url(code);
                 write!(f, "learn more about error code {} at {}", code, url)
             }
             SeeDocs(kind, url) => {
-                write!(f, "see {} documentation at {}", kind, url)
+                write!(f, "see documentation about {} at {}", kind, url)
             }
             Basic(string) => write!(f, "{}", string),
         }

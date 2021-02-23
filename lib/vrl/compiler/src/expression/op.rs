@@ -316,7 +316,7 @@ impl DiagnosticError for Error {
 
         match self {
             ChainedComparison { .. } => vec![Note::SeeDocs(
-                "comparison".to_owned(),
+                "comparisons".to_owned(),
                 Urls::expression_docs_url("#comparison"),
             )],
             Expr(err) => err.notes(),

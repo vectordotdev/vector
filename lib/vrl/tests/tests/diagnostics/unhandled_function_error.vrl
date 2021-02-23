@@ -9,7 +9,7 @@
 #   │ expression can result in runtime error
 #   │ handle the error case to ensure runtime success
 #   │
-#   = see error handling documentation at https://errors.vrl.dev/#handling
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
 

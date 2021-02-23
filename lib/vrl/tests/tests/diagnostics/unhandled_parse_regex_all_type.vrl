@@ -20,7 +20,7 @@
 #   =     .result[0].an = to_string(.result[0].an) ?? "default"
 #   =     sha3(.result[0].an)
 #   =
-#   = see error handling documentation at https://errors.vrl.dev/#handling
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 110 at https://errors.vrl.dev/110
 #   = see language documentation at https://vrl.dev
 
