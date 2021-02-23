@@ -1,6 +1,6 @@
 # result:
 #
-# error[E107]: function argument missing
+# error[E107]: missing function argument
 #   ┌─ :2:1
 #   │
 # 2 │ to_string()

@@ -148,7 +148,7 @@ impl FunctionCall {
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
             .try_for_each(|(i, p)| -> Result<_, _> {
-                Err(Error::RequiredArgument {
+                Err(Error::MissingArgument {
                     call_span,
                     keyword: p.keyword,
                     position: i,
@@ -287,8 +287,8 @@ pub enum Error {
         keywords: Vec<&'static str>,
     },
 
-    #[error("function argument missing")]
-    RequiredArgument {
+    #[error("missing function argument")]
+    MissingArgument {
         call_span: Span,
         keyword: &'static str,
         position: usize,
@@ -327,7 +327,7 @@ impl DiagnosticError for Error {
             WrongNumberOfArgs { .. } => 106,
             UnknownKeyword { .. } => 108,
             Compilation { .. } => 610,
-            RequiredArgument { .. } => 107,
+            MissingArgument { .. } => 107,
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
@@ -407,7 +407,7 @@ impl DiagnosticError for Error {
                 })
                 .collect(),
 
-            RequiredArgument {
+            MissingArgument {
                 call_span,
                 keyword,
                 position,
