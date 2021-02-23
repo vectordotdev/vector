@@ -779,6 +779,11 @@ release-helm: ## Package and release Helm Chart
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
+##@ Vector Remap Language
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	(cd lib/vrl/tests && ${MAYBE_ENVIRONMENT_EXEC} cargo run)
+
 ##@ Utility
 
 .PHONY: build-ci-docker-images
