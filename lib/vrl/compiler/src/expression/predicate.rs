@@ -155,10 +155,7 @@ impl DiagnosticError for Error {
         match &self.variant {
             NonBoolean(..) => vec![
                 Note::CoerceValue,
-                Note::SeeDocs(
-                    "if expression".to_owned(),
-                    Urls::expression_docs_url("#if"),
-                ),
+                Note::SeeDocs("if expression".to_owned(), Urls::expression_docs_url("#if")),
             ],
         }
     }
