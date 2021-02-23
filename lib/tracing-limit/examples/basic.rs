@@ -2,15 +2,15 @@
 extern crate tracing;
 
 use tracing::Dispatch;
-use tracing_limit::Limit;
+use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 
 fn main() {
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(tracing_subscriber::filter::EnvFilter::from("trace"))
-        .without_time()
-        .finish()
-        .with(Limit::default());
+    let subscriber = tracing_subscriber::registry::Registry::default()
+        .with(RateLimitedLayer::new(
+            tracing_subscriber::fmt::Layer::default().without_time(),
+        ))
+        .with(tracing_subscriber::filter::EnvFilter::from("trace"));
 
     let dispatch = Dispatch::new(subscriber);
 
