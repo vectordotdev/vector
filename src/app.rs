@@ -231,17 +231,22 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
+
             let signal = loop {
                 tokio::select! {
                     Some(msg) = api_rx.recv(), if api_server.is_some() => {
                         use api::{ControlMessage, TapControl};
 
                         match msg {
-                            ControlMessage::Tap(TapControl::Start(tap_sink, _)) => {
-                                println!("Started: {}", tap_sink);
-                            }
-                            ControlMessage::Tap(TapControl::Stop(tap_sink)) => {
-                                println!("Stopped: {}", tap_sink);
+                            ControlMessage::Tap(tap) => match tap {
+                                TapControl::Start(sink) => {
+                                    println!("Started: {}", sink.name());
+                                    topology.attach(&sink.input_name(), &sink.name(), sink.router())
+                                },
+                                TapControl::Stop(sink) => {
+                                    println!("Stopped: {}", sink.name());
+                                    topology.detach(&sink.input_name(), &sink.name());
+                                }
                             }
                         }
                     }

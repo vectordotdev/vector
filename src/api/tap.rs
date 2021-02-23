@@ -1,16 +1,20 @@
-use crate::event::{Event, LogEvent};
-use tokio::sync::mpsc;
+use super::{ControlMessage, ControlSender};
+use crate::{
+    event::{Event, LogEvent},
+    topology::fanout::RouterSink,
+};
+use futures::{channel::mpsc, SinkExt, StreamExt};
 use uuid::Uuid;
 
-type EventSender = mpsc::Sender<Event>;
-type LogEventSender = mpsc::Sender<LogEvent>;
-type LogEventReceiver = mpsc::Receiver<LogEvent>;
+type EventSender = mpsc::UnboundedSender<Event>;
+type LogEventSender = mpsc::UnboundedSender<LogEvent>;
 
 pub enum TapControl {
-    Start(String, EventSender),
-    Stop(String),
+    Start(TapSink),
+    Stop(TapSink),
 }
 
+#[derive(Clone)]
 pub struct TapSink {
     id: Uuid,
     input_name: String,
@@ -18,14 +22,14 @@ pub struct TapSink {
 }
 
 impl TapSink {
+    /// Creates a new tap sink, and spawn a listener per sink
     pub fn new(input_name: &str, mut log_event_tx: LogEventSender) -> Self {
-        // Spawn a 'sink' to forward events -> log event listener
-        let (event_tx, mut event_rx) = mpsc::channel::<Event>(100);
+        let (event_tx, mut event_rx) = mpsc::unbounded();
 
         tokio::spawn(async move {
-            while let Some(ev) = event_rx.recv().await {
+            while let Some(ev) = event_rx.next().await {
                 if let Event::Log(ev) = ev {
-                    let _ = log_event_tx.send(ev);
+                    let _ = log_event_tx.start_send(ev);
                 }
             }
         });
@@ -37,8 +41,8 @@ impl TapSink {
         }
     }
 
-    pub fn subscribe(&self) -> EventSender {
-        self.event_tx.clone()
+    pub fn router(&self) -> RouterSink {
+        Box::new(self.event_tx.clone().sink_map_err(|_| ()))
     }
 
     pub fn name(&self) -> String {
@@ -50,6 +54,28 @@ impl TapSink {
     }
 
     pub fn start(&self) -> TapControl {
-        TapControl::Start(self.id.to_string(), self.event_tx.clone())
+        TapControl::Start(self.clone())
+    }
+
+    pub fn stop(&self) -> TapControl {
+        TapControl::Stop(self.clone())
+    }
+}
+
+pub struct TapController {
+    control_tx: ControlSender,
+    sink: TapSink,
+}
+
+impl TapController {
+    pub fn new(control_tx: ControlSender, sink: TapSink) -> Self {
+        let _ = control_tx.send(ControlMessage::Tap(sink.start()));
+        Self { control_tx, sink }
+    }
+}
+
+impl Drop for TapController {
+    fn drop(&mut self) {
+        let _ = self.control_tx.send(ControlMessage::Tap(self.sink.stop()));
     }
 }

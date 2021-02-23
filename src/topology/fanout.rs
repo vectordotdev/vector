@@ -7,7 +7,7 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
+pub type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 
 pub enum ControlMessage {
     Add(String, RouterSink),

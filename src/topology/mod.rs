@@ -7,9 +7,10 @@
 //! each type of component.
 
 pub mod builder;
-mod fanout;
+pub mod fanout;
 mod task;
 
+use crate::topology::fanout::RouterSink;
 use crate::{
     buffers,
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
@@ -722,7 +723,17 @@ impl RunningTopology {
         &self.config
     }
 
-    pub fn tap(&mut self, input_name: &str) {}
+    pub fn attach(&self, input_name: &str, sink_name: &str, sink: RouterSink) {
+        if let Some(tx) = self.outputs.get(input_name) {
+            let _ = tx.send(fanout::ControlMessage::Add(sink_name.to_string(), sink));
+        }
+    }
+
+    pub fn detach(&self, input_name: &str, sink_name: &str) {
+        if let Some(tx) = self.outputs.get(input_name) {
+            let _ = tx.send(fanout::ControlMessage::Remove(sink_name.to_string()));
+        }
+    }
 }
 
 async fn handle_errors(
