@@ -197,6 +197,16 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
+  test-vrl:
+    name: VRL - Linux
+    continue-on-error: true
+    runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make test-vrl
+
   check-component-features:
     name: Component Features - Linux
     needs: changes

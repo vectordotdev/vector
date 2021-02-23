@@ -1,8 +1,7 @@
 mod interop;
 
 use crate::{
-    config::DataType,
-    config::CONFIG_PATHS,
+    config::{DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::{

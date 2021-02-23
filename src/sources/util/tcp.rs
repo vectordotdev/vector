@@ -15,7 +15,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::delay_for,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
 use tracing_futures::Instrument;
 
 async fn make_listener(
@@ -50,12 +50,30 @@ async fn make_listener(
         },
     }
 }
+pub trait IsErrorFatal {
+    fn is_error_fatal() -> bool;
+}
 
-pub trait TcpSource: Clone + Send + Sync + 'static {
+impl IsErrorFatal for LinesCodecError {
+    fn is_error_fatal() -> bool {
+        false
+    }
+}
+
+impl IsErrorFatal for std::io::Error {
+    fn is_error_fatal() -> bool {
+        true
+    }
+}
+
+pub trait TcpSource: Clone + Send + Sync + 'static
+where
+    <<Self as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
+{
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static;
+    type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
+    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
 
     fn decoder(&self) -> Self::Decoder;
 
@@ -163,16 +181,19 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     }
 }
 
-async fn handle_stream(
+async fn handle_stream<T>(
     mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
-    source: impl TcpSource,
+    source: T,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     out: impl Sink<Event> + Send + 'static,
-) {
+) where
+    <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
+    T: TcpSource,
+{
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
@@ -228,6 +249,14 @@ async fn handle_stream(
         reader.poll_next_unpin(cx)
     })
     .take_until(tripwire)
+    .take_while(move |frame| ready(
+        match frame {
+            Ok(_) => true,
+            Err(_) => {
+                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal()
+            }
+        }
+    ))
     .filter_map(move |frame| ready(match frame {
         Ok(frame) => {
             let host = host.clone();

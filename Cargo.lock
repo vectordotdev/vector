@@ -8323,6 +8323,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "cidr-utils",
+ "criterion",
  "grok",
  "hex",
  "hostname",

@@ -208,9 +208,7 @@ fn main() {
         }
     }
 
-    if failed_count > 0 {
-        std::process::exit(1)
-    }
+    print_result(failed_count)
 }
 
 #[derive(Debug)]
@@ -355,4 +353,25 @@ fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
         .filter(|line| line.trim().starts_with("error[E"))
         .zip(want.trim().lines())
         .all(|(got, want)| got.contains(want))
+}
+
+fn print_result(failed_count: usize) {
+    let code = if failed_count > 0 { 1 } else { 0 };
+
+    println!("\n");
+
+    if failed_count > 0 {
+        println!(
+            "  Overall result: {}\n\n    Number failed: {}\n",
+            Colour::Red.bold().paint("FAILED"),
+            failed_count
+        );
+    } else {
+        println!(
+            "  Overall result: {}\n",
+            Colour::Green.bold().paint("SUCCESS")
+        );
+    }
+
+    std::process::exit(code)
 }

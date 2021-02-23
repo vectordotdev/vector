@@ -13,8 +13,6 @@ tags: ["type: featured", "domain: remap"]
 
 The Vector team is excited to announce the **Vector Remap Language** (VRL) is an expression-oriented language designed to work with observability data (logs and metrics) in a *safe* and *performant* manner. It features a [simple syntax][vrl_expressions], a rich set of [built-in functions][vrl_functions] tailored to observability use cases, and [numerous features][vrl_features] that set it far apart from other options. This 0.12 release of Vector marks the official release of the language.
 
-import Jump from '@site/src/components/Jump';
-
 <Jump to="/blog/vector-remap-language">Read the announcement post</Jump>
 
 ## Further reading
