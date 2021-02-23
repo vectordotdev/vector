@@ -300,7 +300,7 @@ pub enum Error {
         error: Box<dyn DiagnosticError>,
     },
 
-    #[error("can't abort function that never fails")]
+    #[error("can't abort infallible function")]
     AbortInfallible { ident_span: Span, abort_span: Span },
 
     #[error("invalid argument type")]
