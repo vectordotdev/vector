@@ -1,11 +1,12 @@
 # result:
 #
-# error[E101]: invalid regex
+# error[E101]: invalid regular expression
 #   ┌─ :2:1
 #   │
 # 2 │ r'['
 #   │ ^^^^ regex parse error: unclosed character class: [
 #   │
+#   = see regex documentation at https://vrl.dev/expressions/#regular-expression
 #   = learn more about error code 101 at https://errors.vrl.dev/101
 #   = see language documentation at https://vrl.dev
 
