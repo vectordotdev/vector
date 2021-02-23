@@ -1,8 +1,8 @@
-use crate::timestamp;
 use super::{
     common::{open_url, print_function_list, Repl},
     Error,
 };
+use crate::timestamp;
 use indoc::indoc;
 use rustyline::{error::ReadlineError, Editor};
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
@@ -112,7 +112,10 @@ pub fn tutorial() -> Result<(), Error> {
                     "cheat" => {
                         let tut = &tutorials[index];
                         let cheat_text = tut.cheat;
-                        println!("\nSince you insist on taking the easy way out...\n\n{}\n", cheat_text);
+                        println!(
+                            "\nSince you insist on taking the easy way out...\n\n{}\n",
+                            cheat_text
+                        );
                     }
                     "funcs" => {
                         print_function_list();
@@ -384,7 +387,10 @@ fn tutorials() -> Vec<Tutorial> {
 
     let t1 = "2020-12-19T21:48:09.004Z";
     let ts1 = timestamp!(t1);
-    let msg1 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t1);
+    let msg1 = format!(
+        "<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet",
+        t1
+    );
 
     let parse_syslog_tut = Tutorial {
         section: 2,
@@ -435,7 +441,10 @@ fn tutorials() -> Vec<Tutorial> {
 
     let t2 = "2021-01-03T08:01:47.004Z";
     let ts2 = timestamp!(t2);
-    let msg2 = format!("<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet", t2);
+    let msg2 = format!(
+        "<12>3 {} initech.io su 4015 ID81 - TPS report missing cover sheet",
+        t2
+    );
 
     let transform_syslog_tut = Tutorial {
         section: 3,
@@ -506,8 +515,6 @@ fn tutorials() -> Vec<Tutorial> {
 #[macro_export]
 macro_rules! timestamp {
     ($ts:tt) => {
-        vrl::Value::Timestamp(chrono::DateTime::parse_from_rfc3339($ts)
-            .unwrap()
-            .into())
-    }
+        vrl::Value::Timestamp(chrono::DateTime::parse_from_rfc3339($ts).unwrap().into())
+    };
 }
