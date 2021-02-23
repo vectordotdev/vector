@@ -10,6 +10,7 @@
 #   │    instead it resolves to "string"
 #   │
 #   = hint: coerce the value to the required type using a coercion function
+#   = see if expression documentation at https://vrl.dev/expressions/#if
 #   = learn more about error code 102 at https://errors.vrl.dev/102
 #   = see language documentation at https://vrl.dev
 

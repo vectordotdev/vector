@@ -483,9 +483,10 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
-            WrongNumberOfArgs { .. } => vec![
-                Note::SeeDocs("function arguments".to_owned(), Urls::expression_docs_url("#arguments"))
-            ],
+            WrongNumberOfArgs { .. } => vec![Note::SeeDocs(
+                "function arguments".to_owned(),
+                Urls::expression_docs_url("#arguments"),
+            )],
             AbortInfallible { .. } | FallibleArgument { .. } => vec![Note::SeeErrorDocs],
             InvalidArgumentKind {
                 function_ident,

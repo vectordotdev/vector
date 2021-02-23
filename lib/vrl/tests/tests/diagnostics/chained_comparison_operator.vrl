@@ -6,6 +6,7 @@
 # 2 │ 2 < 3 < 4
 #   │       ^
 #   │
+#   = see comparison documentation at https://vrl.dev/expressions/#comparison
 #   = see language documentation at https://vrl.dev
 #
 # error[E650]: comparison operators can't be chained together
