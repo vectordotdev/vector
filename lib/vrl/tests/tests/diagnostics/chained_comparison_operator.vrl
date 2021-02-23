@@ -14,6 +14,7 @@
 # 3 │ true == false == true
 #   │               ^^
 #   │
+#   = see comparison documentation at https://vrl.dev/expressions/#comparison
 #   = see language documentation at https://vrl.dev
 
 2 < 3 < 4

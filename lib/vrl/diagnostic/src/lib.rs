@@ -61,4 +61,8 @@ impl Urls {
     fn error_code_url(code: &usize) -> String {
         format!("{}/{}", VRL_ERROR_DOCS_ROOT_URL, code)
     }
+
+    pub fn expression_docs_url(expr: &str) -> String {
+        format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
+    }
 }

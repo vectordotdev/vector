@@ -1,7 +1,7 @@
 use crate::expression::{self, Expr, Noop, Resolved};
 use crate::parser::{ast, Node};
 use crate::{value, Context, Expression, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note, Span};
+use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use std::fmt;
 
 #[derive(Clone, PartialEq)]
@@ -315,6 +315,10 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
+            ChainedComparison { .. } => vec![Note::SeeDocs(
+                "comparison".to_owned(),
+                Urls::expression_docs_url("#comparison"),
+            )],
             Expr(err) => err.notes(),
             _ => vec![],
         }
