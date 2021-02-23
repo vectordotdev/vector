@@ -64,13 +64,6 @@ impl Value {
         }
     }
 
-    pub fn unwrap_integer(self) -> i64 {
-        match self {
-            Value::Integer(v) => v,
-            _ => panic!("not an integer"),
-        }
-    }
-
     pub fn try_integer(self) -> Result<i64, Error> {
         match self {
             Value::Integer(v) => Ok(v),
@@ -156,13 +149,6 @@ impl Value {
         }
     }
 
-    pub fn unwrap_float(self) -> f64 {
-        match self {
-            Value::Float(v) => v.into_inner(),
-            _ => panic!("not a float"),
-        }
-    }
-
     pub fn try_float(self) -> Result<f64, Error> {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
@@ -222,20 +208,6 @@ impl Value {
         match self {
             Value::Bytes(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn unwrap_bytes(self) -> Bytes {
-        match self {
-            Value::Bytes(v) => v,
-            _ => panic!("not a bytes"),
-        }
-    }
-
-    pub fn unwrap_bytes_utf8_lossy(&self) -> Cow<'_, str> {
-        match self.as_bytes() {
-            Some(bytes) => String::from_utf8_lossy(&bytes),
-            None => panic!("not a bytes"),
         }
     }
 
@@ -310,13 +282,6 @@ impl Value {
         }
     }
 
-    pub fn unwrap_boolean(self) -> bool {
-        match self {
-            Value::Boolean(v) => v,
-            _ => panic!("not a boolean"),
-        }
-    }
-
     pub fn try_boolean(self) -> Result<bool, Error> {
         match self {
             Value::Boolean(v) => Ok(v),
@@ -345,13 +310,6 @@ impl Value {
         match self {
             Value::Regex(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn unwrap_regex(self) -> Regex {
-        match self {
-            Value::Regex(v) => v,
-            _ => panic!("not a regex"),
         }
     }
 
@@ -389,13 +347,6 @@ impl Value {
         match self {
             Value::Null => Some(()),
             _ => None,
-        }
-    }
-
-    pub fn unwrap_null(self) {
-        match self {
-            Value::Null => (),
-            _ => panic!("not a null"),
         }
     }
 
@@ -446,13 +397,6 @@ impl Value {
         }
     }
 
-    pub fn unwrap_array(self) -> Vec<Value> {
-        match self {
-            Value::Array(v) => v,
-            _ => panic!("not an array"),
-        }
-    }
-
     pub fn try_array(self) -> Result<Vec<Value>, Error> {
         match self {
             Value::Array(v) => Ok(v),
@@ -497,13 +441,6 @@ impl Value {
         }
     }
 
-    pub fn unwrap_object(self) -> BTreeMap<String, Value> {
-        match self {
-            Value::Object(v) => v,
-            _ => panic!("not an object"),
-        }
-    }
-
     pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
         match self {
             Value::Object(v) => Ok(v),
@@ -538,13 +475,6 @@ impl Value {
         match self {
             Value::Timestamp(v) => Some(v),
             _ => None,
-        }
-    }
-
-    pub fn unwrap_timestamp(self) -> DateTime<Utc> {
-        match self {
-            Value::Timestamp(v) => v,
-            _ => panic!("not a timestamp"),
         }
     }
 

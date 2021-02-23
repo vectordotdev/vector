@@ -39,7 +39,7 @@ struct Sha1Fn {
 
 impl Expression for Sha1Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.unwrap_bytes();
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         Ok(hex::encode(sha1::Sha1::digest(&value)).into())
     }

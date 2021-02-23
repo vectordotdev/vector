@@ -141,32 +141,32 @@ impl Expression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let options = CompactOptions {
             recursive: match &self.recursive {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
 
             null: match &self.null {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
 
             string: match &self.string {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
 
             map: match &self.map {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
 
             array: match &self.array {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
 
             nullish: match &self.nullish {
-                Some(expr) => expr.resolve(ctx)?.unwrap_boolean(),
+                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => false,
             },
         };

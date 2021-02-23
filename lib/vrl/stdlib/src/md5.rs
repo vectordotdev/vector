@@ -39,7 +39,7 @@ struct Md5Fn {
 
 impl Expression for Md5Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.unwrap_bytes();
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         Ok(hex::encode(md5::Md5::digest(&value)).into())
     }

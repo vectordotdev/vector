@@ -9,12 +9,12 @@ impl Value {
         let err = || Error::Mul(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_bytes() => rhs.unwrap_bytes().repeat(lhv as usize).into(),
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv * f64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Bytes(lhv) if rhs.is_integer() => {
-                lhv.repeat(rhs.unwrap_integer() as usize).into()
+                lhv.repeat(rhs.try_integer()? as usize).into()
             }
             _ => return Err(err()),
         };
@@ -46,7 +46,7 @@ impl Value {
         let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 + rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 + rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Bytes(_) if rhs.is_null() => self,
@@ -68,7 +68,7 @@ impl Value {
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 - rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 - rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
@@ -119,7 +119,7 @@ impl Value {
         let err = || Error::Rem(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 % rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 % rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv % i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv % f64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
@@ -133,7 +133,7 @@ impl Value {
         let err = || Error::Rem(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 > rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 > rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv > i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => {
                 (lhv.into_inner() > f64::try_from(&rhs).map_err(|_| err())?).into()
@@ -149,7 +149,7 @@ impl Value {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 >= rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 >= rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv >= i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => {
                 (lhv.into_inner() >= f64::try_from(&rhs).map_err(|_| err())?).into()
@@ -165,7 +165,7 @@ impl Value {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => ((lhv as f64) < rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => ((lhv as f64) < rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv < i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => {
                 (lhv.into_inner() < f64::try_from(&rhs).map_err(|_| err())?).into()
@@ -181,7 +181,7 @@ impl Value {
         let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 <= rhs.unwrap_float()).into(),
+            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 <= rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv <= i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => {
                 (lhv.into_inner() <= f64::try_from(&rhs).map_err(|_| err())?).into()

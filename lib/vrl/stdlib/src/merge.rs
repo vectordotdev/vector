@@ -63,9 +63,9 @@ pub struct MergeFn {
 
 impl Expression for MergeFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut to_value = self.to.resolve(ctx)?.unwrap_object();
-        let from_value = self.from.resolve(ctx)?.unwrap_object();
-        let deep = self.deep.resolve(ctx)?.unwrap_boolean();
+        let mut to_value = self.to.resolve(ctx)?.try_object()?;
+        let from_value = self.from.resolve(ctx)?.try_object()?;
+        let deep = self.deep.resolve(ctx)?.try_boolean()?;
 
         merge_maps(&mut to_value, &from_value, deep);
 

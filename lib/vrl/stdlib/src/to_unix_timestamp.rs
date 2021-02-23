@@ -49,7 +49,10 @@ impl Function for ToUnixTimestamp {
 
         let unit = arguments
             .optional_enum("unit", &Unit::all_value().as_slice())?
-            .map(|s| Unit::from_str(&s.unwrap_bytes_utf8_lossy()).expect("validated enum"))
+            .map(|s| {
+                Unit::from_str(&s.try_bytes_utf8_lossy().expect("unit not bytes"))
+                    .expect("validated enum")
+            })
             .unwrap_or_default();
 
         Ok(Box::new(ToUnixTimestampFn { value, unit }))
@@ -122,7 +125,7 @@ impl ToUnixTimestampFn {
 
 impl Expression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ts = self.value.resolve(ctx)?.unwrap_timestamp();
+        let ts = self.value.resolve(ctx)?.try_timestamp()?;
 
         let time = match self.unit {
             Unit::Seconds => ts.timestamp(),

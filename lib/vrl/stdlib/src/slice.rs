@@ -67,9 +67,9 @@ struct SliceFn {
 
 impl Expression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let start = self.start.resolve(ctx)?.unwrap_integer();
+        let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {
-            Some(expr) => Some(expr.resolve(ctx)?.unwrap_integer()),
+            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
 

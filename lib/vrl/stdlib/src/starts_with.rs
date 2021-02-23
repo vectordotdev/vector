@@ -70,11 +70,11 @@ struct StartsWithFn {
 
 impl Expression for StartsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?.unwrap_boolean();
+        let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
         let substring = {
             let value = self.substring.resolve(ctx)?;
-            let string = value.unwrap_bytes_utf8_lossy();
+            let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
                 true => string.into_owned(),
@@ -84,7 +84,7 @@ impl Expression for StartsWithFn {
 
         let value = {
             let value = self.value.resolve(ctx)?;
-            let string = value.unwrap_bytes_utf8_lossy();
+            let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
                 true => string.into_owned(),

@@ -79,12 +79,12 @@ struct ReplaceFn {
 impl Expression for ReplaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let value = value.unwrap_bytes_utf8_lossy();
+        let value = value.try_bytes_utf8_lossy()?;
 
         let with_value = self.with.resolve(ctx)?;
-        let with = with_value.unwrap_bytes_utf8_lossy();
+        let with = with_value.try_bytes_utf8_lossy()?;
 
-        let count = self.count.resolve(ctx)?.unwrap_integer();
+        let count = self.count.resolve(ctx)?.try_integer()?;
 
         self.pattern.resolve(ctx).and_then(|pattern| match pattern {
             Value::Bytes(bytes) => {
