@@ -60,7 +60,9 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
         .map(|v| v.as_str().unwrap_or_default())
         .unwrap_or_default();
 
-    let parsed = syslog_loose::parse_message(message);
+    let message = message.to_lowercase();
+
+    let parsed = syslog_loose::parse_message(&message);
 
     event.insert("message".to_owned(), parsed.msg.into());
 

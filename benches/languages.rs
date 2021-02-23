@@ -220,6 +220,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   . = parse_syslog!(.message)
                   .timestamp = format_timestamp!(.timestamp, format: "%c")
                   del(.hostname)
+                  .message = downcase(string!(.message))
                   """
             "#},
         ),
@@ -239,6 +240,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
 
                     timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, minute=minute, second=second}))
                     severity = "info"
+                    message = string.lower(message)
 
                     return {severity = severity, priority = priority, version = version, timestamp = timestamp, appname = appname, procid = procid, msgid = msgid, message = message}
                   end
